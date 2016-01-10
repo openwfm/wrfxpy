@@ -17,8 +17,10 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from utils import ensure_dir
 from datetime import datetime, timedelta
 import requests
+import os.path as pth
 
 class GribError(Exception):
     """
@@ -61,7 +63,7 @@ class GribSource(object):
         """
         pass
 
-    def retrieve_grib(self, url_base, rel_path):
+    def download_grib(self, url_base, rel_path):
         """
         Download a GRIB file from a GRIB service and stream to rel_path in ingest_dir.
 
@@ -69,8 +71,9 @@ class GribSource(object):
         :param rel_path: the relative path of the file (w.r.t GRIB base url and w.r.t self.ingest_dir)
         """
         r = requests.get(url_base + '/' + rel_path, stream=True)
-        with open(pth.join(self.ingest_dir, rel_path), 'wb') as f:
-            for chunk in r.iter_content(chunk_size):
+        grib_path = pth.join(self.ingest_dir, rel_path )
+        with open(ensure_dir(grib_path), 'wb') as f:
+            for chunk in r.iter_content(1024*1024):
                 f.write(chunk)
 
     def symlink_gribs(self, manifest, wps_dir):
@@ -121,7 +124,7 @@ class HRRR(GribSource):
         to_utc = to_utc.replace(minute=0, second=0)
 
         # select cycle (at least one hour behind)
-        cycle_start = from_utc - timedelta(hour=1)
+        cycle_start = from_utc - timedelta(hours=1)
 
         # check if the request is even satisfiable
         delta = to_utc - cycle_start
@@ -131,7 +134,7 @@ class HRRR(GribSource):
           raise GribError('Unsatisfiable: HRRR only forecasts 15 hours ahead.')
 
         # computes the relative paths of the desired files (the manifest)
-        manifest = compute_manifest(from_utc, fc_hours)
+        manifest = self.compute_manifest(from_utc, fc_hours)
 
         # check what's available locally
         nonlocals = filter(lambda x: not pth.exists(pth.join(self.ingest_dir, x)), manifest)
@@ -159,8 +162,9 @@ class HRRR(GribSource):
         :param cycle_start: UTC time of cycle start
         :param fc_hours: final forecast hour 
         """
-        # FIXME: USE path_tmpl to compute the file path
-        #, [Y, M, D, H, FcHr]
+        year, mon, day, hour = cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
+        return map(lambda x: self.path_tmpl % (year,mon,day,hour,x), range(fc_hours))
+
 
     remote_url = 'http://www.ftp.ncep.noaa.gov/data/nccf/nonoperational/com/hrrr/prod'
     path_tmpl = 'hrrr.%04d%02d%02d/hrrr.t%02dz.wrfprsf%02d.grib2'

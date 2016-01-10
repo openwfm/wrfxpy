@@ -67,9 +67,9 @@ def execute(args):
 
     # step 2: patch namelist for geogrid and execute geogrid
     wps_nml['geogrid']['geog_data_path'] = args['geogrid_path']
-    f90nml.write(wps_nml, pth.join(wps_dir, 'namelist.wps'))
+    f90nml.write(wps_nml, pth.join(wps_dir, 'namelist.wps'), force=True)
 
-    Geogrid(wps_dir).execute().check_output()
+    #Geogrid(wps_dir).execute().check_output()
 
     # step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps
     start_utc, end_utc = args['start_utc'], args['end_utc']
@@ -80,7 +80,7 @@ def execute(args):
     wps_nml['share']['start_date'] = [ utc_to_esmf(start_utc) ] * num_doms
     wps_nml['share']['end_date'] = [ utc_to_esmf(end_utc) ] * num_doms
     wps_nml['share']['interval_seconds'] = 3600
-    f90nml.write(wps_nml, pth.join(wps_dir, 'namelist.wps'))
+    f90nml.write(wps_nml, pth.join(wps_dir, 'namelist.wps'), force=True)
 
     Ungrib(wps_dir).execute().check_output()
 

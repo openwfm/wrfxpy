@@ -17,7 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from utils import ensure_dir
+from utils import ensure_dir, make_dir, symlink_unless_exists
 
 import os
 import os.path as pth
@@ -63,10 +63,10 @@ class WRFCloner(object):
         symlinks.extend(with_files)
 
         # create target directory (and all intermediate subdirs if necessary)
-        os.makedirs(tgt)
+        make_dir(tgt)
 
         # clone all WPS executables
-        map(lambda x: os.symlink(pth.join(src, x), pth.join(tgt, x)), symlinks)
+        map(lambda x: symlink_unless_exists(pth.join(src, x), pth.join(tgt, x)), symlinks)
 
         # clone all vtables (build symlink name, ensure directories exist, create the symlink)
         for vtable_id, vtable_path in vtables.iteritems():
@@ -75,7 +75,7 @@ class WRFCloner(object):
 
             if not pth.exists(symlink_path):
                 symlink_tgt = pth.join(self.sys_idir, "etc/vtables", vtable_path)
-                os.symlink(symlink_tgt, ensure_dir(symlink_path))
+                symlink_unless_exists(symlink_tgt, ensure_dir(symlink_path))
 
     def clone_wrf(self, tgt, with_files):
         """
@@ -92,10 +92,10 @@ class WRFCloner(object):
         symlinks.extend(with_files)
 
         # create target directory (and all intermediate subdirs if necessary)
-        os.makedirs(tgt)
+        make_dir(tgt)
 
         # symlink all at once
-        map(lambda x: os.symlink(pth.join(src, x), pth.join(tgt, x)), symlinks)
+        map(lambda x: symlink_unless_exists(pth.join(src, x), pth.join(tgt, x)), symlinks)
 
     # list of executable file that must be symlinked in WPS directory
     wps_exec_files = ['geogrid.exe', 'metgrid.exe', 'ungrib.exe']
