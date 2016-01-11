@@ -20,7 +20,7 @@
 from utils import ensure_dir, make_dir, symlink_unless_exists
 
 import os
-import os.path as pth
+import os.path as osp
 
 
 class WRFCloner(object):
@@ -66,15 +66,15 @@ class WRFCloner(object):
         make_dir(tgt)
 
         # clone all WPS executables
-        map(lambda x: symlink_unless_exists(pth.join(src, x), pth.join(tgt, x)), symlinks)
+        map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks)
 
         # clone all vtables (build symlink name, ensure directories exist, create the symlink)
         for vtable_id, vtable_path in vtables.iteritems():
             # build path to link location
-            symlink_path = pth.join(tgt, vtable_locs[vtable_id])
+            symlink_path = osp.join(tgt, vtable_locs[vtable_id])
 
-            if not pth.exists(symlink_path):
-                symlink_tgt = pth.join(self.sys_idir, "etc/vtables", vtable_path)
+            if not osp.exists(symlink_path):
+                symlink_tgt = osp.join(self.sys_idir, "etc/vtables", vtable_path)
                 symlink_unless_exists(symlink_tgt, ensure_dir(symlink_path))
 
     def clone_wrf(self, tgt, with_files):
@@ -85,7 +85,7 @@ class WRFCloner(object):
         :param with_files: a list of files from the WPS source directory that should be symlinked
         :return:
         """
-        src = pth.join(self.wrf_idir, "run")
+        src = osp.join(self.wrf_idir, "run")
 
         # gather all files to symlink in one place
         symlinks = list(self.wrf_files)
@@ -95,7 +95,7 @@ class WRFCloner(object):
         make_dir(tgt)
 
         # symlink all at once
-        map(lambda x: symlink_unless_exists(pth.join(src, x), pth.join(tgt, x)), symlinks)
+        map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks)
 
     # list of executable file that must be symlinked in WPS directory
     wps_exec_files = ['geogrid.exe', 'metgrid.exe', 'ungrib.exe']
@@ -117,7 +117,7 @@ class WRFCloner(object):
 
 def test_cloner():
     inst_dir = '/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/'
-    w = WRFCloner(pth.join(inst_dir, 'WRFV3'), pth.join(inst_dir, 'WPS'))
+    w = WRFCloner(osp.join(inst_dir, 'WRFV3'), osp.join(inst_dir, 'WPS'))
     import shutil
     if os.path.exists('test_wps'): shutil.rmtree('test_wps')
     if os.path.exists('test_wrf'): shutil.rmtree('test_wrf')

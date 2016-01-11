@@ -17,10 +17,11 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from utils import ensure_dir
+from utils import ensure_dir, symlink_unless_exists
 from datetime import datetime, timedelta
 import requests
-import os.path as pth
+import os
+import os.path as osp
 
 class GribError(Exception):
     """
@@ -45,11 +46,17 @@ class GribSource(object):
 
         :param ingest_dir: root of GRIB storage
         """
-        self.ingest_dir = ingest_dir
+        self.ingest_dir = osp.abspath(ingest_dir)
 
     def vtables(self):
         """
         Returns the vtables that must be set for use with this source.
+        """
+        return {}
+
+    def namelist_keys(self):
+        """
+        Returns the namelist keys that must be modified in namelist.input with this GRIB source.
         """
         return {}
 
@@ -71,7 +78,7 @@ class GribSource(object):
         :param rel_path: the relative path of the file (w.r.t GRIB base url and w.r.t self.ingest_dir)
         """
         r = requests.get(url_base + '/' + rel_path, stream=True)
-        grib_path = pth.join(self.ingest_dir, rel_path )
+        grib_path = osp.join(self.ingest_dir, rel_path )
         with open(ensure_dir(grib_path), 'wb') as f:
             for chunk in r.iter_content(1024*1024):
                 f.write(chunk)
@@ -84,8 +91,8 @@ class GribSource(object):
         :param wps_dir: the WPS directory where we want the symlinks to appear
         :return:
         """
-        for rel_path, ext in zip(manifest, generate_grib_exts()):
-            os.symlink(pth.join(self.ingest_dir, rel_path), pth.join(wps_dir, "GRIBFILE." + ext))
+        for rel_path, grib_name in zip(manifest, generate_grib_names()):
+            symlink_unless_exists(osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, grib_name))
 
 
 class HRRR(GribSource):
@@ -137,7 +144,7 @@ class HRRR(GribSource):
         manifest = self.compute_manifest(from_utc, fc_hours)
 
         # check what's available locally
-        nonlocals = filter(lambda x: not pth.exists(pth.join(self.ingest_dir, x)), manifest)
+        nonlocals = filter(lambda x: not osp.exists(osp.join(self.ingest_dir, x)), manifest)
 
         # check if GRIBs we don't are available remotely
         url_base = self.remote_url
@@ -171,13 +178,13 @@ class HRRR(GribSource):
 
 
 
-def generate_grib_exts():
+def generate_grib_names():
     """
-    Keeps generating gribfile extensions from AAA to ZZZ then raises IterationError.
+    Keeps generating gribfile names from GRIBFILE.AAA to ZZZ.
     """
     alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     for c1 in alphabet:
         for c2 in alphabet:
             for c3 in alphabet:
-                yield c1+c2+c3
+                yield "GRIBFILE."+c1+c2+c3
 

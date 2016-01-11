@@ -19,11 +19,11 @@
 
 
 from wrf_cloner import WRFCloner
-from wps_exec import Geogrid, Ungrib, Metgrid
-from utils import utc_to_esmf
+from wrf_exec import Geogrid, Ungrib, Metgrid, Real
+from utils import utc_to_esmf, symlink_matching_files, update_time_control, update_namelist
 
 import f90nml
-import os.path as pth
+import os.path as osp
 from datetime import datetime
 
 def execute(args):
@@ -58,8 +58,8 @@ def execute(args):
     num_doms = int(wps_nml['share']['max_dom'])
 
     # build directories in workspace
-    wps_dir = pth.join(wksp_dir, job_id, 'wps')
-    wrf_dir = pth.join(wksp_dir, job_id, 'wrf')
+    wps_dir = osp.abspath(osp.join(wksp_dir, job_id, 'wps'))
+    wrf_dir = osp.abspath(osp.join(wksp_dir, job_id, 'wrf'))
 
     # step 1: clone WPS and WRF directories
     cln = WRFCloner(args)
@@ -67,9 +67,9 @@ def execute(args):
 
     # step 2: patch namelist for geogrid and execute geogrid
     wps_nml['geogrid']['geog_data_path'] = args['geogrid_path']
-    f90nml.write(wps_nml, pth.join(wps_dir, 'namelist.wps'), force=True)
+    f90nml.write(wps_nml, osp.join(wps_dir, 'namelist.wps'), force=True)
 
-    #Geogrid(wps_dir).execute().check_output()
+    Geogrid(wps_dir).execute().check_output()
 
     # step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps
     start_utc, end_utc = args['start_utc'], args['end_utc']
@@ -80,16 +80,28 @@ def execute(args):
     wps_nml['share']['start_date'] = [ utc_to_esmf(start_utc) ] * num_doms
     wps_nml['share']['end_date'] = [ utc_to_esmf(end_utc) ] * num_doms
     wps_nml['share']['interval_seconds'] = 3600
-    f90nml.write(wps_nml, pth.join(wps_dir, 'namelist.wps'), force=True)
+    f90nml.write(wps_nml, osp.join(wps_dir, 'namelist.wps'), force=True)
 
     Ungrib(wps_dir).execute().check_output()
 
     # step 5: execute metgrid
+    Metgrid(wps_dir).execute().check_output()
 
-    # step 6: execute real.exe
+    # step 6: clone wrf directory, symlink all met_em* files
     cln.clone_wrf(wrf_dir, [])
+    symlink_matching_files(wrf_dir, wps_dir, "met_em*")
 
-    # step 7: execute wrf.exe on parallel backend
+    # step 7: patch input namelist, fire namelist and execute real.exe
+    time_ctrl = update_time_control(start_utc, end_utc, num_doms)
+    wrf_nml['time_control'].update(time_ctrl)
+    update_namelist(wrf_nml, grib_source.namelist_keys())
+    f90nml.write(wrf_nml, osp.join(wrf_dir, 'namelist.input'), force=True)
+
+    f90nml.write(fire_nml, osp.join(wrf_dir, 'namelist.fire'), force=True)
+
+    Real(wrf_dir).execute().check_output()
+
+    # step 8: execute wrf.exe on parallel backend
 
 
 def verify_inputs(args):
@@ -112,7 +124,7 @@ def verify_inputs(args):
 
     # check each path that should exist
     for key, err in required_files:
-        if not pth.exists(args[key]):
+        if not osp.exists(args[key]):
             raise OSError(err % args[key])
 
 
