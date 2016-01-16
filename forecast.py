@@ -19,12 +19,20 @@
 
 
 from wrf_cloner import WRFCloner
-from wrf_exec import Geogrid, Ungrib, Metgrid, Real
-from utils import utc_to_esmf, symlink_matching_files, update_time_control, update_namelist
+from wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
+from utils import utc_to_esmf, symlink_matching_files, update_time_control, update_namelist, compute_fc_hours
 
 import f90nml
 import os.path as osp
 from datetime import datetime
+
+
+def make_job_id(grid_code, start_utc, fc_hrs):
+    """
+    Computes the job id from grid code, UTC start time and number of forecast hours.
+    """
+    return "sim-" + grid_code +  "-" + utc_to_esmf(start_utc) + "-%02d" % fc_hrs
+
 
 def execute(args):
     """
@@ -33,7 +41,7 @@ def execute(args):
     The args dictionary contains
 
     :param args: a dictionary with the following keys
-        job_id: ID of job (must be valid filename)
+        grid_code: the (unique) code of the grid that is used
         sys_install_dir: system installation directory
         start_utc: start time of simulation in UTC
         end_utc: end time of simulation in UTC
@@ -47,8 +55,12 @@ def execute(args):
         geogrid_path: the path to the geogrid data directory providing terrain/fuel data
     :return:
     """
-    job_id, wksp_dir = args['job_id'], args['workspace_dir']
-    grib_source = args['grib_source']
+    wksp_dir, grib_source = args['workspace_dir'], args['grib_source']
+    
+    # compute the job id
+    grid_code, start_utc, end_utc = args['grid_code'], args['start_utc'], args['end_utc']
+    fc_hrs = compute_fc_hours(start_utc, end_utc)
+    job_id = make_job_id(grid_code, start_utc, fc_hrs)
 
     # read in all namelists
     wps_nml = f90nml.read(args['wps_namelist_path'])
@@ -72,7 +84,6 @@ def execute(args):
     Geogrid(wps_dir).execute().check_output()
 
     # step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps
-    start_utc, end_utc = args['start_utc'], args['end_utc']
     manifest = grib_source.retrieve_gribs(start_utc, end_utc)
     grib_source.symlink_gribs(manifest, wps_dir)
     
@@ -102,6 +113,8 @@ def execute(args):
     Real(wrf_dir).execute().check_output()
 
     # step 8: execute wrf.exe on parallel backend
+    qman, nnodes, ppn, wall_time_hrs = args['qman'], args['num_nodes'], args['ppn'], args['wall_time_hrs']
+    WRF(wrf_dir, qman).submit("sim-" + grid_code, nnodes, ppn, wall_time_hrs)
 
 
 def verify_inputs(args):
@@ -131,7 +144,7 @@ def verify_inputs(args):
 def test():
     from grib_source import HRRR
 
-    args = {'job_id': 'test-job',
+    args = {'grid_code': 'colo2dv1',
             'workspace_dir': 'wksp',
             'wps_install_dir': '/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/WPS',
             'wrf_install_dir': '/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/WRFV3',
@@ -141,6 +154,10 @@ def test():
             'fire_namelist_path': 'etc/nlists/colorado-3k.fire',
             'geogrid_path' : '/share_home/mvejmelka/Packages/WPS-GEOG',
             'sys_install_dir' : '/share_home/mvejmelka/Projects/wrfxpy',
+            'num_nodes' : 10,
+            'ppn' : 12,
+            'wall_time_hrs' : 3,
+            'qman' : 'sge',
             'start_utc' : datetime(2016,1,10,11,0,0),
             'end_utc' : datetime(2016,1,10,14,0,0) }
 
