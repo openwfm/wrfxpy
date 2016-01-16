@@ -61,6 +61,18 @@ def utc_to_esmf(utc):
     return "%04d-%02d-%02d_%02d:%02d:%02d" % (utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second)
 
 
+def compute_fc_hours(start_utc, end_utc):
+    """
+    Compute the number of forecast hours.  Rounds up in case of incomplete hours.
+
+    :param start_utc: start time of forecast
+    :param end_utc: end time of forecast
+    :return: number of forecast hours (rounded up to nearest hour)
+    """
+    delta = end_utc - start_utc
+    return delta.days * 24 + int(delta.seconds + 3600 - 1) / 3600
+
+
 def symlink_matching_files(tgt_dir, src_dir, glob_pattern):
     """
     Retrieves all files in directory src_dir matching glob_pattern and creates symlinks in tgt_dir.
