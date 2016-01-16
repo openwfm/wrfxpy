@@ -17,20 +17,16 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from subprocess import check_call 
+from subprocess import check_call
 import os
 import os.path as osp
+
 
 class OutputCheckFailed(Exception):
     """
     Carries info about the failure of a subprocess execution.
     """
-
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 
 class Executor(object):
@@ -61,10 +57,10 @@ class Executor(object):
         """
         # first verify if we have already done our job
         try:
-          self.check_output()
-          return self
+            self.check_output()
+            return self
         except:
-          pass
+            pass
 
         exec_name = self.exec_name
         stdout_file = open(osp.join(self.work_dir, exec_name + '.stdout'), 'w')
@@ -90,7 +86,6 @@ class Geogrid(Executor):
         """
         super(Geogrid, self).__init__(work_dir, './geogrid.exe')
 
-
     def check_output(self):
         """
         Checks if the output file for geogrid contains the string "Successful completion of geogrid."
@@ -100,11 +95,11 @@ class Geogrid(Executor):
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
 
         if not osp.exists(output_path):
-          raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
+            raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
 
         if 'Successful completion of geogrid.' not in open(output_path).read():
             raise OutputCheckFailed(
-                "Execution of geogrid.exe was not successfull, examine %s for details." % output_path)
+                    "Execution of geogrid.exe was not successfull, examine %s for details." % output_path)
 
 
 class Ungrib(Executor):
@@ -121,7 +116,6 @@ class Ungrib(Executor):
         """
         super(Ungrib, self).__init__(work_dir, './ungrib.exe')
 
-
     def check_output(self):
         """
         Checks if the output file for ungrib contains the string "Successful completion of ungrib."
@@ -131,7 +125,7 @@ class Ungrib(Executor):
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of ungrib.' not in open(output_path).read():
             raise OutputCheckFailed(
-                "Execution of ungrib.exe was not successful, examine %s for details." % output_path)
+                    "Execution of ungrib.exe was not successful, examine %s for details." % output_path)
 
 
 class Metgrid(Executor):
@@ -148,7 +142,6 @@ class Metgrid(Executor):
         """
         super(Metgrid, self).__init__(work_dir, './metgrid.exe')
 
-
     def check_output(self):
         """
         Checks if the output file for metgrid contains the string "Successful completion of metgrid."
@@ -158,7 +151,7 @@ class Metgrid(Executor):
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of metgrid.' not in open(output_path).read():
             raise OutputCheckFailed(
-                "Execution of ungrib.exe was not successful, examine %s for details." % output_path)
+                    "Execution of ungrib.exe was not successful, examine %s for details." % output_path)
 
 
 class Real(Executor):
@@ -175,7 +168,6 @@ class Real(Executor):
         """
         super(Real, self).__init__(work_dir, './real.exe')
 
-
     def execute(self):
         """
         Execute real.exe in given working directory.
@@ -188,10 +180,10 @@ class Real(Executor):
         """
         # first verify if we have already done our job
         try:
-          self.check_output()
-          return self
+            self.check_output()
+            return self
         except OutputCheckFailed:
-          pass
+            pass
 
         exec_name = self.exec_name
         wdir = self.work_dir
@@ -201,7 +193,6 @@ class Real(Executor):
 
         return self
 
-
     def check_output(self):
         """
         Checks if the output file for real contains the string "SUCCESS COMPLETE REAL_EM INIT"
@@ -209,13 +200,13 @@ class Real(Executor):
         :return: raises OutputCheckFailed
         """
         output_path = osp.join(self.work_dir, "real.exe.stderr")
-        
+
         if not osp.exists(output_path):
-          raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
+            raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
 
         if 'SUCCESS COMPLETE REAL_EM INIT' not in open(output_path).read():
             raise OutputCheckFailed(
-                "Execution of real.exe was not successful, examine %s for details." % output_path)
+                    "Execution of real.exe was not successful, examine %s for details." % output_path)
 
 
 class Submitter(object):
@@ -250,30 +241,28 @@ class Submitter(object):
         script_tmpl = qman_info['qsub_script']
         job_code_f = qman_info['job_code_f']
 
-        args = { 'nodes': nodes, 'ppn': ppn, 'wall_time_hrs': wall_time_hrs,
-                 'exec_path' : exec_path, 'cwd': self.work_dir, 'task_id': task_id, 'np': nodes * ppn }
+        args = {'nodes': nodes, 'ppn': ppn, 'wall_time_hrs': wall_time_hrs,
+                'exec_path': exec_path, 'cwd': self.work_dir, 'task_id': task_id, 'np': nodes * ppn}
 
         script_path = osp.join(self.work_dir, task_id + ".sub")
         with open(script_path, 'w') as f:
             f.write(script_tmpl % args)
 
-        ret = check_call([qsub, script_path], cwd = self.work_dir)
+        ret = check_call([qsub, script_path], cwd=self.work_dir)
         try:
             self.job_code = job_code_f(ret)
         except ValueError as e:
             raise CalledProcessException('Failed to capture job code from submit with error %s' % e)
 
-
-
-    qman_infos = { 
-        'sge' : {
-            'qsub_cmd' : 'qsub',
-            'job_code_f' : lambda x: int(x.strip()),
-            'qsub_script' : '#$ -S /bin/bash\n' '#$ -N %(task_id)s\n' '#$ -wd %(cwd)s\n'
-                            '#$ -l h_rt=%(wall_time_hrs)02d:00:00\n' '#$ -pe mpich %(np)d\n'
-                            'mpirun_rsh -np %(np)d -hostfile $TMPDIR/machines %(exec_path)s\n'
-                }
-      }
+    qman_infos = {
+        'sge': {
+            'qsub_cmd': 'qsub',
+            'job_code_f': lambda x: int(x.strip()),
+            'qsub_script': '#$ -S /bin/bash\n' '#$ -N %(task_id)s\n' '#$ -wd %(cwd)s\n'
+                           '#$ -l h_rt=%(wall_time_hrs)02d:00:00\n' '#$ -pe mpich %(np)d\n'
+                           'mpirun_rsh -np %(np)d -hostfile $TMPDIR/machines %(exec_path)s\n'
+        }
+    }
 
 
 class WRF(Submitter):
@@ -290,7 +279,6 @@ class WRF(Submitter):
         """
         super(WRF, self).__init__(work_dir, qman)
 
-
     def submit(self, task_id, nodes, ppn, wall_time_hrs):
         """
         Submits a WRF job with the given parameters via queue manager setup during construction.
@@ -303,5 +291,3 @@ class WRF(Submitter):
         :param wall_time_hrs: wall time to request for job
         """
         super(WRF, self).submit(task_id, "./wrf.exe", nodes, ppn, wall_time_hrs)
-
-

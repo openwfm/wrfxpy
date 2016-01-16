@@ -14,8 +14,9 @@ def ensure_dir(path):
     """
     path_dir = osp.dirname(path)
     if not osp.exists(path_dir):
-      os.makedirs(path_dir)
+        os.makedirs(path_dir)
     return path
+
 
 def make_dir(dir):
     """
@@ -24,7 +25,7 @@ def make_dir(dir):
     :param dir: the directory to be created
     """
     if not osp.exists(dir):
-      os.makedirs(dir)
+        os.makedirs(dir)
 
 
 def symlink_unless_exists(link_tgt, link_loc):
@@ -35,7 +36,7 @@ def symlink_unless_exists(link_tgt, link_loc):
     :param link_loc: link location
     """
     if not osp.lexists(link_loc):
-      os.symlink(link_tgt, link_loc)
+        os.symlink(link_tgt, link_loc)
 
 
 def esmf_to_utc(esmf):
@@ -83,7 +84,7 @@ def symlink_matching_files(tgt_dir, src_dir, glob_pattern):
     """
     files = glob.glob(osp.join(src_dir, glob_pattern))
     map(lambda f: symlink_unless_exists(f, osp.join(tgt_dir, osp.basename(f))), files)
-    
+
 
 def update_time_keys(time_utc, which, num_domains):
     """
@@ -98,8 +99,8 @@ def update_time_keys(time_utc, which, num_domains):
     res = {}
     year, mon, day = time_utc.year, time_utc.month, time_utc.day
     hour, minute, sec = time_utc.hour, time_utc.minute, time_utc.second
-    key_seq = map(lambda x: which + x, [ '_year', '_month', '_day', '_hour', '_minute', '_second' ])
-    return { key : [value] * num_domains for (key, value) in zip(key_seq, [year, mon, day, hour, minute, sec])}
+    key_seq = map(lambda x: which + x, ['_year', '_month', '_day', '_hour', '_minute', '_second'])
+    return {key: [value] * num_domains for (key, value) in zip(key_seq, [year, mon, day, hour, minute, sec])}
 
 
 def update_time_control(start_utc, end_utc, num_domains):
@@ -140,4 +141,3 @@ def update_namelist(nml, with_keys):
     """
     for section, section_dict in with_keys.iteritems():
         nml[section].update(section_dict)
-

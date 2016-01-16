@@ -31,7 +31,7 @@ def make_job_id(grid_code, start_utc, fc_hrs):
     """
     Computes the job id from grid code, UTC start time and number of forecast hours.
     """
-    return "sim-" + grid_code +  "-" + utc_to_esmf(start_utc) + "-%02d" % fc_hrs
+    return 'sim-' + grid_code + '-' + utc_to_esmf(start_utc) + '-{0:02d}'.format(fc_hrs)
 
 
 def execute(args):
@@ -56,7 +56,7 @@ def execute(args):
     :return:
     """
     wksp_dir, grib_source = args['workspace_dir'], args['grib_source']
-    
+
     # compute the job id
     grid_code, start_utc, end_utc = args['grid_code'], args['start_utc'], args['end_utc']
     fc_hrs = compute_fc_hours(start_utc, end_utc)
@@ -86,10 +86,10 @@ def execute(args):
     # step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps
     manifest = grib_source.retrieve_gribs(start_utc, end_utc)
     grib_source.symlink_gribs(manifest, wps_dir)
-    
+
     # step 4: patch namelist for ungrib end execute ungrib
-    wps_nml['share']['start_date'] = [ utc_to_esmf(start_utc) ] * num_doms
-    wps_nml['share']['end_date'] = [ utc_to_esmf(end_utc) ] * num_doms
+    wps_nml['share']['start_date'] = [utc_to_esmf(start_utc)] * num_doms
+    wps_nml['share']['end_date'] = [utc_to_esmf(end_utc)] * num_doms
     wps_nml['share']['interval_seconds'] = 3600
     f90nml.write(wps_nml, osp.join(wps_dir, 'namelist.wps'), force=True)
 
@@ -152,16 +152,15 @@ def test():
             'wps_namelist_path': 'etc/nlists/colorado-3k.wps',
             'wrf_namelist_path': 'etc/nlists/colorado-3k.input',
             'fire_namelist_path': 'etc/nlists/colorado-3k.fire',
-            'geogrid_path' : '/share_home/mvejmelka/Packages/WPS-GEOG',
-            'sys_install_dir' : '/share_home/mvejmelka/Projects/wrfxpy',
-            'num_nodes' : 10,
-            'ppn' : 12,
-            'wall_time_hrs' : 3,
-            'qman' : 'sge',
-            'start_utc' : datetime(2016,1,10,11,0,0),
-            'end_utc' : datetime(2016,1,10,14,0,0) }
+            'geogrid_path': '/share_home/mvejmelka/Packages/WPS-GEOG',
+            'sys_install_dir': '/share_home/mvejmelka/Projects/wrfxpy',
+            'num_nodes': 10,
+            'ppn': 12,
+            'wall_time_hrs': 3,
+            'qman': 'sge',
+            'start_utc': datetime(2016, 1, 10, 11, 0, 0),
+            'end_utc': datetime(2016, 1, 10, 14, 0, 0)}
 
     verify_inputs(args)
 
     execute(args)
-

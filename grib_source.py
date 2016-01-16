@@ -23,16 +23,12 @@ import requests
 import os
 import os.path as osp
 
+
 class GribError(Exception):
     """
-    Carries info about an error in the GRIB system.
+    Raised when a GribSource cannot retrieve GRIBs.
     """
-
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 
 class GribSource(object):
@@ -78,9 +74,9 @@ class GribSource(object):
         :param rel_path: the relative path of the file (w.r.t GRIB base url and w.r.t self.ingest_dir)
         """
         r = requests.get(url_base + '/' + rel_path, stream=True)
-        grib_path = osp.join(self.ingest_dir, rel_path )
+        grib_path = osp.join(self.ingest_dir, rel_path)
         with open(ensure_dir(grib_path), 'wb') as f:
-            for chunk in r.iter_content(1024*1024):
+            for chunk in r.iter_content(1024 * 1024):
                 f.write(chunk)
 
     def symlink_gribs(self, manifest, wps_dir):
@@ -138,7 +134,7 @@ class HRRR(GribSource):
         fc_hours = delta.days * 24 + delta.seconds / 3600
 
         if fc_hours > 15:
-          raise GribError('Unsatisfiable: HRRR only forecasts 15 hours ahead.')
+            raise GribError('Unsatisfiable: HRRR only forecasts 15 hours ahead.')
 
         # computes the relative paths of the desired files (the manifest)
         manifest = self.compute_manifest(from_utc, fc_hours)
@@ -158,7 +154,6 @@ class HRRR(GribSource):
         # return manifest
         return manifest
 
-
     def compute_manifest(self, cycle_start, fc_hours):
         """
         Computes the relative paths of required GRIB files.
@@ -170,12 +165,11 @@ class HRRR(GribSource):
         :param fc_hours: final forecast hour 
         """
         year, mon, day, hour = cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
-        return map(lambda x: self.path_tmpl % (year,mon,day,hour,x), range(fc_hours))
+        return map(lambda x: self.path_tmpl % (year, mon, day, hour, x), range(fc_hours))
 
-
+    # instance variables
     remote_url = 'http://www.ftp.ncep.noaa.gov/data/nccf/nonoperational/com/hrrr/prod'
     path_tmpl = 'hrrr.%04d%02d%02d/hrrr.t%02dz.wrfprsf%02d.grib2'
-
 
 
 def generate_grib_names():
@@ -186,5 +180,4 @@ def generate_grib_names():
     for c1 in alphabet:
         for c2 in alphabet:
             for c3 in alphabet:
-                yield "GRIBFILE."+c1+c2+c3
-
+                yield "GRIBFILE." + c1 + c2 + c3
