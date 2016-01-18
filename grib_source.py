@@ -108,6 +108,15 @@ class HRRR(GribSource):
                 'ungrib_vtable': 'Vtable.HRRR',
                 'metgrid_vtable': 'METGRID.TBL.HRRR'}
 
+    def namelist_keys(self):
+        """
+        Returns the namelist keys that must be modified in namelist.input with HRRR.
+
+        HRRR requires that ''num_metgrid_soil_levels'' is set to 8.
+        """
+        #return { 'domains' : { 'num_metgrid_soil_levels': 8 }}
+        return {}
+
     def retrieve_gribs(self, from_utc, to_utc):
         """
         Attempts to retrieve the files to satisfy the simulation request from_utc - to_utc.
