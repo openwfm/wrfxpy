@@ -25,6 +25,8 @@ from utils import utc_to_esmf, symlink_matching_files, update_time_control, upda
 import f90nml
 import os.path as osp
 from datetime import datetime
+import time
+import re
 
 
 def make_job_id(grid_code, start_utc, fc_hrs):
@@ -114,7 +116,38 @@ def execute(args):
 
     # step 8: execute wrf.exe on parallel backend
     qman, nnodes, ppn, wall_time_hrs = args['qman'], args['num_nodes'], args['ppn'], args['wall_time_hrs']
-    WRF(wrf_dir, qman).submit("sim-" + grid_code, nnodes, ppn, wall_time_hrs)
+    task_id = "sim-" + grid_code + "-" + utc_to_esmf(start_utc)[:10]
+    #WRF(wrf_dir, qman).submit(task_id, nnodes, ppn, wall_time_hrs)
+
+    # step 9: wait for appearance of rsl.error.0000 and open it, then keep reading
+    wrf_out = None
+    while wrf_out is None:
+        try:
+            wrf_out = open(osp.join(wrf_dir, 'rsl.error.0000'))
+            break
+        except IOError:
+            print('forecast: waiting 10 seconds for rsl.error.0000 file')
+        
+        time.sleep(5)
+
+    while True:
+        line = wrf_out.readline().strip()
+        if not line:
+            time.sleep(0.2)
+            continue
+
+        # print line
+        print(line)
+
+        if "SUCCESS COMPLETE WRF" in line:
+            print("WRF completion detected.")
+            break
+
+        if "Timing for Writing" in line:
+            domain = int(re.match(r'.* for domain\ +(\d+):',line).group(1))
+            print("Detected history write in for domain %d." % domain)
+
+          
 
 
 def verify_inputs(args):
@@ -158,8 +191,8 @@ def test():
             'ppn': 12,
             'wall_time_hrs': 3,
             'qman': 'sge',
-            'start_utc': datetime(2016, 1, 10, 11, 0, 0),
-            'end_utc': datetime(2016, 1, 10, 14, 0, 0)}
+            'start_utc': datetime(2016, 1, 17, 16, 0, 0),
+            'end_utc': datetime(2016, 1, 17, 22, 0, 0)}
 
     verify_inputs(args)
 
