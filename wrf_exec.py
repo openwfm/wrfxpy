@@ -17,10 +17,10 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from subprocess import check_call
+from subprocess import check_call, check_output
 import os
 import os.path as osp
-
+import re
 
 class OutputCheckFailed(Exception):
     """
@@ -248,16 +248,16 @@ class Submitter(object):
         with open(script_path, 'w') as f:
             f.write(script_tmpl % args)
 
-        ret = check_call([qsub, script_path], cwd=self.work_dir)
+        ret = check_output([qsub, script_path], cwd=self.work_dir)
         try:
             self.job_code = job_code_f(ret)
         except ValueError as e:
-            raise CalledProcessException('Failed to capture job code from submit with error %s' % e)
+            raise OutputCheckFailed('Failed to capture job code from submit with error %s from ret %s' % (e, ret))
 
     qman_infos = {
         'sge': {
             'qsub_cmd': 'qsub',
-            'job_code_f': lambda x: int(x.strip()),
+            'job_code_f': lambda x: int(re.match(r'Your job (\d+)', x).group(1)),
             'qsub_script': '#$ -S /bin/bash\n' '#$ -N %(task_id)s\n' '#$ -wd %(cwd)s\n'
                            '#$ -l h_rt=%(wall_time_hrs)02d:00:00\n' '#$ -pe mpich %(np)d\n'
                            'mpirun_rsh -np %(np)d -hostfile $TMPDIR/machines %(exec_path)s\n'
