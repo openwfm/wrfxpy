@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright (C) 2013-2016 Martin Vejmelka, UC Denver
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,13 +21,13 @@
 
 from wrf_cloner import WRFCloner
 from wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
-from utils import utc_to_esmf, symlink_matching_files, update_time_control, update_namelist, compute_fc_hours
+from utils import utc_to_esmf, symlink_matching_files, update_time_control, update_namelist, compute_fc_hours, esmf_to_utc
+from grib_source import HRRR
 
 import f90nml
 import os.path as osp
 from datetime import datetime
-import time
-import re
+import time, re, json, sys, logging
 
 
 def make_job_id(grid_code, start_utc, fc_hrs):
@@ -57,12 +58,15 @@ def execute(args):
         geogrid_path: the path to the geogrid data directory providing terrain/fuel data
     :return:
     """
+    logging.basicConfig(level=logging.INFO)
     wksp_dir, grib_source = args['workspace_dir'], args['grib_source']
 
     # compute the job id
     grid_code, start_utc, end_utc = args['grid_code'], args['start_utc'], args['end_utc']
     fc_hrs = compute_fc_hours(start_utc, end_utc)
     job_id = make_job_id(grid_code, start_utc, fc_hrs)
+
+    logging.info("job %s starting [%d hours to forecast]." % (job_id, fc_hrs))
 
     # read in all namelists
     wps_nml = f90nml.read(args['wps_namelist_path'])
@@ -71,13 +75,19 @@ def execute(args):
 
     num_doms = int(wps_nml['share']['max_dom'])
 
+    logging.info("number of domains is %d." % num_doms)
+
     # build directories in workspace
     wps_dir = osp.abspath(osp.join(wksp_dir, job_id, 'wps'))
     wrf_dir = osp.abspath(osp.join(wksp_dir, job_id, 'wrf'))
 
+    logging.info("cloning WPS into %s" % wps_dir)
+
     # step 1: clone WPS and WRF directories
     cln = WRFCloner(args)
     cln.clone_wps(wps_dir, grib_source.vtables(), [])
+
+    logging.info("running GEOGRID")
 
     # step 2: patch namelist for geogrid and execute geogrid
     wps_nml['geogrid']['geog_data_path'] = args['geogrid_path']
@@ -85,9 +95,13 @@ def execute(args):
 
     Geogrid(wps_dir).execute().check_output()
 
+    logging.info("retrieving GRIB files.")
+
     # step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps
     manifest = grib_source.retrieve_gribs(start_utc, end_utc)
     grib_source.symlink_gribs(manifest, wps_dir)
+
+    logging.info("running UNGRIB")
 
     # step 4: patch namelist for ungrib end execute ungrib
     wps_nml['share']['start_date'] = [utc_to_esmf(start_utc)] * num_doms
@@ -97,27 +111,36 @@ def execute(args):
 
     Ungrib(wps_dir).execute().check_output()
 
+    logging.info("running METGRID")
+
     # step 5: execute metgrid
     Metgrid(wps_dir).execute().check_output()
+
+    logging.info("cloning WRF into %s" % wrf_dir)
 
     # step 6: clone wrf directory, symlink all met_em* files
     cln.clone_wrf(wrf_dir, [])
     symlink_matching_files(wrf_dir, wps_dir, "met_em*")
+
+    logging.info("running REAL")
 
     # step 7: patch input namelist, fire namelist and execute real.exe
     time_ctrl = update_time_control(start_utc, end_utc, num_doms)
     wrf_nml['time_control'].update(time_ctrl)
     update_namelist(wrf_nml, grib_source.namelist_keys())
     f90nml.write(wrf_nml, osp.join(wrf_dir, 'namelist.input'), force=True)
-
     f90nml.write(fire_nml, osp.join(wrf_dir, 'namelist.fire'), force=True)
 
     Real(wrf_dir).execute().check_output()
 
+    logging.info("submitting WRF job")
+
     # step 8: execute wrf.exe on parallel backend
     qman, nnodes, ppn, wall_time_hrs = args['qman'], args['num_nodes'], args['ppn'], args['wall_time_hrs']
     task_id = "sim-" + grid_code + "-" + utc_to_esmf(start_utc)[:10]
-    #WRF(wrf_dir, qman).submit(task_id, nnodes, ppn, wall_time_hrs)
+    WRF(wrf_dir, qman).submit(task_id, nnodes, ppn, wall_time_hrs)
+
+    logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % task_id)
 
     # step 9: wait for appearance of rsl.error.0000 and open it, then keep reading
     wrf_out = None
@@ -126,9 +149,11 @@ def execute(args):
             wrf_out = open(osp.join(wrf_dir, 'rsl.error.0000'))
             break
         except IOError:
-            print('forecast: waiting 10 seconds for rsl.error.0000 file')
+            logging.info('forecast: waiting 10 seconds for rsl.error.0000 file')
         
         time.sleep(5)
+    
+    logging.info('Detected rsl.error.0000')
 
     while True:
         line = wrf_out.readline().strip()
@@ -136,18 +161,14 @@ def execute(args):
             time.sleep(0.2)
             continue
 
-        # print line
-        print(line)
-
         if "SUCCESS COMPLETE WRF" in line:
-            print("WRF completion detected.")
+            logging.info("WRF completion detected.")
             break
 
         if "Timing for Writing" in line:
             domain = int(re.match(r'.* for domain\ +(\d+):',line).group(1))
-            print("Detected history write in for domain %d." % domain)
+            logging.info("Detected history write in for domain %d." % domain)
 
-          
 
 
 def verify_inputs(args):
@@ -175,7 +196,6 @@ def verify_inputs(args):
 
 
 def test():
-    from grib_source import HRRR
 
     args = {'grid_code': 'colo2dv1',
             'workspace_dir': 'wksp',
@@ -197,3 +217,42 @@ def test():
     verify_inputs(args)
 
     execute(args)
+
+
+def process_arguments(args):
+    """
+    Convert arguments passed into program.
+
+    Transforms unicode strings into standard strings.
+
+    :param args: the input arguments
+    """
+
+    # process the arguments
+    args['grib_source'] = HRRR('ingest')
+    args['start_utc'] = esmf_to_utc(args['start_utc'])
+    args['end_utc'] = esmf_to_utc(args['end_utc'])
+
+    for k, v in args.iteritems():
+        if type(v) == unicode:
+            args[k] = v.encode('ascii')
+
+
+
+if __name__ == '__main__':
+
+    # load configuration JSON
+    cfg_str = open(sys.argv[1]).read()
+    args = json.loads(cfg_str, 'ascii')
+
+    # HRRR source is compulsory
+    assert args['grib_source'] == 'HRRR'
+
+    process_arguments(args)
+
+    # sanity check
+    verify_inputs(args)
+
+    # execute the job
+    execute(args)
+
