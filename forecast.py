@@ -21,7 +21,7 @@
 
 from wrf_cloner import WRFCloner
 from wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
-from utils import utc_to_esmf, symlink_matching_files, update_time_control, update_namelist, compute_fc_hours, esmf_to_utc
+from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, update_namelist, compute_fc_hours, esmf_to_utc
 from grib_source import HRRR
 
 import f90nml
@@ -34,7 +34,7 @@ def make_job_id(grid_code, start_utc, fc_hrs):
     """
     Computes the job id from grid code, UTC start time and number of forecast hours.
     """
-    return 'sim-' + grid_code + '-' + utc_to_esmf(start_utc) + '-{0:02d}'.format(fc_hrs)
+    return 'wfc-' + grid_code + '-' + utc_to_esmf(start_utc) + '-{0:02d}'.format(fc_hrs)
 
 
 def execute(args):
@@ -87,13 +87,16 @@ def execute(args):
     cln = WRFCloner(args)
     cln.clone_wps(wps_dir, grib_source.vtables(), [])
 
-    logging.info("running GEOGRID")
-
     # step 2: patch namelist for geogrid and execute geogrid
     wps_nml['geogrid']['geog_data_path'] = args['geogrid_path']
     f90nml.write(wps_nml, osp.join(wps_dir, 'namelist.wps'), force=True)
-
-    Geogrid(wps_dir).execute().check_output()
+    if 'precomputed' in args:
+        logging.info('precomputed grids found, linking in ...')
+        for grid, path in args['precomputed'].iteritems():
+           symlink_unless_exists(osp.abspath(path), osp.join(wps_dir, grid))
+    else:
+        logging.info("running GEOGRID")
+        Geogrid(wps_dir).execute().check_output()
 
     logging.info("retrieving GRIB files.")
 
@@ -205,6 +208,8 @@ def test():
             'wps_namelist_path': 'etc/nlists/colorado-3k.wps',
             'wrf_namelist_path': 'etc/nlists/colorado-3k.input',
             'fire_namelist_path': 'etc/nlists/colorado-3k.fire',
+            'precomputed' : { 'geo_em.d01.nc' : 'precomputed/colorado/geo_em.d01',
+                              'geo_em.d02.nc' : 'precomputed/colorado/geo_em.d02' },
             'geogrid_path': '/share_home/mvejmelka/Packages/WPS-GEOG',
             'sys_install_dir': '/share_home/mvejmelka/Projects/wrfxpy',
             'num_nodes': 10,
