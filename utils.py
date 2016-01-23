@@ -141,3 +141,40 @@ def update_namelist(nml, with_keys):
     """
     for section, section_dict in with_keys.iteritems():
         nml[section].update(section_dict)
+
+
+def update_ignitions(ign_specs, max_dom):
+    """
+    Build a dictionary with which we can update the input namelist with passed ignition specifications.
+
+    :param ign_specs: the ignition specifications
+    :param max_dom: the maximum number of domains
+    """
+    def set_ignition_val(dom_id, v):
+        dvals = [0] * max_dom
+        dvals[dom_id-1] = v
+        return dvals
+
+    keys = [ "fire_ignition_start_lat", "fire_ignition_end_lat",
+             "fire_ignition_start_lon", "fire_ignition_end_lon", 
+             "fire_ignition_start_time", "fire_ignition_end_time", 
+             "fire_ignition_radius", "fire_ignition_ros" ]
+
+    nml_igns = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom }
+    for dom_str, dom_igns in ign_specs.iteritems():
+        # ensure fire model is switched on in every domain with ignitions
+        dom_id = int(dom_str)
+        nml_igns['ifire'][dom_id-1] = 2
+        nml_igns['fire_num_ignitions'][dom_id-1] = len(dom_igns)
+
+        # for each ignition 
+        for ndx,ign in enumerate(dom_igns):
+            start, dur = ign['start_delay_s'], ign['duration_s']
+            lat, lon = ign['lat'], ign['long']
+            vals = [ lat, lat, lon, lon, start, start+dur, 200, 1 ]
+            kv = dict(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals]))
+            nml_igns.update(kv)
+
+    return { 'fire' : nml_igns }
+
+

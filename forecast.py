@@ -21,7 +21,7 @@
 
 from wrf_cloner import WRFCloner
 from wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
-from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, update_namelist, compute_fc_hours, esmf_to_utc
+from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions
 from grib_source import HRRR
 
 import f90nml
@@ -131,9 +131,13 @@ def execute(args):
     time_ctrl = update_time_control(start_utc, end_utc, num_doms)
     wrf_nml['time_control'].update(time_ctrl)
     update_namelist(wrf_nml, grib_source.namelist_keys())
-    f90nml.write(wrf_nml, osp.join(wrf_dir, 'namelist.input'), force=True)
     f90nml.write(fire_nml, osp.join(wrf_dir, 'namelist.fire'), force=True)
 
+    # render ignition specification into the wrf namelist
+    if 'ignitions' in args:
+        update_namelist(wrf_nml, update_ignitions(args['ignitions'], num_doms))
+   
+    f90nml.write(wrf_nml, osp.join(wrf_dir, 'namelist.input'), force=True)
     Real(wrf_dir).execute().check_output()
 
     logging.info("submitting WRF job")
