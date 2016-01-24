@@ -45,7 +45,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,cb_title,dpi=200):
     # save png to a StringIO
     str_io = StringIO.StringIO()
     fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
-    fig.close()
+    plt.close()
 
     return str_io.getvalue()
 
