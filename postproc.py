@@ -38,7 +38,7 @@ class Postprocessor(object):
 
         :param wrf_file: WRF file to process
         :param dom_id: the domain identifier
-        :param ts_esmf time stamp in ESMF format
+        :param ts_esmf: time stamp in ESMF format
         :param vars: list of variables to process
         """
         # open the netCDF dataset
