@@ -45,6 +45,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,cb_title,dpi=200):
     # save png to a StringIO
     str_io = StringIO.StringIO()
     fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
+    fig.close()
 
     return str_io.getvalue()
 
@@ -68,8 +69,9 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
 
   str_io = StringIO.StringIO()
   plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
-  bounds = [ (lons[0],lats[0]),(lons[1],lats[0]),(lons[1],lats[1]),(lons[0],lats[1]) ]
+  plt.close()
 
+  bounds = [ (lons[0],lats[0]),(lons[1],lats[0]),(lons[1],lats[1]),(lons[0],lats[1]) ]
   return str_io.getvalue(), bounds
 
 
