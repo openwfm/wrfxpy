@@ -21,13 +21,14 @@
 
 from wrf_cloner import WRFCloner
 from wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
-from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions
+from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions, make_dir
+from postproc import Postprocessor
 from grib_source import HRRR
 
 import f90nml
-import os.path as osp
 from datetime import datetime
 import time, re, json, sys, logging
+import os.path as osp
 
 
 def make_job_id(grid_code, start_utc, fc_hrs):
@@ -149,7 +150,7 @@ def execute(args):
 
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % task_id)
 
-    # step 9: wait for appearance of rsl.error.0000 and open it, then keep reading
+    # step 9: wait for appearance of rsl.error.0000 and open it
     wrf_out = None
     while wrf_out is None:
         try:
@@ -162,6 +163,14 @@ def execute(args):
     
     logging.info('Detected rsl.error.0000')
 
+    # step 10: track log output and check for history writes fro WRF
+    pp_instr, pp = {}, None
+    if 'postproc' in args:
+        pp_instr = args['postproc']
+        pp_dir = osp.join(wksp_dir, job_id, "products")
+        make_dir(pp_dir)
+        pp = Postprocessor(pp_dir, 'wfc-' + grid_code )
+
     while True:
         line = wrf_out.readline().strip()
         if not line:
@@ -173,9 +182,14 @@ def execute(args):
             break
 
         if "Timing for Writing" in line:
-            domain = int(re.match(r'.* for domain\ +(\d+):',line).group(1))
-            logging.info("Detected history write in for domain %d." % domain)
-
+            esmf_time,domain_str = re.match(r'.*wrfout_d.._([0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
+            dom_id = int(domain_str)
+            logging.info("Detected history write in for domain %d for time %s." % (dom_id, esmf_time))
+            if str(dom_id) in pp_instr:
+                var_list = pp_instr[str(dom_id)]
+                logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
+                wrfout_path = osp.join(wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(start_utc))) 
+                pp.raster2kmz(wrfout_path, dom_id, esmf_time, var_list)
 
 
 def verify_inputs(args):

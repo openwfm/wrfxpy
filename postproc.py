@@ -5,7 +5,7 @@ import simplekml as kml
 from mpl_toolkits.basemap import Basemap
 import numpy as np
 import netCDF4 as nc4
-import sys, os, StringIO, utils
+import sys, os, StringIO, utils, json
 
 from var_wisdom import convert_value, get_wisdom
 from wrf_raster import make_colorbar, basemap_raster_mercator
@@ -32,28 +32,27 @@ class Postprocessor(object):
         self.manifest = {}
 
 
-    def raster2kmz(self, wrf_path, dom_id, ts_utc, vars):
+    def raster2kmz(self, wrf_path, dom_id, ts_esmf, vars):
         """
         Postprocess a raster variable into a KMZ file.
 
         :param wrf_file: WRF file to process
         :param dom_id: the domain identifier
-        :param ts_utc: time stamp to process
+        :param ts_esmf time stamp in ESMF format
         :param vars: list of variables to process
         """
         # open the netCDF dataset
         d = nc4.Dataset(wrf_path)
-        tstr = utils.utc_to_esmf(ts_utc)
 
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:]]
-        if tstr not in times:
-            raise PostprocError("Invalid timestamp %s" % tstr)
-        tndx = times.index(tstr)
+        if ts_esmf not in times:
+            raise PostprocError("Invalid timestamp %s" % ts_esmf)
+        tndx = times.index(ts_esmf)
 
         for var in vars:
-            out_path = os.path.join(self.output_path, self.product_name + "-" + tstr + "-" var)
-            vw = get_wisdom(varname)
+            out_path = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var)
+            vw = get_wisdom(var)
 
             # extract variables
             fa = vw['retrieve_as'](d,tndx) # this calls a lambda defined to read the required 2d field
@@ -67,10 +66,10 @@ class Postprocessor(object):
                 raise PostprocError("Variable %s size does not correspond to grid size." % var)
 
             # construct kml file
-            doc = kml.Kml(name = varname)
+            doc = kml.Kml(name = var)
 
             # gather wisdom about the variable
-            wisdom = get_wisdom(varname)
+            wisdom = get_wisdom(var)
             native_unit = wisdom['native_unit']
             cmap_name = wisdom['colormap']
             cmap = mpl.cm.get_cmap(cmap_name)
@@ -89,7 +88,7 @@ class Postprocessor(object):
             cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
 
             #  colorbar + add it to the KMZ as a screen overlay
-            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,vw['name'] + ' ' + cb_unit,varname)
+            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,vw['name'] + ' ' + cb_unit,var)
             cb_name = out_path + '-cb' + '.png'
             with open(cb_name, 'w') as f:
                 f.write(cb_png_data)
@@ -104,7 +103,7 @@ class Postprocessor(object):
             cbo.visibility = 1
             cbo.icon.href=cb_name
 
-            ground = doc.newgroundoverlay(name=varname,color='80ffffff')
+            ground = doc.newgroundoverlay(name=var,color='80ffffff')
             raster_png_data,corner_coords = basemap_raster_mercator(lon,lat,fa,fa_min,fa_max,cmap)
             raster_name = out_path + '-raster.png'
             with open(raster_name,'w') as f:
@@ -116,27 +115,27 @@ class Postprocessor(object):
             kmz_path = out_path + ".kmz"
             doc.savekmz(kmz_path)
 
-            self._update_manifest(tstr, var, { 'kml' : kmz_path })
+            self._update_manifest(ts_esmf, var, { 'kml' : kmz_path })
 
             # cleanup
             os.remove(cb_name)
             os.remove(raster_name)
 
 
-    def _update_manifest(self, tstr, var, kv):
+    def _update_manifest(self,ts_esmf, var, kv):
         """
-        Adds a key-value set to the dictionary storing metadata for time tstr and variable var.
+        Adds a key-value set to the dictionary storing metadata for time ts_esmf and variable var.
 
-        :param tstr: ESMF time string 
+        :param ts_esmf: ESMF time string 
         :param var: variable name
         :param kv: key-value dictionary to merge
         """
-        # update the manifest with the tstr/var info
-        td = self.manifest.get(tstr, {})
-        self.manifest[tstr] = td
+        # update the manifest with the ts_esmf/var info
+        td = self.manifest.get(ts_esmf, {})
+        self.manifest[ts_esmf] = td
         vd = td.get(var, {})
         td[var] = vd
-        vd.merge(kv)
+        vd.update(kv)
         mf_path = os.path.join(self.output_path, self.product_name + '.json')
-        json.dump(self.manifest, mf_path)
+        json.dump(self.manifest, open(mf_path, 'w'))
 
