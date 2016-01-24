@@ -12,6 +12,7 @@ Welcome to wrfxpy's documentation!
    intro
    tutorial
    configuration
+   modules
 
 
 Indices and tables

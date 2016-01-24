@@ -32,12 +32,17 @@ also listed here:
     "end_utc": "2016-01-23_11:00:00",
     "precomputed" : { "geo_em.d01.nc" : "precomputed/colorado/geo_em.d01.nc", "geo_em.d02.nc" : "precomputed/colorado/geo_em.d02.nc" },
     "ignitions" : {
-     "2" : [ {
-      "start_delay_s" : 600,
-      "duration_s" : 240,
-      "lat" : 39.894264,
-      "long" : -103.903222
-       } ]
+      "2" : [ {
+        "start_delay_s" : 600,
+        "duration_s" : 240,
+        "lat" : 39.894264,
+        "long" : -103.903222
+       } ],
+    }
+    "postproc" : {
+      "1" : [ "T2" ],
+      "2" : [ "T2" ]
+    }
   }
 
 For a detailed overview of the configuration keys, refer to :doc:`configuration`.
