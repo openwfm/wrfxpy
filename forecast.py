@@ -186,10 +186,13 @@ def execute(args):
             dom_id = int(domain_str)
             logging.info("Detected history write in for domain %d for time %s." % (dom_id, esmf_time))
             if str(dom_id) in pp_instr:
-                var_list = pp_instr[str(dom_id)]
+                var_list = [str(x) for x in pp_instr[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                 wrfout_path = osp.join(wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(start_utc))) 
-                pp.raster2kmz(wrfout_path, dom_id, esmf_time, var_list)
+                try:
+                    pp.raster2kmz(wrfout_path, dom_id, esmf_time, var_list)
+                except Exception as e:
+                    logging.warning("Exception %s while postprocessing %s at %s" % (e.message, var_list, esmf_time))
 
 
 def verify_inputs(args):
@@ -244,7 +247,7 @@ def test():
 
 def process_arguments(args):
     """
-    Convert arguments passed into program.
+    Convert arguments passed into program via the JSON configuration file.
 
     Transforms unicode strings into standard strings.
 
