@@ -189,10 +189,8 @@ def execute(args):
                 var_list = [str(x) for x in pp_instr[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                 wrfout_path = osp.join(wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(start_utc))) 
-                try:
-                    pp.raster2kmz(wrfout_path, dom_id, esmf_time, var_list)
-                except Exception as e:
-                    logging.warning("Exception %s while postprocessing %s at %s" % (e.message, var_list, esmf_time))
+                pp.vars2kmz(wrfout_path, dom_id, esmf_time, var_list)
+                pp.vars2png(wrfout_path, dom_id, esmf_time, var_list)
 
 
 def verify_inputs(args):
