@@ -1,13 +1,14 @@
 Configuration keys
 ******************
 
-The script `forecast.py` requires a configuration file to control its execution,
-for an example refer to the :doc:`tutorial`.
+The script `forecast.py` requires a JSON configuration file to control its execution,
+for an example refer to the :doc:`tutorial`.  The configuration file is JSON dictionary
+with the keys described in the following sections.  Not all keys are required.
 
 Directories
 ===========
 
-All the following keys are compulstory.
+All of the following keys are required.
 
 * ``workspace_dir : [string]`` the path in which jobs are executed
 * ``wps_install_dir : [string]`` the path to a working installation of WPS
@@ -17,7 +18,7 @@ All the following keys are compulstory.
 WRF-SFIRE inputs
 ================
 
-All the following keys except ``precomputed`` are compulsory.
+All of the following keys except ``precomputed`` are required.
 
 * ``grid_code : [string]`` the grid code is part of the job id and semantically should identify the configured grid
 * ``grib_source : [string]`` must be HRRR
@@ -25,7 +26,7 @@ All the following keys except ``precomputed`` are compulsory.
 * ``start_utc : [esmf_time]`` the start time of the simulation in ESMF format
 * ``end_utc : [esmf_time]`` the end time of the simulation in ESMF format
 
-The next keys are optional.  Without the ignitions key, the fire section of
+The keys in the remainder of this section are optional.  Without the ignitions key, the fire section of
 the template ``namelist.input`` will remain unaffected.  If the ``ignitions``
 key is included, the fire model is switched on.
 
@@ -36,7 +37,7 @@ key is included, the fire model is switched on.
 Namelist templates
 ==================
 
-All the following keys are compulsory.
+All of the following keys are required.
 
 * ``wps_namelist_path : [string]`` the WPS namelist template
 * ``wrf_namelist_path : [string]`` the WRF namelist template

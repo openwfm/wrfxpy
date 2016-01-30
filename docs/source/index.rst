@@ -7,12 +7,11 @@ Welcome to wrfxpy's documentation!
 ==================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    intro
    tutorial
    configuration
-   modules
 
 
 Indices and tables

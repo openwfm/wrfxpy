@@ -10,7 +10,7 @@ In particular, the modules herein can:
 * download GRIB files from various GRIB sources
 * execute geogrid, ungrib, metgrid, real, WRF
 * monitor WRF execution
-* postprocess `netCDF files <http://www.unidata.ucar.edu/software/netcdf/>` to generate raster images or KML files
+* postprocess `netCDF files <http://www.unidata.ucar.edu/software/netcdf/>`_ to generate raster images or KML files
 
 Prerequisites
 =============
@@ -22,6 +22,8 @@ The *wrfxpy* system needs the following software to be installed:
 * `simplekml <https://simplekml.readthedocs.org/en/latest/>`_
 
 The simplest way to satisfy these requirements is to install `Anaconda Python <https://www.continuum.io/downloads>`_ and then run the following commands:
+
+::
 
   conda install basemap netcdf4 
   conda install --channel https://conda.anaconda.org/IOOS simplekml

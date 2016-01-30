@@ -1,5 +1,11 @@
 Tutorial
 ********
+.. warning::
+
+  It is imperative that a working WRF-SFIRE installation is available.
+  Installation and configuration of WRF-SFIRE is outside the scope of this documentation,
+  please refer to the `OpenWFM <http://www.openwfm.org>`_ website for instructions.
+
 
 To perform a fire forecast, the script ``forecast.py`` has to be executed with
 a JSON configuration file as an argument, for example:
