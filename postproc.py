@@ -6,6 +6,7 @@ from mpl_toolkits.basemap import Basemap
 import numpy as np
 import netCDF4 as nc4
 import sys, os, StringIO, utils, json, logging
+import os.path as osp
 
 from var_wisdom import convert_value, get_wisdom
 from wrf_raster import make_colorbar, basemap_raster_mercator
@@ -175,7 +176,8 @@ class Postprocessor(object):
             try:
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
                 kmz_path = self._var2kmz(d, var, tndx, outpath_base)
-                self._update_manifest(ts_esmf, var, { 'kml' : kmz_path })
+                kmz_name = osp.basename(kmz_path)
+                self._update_manifest(ts_esmf, var, { 'kml' : kmz_name })
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
 
@@ -202,7 +204,10 @@ class Postprocessor(object):
             try:
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
                 raster_path, cb_path, coords = self._var2png(d, var, tndx, outpath_base)
-                self._update_manifest(ts_esmf, var, { 'raster' : raster_path, 'colorbar' : cb_path, 'coords' : coords})
+                # only basename goes into the manifest
+                raster_name = osp.basename(raster_path)
+                cb_name = osp.basename(cb_path)
+                self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'colorbar' : cb_name, 'coords' : coords})
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
 
