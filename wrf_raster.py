@@ -71,7 +71,8 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
   plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
   plt.close()
 
-  bounds = [ (lons[0],lats[0]),(lons[1],lats[0]),(lons[1],lats[1]),(lons[0],lats[1]) ]
-  return str_io.getvalue(), bounds
+  numpy_bounds = [ (lons[0],lats[0]),(lons[1],lats[0]),(lons[1],lats[1]),(lons[0],lats[1]) ]
+  float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
+  return str_io.getvalue(), float_bounds
 
 

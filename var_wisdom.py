@@ -32,6 +32,22 @@ _var_wisdom = {
        'scale' : [0.0, 2.0],
        'retrieve_as' : lambda d,t: d.variables['F_ROS'][t,:,:]
       },
+    'PSFC' : {
+      'name' : 'surface pressure',
+      'native_unit' : 'Pa',
+      'colorbar_units' : ['Pa'],
+      'colormap' : 'jet',
+      'scale' : 'original',
+      'retrieve_as' : lambda d, t: d.variables['PSFC'][t,:,:]
+      },
+    'WINDSPD' : {
+      'name' : 'wind speed',
+      'native_unit' : 'm/s',
+      'colorbar_units' : [ 'm/s' ],
+      'colormap' : 'jet',
+      'scale' : 'original',
+      'retrieve_as' : lambda d, t: d.variables['U'][t,:,:]
+    },
     'F_INT' : {
        'name' : 'fireline intensity',
        'native_unit' : 'J/m/s^2',
