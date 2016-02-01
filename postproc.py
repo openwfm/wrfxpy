@@ -301,7 +301,7 @@ class Postprocessor(object):
                     raster_name = osp.basename(raster_path)
                     self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'coords' : coords})
                 else:
-                    raster_path, cb_path, coords = self._var2png(d, var, tndx, outpath_base)
+                    raster_path, cb_path, coords = self._scalar2png(d, var, tndx, outpath_base)
                     raster_name, cb_name = osp.basename(raster_path), osp.basename(cb_path)
                     self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'colorbar' : cb_name, 'coords' : coords})
             except Exception as e:

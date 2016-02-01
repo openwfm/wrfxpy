@@ -86,8 +86,6 @@ def basemap_barbs_mercator(u,v,lat,lon):
     m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],
                 llcrnrlon=lons[0],urcrnrlon=lons[1])
 
-    print u.shape, v.shape, lat.shape, lon.shape
-
     #vmin,vmax = np.nanmin(grid),np.nanmax(grid)
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*3)
     plt.axis('off')
