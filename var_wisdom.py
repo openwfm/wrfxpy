@@ -1,3 +1,4 @@
+import numpy as np
 
 _var_wisdom = {
     'T2' : {
@@ -8,6 +9,33 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: d.variables['T2'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+    'FIRE_AREA' : {
+        'name' : 'fire area',
+        'native_unit' : '-',
+        'colorbar_units' : ['-'],
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d.variables['FIRE_AREA'][t,:,:],
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+      },
+    'FLINEINT' : {
+        'name' : 'fireline intensity',
+        'native_unit' : '-',
+        'colorbar_units' : ['-'],
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d.variables['FLINEINT'][t,:,:],
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+      },
+    'FLINEINT2' : {
+        'name' : 'fireline intensity 2',
+        'native_unit' : '-',
+        'colorbar_units' : ['-'],
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d.variables['FLINEINT2'][t,:,:],
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
       },
     'RH_FIRE' : {
         'name' : 'relative humidity',
@@ -45,22 +73,29 @@ _var_wisdom = {
         'retrieve_as' : lambda d, t: d.variables['PSFC'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
-    'WINDSPD' : {
+     'WINDSPD' : {
         'name' : 'wind speed',
-        'components' : [ 'U', 'V' ],
+        'native_unit' : 'm/s',
+        'colorbar_units' : ['m/s'],
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
+    'WINDVEC' : {
+        'name' : 'wind speed',
+        'components' : [ 'U10', 'V10' ],
         'native_unit' : 'm/s',
         'scale' : 'original',
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
-    'U' : {
+    'U10' : {
         'name' : 'longitudinal wind component',
-        'retrieve_as' : lambda d, t: d.variables['U'][t,0,:,:],
-        'grid' : lambda d: (d.variables['XLAT_U'][0,:,:], d.variables['XLONG_U'][0,:,:])
+        'retrieve_as' : lambda d, t: d.variables['U10'][t,:,:],
     },
-     'V' : {
+    'V10' : {
         'name' : 'latitudinal wind component',
-        'retrieve_as' : lambda d, t: d.variables['V'][t,0,:,:],
-        'grid' : lambda d: (d.variables['XLAT_V'][0,:,:], d.variables['XLONG_V'][0,:,:])
+        'retrieve_as' : lambda d, t: d.variables['V10'][t,:,:],
     },
     'F_INT' : {
         'name' : 'fireline intensity',

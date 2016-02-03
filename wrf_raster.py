@@ -87,9 +87,9 @@ def basemap_barbs_mercator(u,v,lat,lon):
                 llcrnrlon=lons[0],urcrnrlon=lons[1])
 
     #vmin,vmax = np.nanmin(grid),np.nanmax(grid)
-    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*3)
+    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
-    m.barbs(lon,lat,u,v,latlon=True,length=4,barbcolor='r')
+    m.quiver(lon,lat,u,v,latlon=True)
 
     str_io = StringIO.StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
