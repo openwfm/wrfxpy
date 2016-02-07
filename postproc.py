@@ -208,8 +208,8 @@ class Postprocessor(object):
 
         # cleanup
         if cleanup:
-            os.remove(cb_name)
-            os.remove(raster_name)
+            os.remove(raster_path)
+            os.remove(bp_path)
         
         return kmz_path, raster_path, cb_path, corner_coords
 

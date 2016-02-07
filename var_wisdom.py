@@ -14,8 +14,8 @@ _var_wisdom = {
         'name' : 'fire area',
         'native_unit' : '-',
         'colorbar_units' : ['-'],
-        'colormap' : 'jet',
-        'scale' : 'original',
+        'colormap' : 'gray_r',
+        'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['FIRE_AREA'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
       },
@@ -106,7 +106,7 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: d.variables['F_INT'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
       },
-      'NFUEL_CAT' : {
+    'NFUEL_CAT' : {
        'name' : 'fuel categories',
        'native_unit' : 'fuel_type',
        'colorbar_units' : ['fuel_type'],
