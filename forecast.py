@@ -26,7 +26,7 @@ from postproc import Postprocessor
 from grib_source import HRRR
 
 import f90nml
-from datetime import datetime
+from datetime import datetime, timedelta
 import time, re, json, sys, logging
 import os.path as osp
 
@@ -254,8 +254,25 @@ def process_arguments(args):
 
     # process the arguments
     args['grib_source'] = HRRR('ingest')
-    args['start_utc'] = esmf_to_utc(args['start_utc'])
-    args['end_utc'] = esmf_to_utc(args['end_utc'])
+
+    # if the time reference is relative (i.e. "T-90"), resolve it
+    def resolve_relative_time(tstr, from_time=None):
+        min_shift = int(tstr[1:])
+        if from_time is None:
+            from_time = datetime.utcnow()
+        start = from_time + timedelta(minutes = min_shift)
+        start = start.replace(minute = 0, second = 0)
+        return start
+
+    if args['start_utc'][0] == 'T':
+        args['start_utc'] = resolve_relative_time(args['start_utc'])
+    else:
+        args['start_utc'] = esmf_to_utc(args['start_utc'])
+
+    if args['end_utc'][0] == 'T':
+        args['end_utc'] = resolve_relative_time(args['end_utc'], from_time = args['start_utc'])
+    else:
+        args['end_utc'] = esmf_to_utc(args['end_utc'])
 
     for k, v in args.iteritems():
         if type(v) == unicode:
