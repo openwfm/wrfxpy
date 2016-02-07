@@ -181,7 +181,7 @@ def execute(args):
             logging.info("WRF completion detected.")
             break
 
-        if "Timing for Writing" in line:
+        if "Timing for Writing wrfout" in line:
             esmf_time,domain_str = re.match(r'.*wrfout_d.._([0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             dom_id = int(domain_str)
             logging.info("Detected history write in for domain %d for time %s." % (dom_id, esmf_time))
