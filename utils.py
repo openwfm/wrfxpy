@@ -1,4 +1,24 @@
-from datetime import datetime
+# Copyright (C) 2013-2016 Martin Vejmelka, UC Denver
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+# of the Software, and to permit persons to whom the Software is furnished to do
+# so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+# A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+from datetime import datetime, timedelta
 import pytz
 import os
 import os.path as osp
@@ -176,5 +196,27 @@ def update_ignitions(ign_specs, max_dom):
             nml_igns.update(kv)
 
     return { 'fire' : nml_igns }
+
+
+def timespec_to_utc_hour(ts_str, from_time = None):
+    """
+    Converts relative time specifications into a UTC datetime which is rounded down to the nearest hour.
+
+    ts_str can be an ESMF time, in which case this function returns esmf_to_utc(ts_str) rounded
+    down, or it can be in the format 'T+YY' or 'T-YY' and then it's a relative specification of minutes
+    from from_time.
+
+    :param ts_str: the time specification string
+    :param from_time: an optional origin time w.r.t. which the timespec is resolved
+    """
+    if ts_str[0] == 'T':
+        if from_time is None:
+            from_time = datetime.utcnow()
+        min_shift = int(ts_str[1:])
+        dt = from_time + timedelta(minutes = min_shift)
+        return dt.replace(minute = 0, second = 0)
+    else:
+        dt = esmf_to_utc(ts_str)
+        return dt.replace(minute = 0, second = 0)
 
 
