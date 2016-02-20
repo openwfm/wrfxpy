@@ -151,7 +151,7 @@ class Metgrid(Executor):
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of metgrid.' not in open(output_path).read():
             raise OutputCheckFailed(
-                    "Execution of ungrib.exe was not successful, examine %s for details." % output_path)
+                    "Execution of metgrid.exe was not successful, examine %s for details." % output_path)
 
 
 class Real(Executor):
