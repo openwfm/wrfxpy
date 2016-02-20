@@ -21,9 +21,12 @@
 
 from wrf_cloner import WRFCloner
 from wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
-from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions, make_dir
+from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
+                  update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions, make_dir, \
+                  timespec_to_utc_hour
 from postproc import Postprocessor
 from grib_source import HRRR
+from var_wisdom import get_wisdom_variables
 
 import f90nml
 from datetime import datetime, timedelta
@@ -201,7 +204,6 @@ def verify_inputs(args):
       args -- dictionary of arguments
     """
     # we don't check if job_id is a valid path
-
     required_files = [('sys_install_dir', 'Non-existent system installation directory %s'),
                       ('workspace_dir', 'Non-existent workspace directory %s'),
                       ('wps_install_dir', 'Non-existent WPS installation directory %s'),
@@ -215,6 +217,18 @@ def verify_inputs(args):
     for key, err in required_files:
         if not osp.exists(args[key]):
             raise OSError(err % args[key])
+
+    # check if the postprocessor knows how to handle all variables
+    wvs = get_wisdom_variables()
+    failing = False
+    if 'postproc' in args:
+        for dom in args['postproc'].keys():
+            for vname in args['postproc'][dom]:
+                if vname not in wvs:
+                    logger.error('unrecognized variable %s in postproc key for domain %s.' % (vname, dom))
+                    failing = True
+    if failing:
+        raise ValueError('One or more unrecognized variables in postproc.')
 
 
 def test():
@@ -255,29 +269,13 @@ def process_arguments(args):
     # process the arguments
     args['grib_source'] = HRRR('ingest')
 
-    # if the time reference is relative (i.e. "T-90"), resolve it
-    def resolve_relative_time(tstr, from_time=None):
-        min_shift = int(tstr[1:])
-        if from_time is None:
-            from_time = datetime.utcnow()
-        start = from_time + timedelta(minutes = min_shift)
-        start = start.replace(minute = 0, second = 0)
-        return start
-
-    if args['start_utc'][0] == 'T':
-        args['start_utc'] = resolve_relative_time(args['start_utc'])
-    else:
-        args['start_utc'] = esmf_to_utc(args['start_utc'])
-
-    if args['end_utc'][0] == 'T':
-        args['end_utc'] = resolve_relative_time(args['end_utc'], from_time = args['start_utc'])
-    else:
-        args['end_utc'] = esmf_to_utc(args['end_utc'])
+    # resolve possible relative time specifications
+    args['start_utc'] = timespec_to_utc_hour(args['start_utc'])
+    args['end_utc'] = timespec_to_utc_hour(args['end_utc'], args['start_utc'])
 
     for k, v in args.iteritems():
         if type(v) == unicode:
             args[k] = v.encode('ascii')
-
 
 
 if __name__ == '__main__':
