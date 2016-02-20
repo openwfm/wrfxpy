@@ -209,7 +209,7 @@ class Postprocessor(object):
         # cleanup
         if cleanup:
             os.remove(raster_path)
-            os.remove(bp_path)
+            os.remove(cb_path)
         
         return kmz_path, raster_path, cb_path, corner_coords
 
@@ -242,7 +242,7 @@ class Postprocessor(object):
 
         # cleanup
         if cleanup:
-            os.remove(raster_name)
+            os.remove(raster_path)
         
         return kmz_path, raster_path, corner_coords
 
