@@ -76,7 +76,10 @@ def execute(args):
     wps_nml = f90nml.read(args['wps_namelist_path'])
     wrf_nml = f90nml.read(args['wrf_namelist_path'])
     fire_nml = f90nml.read(args['fire_namelist_path'])
-
+    ems_nml = None
+    if 'emissions_namelist_path' in args:
+        ems_nml = f90nml.read(args['emissions_namelist_path'])
+    
     num_doms = int(wps_nml['share']['max_dom'])
 
     logging.info("number of domains is %d." % num_doms)
@@ -131,11 +134,14 @@ def execute(args):
 
     logging.info("running REAL")
 
-    # step 7: patch input namelist, fire namelist and execute real.exe
+    # step 7: patch input namelist, fire namelist, emissions namelist (if required)
+    #         and execute real.exe
     time_ctrl = update_time_control(start_utc, end_utc, num_doms)
     wrf_nml['time_control'].update(time_ctrl)
     update_namelist(wrf_nml, grib_source.namelist_keys())
     f90nml.write(fire_nml, osp.join(wrf_dir, 'namelist.fire'), force=True)
+    if ems_nml is not None:
+        f90nml.write(ems_nml, osp.join(wrf_dir, 'namelist.fire_emissions'), force=True)
 
     # render ignition specification into the wrf namelist
     if 'ignitions' in args:
@@ -187,7 +193,7 @@ def execute(args):
         if "Timing for Writing wrfout" in line:
             esmf_time,domain_str = re.match(r'.*wrfout_d.._([0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             dom_id = int(domain_str)
-            logging.info("Detected history write in for domain %d for time %s." % (dom_id, esmf_time))
+            logging.info("Detected history write for domain %d for time %s." % (dom_id, esmf_time))
             if str(dom_id) in pp_instr:
                 var_list = [str(x) for x in pp_instr[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
@@ -213,10 +219,24 @@ def verify_inputs(args):
                       ('fire_namelist_path', 'Non-existent fire namelist template %s'),
                       ('geogrid_path', 'Non-existent geogrid data (WPS-GEOG) path %s')]
 
+    optional_files = [('emissions_namelist_path', 'Non-existent namelist template %s')]
+
     # check each path that should exist
     for key, err in required_files:
         if not osp.exists(args[key]):
             raise OSError(err % args[key])
+
+    # check each path that should exist
+    for key, err in optional_files:
+        if key in args:
+            if not osp.exists(args[key]):
+                raise OSError(err % args[key])
+
+    # if precomputed key is present, check files linked in
+    if 'precomputed' in args:
+      for key,path in args['precomputed'].iteritems():
+          if not osp.exists(path):
+              raise OSError('Precomputed entry %s points to non-existent file %s' % (key,path))
 
     # check if the postprocessor knows how to handle all variables
     wvs = get_wisdom_variables()
@@ -225,7 +245,7 @@ def verify_inputs(args):
         for dom in args['postproc'].keys():
             for vname in args['postproc'][dom]:
                 if vname not in wvs:
-                    logger.error('unrecognized variable %s in postproc key for domain %s.' % (vname, dom))
+                    logging.error('unrecognized variable %s in postproc key for domain %s.' % (vname, dom))
                     failing = True
     if failing:
         raise ValueError('One or more unrecognized variables in postproc.')
@@ -239,18 +259,31 @@ def test():
             'wrf_install_dir': '/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/WRFV3',
             'grib_source': HRRR('ingest'),
             'wps_namelist_path': 'etc/nlists/colorado-3k.wps',
-            'wrf_namelist_path': 'etc/nlists/colorado-3k.input',
+            'wrf_namelist_path': 'etc/nlists/colorado-3k.input.tracers',
             'fire_namelist_path': 'etc/nlists/colorado-3k.fire',
-            'precomputed' : { 'geo_em.d01.nc' : 'precomputed/colorado/geo_em.d01',
-                              'geo_em.d02.nc' : 'precomputed/colorado/geo_em.d02' },
+            'emissions_namelist_path' : 'etc/nlists/colorado-3k.fire_emissions',
+            'precomputed' : { 'geo_em.d01.nc' : 'precomputed/colorado/geo_em.d01.nc',
+                              'geo_em.d02.nc' : 'precomputed/colorado/geo_em.d02.nc' },
             'geogrid_path': '/share_home/mvejmelka/Packages/WPS-GEOG',
-            'sys_install_dir': '/share_home/mvejmelka/Projects/wrfxpy',
+            'sys_install_dir': '/share_home/mvejmelka/Projects/wrfxpy-dev',
+            'postproc' : {
+                "2" : [ "T2", "PSFC", "WINDSPD", "WINDVEC", "FIRE_AREA", "FIRE_HFX", "SMOKE_INT", "F_ROS" ]
+            },
+            "ignitions" : {
+                "2" : [ {
+                    "start_delay_s" : 600,
+                    "duration_s" : 240,
+                    "lat" : 39.894264,
+                    "long" : -103.903222
+                    } ]
+            },
             'num_nodes': 10,
             'ppn': 12,
             'wall_time_hrs': 3,
             'qman': 'sge',
             'start_utc': datetime(2016, 1, 17, 16, 0, 0),
-            'end_utc': datetime(2016, 1, 17, 22, 0, 0)}
+            'end_utc': datetime(2016, 1, 17, 22, 0, 0)
+           }
 
     verify_inputs(args)
 
@@ -283,6 +316,9 @@ if __name__ == '__main__':
     # load configuration JSON
     cfg_str = open(sys.argv[1]).read()
     args = json.loads(cfg_str, 'ascii')
+
+    # configure the basic logger
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # HRRR source is compulsory
     assert args['grib_source'] == 'HRRR'

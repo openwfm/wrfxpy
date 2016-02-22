@@ -101,11 +101,11 @@
  v_mom_adv_order                     = 5,     5,
  h_sca_adv_order                     = 5,     5,
  v_sca_adv_order                     = 5,     5,
- non_hydrostatic                     = .true.,.true.,
+ non_hydrostatic                     = .true.,.true.
  /
 
 &fire ! be sure to set sr_x,sr_y in domains-namelist (to set refinement in x,y)
-ifire                               =   0,     0
+ifire                               =   0,     2
 fire_fuel_read                      =   0,      -1
 fire_fuel_cat                       =   3,      1
 fire_print_msg                      =   0,      1
