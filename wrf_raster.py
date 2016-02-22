@@ -39,8 +39,8 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,cb_title,dpi=200):
     # move ticks to left side
     ax.yaxis.set_ticks_position('left')
     for tick_lbl in ax.get_yticklabels():
-      tick_lbl.set_color('1')
-      tick_lbl.set_fontsize(8)
+        tick_lbl.set_color('1')
+        tick_lbl.set_fontsize(8)
 
     # save png to a StringIO
     str_io = StringIO.StringIO()

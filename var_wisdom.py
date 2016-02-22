@@ -1,6 +1,26 @@
 import numpy as np
 
 _var_wisdom = {
+     'FGRNHFX' : {
+        'name' : 'Ground level heat flux [log]',
+        'native_unit' : 'W/m^2',
+        'colorbar_units' : ['W/m^2'],
+        'colormap' : 'jet',
+        'transparent_values' : [-np.inf, 0],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: np.ma.filled(np.ma.log10(np.ma.masked_less_equal(d.variables['FGRNHFX'][t,:,:], 0)), 0),
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:]),
+      },
+     'SMOKE_INT' : {
+        'name' : 'vertically integrated smoke',
+        'native_unit' : '-',
+        'colorbar_units' : ['-'],
+        'colormap' : 'gray_r',
+        'transparent_values' : [-np.inf, 50],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: np.sum(d.variables['tr17_1'][t,:,:,:], axis=0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
     'T2' : {
         'name' : 'temperature at 2m',
         'native_unit' : 'K',
@@ -15,6 +35,7 @@ _var_wisdom = {
         'native_unit' : '-',
         'colorbar_units' : ['-'],
         'colormap' : 'gray_r',
+        'transparent_values' : [-np.inf, 0],
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['FIRE_AREA'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
@@ -24,27 +45,19 @@ _var_wisdom = {
         'native_unit' : '-',
         'colorbar_units' : ['-'],
         'colormap' : 'jet',
+        'transparent_values' : [-np.inf, 0],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: d.variables['FLINEINT'][t,:,:],
+        'retrieve_as' : lambda d,t: np.ma.filled(np.ma.log10(np.ma.masked_less_equal(d.variables['FLINEINT'][t,:,:], 0)), 0),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
       },
-    'FLINEINT2' : {
-        'name' : 'fireline intensity 2',
-        'native_unit' : '-',
-        'colorbar_units' : ['-'],
-        'colormap' : 'jet',
-        'scale' : 'original',
-        'retrieve_as' : lambda d,t: d.variables['FLINEINT2'][t,:,:],
-        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
-      },
-    'RH_FIRE' : {
+     'RH_FIRE' : {
         'name' : 'relative humidity',
         'native_unit' : '-',
         'colorbar_units' : ['-'],
         'colormap' : 'jet_r',
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['RH_FIRE'][t,:,:],
-        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
      'FIRE_HFX' : {
         'name' : 'fire heat flux',
@@ -52,6 +65,7 @@ _var_wisdom = {
         'colorbar_units' : ['W/m^2'],
         'colormap' : 'jet',
         'scale' : 'original',
+        'transparent_values' : [-np.inf, 0],
         'retrieve_as' : lambda d,t: d.variables['FIRE_HFX'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
       },

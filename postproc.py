@@ -9,6 +9,7 @@ import numpy as np
 import netCDF4 as nc4
 import sys, os, StringIO, utils, json, logging
 import os.path as osp
+import traceback
 
 from var_wisdom import convert_value, get_wisdom
 from wrf_raster import make_colorbar, basemap_raster_mercator, basemap_barbs_mercator
@@ -34,6 +35,11 @@ class Postprocessor(object):
         self.product_name = prod_name
         self.manifest = {}
 
+        # in case the manifest exists, load the existing version
+        mf_path = os.path.join(output_path, prod_name + '.json')
+        if osp.exists(mf_path):
+            self.manifest = json.load(open(mf_path))
+    
     def _scalar2raster(self, d, var, tndx):
         """
         Convert a single variable into a raster and colorbar.
@@ -71,6 +77,11 @@ class Postprocessor(object):
 
         #  colorbar + add it to the KMZ as a screen overlay
         cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit,var)
+
+        # check for 'transparent' color value and replace with nans
+        if 'transparent_values' in wisdom:
+            rng = wisdom['transparent_values']
+            fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
 
         # create the raster & get coordinate bounds
         raster_png_data,corner_coords = basemap_raster_mercator(lon,lat,fa,fa_min,fa_max,cmap)
@@ -271,13 +282,14 @@ class Postprocessor(object):
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
                 kmz_path = None
                 if var in ['WINDVEC']:
-                    kmz_path,_,_,_= self._vector2kmz(d, var, tndx, outpath_base)
+                    kmz_path,_,_ = self._vector2kmz(d, var, tndx, outpath_base)
                 else:
                     kmz_path,_,_,_ = self._scalar2kmz(d, var, tndx, outpath_base)
                 kmz_name = osp.basename(kmz_path)
                 self._update_manifest(ts_esmf, var, { 'kml' : kmz_name })
             except Exception as e:
-                logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
+                logging.warning("Exception %s while postprocessing %s for time %s into KMZ" % (e.message, var, ts_esmf))
+                logging.warning(traceback.print_exc())
 
     
     def vars2png(self, wrfout_path, dom_id, ts_esmf, vars):
@@ -311,15 +323,16 @@ class Postprocessor(object):
                     raster_name, cb_name = osp.basename(raster_path), osp.basename(cb_path)
                     self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'colorbar' : cb_name, 'coords' : coords})
             except Exception as e:
-                logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
+                logging.warning("Exception %s while postprocessing %s for time %s into PNG" % (e.message, var, ts_esmf))
+                logging.warning(traceback.print_exc())
 
-
-    def process_file(self, wrfout_path, var_list):
+    def process_file(self, wrfout_path, var_list, skip=1):
         """
         Process an entire file, all timestamps.
 
         :param wrfout_path: the wrfout to process
         :param var_list: list of variables to process
+        :param skip: only process every skip-th frame
         """
         # open the netCDF dataset
         d = nc4.Dataset(wrfout_path)
@@ -328,7 +341,7 @@ class Postprocessor(object):
         times = [''.join(x) for x in d.variables['Times'][:]]
 
         # build one KMZ per variable
-        for tndx, ts_esmf in enumerate(times):
+        for tndx, ts_esmf in enumerate(times[::skip]):
             print('Processing time %s ...' % ts_esmf)
             for var in var_list:
                 try:
@@ -349,7 +362,7 @@ class Postprocessor(object):
 
 
 
-    def _update_manifest(self,ts_esmf, var, kv):
+    def _update_manifest(self,ts_esmf,var,kv):
         """
         Adds a key-value set to the dictionary storing metadata for time ts_esmf and variable var.
 
@@ -370,17 +383,22 @@ class Postprocessor(object):
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     
-    if len(sys.argv) != 4:
-        print('usage: %s <wrfout_path> <var_list> <prefix>' % sys.argv[0])
+    if len(sys.argv) != 4 and len(sys.argv) != 5:
+        print('usage: %s <wrfout_path> <var_list> <prefix> [skip]' % sys.argv[0])
         sys.exit(1)
 
     wrf_path = sys.argv[1]
     var_list = sys.argv[2].split(',')
     prefix = sys.argv[3]
+    skip = 1
+    if len(sys.argv) == 5:
+        skip = int(sys.argv[4])
 
     p = Postprocessor(os.path.dirname(prefix), os.path.basename(prefix))
-    p.process_file(wrf_path, var_list)
+    p.process_file(wrf_path, var_list, skip)
 
 
 
