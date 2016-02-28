@@ -4,17 +4,17 @@ _var_wisdom = {
      'FGRNHFX' : {
         'name' : 'Ground level heat flux [log]',
         'native_unit' : 'W/m^2',
-        'colorbar_units' : ['W/m^2'],
+        'colorbar' : 'W/m^2',
         'colormap' : 'jet',
-        'transparent_values' : [-np.inf, 0],
-        'scale' : 'original',
+        'transparent_values' : [-np.inf, 1],
+        'scale' : [0, 6],
         'retrieve_as' : lambda d,t: np.ma.filled(np.ma.log10(np.ma.masked_less_equal(d.variables['FGRNHFX'][t,:,:], 0)), 0),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:]),
       },
      'SMOKE_INT' : {
         'name' : 'vertically integrated smoke',
         'native_unit' : '-',
-        'colorbar_units' : ['-'],
+        'colorbar' : None,
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, 50],
         'scale' : 'original',
@@ -24,7 +24,7 @@ _var_wisdom = {
     'T2' : {
         'name' : 'temperature at 2m',
         'native_unit' : 'K',
-        'colorbar_units' : ['C', 'F'],
+        'colorbar' : 'C',
         'colormap' : 'jet',
         'scale' : 'original',
         'retrieve_as' : lambda d,t: d.variables['T2'][t,:,:],
@@ -33,8 +33,8 @@ _var_wisdom = {
     'FIRE_AREA' : {
         'name' : 'fire area',
         'native_unit' : '-',
-        'colorbar_units' : ['-'],
-        'colormap' : 'gray_r',
+        'colorbar' : None,
+        'colormap' : 'gray',
         'transparent_values' : [-np.inf, 0],
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['FIRE_AREA'][t,:,:],
@@ -43,9 +43,9 @@ _var_wisdom = {
     'FLINEINT' : {
         'name' : 'fireline intensity',
         'native_unit' : '-',
-        'colorbar_units' : ['-'],
+        'colorbar' : '-',
         'colormap' : 'jet',
-        'transparent_values' : [-np.inf, 0],
+        'transparent_values' : [-np.inf, 1],
         'scale' : 'original',
         'retrieve_as' : lambda d,t: np.ma.filled(np.ma.log10(np.ma.masked_less_equal(d.variables['FLINEINT'][t,:,:], 0)), 0),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
@@ -53,7 +53,7 @@ _var_wisdom = {
      'RH_FIRE' : {
         'name' : 'relative humidity',
         'native_unit' : '-',
-        'colorbar_units' : ['-'],
+        'colorbar' : '-',
         'colormap' : 'jet_r',
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['RH_FIRE'][t,:,:],
@@ -62,7 +62,7 @@ _var_wisdom = {
      'FIRE_HFX' : {
         'name' : 'fire heat flux',
         'native_unit' : 'W/m^2',
-        'colorbar_units' : ['W/m^2'],
+        'colorbar' : 'W/m^2',
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf, 0],
@@ -72,7 +72,7 @@ _var_wisdom = {
     'F_ROS' : {
         'name' : 'fire spread rate',
         'native_unit' : 'm/s',
-        'colorbar_units' : ['m/s', 'ft/s'],
+        'colorbar' : 'm/s',
         'colormap' : 'jet',
         'scale' : [0.0, 2.0],
         'retrieve_as' : lambda d,t: d.variables['F_ROS'][t,:,:],
@@ -81,7 +81,7 @@ _var_wisdom = {
     'PSFC' : {
         'name' : 'surface pressure',
         'native_unit' : 'Pa',
-        'colorbar_units' : ['Pa'],
+        'colorbar' : 'Pa',
         'colormap' : 'jet',
         'scale' : 'original',
         'retrieve_as' : lambda d, t: d.variables['PSFC'][t,:,:],
@@ -90,7 +90,7 @@ _var_wisdom = {
      'WINDSPD' : {
         'name' : 'wind speed',
         'native_unit' : 'm/s',
-        'colorbar_units' : ['m/s'],
+        'colorbar' : 'm/s',
         'colormap' : 'jet',
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
@@ -114,7 +114,7 @@ _var_wisdom = {
     'F_INT' : {
         'name' : 'fireline intensity',
         'native_unit' : 'J/m/s^2',
-        'colorbar_units' : ['J/m/s^2'],
+        'colorbarct' : 'J/m/s^2',
         'colormap' : 'jet',
         'scale' : 'original',
         'retrieve_as' : lambda d,t: d.variables['F_INT'][t,:,:],
@@ -123,7 +123,7 @@ _var_wisdom = {
     'NFUEL_CAT' : {
        'name' : 'fuel categories',
        'native_unit' : 'fuel_type',
-       'colorbar_units' : ['fuel_type'],
+       'colorbar' : 'fuel_type',
        'colormap' : 'jet',
        'scale' : 'original',
        'retrieve_as' : lambda d,t: d.variables['NFUEL_CAT'][t,:,:],
@@ -132,7 +132,7 @@ _var_wisdom = {
     'ZSF' : {
        'name' : 'terrain height',
        'native_unit' : 'm',
-       'colorbar_units' : ['m','ft'],
+       'colorbar' : 'm',
        'colormap' : 'jet',
        'scale' : 'original',
        'retrieve_as' : lambda d,t: d.variables['ZSF'][t,:,:],
@@ -141,7 +141,7 @@ _var_wisdom = {
     'FMC_G' : {
        'name' : 'fuel moisture',
        'native_unit' : '-',
-       'colorbar_units' : ['-'],
+       'colorbar' : '-',
        'colormap' : 'jet_r',
        'scale' : [0.0, 0.5],
        'retrieve_as' : lambda d,t: d.variables['FMC_G'][t,:,:],
@@ -150,34 +150,34 @@ _var_wisdom = {
     '1HR_FM' : {
        'name' : '1-HR fuel moisture',
        'native_unit' : '-',
-       'colorbar_units' : ['-'],
+       'colorbar' : '-',
        'colormap' : 'jet_r',
-       'scale' : [0.0, 1.0],
+       'scale' : [0.0, 0.5],
        'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,0,:,:],
        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     '10HR_FM' : {
        'name' : '10-HR fuel moisture',
        'native_unit' : '-',
-       'colorbar_units' : ['-'],
+       'colorbar' : '-',
        'colormap' : 'jet_r',
-       'scale' : [0.0, 1.0],
+       'scale' : [0.0, 0.5],
        'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,1,:,:],
        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     '100HR_FM' : {
        'name' : '100-HR fuel moisture',
        'native_unit' : '-',
-       'colorbar_units' : ['-'],
+       'colorbar' : '-',
        'colormap' : 'jet_r',
-       'scale' : [0.0, 1.0],
+       'scale' : [0.0, 0.5],
        'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,2,:,:],
        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'FMC_EQUI' : {
        'name' : 'fuel moisture equilibrium',
        'native_unit' : '-',
-       'colorbar_units' : ['-'],
+       'colorbar' : '-',
        'colormap' : 'jet_r',
        'scale' : [0.0, 1.0],
        'retrieve_as' : lambda d,t: d.variables['FMC_EQUI'][t,0,:,:],

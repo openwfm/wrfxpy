@@ -24,16 +24,19 @@ class Postprocessor(object):
     Postprocessing of WRF data.
     """
 
-    def __init__(self, output_path, prod_name):
+    def __init__(self, output_path, prod_name, wisdom_update = {}):
         """
         Initialize postprocessor with output parameters.
 
         :param output_path: path where postprocessing files are stored
         :param prod_name: name of manifest json file and prefix of all output files
+        :param wisdom_update: an optional dictionary that maps variables to
+                              modifications requested in their visualization wisdom
         """
         self.output_path = output_path
         self.product_name = prod_name
         self.manifest = {}
+        self.wisdom_update = wisdom_update
 
         # in case the manifest exists, load the existing version
         mf_path = os.path.join(output_path, prod_name + '.json')
@@ -50,11 +53,11 @@ class Postprocessor(object):
         :return: two StringIO objects, first is the PNG raster, second is PNG colorbar
         """
         # gather wisdom about the variable
-        wisdom = get_wisdom(var)
+        wisdom = get_wisdom(var).copy()
+        wisdom.update(self.wisdom_update.get(var, {}))
         native_unit = wisdom['native_unit']
         cmap_name = wisdom['colormap']
         cmap = mpl.cm.get_cmap(cmap_name)
-        cb_unit = wisdom['colorbar_units'][0]
 
         # extract variable
         fa = wisdom['retrieve_as'](d,tndx) # this calls a lambda defined to read the required 2d field
@@ -73,10 +76,13 @@ class Postprocessor(object):
             fa[fa < fa_min] = fa_min
             fa[fa > fa_max] = fa_max
 
-        cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
-
-        #  colorbar + add it to the KMZ as a screen overlay
-        cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit,var)
+        # only create the colorbar if requested
+        cb_png_data = None
+        if wisdom['colorbar'] is not None:
+            cb_unit = wisdom['colorbar']
+            cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
+            #  colorbar + add it to the KMZ as a screen overlay
+            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit,var)
 
         # check for 'transparent' color value and replace with nans
         if 'transparent_values' in wisdom:
@@ -100,12 +106,15 @@ class Postprocessor(object):
         """
         # gather wisdom about the variable
         wisdom = get_wisdom(var)
+        wisdom.update(self.wisdom_update.get(var, {}))
         native_unit = wisdom['native_unit']
         u_name, v_name = wisdom['components']
         lat, lon = wisdom['grid'](d)
 
         # extract variable
         uw, vw = get_wisdom(u_name), get_wisdom(v_name)
+        uw.update(self.wisdom_update.get(u_name, {}))
+        vw.update(self.wisdom_update.get(v_name, {}))
         u = uw['retrieve_as'](d, tndx)
         v = vw['retrieve_as'](d, tndx)
 
@@ -153,9 +162,11 @@ class Postprocessor(object):
             f.write(raster_png_data)
 
         # write colorbar file
-        colorbar_path = out_path + "-cb.png"
-        with open(colorbar_path, "w") as f:
-            f.write(cb_png_data)
+        colorbar_path = None
+        if cb_png_data is not None:
+            colorbar_path = out_path + "-cb.png"
+            with open(colorbar_path, "w") as f:
+                f.write(cb_png_data)
 
         return raster_path, colorbar_path, corner_coords
 
@@ -198,14 +209,15 @@ class Postprocessor(object):
         raster_path, cb_path, corner_coords = self._scalar2png(d, var, tndx, out_path)
 
         # add colorbar to KMZ
-        cbo = doc.newscreenoverlay(name='colorbar')
-        cbo.overlayxy = kml.OverlayXY(x=0,y=1,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
-        cbo.screenxy = kml.ScreenXY(x=0.02,y=0.95,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
-        cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixel,yunits=kml.Units.pixel)
-        cbo.color = kml.Color.rgb(255,255,255,a=150)
-        cbo.visibility = 1
-        doc.addfile(cb_path)
-        cbo.icon.href=cb_path
+        if cb_path is not None:
+            cbo = doc.newscreenoverlay(name='colorbar')
+            cbo.overlayxy = kml.OverlayXY(x=0,y=1,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
+            cbo.screenxy = kml.ScreenXY(x=0.02,y=0.95,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
+            cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixel,yunits=kml.Units.pixel)
+            cbo.color = kml.Color.rgb(255,255,255,a=150)
+            cbo.visibility = 1
+            doc.addfile(cb_path)
+            cbo.icon.href=cb_path
 
         # add ground overlay
         ground = doc.newgroundoverlay(name=var,color='80ffffff')
@@ -233,6 +245,7 @@ class Postprocessor(object):
         :param var: the variable name
         :param tndx: the temporal index of the grid to store
         :param out_path: the path to the KMZ output
+        :param cleanup: if True, PNG files are deleted after KMZ is build
         :return: the path to the generated KMZ
         """
         # construct kml file
@@ -320,15 +333,17 @@ class Postprocessor(object):
                     self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'coords' : coords})
                 else:
                     raster_path, cb_path, coords = self._scalar2png(d, var, tndx, outpath_base)
-                    raster_name, cb_name = osp.basename(raster_path), osp.basename(cb_path)
-                    self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'colorbar' : cb_name, 'coords' : coords})
+                    mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords}
+                    if cb_path is not None:
+                        mf_upd['colorbar'] = osp.basename(cb_path)
+                    self._update_manifest(ts_esmf, var, mf_upd)
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s into PNG" % (e.message, var, ts_esmf))
                 logging.warning(traceback.print_exc())
 
     def process_file(self, wrfout_path, var_list, skip=1):
         """
-        Process an entire file, all timestamps.
+        Process an entire file, all timestamps and generate images for var_instr.keys().
 
         :param wrfout_path: the wrfout to process
         :param var_list: list of variables to process
@@ -341,6 +356,7 @@ class Postprocessor(object):
         times = [''.join(x) for x in d.variables['Times'][:]]
 
         # build one KMZ per variable
+        fixed_colorbars = {}
         for tndx, ts_esmf in enumerate(times[::skip]):
             print('Processing time %s ...' % ts_esmf)
             for var in var_list:
@@ -353,11 +369,25 @@ class Postprocessor(object):
                         self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'coords' : coords, 'kml' : kmz_name})
                     else:
                         kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, outpath_base, cleanup=False)
-                        raster_name, cb_name = osp.basename(raster_path), osp.basename(cb_path)
-                        kmz_name = osp.basename(kmz_path)
-                        self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'colorbar' : cb_name, 'coords' : coords, 'kml' : kmz_name })
+                        mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords, 'kml' : osp.basename(kmz_path) }
+                        if cb_path is not None:
+                            # optimization for display when we know colorbar has fixed scale
+                            # we memoize the colorbar computed at time 0 and use it for all frames
+                            # although other colorbars are generated, they are deleted
+                            scale = self.wisdom_update.get('scale', get_wisdom(var)['scale'])
+                            if type(scale) == list and np.isfinite(scale[0]) and np.isfinite(scale[1]):
+                                logging.info("Using fixed colorbar strategy for variable " + var)
+                                if tndx == 0:
+                                    fixed_colorbars[var] = osp.basename(cb_path)
+                                else:
+                                    os.remove(cb_path)
+                                mf_upd['colorbar'] = fixed_colorbars[var]
+                            else:
+                                mf_upd['colorbar'] = osp.basename(cb_path)
+                        self._update_manifest(ts_esmf, var, mf_upd)
                 except Exception as e:
                     logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
+                    logging.warning(traceback.print_exc())
 
 
 
@@ -387,19 +417,22 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     
     if len(sys.argv) != 4 and len(sys.argv) != 5:
-        print('usage: %s <wrfout_path> <var_list> <prefix> [skip]' % sys.argv[0])
+        print('usage: %s <wrfout_path> <var_instr> <prefix> [skip]' % sys.argv[0])
         sys.exit(1)
 
     wrf_path = sys.argv[1]
-    var_list = sys.argv[2].split(',')
+    var_instr = None
+    if sys.argv[2][0] == '@':
+        var_instr = json.load(open(sys.argv[2][1:]))
+    else:
+        var_instr = {x:{} for x in sys.argv[2].split(',')}
+        
     prefix = sys.argv[3]
     skip = 1
     if len(sys.argv) == 5:
         skip = int(sys.argv[4])
 
-    p = Postprocessor(os.path.dirname(prefix), os.path.basename(prefix))
-    p.process_file(wrf_path, var_list, skip)
-
-
+    p = Postprocessor(os.path.dirname(prefix), os.path.basename(prefix), var_instr)
+    p.process_file(wrf_path, var_instr.keys(), skip)
 
 
