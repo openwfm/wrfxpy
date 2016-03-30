@@ -22,15 +22,13 @@ All of the following keys except ``precomputed`` are required.
 
 * ``grid_code : [string]`` the grid code is part of the job id and semantically should identify the configured grid
 * ``grib_source : [string]`` must be HRRR
-* ``geogrid_path : [string]`` the path to ``WPS GEOG`` data
+* ``geogrid_path : [string]`` the path to ``WPS GEOG`` data, refer to WPS documentation
 * ``start_utc : [esmf_time]`` the start time of the simulation in ESMF format
 * ``end_utc : [esmf_time]`` the end time of the simulation in ESMF format
 
-The keys in the remainder of this section are optional.  Without the ignitions key, the fire section of
-the template ``namelist.input`` will remain unaffected.  If the ``ignitions``
-key is included, the fire model is switched on.
+The keys in the remainder of this section are optional.
 
-* ``ignitions : [dict]`` (optional) is a dictionary of domains (string identifier, e.g. "1") to a list of ignitions that should be added to the domain, each being a dictionary with keys as shown in example.  Including this option causes the fire model to be switched on in each domain with ignitions.  Limitation: each ignition can only be setup in one domain.
+* ``ignitions : [dict]`` (optional) is a dictionary of domains (string identifier, e.g. "1") to a list of ignitions that should be added to the domain, each being a dictionary with keys as shown in example.  Including this option causes the fire model to be switched on in each domain listed.  A total of five ignitions is allowed (combined for all domains).  If a domain is listed without any ignitions, the fire model is switched on and computes spread rates etc for fire danger forecasting.
 * ``precomputed : [dict]`` (optional) the system has support for precomputed geogrids, which can be linked in instead of running ``geogrid.exe``.  The value must be a dictionary mapping ``geo_em.dYY.nc`` files to their actual location.
 
 
@@ -58,7 +56,6 @@ The following keys are compulstory.
 Postprocessing
 ==============
 
-The key ``postproc``, when present contains a dictionary keyed by domain id (string),
-which identifies the variables to postprocess for each domain.
-
+The key ``postproc``, when present contains a dictionary keyed by domain id (string), which identifies the variables to postprocess for each domain.
+For each listed variable, a PNG and a KMZ file is created and if required, a colorbar (configured in ``var_wisdom``).
   

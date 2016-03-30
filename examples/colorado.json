@@ -20,6 +20,7 @@
     "geo_em.d02.nc" : "precomputed/colorado/geo_em.d02.nc"
   },
   "ignitions" : {
+     "1" : [],
      "2" : [ {
       "start_delay_s" : 600,
       "duration_s" : 240,

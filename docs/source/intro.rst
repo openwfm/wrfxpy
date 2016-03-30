@@ -20,6 +20,7 @@ The *wrfxpy* system needs the following software to be installed:
 * `Python 2.7+ <https://www.python.org/download/releases/2.7/>`_
 * `Basemap <http://matplotlib.org/basemap/>`_
 * `simplekml <https://simplekml.readthedocs.org/en/latest/>`_
+* `f90nml <https://pypi.python.org/pypi/f90nml>`_
 
 The simplest way to satisfy these requirements is to install `Anaconda Python <https://www.continuum.io/downloads>`_ and then run the following commands:
 
