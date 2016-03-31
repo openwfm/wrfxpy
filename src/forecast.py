@@ -19,14 +19,15 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-from wrf_cloner import WRFCloner
-from wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
+from wrf.wrf_cloner import WRFCloner
+from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions, make_dir, \
                   timespec_to_utc_hour
-from postproc import Postprocessor
-from grib_source import HRRR
-from var_wisdom import get_wisdom_variables
+from vis.postprocessor import Postprocessor
+from vis.var_wisdom import get_wisdom_variables
+
+from ingest.grib_source import HRRR, NAM218, NARR
 
 import f90nml
 from datetime import datetime, timedelta
@@ -35,6 +36,7 @@ import os.path as osp
 
 import smtplib
 from email.mime.text import MIMEText
+
 
 def send_email(email_parameters, event, body):
     """
@@ -45,7 +47,7 @@ def send_email(email_parameters, event, body):
     :param event: name of the event firing the e-mail, the e-mail will not be sent unless <event> appears in the events array
     :param body: the body that will be placed into the e-mail
     """
-    if event in email_parameters['events']:
+    if email_parameters is not None and event in email_parameters['events']:
         mail_serv = smtplib.SMTP(email_parameters.get('smtp_server', 'localhost'))
         msg = email_parameters['mime_text']
         msg.set_payload(body)
@@ -90,7 +92,7 @@ def execute(args):
     job_id = make_job_id(grid_code, start_utc, fc_hrs)
 
     # configure e-mail notifications about this job
-    email_notification = args.get('email_notification', None)
+    email_notification = args.get('email_notifications', None)
     if email_notification is not None:
         msg = MIMEText('')
         msg['To'] = email_notification['to']

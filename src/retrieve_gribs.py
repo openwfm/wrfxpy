@@ -19,8 +19,9 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-from grib_source import HRRR, NAM218, NARR
+from ingest.grib_source import HRRR, NAM218, NARR
 from utils import esmf_to_utc
+
 import logging
 import sys
 

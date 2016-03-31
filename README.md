@@ -1,2 +1,2 @@
 # wrfxpy
-WRF fire forecasting and data assimilation in python
+WRF fire forecasting and fuel moisture data assimilation system.

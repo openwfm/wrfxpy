@@ -55,3 +55,10 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# temporary output
+temp/
+
+# input/output directories
+ingest/
+wksp/

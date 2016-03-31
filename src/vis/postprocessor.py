@@ -11,8 +11,8 @@ import sys, os, StringIO, utils, json, logging
 import os.path as osp
 import traceback
 
-from var_wisdom import convert_value, get_wisdom
-from wrf_raster import make_colorbar, basemap_raster_mercator, basemap_barbs_mercator
+from vis.rasterizer import make_colorbar, basemap_raster_mercator, basemap_barbs_mercator
+from vis.var_wisdom import convert_value, get_wisdom
 
 
 class PostprocError(Exception):
