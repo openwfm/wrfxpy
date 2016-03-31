@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) 2013-2016 Martin Vejmelka, UC Denver
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,14 +17,13 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from utils import ensure_dir, symlink_unless_exists, esmf_to_utc
+from utils import ensure_dir, symlink_unless_exists
 from datetime import datetime, timedelta
 import pytz
 import requests
 import os
 import os.path as osp
 import sys
-import logging
 
 
 class GribError(Exception):
@@ -446,47 +444,5 @@ def generate_grib_names():
         for c2 in alphabet:
             for c3 in alphabet:
                 yield "GRIBFILE." + c1 + c2 + c3
-
-## Standalone script that can be used to simply download files
-if __name__ == '__main__':
-    if len(sys.argv) != 5:
-        print('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0])
-        print('       supported GRIB sources: HRRR, NAM, NARR')
-        sys.exit(-1)
-
-    # configure the basic logger
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-    grib_src_name = sys.argv[1]
-    from_utc = esmf_to_utc(sys.argv[2])
-    to_utc = esmf_to_utc(sys.argv[3])
-    ingest_dir = sys.argv[4]
-
-    grib_src = None
-    if grib_src_name == 'HRRR':
-        grib_src = HRRR(ingest_dir)
-    elif grib_src_name == 'NAM':
-        grib_src = NAM218(ingest_dir)
-    elif grib_src_name == 'NARR':
-        grib_src = NARR(ingest_dir)
-    else:
-        raise ValueError('Invalid GRIB source %s' % grib_src_name)
-
-    logging.info('Initiating download of files from GRIB source %s' % grib_src_name)
-
-    gribs = grib_src.retrieve_gribs(from_utc, to_utc)
-    
-    logging.info('SUCCESS, the following files are now available:')
-    print('')
-    for g in gribs:
-        print(osp.join(ingest_dir, g))
-    
-    print('\n** NOTE **')
-    print('The following variable tables must be used with this grib source:')
-    print(repr(grib_src.vtables()))
-    print('The following keys must be set in namelists:')
-    print(repr(grib_src.namelist_keys()))
-
-
 
 
