@@ -33,6 +33,24 @@ from datetime import datetime, timedelta
 import time, re, json, sys, logging
 import os.path as osp
 
+import smtplib
+from email.mime.text import MIMEText
+
+def send_email(email_parameters, event, body):
+    """
+    Sends an e-mail with body <body> according to the e-mail parameters (constructed in execute) if the stated <event>
+    is contained in the appropriate array.
+
+    :param email_parameters: the e-mail configuration including the mime text, from, to addresses and smtp_server
+    :param event: name of the event firing the e-mail, the e-mail will not be sent unless <event> appears in the events array
+    :param body: the body that will be placed into the e-mail
+    """
+    if event in email_parameters['events']:
+        mail_serv = smtplib.SMTP(email_parameters.get('smtp_server', 'localhost'))
+        msg = email_parameters['mime_text']
+        msg.set_payload(body)
+        mail_serv.sendmail(msg['From'], [msg['To']], msg.as_string())
+
 
 def make_job_id(grid_code, start_utc, fc_hrs):
     """
@@ -60,6 +78,7 @@ def execute(args):
         wrf_namelist_path: the path to the namelist.input file that will be used as template
         fire_namelist_path: the path to the namelist.fire file that will be used as template
         geogrid_path: the path to the geogrid data directory providing terrain/fuel data
+        email_notification: dictionary containing keys address and events indicating when a mail should be fired off
     :return:
     """
     logging.basicConfig(level=logging.INFO)
@@ -70,7 +89,17 @@ def execute(args):
     fc_hrs = compute_fc_hours(start_utc, end_utc)
     job_id = make_job_id(grid_code, start_utc, fc_hrs)
 
+    # configure e-mail notifications about this job
+    email_notification = args.get('email_notification', None)
+    if email_notification is not None:
+        msg = MIMEText('')
+        msg['To'] = email_notification['to']
+        msg['From'] = 'wrfxpy@gross.ucdenver.edu' 
+        msg['Subject'] = 'Job %s: status update' % job_id
+        email_notification['mime_text'] = msg
+
     logging.info("job %s starting [%d hours to forecast]." % (job_id, fc_hrs))
+    send_email(email_notification, 'start', 'Job %s started.' % job_id)
 
     # read in all namelists
     wps_nml = f90nml.read(args['wps_namelist_path'])
@@ -105,12 +134,14 @@ def execute(args):
         logging.info("running GEOGRID")
         Geogrid(wps_dir).execute().check_output()
 
+    send_email(email_notification, 'geogrid', 'Job %s - geogrid complete.' % job_id)
     logging.info("retrieving GRIB files.")
 
     # step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps
     manifest = grib_source.retrieve_gribs(start_utc, end_utc)
     grib_source.symlink_gribs(manifest, wps_dir)
 
+    send_email(email_notification, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (job_id, len(manifest)))
     logging.info("running UNGRIB")
 
     # step 4: patch namelist for ungrib end execute ungrib
@@ -121,11 +152,13 @@ def execute(args):
 
     Ungrib(wps_dir).execute().check_output()
 
+    send_email(email_notification, 'ungrib', 'Job %s - ungrib complete.' % job_id)
     logging.info("running METGRID")
 
     # step 5: execute metgrid
     Metgrid(wps_dir).execute().check_output()
 
+    send_email(email_notification, 'metgrid', 'Job %s - metgrid complete.' % job_id)
     logging.info("cloning WRF into %s" % wrf_dir)
 
     # step 6: clone wrf directory, symlink all met_em* files
@@ -151,11 +184,14 @@ def execute(args):
     Real(wrf_dir).execute().check_output()
 
     logging.info("submitting WRF job")
+    send_email(email_notification, 'wrf_submit', 'Job %s - wrf job submitted.' % job_id)
 
     # step 8: execute wrf.exe on parallel backend
     qman, nnodes, ppn, wall_time_hrs = args['qman'], args['num_nodes'], args['ppn'], args['wall_time_hrs']
     task_id = "sim-" + grid_code + "-" + utc_to_esmf(start_utc)[:10]
     WRF(wrf_dir, qman).submit(task_id, nnodes, ppn, wall_time_hrs)
+
+    send_email(email_notification, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (job_id, task_id))
 
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % task_id)
 
@@ -187,6 +223,7 @@ def execute(args):
             continue
 
         if "SUCCESS COMPLETE WRF" in line:
+            send_email(email_notification, 'complete', 'Job %s - wrf job complete SUCCESS.' % job_id)
             logging.info("WRF completion detected.")
             break
 
