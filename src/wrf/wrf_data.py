@@ -81,7 +81,9 @@ class WRFModelData:
             del self.fields['RAINC']
         else:
             # if no rainfall data is available, we set RAIN to zeros
-            self.fields['RAIN'] = np.zeros_like(self.fields['lat'])
+            lat = self.fields['lat']
+            rain_shape = (1, lat.shape[0], lat.shape[1])
+            self.fields['RAIN'] = np.zeros(rain_shape)
 
         # precompute the equilibrium fields needed everywhere
         self.equilibrium_moisture()
