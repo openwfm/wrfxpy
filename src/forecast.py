@@ -28,6 +28,7 @@ from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
 from ingest.grib_source import HRRR, NAM218, NARR
+from fmda.fuel_moisture_da import assimilate_fm10_observations
 
 import f90nml
 from datetime import datetime, timedelta
@@ -185,7 +186,14 @@ def execute(args):
     f90nml.write(wrf_nml, osp.join(wrf_dir, 'namelist.input'), force=True)
     Real(wrf_dir).execute().check_output()
 
-    logging.info("submitting WRF job")
+    # step 8: if requested, do fuel moisture DA
+    if 'fuel_moisture_da' in args:
+        logging.info('running fuel moisture data assimilation')
+        mesowest_token = args['fuel_moisture_da']['mesowest_token']
+        for dom in args['fuel_moisture_da']['domains']:
+            assimilate_fm10_observations(osp.join(wrf_dir, 'wrfinput_d%02d' % dom), None, mesowest_token)
+
+    logging.info('submitting WRF job')
     send_email(email_notification, 'wrf_submit', 'Job %s - wrf job submitted.' % job_id)
 
     # step 8: execute wrf.exe on parallel backend

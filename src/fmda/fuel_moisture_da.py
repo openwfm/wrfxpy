@@ -117,11 +117,11 @@ def execute_da_step(model, model_time, covariates, fm10):
     dom_shape = fmc_gc.shape[:2]
 
     # construct covariate storage
-    Xd3 = len(covariates) + 1
+    Xd3 = min(len(covariates) + 1, len(obs_valid_now))
     X = np.zeros((dom_shape[0], dom_shape[1], Xd3))
     X[:,:,0] = fmc_gc[:,:,1]
-    for i,c in enumerate(covariates):
-      X[:,:,i+1] = covariates[i]
+    for i,c in zip(range(Xd3-1),covariates):
+        X[:,:,i+1] = covariates[i]
 
     # run the trend surface model (clamp output to [0.0 - 2.5] to be safe)
     Kf_fn, Vf_fn = fit_tsm(obs_valid_now, X)
@@ -139,7 +139,7 @@ def execute_da_step(model, model_time, covariates, fm10):
 
 
 def run_data_assimilation(wrf_model, fm10, wrf_model_prev = None):
-    """"
+    """
     Run the fuel moisture and DA for all time steps in the model wrf_model.
     If a previous run is available, the fuel moisture values (and covariance if available)
     are transferred.
@@ -206,7 +206,7 @@ def run_data_assimilation(wrf_model, fm10, wrf_model_prev = None):
         d.close()
 
 
-def assimilate_observations(path_wrf, path_wrf0, mesowest_token):
+def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
   
   # load the wrfinput file
   wrfin = WRFModelData(path_wrf, ['T2', 'Q2', 'PSFC', 'HGT', 'FMC_GC', 'FMEP'])
@@ -242,11 +242,11 @@ def assimilate_observations(path_wrf, path_wrf0, mesowest_token):
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 2:
-        print('usage: %s <cfg-file>' % sys.argv[0])
+    if len(sys.argv) != 3:
+        print('usage: %s <wrf-file> <mesowest_token>' % sys.argv[0])
         sys.exit(1)
 
     #cfg = json.load(open(sys.argv[1]))
-    assimilate_observations(sys.argv[1], None, 'd98b58462fe24c83b1444922f0e98d70')
+    assimilate_fm10_observations(sys.argv[1], None, sys.argv[2])
     sys.exit(0)
 
