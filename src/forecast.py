@@ -21,6 +21,8 @@
 
 from wrf.wrf_cloner import WRFCloner
 from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
+from wrf.wps_domains import WPSDomainLCC
+
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions, make_dir, \
                   timespec_to_utc_hour
@@ -34,32 +36,182 @@ import f90nml
 from datetime import datetime, timedelta
 import time, re, json, sys, logging
 import os.path as osp
+from multiprocessing import Process, Queue
 
 import smtplib
 from email.mime.text import MIMEText
 
 
-def send_email(email_parameters, event, body):
+class Dict(dict):
+    """
+    A dictionary that allows member access to its keys.
+    """
+
+    def __init__(self, d):
+        """
+        Updates itself with d.
+        """
+        self.update(d)
+
+    def __getattr__(self, item):
+        return self[item]
+
+    def __setattr__(self, item, value):
+        self[item] = value
+
+
+class JobState(Dict):
+    """
+    A coherent structure that holds information about the job.
+    """
+
+    def __init__(self, args):
+        """
+        Initialize the job state from the arguments dictionary.
+
+        :param args: the forecast job arguments
+        """
+        super(JobState, self).__init__(args)
+        self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
+        self.grib_source = self.resolve_grib_source(self.grib_source)
+        self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(self.fc_hrs)
+        self.emails = self.parse_emails(args)
+        self.domains = args['domains']
+        self.ignitions = args.get('ignitions', None)
+        self.fmda = self.parse_fmda(args)
+        self.postproc = args['postproc']
+
+    
+    def resolve_grib_source(self, gs_name):
+        """
+        Creates the right GribSource object from the name.
+        
+        :param gs_name: the name of the grib source
+        """
+        if gs_name == 'HRRR':
+            return HRRR('ingest')
+        elif gs_name == 'NAM':
+            return NAM218('ingest')
+        elif gs_name == 'NARR':
+            return NARR('ingest')
+        else:
+            raise ValueError('Unrecognized grib_source %s' % gs_name)
+
+
+    def parse_fmda(self, args):
+        """
+        Parse information inside the FMDA blob, if any.
+
+        :param args: the forecast job argument dictionary
+        """
+        if 'fuel_moisture_da' in args:
+            fmda = args['fuel_moisture_da']
+            self.fmda = Dict({'token' : fmda['mesowest_token'], 'domains' : fmda['domains']})
+        else:
+            self.fmda = None
+
+
+    def parse_emails(self, args):
+        """
+        Parse the definition of e-mail notifications
+
+        :param args: the forecast job argument dictionary
+        """
+        if 'email_notifications' in args:
+            emails = args['email_notifications']
+            self.emails = Dict({'to' : emails['to'], 'events' : emails['events'],
+                                'server' : emails.get('smtp_server', 'localhost'),
+                                'origin' : emails.get('from', 'wrfxpy@gross.ucdenver.edu')})
+        else:
+            self.emails = None
+
+
+def send_email(js, event, body):
     """
     Sends an e-mail with body <body> according to the e-mail parameters (constructed in execute) if the stated <event>
     is contained in the appropriate array.
 
-    :param email_parameters: the e-mail configuration including the mime text, from, to addresses and smtp_server
+    :param js: the JobState structure containing confiuration info
     :param event: name of the event firing the e-mail, the e-mail will not be sent unless <event> appears in the events array
     :param body: the body that will be placed into the e-mail
     """
-    if email_parameters is not None and event in email_parameters['events']:
-        mail_serv = smtplib.SMTP(email_parameters.get('smtp_server', 'localhost'))
-        msg = email_parameters['mime_text']
-        msg.set_payload(body)
-        mail_serv.sendmail(msg['From'], [msg['To']], msg.as_string())
+    if js.emails is not None:
+        if event in js.emails.events:
+            mail_serv = smtplib.SMTP(js.emails.server)
+            msg = MIMEText(body)
+            msg['Subject'] = 'Job %s status' % js.job_id
+            msg['From'] = js.emails.origin
+            msg['To'] = js.emails.to
+            mail_serv.sendmail(js.emails.origin, [js.emails.to], msg.as_string())
+            mail_serv.quit()
 
 
-def make_job_id(grid_code, start_utc, fc_hrs):
+def retrieve_gribs_and_run_ungrib(js, q):
     """
-    Computes the job id from grid code, UTC start time and number of forecast hours.
+    This function retrieves required GRIB files and runs ungrib.
+
+    It returns either 'SUCCESS' or 'FAILURE' on completion.
+
+    :param js: the JobState object containing the forecast configuration
+    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
-    return 'wfc-' + grid_code + '-' + utc_to_esmf(start_utc) + '-{0:02d}'.format(fc_hrs)
+    try:
+        logging.info("retrieving GRIB files.")
+
+        # step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps
+        manifest = js.grib_source.retrieve_gribs(js.start_utc, js.end_utc)
+        js.grib_source.symlink_gribs(manifest, js.wps_dir)
+
+        send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
+        logging.info("running UNGRIB")
+
+        # step 4: patch namelist for ungrib end execute ungrib
+        f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+
+        Ungrib(js.wps_dir).execute().check_output()
+
+        send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
+        logging.info('UNGRIB complete')
+        q.put('SUCCESS')
+
+    except Exception as e:
+        logging.error('GRIB2/UNGRIB step failed with exception %s' % repr(e))
+        q.put('FAILURE')
+
+
+def run_geogrid(js, q):
+    """
+    This function runs geogrid or links in precomputed grid files as required.
+
+    :param js: the JobState object containing the forecast configuration
+    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
+    """
+    try:
+        logging.info("running GEOGRID")
+        Geogrid(js.wps_dir).execute().check_output()
+        logging.info('GEOGRID complete')
+        
+        send_email(js, 'geogrid', 'Job %s - geogrid complete.' % js.job_id)
+        q.put('SUCCESS')
+
+    except Exception as e:
+        logging.error('GEOGRID step failed with exception %s' % repr(e))
+        q.put('FAILURE')
+
+
+def process_domains(js):
+    """
+    Parse domain definitions
+    """
+    doms = []
+    for i in range(len(js.domains)):
+        doms.append(WPSDomainLCC(i+1, js.domains[str(i+1)]))
+    js.domains = doms
+
+    # ensure wps_nml is updated with respect to all domains
+    for dom in js.domains:
+        dom.update_wpsnl(js.wps_nml)
+        dom.update_inputnl(js.wrf_nml)
 
 
 def execute(args):
@@ -76,7 +228,7 @@ def execute(args):
         workspace_dir: workspace directory
         wps_install_dir: installation directory of WPS that will be used
         wrf_install_dir: installation directory of WRF that will be used
-        grib_source: a GribSource object that will be used to obtain GRIB files
+        grib_source: a string identifying a valid GRIB2 source
         wps_namelist_path: the path to the namelist.wps file that will be used as template
         wrf_namelist_path: the path to the namelist.input file that will be used as template
         fire_namelist_path: the path to the namelist.fire file that will be used as template
@@ -85,131 +237,123 @@ def execute(args):
     :return:
     """
     logging.basicConfig(level=logging.INFO)
-    wksp_dir, grib_source = args['workspace_dir'], args['grib_source']
 
-    # compute the job id
-    grid_code, start_utc, end_utc = args['grid_code'], args['start_utc'], args['end_utc']
-    fc_hrs = compute_fc_hours(start_utc, end_utc)
-    job_id = make_job_id(grid_code, start_utc, fc_hrs)
+    # initialize the job state from the arguments
+    js = JobState(args)
 
-    # configure e-mail notifications about this job
-    email_notification = args.get('email_notifications', None)
-    if email_notification is not None:
-        msg = MIMEText('')
-        msg['To'] = email_notification['to']
-        msg['From'] = 'wrfxpy@gross.ucdenver.edu' 
-        msg['Subject'] = 'Job %s: status update' % job_id
-        email_notification['mime_text'] = msg
-
-    logging.info("job %s starting [%d hours to forecast]." % (job_id, fc_hrs))
-    send_email(email_notification, 'start', 'Job %s started.' % job_id)
+    logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
+    send_email(js, 'start', 'Job %s started.' % js.job_id)
 
     # read in all namelists
-    wps_nml = f90nml.read(args['wps_namelist_path'])
-    wrf_nml = f90nml.read(args['wrf_namelist_path'])
-    fire_nml = f90nml.read(args['fire_namelist_path'])
-    ems_nml = None
+    js.wps_nml = f90nml.read(args['wps_namelist_path'])
+    js.wrf_nml = f90nml.read(args['wrf_namelist_path'])
+    js.fire_nml = f90nml.read(args['fire_namelist_path'])
+    js.ems_nml = None
     if 'emissions_namelist_path' in args:
-        ems_nml = f90nml.read(args['emissions_namelist_path'])
+        js.ems_nml = f90nml.read(args['emissions_namelist_path'])
     
-    num_doms = int(wps_nml['share']['max_dom'])
+    js.num_doms = len(js.domains)
+    js.wps_nml['share']['max_dom'] = js.num_doms
+    js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * js.num_doms
+    js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * js.num_doms
+    js.wps_nml['share']['interval_seconds'] = 3600
 
-    logging.info("number of domains is %d." % num_doms)
+    logging.info("number of domains defined is %d." % js.num_doms)
 
     # build directories in workspace
-    wps_dir = osp.abspath(osp.join(wksp_dir, job_id, 'wps'))
-    wrf_dir = osp.abspath(osp.join(wksp_dir, job_id, 'wrf'))
+    js.wps_dir = osp.abspath(osp.join(js.workspace_dir, js.job_id, 'wps'))
+    js.wrf_dir = osp.abspath(osp.join(js.workspace_dir, js.job_id, 'wrf'))
 
-    logging.info("cloning WPS into %s" % wps_dir)
+    logging.info("cloning WPS into %s" % js.wps_dir)
 
     # step 1: clone WPS and WRF directories
     cln = WRFCloner(args)
-    cln.clone_wps(wps_dir, grib_source.vtables(), [])
+    cln.clone_wps(js.wps_dir, js.grib_source.vtables(), [])
 
-    # step 2: patch namelist for geogrid and execute geogrid
-    wps_nml['geogrid']['geog_data_path'] = args['geogrid_path']
-    f90nml.write(wps_nml, osp.join(wps_dir, 'namelist.wps'), force=True)
-    if 'precomputed' in args:
-        logging.info('precomputed grids found, linking in ...')
-        for grid, path in args['precomputed'].iteritems():
-           symlink_unless_exists(osp.abspath(path), osp.join(wps_dir, grid))
-    else:
-        logging.info("running GEOGRID")
-        Geogrid(wps_dir).execute().check_output()
+    # step 2: process domain information and patch namelist for geogrid
+    js.wps_nml['geogrid']['geog_data_path'] = args['geogrid_path']
 
-    send_email(email_notification, 'geogrid', 'Job %s - geogrid complete.' % job_id)
-    logging.info("retrieving GRIB files.")
+    # FIXME: only one domain works now
+    process_domains(js)
 
-    # step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps
-    manifest = grib_source.retrieve_gribs(start_utc, end_utc)
-    grib_source.symlink_gribs(manifest, wps_dir)
+    f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
-    send_email(email_notification, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (job_id, len(manifest)))
-    logging.info("running UNGRIB")
+    # do steps 2 & 3 & 4 in parallel (two execution streams)
+    #  -> GEOGRID ->
+    #  -> GRIB2 download ->  UNGRIB ->
 
-    # step 4: patch namelist for ungrib end execute ungrib
-    wps_nml['share']['start_date'] = [utc_to_esmf(start_utc)] * num_doms
-    wps_nml['share']['end_date'] = [utc_to_esmf(end_utc)] * num_doms
-    wps_nml['share']['interval_seconds'] = 3600
-    f90nml.write(wps_nml, osp.join(wps_dir, 'namelist.wps'), force=True)
+    proc_q = Queue()
+    geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
+    grib_proc = Process(target=retrieve_gribs_and_run_ungrib, args=(js, proc_q))
 
-    Ungrib(wps_dir).execute().check_output()
+    geogrid_proc.start()
+    grib_proc.start()
 
-    send_email(email_notification, 'ungrib', 'Job %s - ungrib complete.' % job_id)
+    # wait until both tasks are done
+    geogrid_proc.join()
+    grib_proc.join()
+
+    if proc_q.get() != 'SUCCESS':
+        return
+
+    if proc_q.get() != 'SUCCESS':
+        return
+
+    proc_q.close()
+
+    # step 5: execute metgrid after ensuring all grids will be processed
+    js.wps_nml['share']['active_grid'] = [True] * js.num_doms
+    f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+
     logging.info("running METGRID")
+    Metgrid(js.wps_dir).execute().check_output()
 
-    # step 5: execute metgrid
-    Metgrid(wps_dir).execute().check_output()
-
-    send_email(email_notification, 'metgrid', 'Job %s - metgrid complete.' % job_id)
-    logging.info("cloning WRF into %s" % wrf_dir)
+    send_email(js, 'metgrid', 'Job %s - metgrid complete.' % js.job_id)
+    logging.info("cloning WRF into %s" % js.wrf_dir)
 
     # step 6: clone wrf directory, symlink all met_em* files
-    cln.clone_wrf(wrf_dir, [])
-    symlink_matching_files(wrf_dir, wps_dir, "met_em*")
+    cln.clone_wrf(js.wrf_dir, [])
+    symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
 
     logging.info("running REAL")
 
     # step 7: patch input namelist, fire namelist, emissions namelist (if required)
     #         and execute real.exe
-    time_ctrl = update_time_control(start_utc, end_utc, num_doms)
-    wrf_nml['time_control'].update(time_ctrl)
-    update_namelist(wrf_nml, grib_source.namelist_keys())
-    f90nml.write(fire_nml, osp.join(wrf_dir, 'namelist.fire'), force=True)
-    if ems_nml is not None:
-        f90nml.write(ems_nml, osp.join(wrf_dir, 'namelist.fire_emissions'), force=True)
-
-    # render ignition specification into the wrf namelist
+    time_ctrl = update_time_control(js.start_utc, js.end_utc, js.num_doms)
+    js.wrf_nml['time_control'].update(time_ctrl)
+    js.wrf_nml['domains']['max_dom'] = js.num_doms
+    update_namelist(js.wrf_nml, js.grib_source.namelist_keys())
     if 'ignitions' in args:
-        update_namelist(wrf_nml, update_ignitions(args['ignitions'], num_doms))
-   
-    f90nml.write(wrf_nml, osp.join(wrf_dir, 'namelist.input'), force=True)
-    Real(wrf_dir).execute().check_output()
+        update_namelist(js.wrf_nml, update_ignitions(js.ignitions, js.num_doms))
+    f90nml.write(js.wrf_nml, osp.join(js.wrf_dir, 'namelist.input'), force=True)
+
+    f90nml.write(js.fire_nml, osp.join(js.wrf_dir, 'namelist.fire'), force=True)
+    if js.ems_nml is not None:
+        f90nml.write(js.ems_nml, osp.join(js.wrf_dir, 'namelist.fire_emissions'), force=True)
+    
+    Real(js.wrf_dir).execute().check_output()
 
     # step 8: if requested, do fuel moisture DA
-    if 'fuel_moisture_da' in args:
+    if js.fmda is not None:
         logging.info('running fuel moisture data assimilation')
-        mesowest_token = args['fuel_moisture_da']['mesowest_token']
-        for dom in args['fuel_moisture_da']['domains']:
-            assimilate_fm10_observations(osp.join(wrf_dir, 'wrfinput_d%02d' % dom), None, mesowest_token)
+        for dom in js.fmda.domains:
+            assimilate_fm10_observations(osp.join(wrf_dir, 'wrfinput_d%02d' % dom), None, js.fmda.token)
 
     logging.info('submitting WRF job')
-    send_email(email_notification, 'wrf_submit', 'Job %s - wrf job submitted.' % job_id)
+    send_email(js, 'wrf_submit', 'Job %s - wrf job submitted.' % js.job_id)
 
     # step 8: execute wrf.exe on parallel backend
-    qman, nnodes, ppn, wall_time_hrs = args['qman'], args['num_nodes'], args['ppn'], args['wall_time_hrs']
-    task_id = "sim-" + grid_code + "-" + utc_to_esmf(start_utc)[:10]
-    WRF(wrf_dir, qman).submit(task_id, nnodes, ppn, wall_time_hrs)
+    js.task_id = "sim-" + js.grid_code + "-" + utc_to_esmf(js.start_utc)[:10]
+    WRF(js.wrf_dir, js.qman).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
 
-    send_email(email_notification, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (job_id, task_id))
-
-    logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % task_id)
+    send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
+    logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
 
     # step 9: wait for appearance of rsl.error.0000 and open it
     wrf_out = None
     while wrf_out is None:
         try:
-            wrf_out = open(osp.join(wrf_dir, 'rsl.error.0000'))
+            wrf_out = open(osp.join(js.wrf_dir, 'rsl.error.0000'))
             break
         except IOError:
             logging.info('forecast: waiting 10 seconds for rsl.error.0000 file')
@@ -220,11 +364,10 @@ def execute(args):
 
     # step 10: track log output and check for history writes fro WRF
     pp_instr, pp = {}, None
-    if 'postproc' in args:
-        pp_instr = args['postproc']
-        pp_dir = osp.join(wksp_dir, job_id, "products")
-        make_dir(pp_dir)
-        pp = Postprocessor(pp_dir, 'wfc-' + grid_code )
+    if js.postproc is not None:
+        js.pp_dir = osp.join(js.workspace_dir, js.job_id, "products")
+        make_dir(js.pp_dir)
+        pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
 
     while True:
         line = wrf_out.readline().strip()
@@ -233,7 +376,7 @@ def execute(args):
             continue
 
         if "SUCCESS COMPLETE WRF" in line:
-            send_email(email_notification, 'complete', 'Job %s - wrf job complete SUCCESS.' % job_id)
+            send_email(js, 'complete', 'Job %s - wrf job complete SUCCESS.' % js.job_id)
             logging.info("WRF completion detected.")
             break
 
@@ -241,10 +384,10 @@ def execute(args):
             esmf_time,domain_str = re.match(r'.*wrfout_d.._([0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             dom_id = int(domain_str)
             logging.info("Detected history write for domain %d for time %s." % (dom_id, esmf_time))
-            if str(dom_id) in pp_instr:
-                var_list = [str(x) for x in pp_instr[str(dom_id)]]
+            if str(dom_id) in js.postproc:
+                var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
-                wrfout_path = osp.join(wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(start_utc))) 
+                wrfout_path = osp.join(js.wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(js.start_utc))) 
                 pp.vars2kmz(wrfout_path, dom_id, esmf_time, var_list)
                 pp.vars2png(wrfout_path, dom_id, esmf_time, var_list)
 
@@ -278,6 +421,10 @@ def verify_inputs(args):
         if key in args:
             if not osp.exists(args[key]):
                 raise OSError(err % args[key])
+
+    # check for valid grib source
+    if args['grib_source'] not in ['HRRR', 'NAM', 'NARR']:
+        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NARR')
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
@@ -345,10 +492,6 @@ def process_arguments(args):
 
     :param args: the input arguments
     """
-
-    # process the arguments
-    args['grib_source'] = HRRR('ingest')
-
     # resolve possible relative time specifications
     args['start_utc'] = timespec_to_utc_hour(args['start_utc'])
     args['end_utc'] = timespec_to_utc_hour(args['end_utc'], args['start_utc'])
@@ -366,9 +509,6 @@ if __name__ == '__main__':
 
     # configure the basic logger
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-    # HRRR source is compulsory
-    assert args['grib_source'] == 'HRRR'
 
     process_arguments(args)
 

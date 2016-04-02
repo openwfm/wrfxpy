@@ -123,6 +123,8 @@ def execute_da_step(model, model_time, covariates, fm10):
     for i,c in zip(range(Xd3-1),covariates):
         X[:,:,i+1] = covariates[i]
 
+    print(np.sum(X,axis=0))
+
     # run the trend surface model (clamp output to [0.0 - 2.5] to be safe)
     Kf_fn, Vf_fn = fit_tsm(obs_valid_now, X)
     Kf_fn[Kf_fn < 0.0] = 0.0

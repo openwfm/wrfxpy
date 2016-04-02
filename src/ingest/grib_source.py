@@ -24,7 +24,7 @@ import requests
 import os
 import os.path as osp
 import sys
-
+import logging
 
 class GribError(Exception):
     """
@@ -250,7 +250,10 @@ class NAM218(GribSource):
 
         :return: a dictionary of variable tables
         """
-        return {'ungrib_vtable': 'Vtable.NAM'}
+        return {'geogrid_vtable': 'GEOGRID.TBL.NAM',
+                'ungrib_vtable':'Vtable.NAM',
+                'metgrid_vtable':'METGRID.TBL.NAM'}
+
 
     def namelist_keys(self):
         """
@@ -258,7 +261,7 @@ class NAM218(GribSource):
 
         NAM 218 requires that ''num_metgrid_soil_levels'' is set to 8.
         """
-        return { 'domains' : { 'num_metgrid_levels': 40 }}
+        return { 'domains' : { 'num_metgrid_levels': 40, 'num_metgrid_soil_levels' : 4 }}
 
     def retrieve_gribs(self, from_utc, to_utc, ref_utc=None):
         """
@@ -275,26 +278,33 @@ class NAM218(GribSource):
         :return: a list of paths to local GRIB files
         """
         # ensure minutes and seconds are zero, simplifies arithmetic later
-        from_utc = from_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
-        to_utc = to_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
+        from_utc = from_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)
+        to_utc = to_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)
 
         if ref_utc is None:
             ref_utc = datetime.now(pytz.UTC)
 
         # select cycle (at least two hours behind real-time), out of the four NAM 218 cycles per day
         # which occurr at [0, 6, 12, 18] hours
-        cycle_start = min(from_utc, ref_utc - timedelta(hours=2))
+        ref_utc_2 = ref_utc - timedelta(hours=2)
+        ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
+        cycle_start = min(from_utc, ref_utc_2)
         cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
 
         # check if the request is even satisfiable
-        delta = to_utc - cycle_start
-        fc_hours = delta.days * 24 + delta.seconds / 3600
+        delta_end = to_utc - cycle_start
+        fc_hours = delta_end.days * 24 + int(delta_end.seconds / 3600)
 
         if fc_hours > 84:
             raise GribError('Unsatisfiable: NAM 218 initial and boundary conditions are only available for 84 hours.')
 
+        delta_start = from_utc - cycle_start
+        fc_start = delta_start.days * 24 + int(delta_start.seconds / 3600)
+
+        logging.info('NAM218: from_utc=%s to_utc=%s fc [%d,%d] cycle %s' % (str(from_utc), str(to_utc), fc_start, fc_hours, str(cycle_start)))
+
         # computes the relative paths of the desired files (the manifest)
-        manifest = self.compute_manifest(cycle_start, fc_hours)
+        manifest = self.compute_manifest(cycle_start, fc_start, fc_hours)
 
         # check what's available locally
         nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), manifest)
@@ -311,7 +321,7 @@ class NAM218(GribSource):
         # return manifest
         return manifest
 
-    def compute_manifest(self, cycle_start, fc_hours):
+    def compute_manifest(self, cycle_start, fc_start, fc_hours):
         """
         Computes the relative paths of required GRIB files.
 
@@ -319,13 +329,15 @@ class NAM218(GribSource):
         and in remote system w.r.t. URL base.
 
         :param cycle_start: UTC time of cycle start
+        :param fc_start: index of first file we need
         :param fc_hours: final forecast hour 
         """
-        fc_seq = range(36) + range(39, 85, 3)
-        year, mon, day, hour = cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
+        fc_seq = range(fc_start, 36) + range(max(fc_start, 39), 85, 3)
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
         fc_list.append(fc_seq[len(fc_list)])
+        
+        year, mon, day, hour = cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
         return map(lambda x: self.path_tmpl % (year, mon, day, hour, x), fc_list)
 
     # instance variables
