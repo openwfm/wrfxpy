@@ -80,6 +80,7 @@ class JobState(Dict):
         self.ignitions = args.get('ignitions', None)
         self.fmda = self.parse_fmda(args)
         self.postproc = args['postproc']
+        self.wrfxpy_dir = args['sys_install_dir']
 
     
     def resolve_grib_source(self, gs_name):
@@ -139,7 +140,7 @@ def send_email(js, event, body):
         if event in js.emails.events:
             mail_serv = smtplib.SMTP(js.emails.server)
             msg = MIMEText(body)
-            msg['Subject'] = 'Job %s status' % js.job_id
+            msg['Subject'] = 'Job %s event %s notification' % (js.job_id, event)
             msg['From'] = js.emails.origin
             msg['To'] = js.emails.to
             mail_serv.sendmail(js.emails.origin, [js.emails.to], msg.as_string())
@@ -187,11 +188,17 @@ def run_geogrid(js, q):
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
     try:
+        for dom in js.domains:
+            if dom.precomputed:
+                link_tgt = osp.join(js.wrfxpy_dir, dom.precomputed_path)
+                link_loc = osp.join(js.wps_dir, 'geo_em.d%02d.nc' % dom.dom_id)
+                symlink_unless_exists(link_tgt, link_loc) 
+
         logging.info("running GEOGRID")
         Geogrid(js.wps_dir).execute().check_output()
         logging.info('GEOGRID complete')
         
-        send_email(js, 'geogrid', 'Job %s - geogrid complete.' % js.job_id)
+        send_email(js, 'geogrid', 'GEOGRID complete.')
         q.put('SUCCESS')
 
     except Exception as e:
@@ -325,11 +332,15 @@ def execute(args):
     update_namelist(js.wrf_nml, js.grib_source.namelist_keys())
     if 'ignitions' in args:
         update_namelist(js.wrf_nml, update_ignitions(js.ignitions, js.num_doms))
+
+    # if we have an emissions namelist, automatically turn on the tracers
+    if js.ems_nml is not None:
+        f90nml.write(js.ems_nml, osp.join(js.wrf_dir, 'namelist.fire_emissions'), force=True)
+        js.wrf_nml['dynamics']['tracer_opt'] = [2] * js.num_doms
+
     f90nml.write(js.wrf_nml, osp.join(js.wrf_dir, 'namelist.input'), force=True)
 
     f90nml.write(js.fire_nml, osp.join(js.wrf_dir, 'namelist.fire'), force=True)
-    if js.ems_nml is not None:
-        f90nml.write(js.ems_nml, osp.join(js.wrf_dir, 'namelist.fire_emissions'), force=True)
     
     Real(js.wrf_dir).execute().check_output()
 
