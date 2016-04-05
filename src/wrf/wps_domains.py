@@ -18,36 +18,42 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import netCDF4
+import numpy as np
+import pyproj
 
-class WPSDomainLCC:
+
+class WPSDomainLCC(object):
     """
     A top-level Lambert Conic Conformal projection domain.
     """
-    def __init__(self, dom_id, cfg):
+    def __init__(self, dom_id, cfg, parent = None):
         """
         Initialize a top-level LCC domain.
 
         :param dom_id: the domain id
         :param cfg: the configuration dictionary
+        :param parent: the parent domain (if this is a child)
         """
         self.dom_id = dom_id
+        self.parent = parent
+        self.parent_id = parent.dom_id if parent is not None else self.dom_id
+        self.top_level = parent is None
+        self.subgrid_ratio = cfg.get('subgrid_ratio', (1, 1))
+        self.geog_res = str(cfg.get('geog_res', '30s'))
+        self.history_interval = cfg.get('history_interval', 60)
         if 'precomputed' in cfg:
-            self.init_from_precomputed(cfg)
+            self._init_from_precomputed(cfg)
         else:
-            self.init_from_dict(cfg)
+            self._init_from_dict(cfg)
 
 
-    def init_from_dict(self, cfg):
+    def _init_from_dict(self, cfg):
         """
         Initialize the domain from a dictionary containing the parameters.
 
         :param cfg: the parameter dictionary
         """
-        self.parent_id = cfg.get('parent_id', self.dom_id)
-        self.subgrid_ratio = cfg.get('subgrid_ratio', (1, 1))
-        self.geog_res = str(cfg.get('geog_res', '30s'))
-        self.history_interval = cfg.get('history_interval', 60)
-        if self.parent_id == self.dom_id:
+        if self.top_level:
             # this is a top level domain
             self.parent_cell_size_ratio = 1
             self.parent_time_step_ratio = 1
@@ -64,26 +70,104 @@ class WPSDomainLCC:
                 self.stand_lon = cfg['stand_lon']
             else:
                 self.stand_lon = self.ref_lon
-        elif 'center_latlon' not in cfg:
-            # this is a child domain, placed normally
+            self._init_projection()
+        else:
             self.parent_cell_size_ratio = cfg['parent_cell_size_ratio']
             self.parent_time_step_ratio = cfg['parent_time_step_ratio']
-            self.parent_start = tuple(cfg['parent_start'])
-            self.parent_end = tuple(cfg['parent_end'])
-            pstart, pend, pgr = self.parent_start, self.parent_end, self.parent_cell_size_ratio
-            self.domain_size = (pgr * (pend[0] - pstart[0] + 1) + 1, pgr * (pend[1] - pstart[1] + 1) + 1)
-        else:
-            # this is a child domain that we need to place dynamically
-            ref_latlon = tuple(cfg['center_latlon'])
-            radius = cfg['radius']
+            self.cell_size = [float(x) / self.parent_cell_size_ratio for x in self.parent.cell_size]
+            if 'bounding_box' in cfg:
+                # this is a child domain that we need to place dynamically given a bounding box
+                self.bbox = tuple(cfg['bounding_box'])
 
+                min_lon, min_lat, max_lon, max_lat = self.bbox
 
+                # project the min/max coordinates
+                i1, j1 = self.parent.latlon_to_ij(min_lat, min_lon)
+                i2, j2 = self.parent.latlon_to_ij(max_lat, max_lon)
+
+                self.parent_start = (int(i1), int(j1))
+                self.parent_end = (int(i2+1), int(j2+1))
+
+                if any([x < 0 for x in self.parent_start]) or \
+                   self.parent_end[0] >= self.parent.domain_size[0] or \
+                   self.parent_end[1] >= self.parent.domain_size[1]:
+                    raise ValueError('Cannot place child, out of parents bounds')
+
+                pstart, pend, pgr = self.parent_start, self.parent_end, self.parent_cell_size_ratio
+                self.domain_size = (pgr * (pend[0] - pstart[0] + 1) + 1, pgr * (pend[1] - pstart[1] + 1) + 1)
+            elif 'parent_start' in cfg and 'parent_end' in cfg:
+                # this is a child domain, placed normally
+                self.parent_start = tuple(cfg['parent_start'])
+                self.parent_end = tuple(cfg['parent_end'])
+                pstart, pend, pgr = self.parent_start, self.parent_end, self.parent_cell_size_ratio
+                self.domain_size = (pgr * (pend[0] - pstart[0] + 1) + 1, pgr * (pend[1] - pstart[1] + 1) + 1)
+            else:
+                raise ValueError('Invalid domain specification')
 
         # either way, it's not precomputed
         self.precomputed = False
 
 
-    def init_from_precomputed(self, cfg):
+    def _init_projection(self):
+        """
+        This function is based on code by Pavel Krc <krc@cs.cas.cz>, minor changes applied.
+        It initializes the projection for a top-level domain.
+        """
+        radius = 6370e3
+        
+        # Spherical latlon used by WRF
+        self.latlon_sphere = pyproj.Proj(proj='latlong',
+                a=radius, b=radius, towgs84='0,0,0', no_defs=True)
+
+        # Lambert Conformal Conic used by WRF
+        self.lambert_grid = pyproj.Proj(proj='lcc',
+            lat_1=self.truelats[0],
+            lat_2=self.truelats[1],
+            lat_0=self.ref_latlon[0],
+            lon_0=self.stand_lon,
+            a=radius, b=radius, towgs84='0,0,0', no_defs=True)
+
+        grid_size_j = (self.domain_size[0] - 2) * self.cell_size[0]
+        grid_size_i = (self.domain_size[1] - 2) * self.cell_size[1]
+
+        grid_center_j, grid_center_i = pyproj.transform(
+                self.latlon_sphere, self.lambert_grid,
+                self.ref_latlon[1], self.ref_latlon[0])
+        
+        self.offset_j = grid_center_j - grid_size_j * .5
+        self.offset_i = grid_center_i - grid_size_i * .5
+
+
+    def latlon_to_ij(self, lat, lon):
+        """
+        Convert latitude and longitude into grid coordinates.
+
+        If this is a child domain, it asks it's parent to do the projectiona and then
+        remaps it into its own coordinate system via parent_start and cell size ratio.
+
+        :param lat: latitude
+        :param lon: longitude
+        :return: the i, j position in grid coordinates
+        """
+        if self.top_level:
+            proj_j, proj_i = pyproj.transform(self.latlon_sphere, self.lambert_grid,
+                    lon, lat)
+            return  ((proj_i - self.offset_i) / self.cell_size[0],
+                     (proj_j - self.offset_j) / self.cell_size[1])
+        else:
+            pi, pj = self.parent.latlon_to_ij(lat, lon)
+            return ((pi - self.parent_start[0]) * self.parent_cell_size_ratio,
+                    (pj - self.parent_start[1]) * self.parent_cell_size_ratio)
+
+    
+    def ij_to_latlon(self, i, j):
+        lon, lat = pyproj.transform(self.lambert_grid, self.latlon_sphere,
+                j * self.cell_size[1] + self.offset_j,
+                i * self.cell_size[0] + self.offset_i)
+        return lat, lon
+
+
+    def _init_from_precomputed(self, cfg):
         """
         Initialize the domain from an existing geo_em.dXX.nc file.
 
@@ -99,7 +183,7 @@ class WPSDomainLCC:
         self.dom_id = int(d.getncattr('grid_id'))
         self.parent_id = int(d.getncattr('parent_id'))
         self.parent_cell_size_ratio = int(d.getncattr('parent_grid_ratio'))
-        if self.dom_id == self.parent_id:
+        if self.top_level:
             # this is a top-level domain
             self.domain_size = (int(d.getncattr('i_parent_end')), int(d.getncattr('j_parent_end')))
             self.cell_size = (float(d.getncattr('DX')), float(d.getncattr('DY')))
@@ -109,6 +193,7 @@ class WPSDomainLCC:
             self.time_step = cfg.get('time_step', max(1, int(6*min(self.cell_size)/1000)))
             self.parent_start = (1, 1)
             self.parent_time_step_ratio = 1
+            self._init_projection()
         else:
             # this is a child domain
             self.parent_start = (int(d.getncattr('i_parent_start')), int(d.getncattr('j_parent_start')))
@@ -117,6 +202,7 @@ class WPSDomainLCC:
             pstart, pend, pgr = self.parent_start, self.parent_end, self.parent_cell_size_ratio
             self.domain_size = (pgr * (pend[0] - pstart[0] + 1) + 1, pgr * (pend[1] - pstart[1] + 1) + 1)
             self.parent_time_step_ratio = cfg['parent_time_step_ratio']
+            self.cell_size = [float(x) / self.parent_cell_size_ratio for x in self.parent.cell_size]
 
         # only used if this is a top-level domain but we read it in anyway
         d.close()
@@ -129,34 +215,34 @@ class WPSDomainLCC:
         :param nml_geogrid: a dictionary containing the geogrid section of the WPS namelist
         """
         nml_share = nml['share']
-        self.update_entry(nml_share, 'subgrid_ratio_x', self.subgrid_ratio[0])
-        self.update_entry(nml_share, 'subgrid_ratio_y', self.subgrid_ratio[1])
+        self._update_entry(nml_share, 'subgrid_ratio_x', self.subgrid_ratio[0])
+        self._update_entry(nml_share, 'subgrid_ratio_y', self.subgrid_ratio[1])
 
         # prevent geogrid from re-processing the grid (HACK: note that all grids must be activated
         # before metgrid runs!)
-        self.update_entry(nml_share, 'active_grid', not self.precomputed)
+        self._update_entry(nml_share, 'active_grid', not self.precomputed)
 
         nml_geogrid = nml['geogrid']
-        self.update_entry(nml_geogrid, 'geog_data_res', self.geog_res)
-        self.update_entry(nml_geogrid, 'parent_id', self.parent_id)
-        self.update_entry(nml_geogrid, 'parent_grid_ratio', self.parent_cell_size_ratio)
-        self.update_entry(nml_geogrid, 'i_parent_start', self.parent_start[0])
-        self.update_entry(nml_geogrid, 'j_parent_start', self.parent_start[1])
-        self.update_entry(nml_geogrid, 's_we', 1)
-        self.update_entry(nml_geogrid, 's_sn', 1)
-        self.update_entry(nml_geogrid, 'e_we', self.domain_size[0])
-        self.update_entry(nml_geogrid, 'e_sn', self.domain_size[1])
+        self._update_entry(nml_geogrid, 'geog_data_res', self.geog_res)
+        self._update_entry(nml_geogrid, 'parent_id', self.parent_id)
+        self._update_entry(nml_geogrid, 'parent_grid_ratio', self.parent_cell_size_ratio)
+        self._update_entry(nml_geogrid, 'i_parent_start', self.parent_start[0])
+        self._update_entry(nml_geogrid, 'j_parent_start', self.parent_start[1])
+        self._update_entry(nml_geogrid, 's_we', 1)
+        self._update_entry(nml_geogrid, 's_sn', 1)
+        self._update_entry(nml_geogrid, 'e_we', self.domain_size[0])
+        self._update_entry(nml_geogrid, 'e_sn', self.domain_size[1])
 
         # only for top-level domains
         if self.dom_id == self.parent_id:
-            self.update_entry(nml_geogrid, 'dx', self.cell_size[0])
-            self.update_entry(nml_geogrid, 'dy', self.cell_size[1])
-            self.update_entry(nml_geogrid, 'map_proj', 'lambert')
-            self.update_entry(nml_geogrid, 'ref_lat', self.ref_latlon[0])
-            self.update_entry(nml_geogrid, 'ref_lon', self.ref_latlon[1])
-            self.update_entry(nml_geogrid, 'truelat1', self.truelats[0])
-            self.update_entry(nml_geogrid, 'truelat2', self.truelats[1])
-            self.update_entry(nml_geogrid, 'stand_lon', self.stand_lon)
+            self._update_entry(nml_geogrid, 'dx', self.cell_size[0])
+            self._update_entry(nml_geogrid, 'dy', self.cell_size[1])
+            self._update_entry(nml_geogrid, 'map_proj', 'lambert')
+            self._update_entry(nml_geogrid, 'ref_lat', self.ref_latlon[0])
+            self._update_entry(nml_geogrid, 'ref_lon', self.ref_latlon[1])
+            self._update_entry(nml_geogrid, 'truelat1', self.truelats[0])
+            self._update_entry(nml_geogrid, 'truelat2', self.truelats[1])
+            self._update_entry(nml_geogrid, 'stand_lon', self.stand_lon)
 
 
     def update_inputnl(self, nml):
@@ -166,32 +252,32 @@ class WPSDomainLCC:
         :param nml: the namelist dictionary
         """
         nml_tc = nml['time_control']
-        self.update_entry(nml_tc, 'history_interval', self.history_interval)
+        self._update_entry(nml_tc, 'history_interval', self.history_interval)
 
         nml_doms = nml['domains']
-        self.update_entry(nml_doms, 'grid_id', self.dom_id)
-        self.update_entry(nml_doms, 'parent_id', self.parent_id)
-        self.update_entry(nml_doms, 'i_parent_start', self.parent_start[0])
-        self.update_entry(nml_doms, 'j_parent_start', self.parent_start[1])
-        self.update_entry(nml_doms, 's_we', 1)
-        self.update_entry(nml_doms, 's_sn', 1)
-        self.update_entry(nml_doms, 'e_we', self.domain_size[0])
-        self.update_entry(nml_doms, 'e_sn', self.domain_size[1])
-        self.update_entry(nml_doms, 'sr_x', self.subgrid_ratio[0])
-        self.update_entry(nml_doms, 'sr_y', self.subgrid_ratio[1])
+        self._update_entry(nml_doms, 'grid_id', self.dom_id)
+        self._update_entry(nml_doms, 'parent_id', self.parent_id)
+        self._update_entry(nml_doms, 'i_parent_start', self.parent_start[0])
+        self._update_entry(nml_doms, 'j_parent_start', self.parent_start[1])
+        self._update_entry(nml_doms, 's_we', 1)
+        self._update_entry(nml_doms, 's_sn', 1)
+        self._update_entry(nml_doms, 'e_we', self.domain_size[0])
+        self._update_entry(nml_doms, 'e_sn', self.domain_size[1])
+        self._update_entry(nml_doms, 'sr_x', self.subgrid_ratio[0])
+        self._update_entry(nml_doms, 'sr_y', self.subgrid_ratio[1])
+        self._update_entry(nml_doms, 'dx', self.cell_size[0])
+        self._update_entry(nml_doms, 'dy', self.cell_size[1])
         if self.dom_id == self.parent_id:
             # store cell size & time step
-            self.update_entry(nml_doms, 'dx', self.cell_size[0])
-            self.update_entry(nml_doms, 'dy', self.cell_size[1])
-            self.update_entry(nml_doms, 'time_step', self.time_step)
+            self._update_entry(nml_doms, 'time_step', self.time_step)
         
         # for child domains cell sizes and timesteps are determined relative to parents
         # for top-level domains, these are fixed to 1
-        self.update_entry(nml_doms, 'parent_grid_ratio', self.parent_cell_size_ratio)
-        self.update_entry(nml_doms, 'parent_time_step_ratio', self.parent_time_step_ratio)
+        self._update_entry(nml_doms, 'parent_grid_ratio', self.parent_cell_size_ratio)
+        self._update_entry(nml_doms, 'parent_time_step_ratio', self.parent_time_step_ratio)
     
     
-    def update_entry(self, section, key, value):
+    def _update_entry(self, section, key, value):
         """
         Update the corresponding entry (given by dom_id) in the given section.
         Crashes if preceding values are not filled out. i.e. if setting value for domain 2,
@@ -205,7 +291,7 @@ class WPSDomainLCC:
         if type(entries) != list:
             entries = [entries]
         if len(entries) < self.dom_id - 2:
-            raise ValueError('Cannot set namelist value for domain %d when previous domains not filled out.' % self.dom_id)
+            raise ValueError('Cannot set namelist value for domain %d, previous domains not filled out.' % self.dom_id)
         if len(entries) <= self.dom_id - 1:
             entries.append(value)
         else:
@@ -213,24 +299,101 @@ class WPSDomainLCC:
         section[key] = entries
 
 
+class WPSDomainConf(object):
+    """
+    Represents a domain configuration for WPS, that is one or more domains with
+    one top-level domain.
+    """
+
+    def __init__(self, cfg):
+        """
+        Initilize the domain configuration with a config dictionary mapping
+        string domain id ("1", "2", ...) to its configuration.
+
+        :param cfg: the configuration dictionary
+        """
+        self.domains = []
+
+        # process domains in order
+        for i in range(1, len(cfg)+1):
+            this_dom = cfg[str(i)]
+            par_dom = self.domains[this_dom['parent_id']-1] if 'parent_id' in this_dom else None
+            self.domains.append(WPSDomainLCC(i, this_dom, par_dom))
+
+    def __len__(self):
+        """
+        Returns the number of domains.
+        """
+        return len(self.domains)
+
+    
+    def prepare_for_geogrid(self, wps_nml, input_nml = None, wrfxpy_dir = None, wps_dir = None):
+        """
+        Update the namelists for geogrid processing - write the domain configurations.
+        Additionally
+
+        :param wps_nml: the WPS namelist
+        :param input_nml: the input namelist, if None that skipped
+        :param wrfxpy_dir: the installation directory of wrfxpy (if None, no linking is done)
+        :param wps_dir: the WPS working directory
+        """
+        N = len(self.domains)
+        wps_nml['share']['max_dom'] = N
+
+        def extend_entry(nl, key):
+            """
+            Some keys should be same across all domains.  This function takes the first value
+            and copies it max_dom times.
+            """
+            val = nl[key][0] if type(nl[key]) == list else nl[key]
+            nl[key] = [val] * N
+
+        # process the input namelist
+        if input_nml is not None:
+            doms = input_nml['domains']
+            doms['max_dom'] = N
+            doms['s_vert'] = [1] * N   
+            extend_entry(doms, 'e_vert')
+
+        for dom in self.domains:
+            # ensure both namelists is updated with respect to all domains
+            dom.update_wpsnl(wps_nml)
+            if input_nml is not None:
+                dom.update_inputnl(input_nml)
+
+            # if the domains are precomputed, link in the files
+            if dom.precomputed and wrfxpy_dir is not None:
+                link_tgt = osp.join(wrfxpy_dir, dom.precomputed_path)
+                link_loc = osp.join(wps_dir, 'geo_em.d%02d.nc' % dom.dom_id)
+                symlink_unless_exists(link_tgt, link_loc) 
+
+
+    def prepare_for_metgrid(self, wps_nml):
+        """
+        Set all domains that we use to active.
+
+        :param wps_nml: the WPS namelist
+        """
+        wps_nml['share']['active_grid'] = [True] * len(self.domains)
+        
+
 if __name__ == '__main__':
     import f90nml
     import sys
-    d = WPSDomainLCC({'ref_latlon' : [39, -105.663],
-                      'cell_size' : [1000, 1000],
-                      'domain_size' : [51, 51],
-                      'subgrid_ratio' : [50, 50]})
+    import json
 
-    wps_nml = f90nml.read(sys.argv[1])
+    # parse a JSON domain configuration and a namelist.wps file and build the correct wps
+    if len(sys.argv) != 3 and len(sys.argv) != 4:
+        print('usage: %s <domains_json_file> <namelist.wps> [namelist.input]' % sys.argv[0])
 
-    d.update_wpsnl(wps_nml)
+    dcfg = WPSDomainConf(json.load(open(sys.argv[1])))
+    
+    wps_nml = f90nml.read(sys.argv[2])
+    wrf_nml = f90nml.read(sys.argv[3]) if len(sys.argv) == 4 else None
+    dcfg.prepare_for_geogrid(wps_nml, wrf_nml)
+
     f90nml.write(wps_nml, sys.argv[2], force=True)
-
-    d = WPSDomainLCC({'precomputed' : 'geo_em.d01.nc', 'time_step' : 6})
-    wps_nml = f90nml.read(sys.argv[1])
-    d.update_wpsnl(wps_nml)
-    f90nml.write(wps_nml, sys.argv[3], force=True)
-
-
+    if wrf_nml is not None:
+        f90nml.write(wps_nml, sys.argv[3], force=True)
 
 
