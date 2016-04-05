@@ -21,7 +21,7 @@
 
 from wrf.wrf_cloner import WRFCloner
 from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
-from wrf.wps_domains import WPSDomainLCC
+from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions, make_dir, \
@@ -188,12 +188,6 @@ def run_geogrid(js, q):
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
     try:
-        for dom in js.domains:
-            if dom.precomputed:
-                link_tgt = osp.join(js.wrfxpy_dir, dom.precomputed_path)
-                link_loc = osp.join(js.wps_dir, 'geo_em.d%02d.nc' % dom.dom_id)
-                symlink_unless_exists(link_tgt, link_loc) 
-
         logging.info("running GEOGRID")
         Geogrid(js.wps_dir).execute().check_output()
         logging.info('GEOGRID complete')
@@ -204,21 +198,6 @@ def run_geogrid(js, q):
     except Exception as e:
         logging.error('GEOGRID step failed with exception %s' % repr(e))
         q.put('FAILURE')
-
-
-def process_domains(js):
-    """
-    Parse domain definitions
-    """
-    doms = []
-    for i in range(len(js.domains)):
-        doms.append(WPSDomainLCC(i+1, js.domains[str(i+1)]))
-    js.domains = doms
-
-    # ensure wps_nml is updated with respect to all domains
-    for dom in js.domains:
-        dom.update_wpsnl(js.wps_nml)
-        dom.update_inputnl(js.wrf_nml)
 
 
 def execute(args):
@@ -259,13 +238,15 @@ def execute(args):
     if 'emissions_namelist_path' in args:
         js.ems_nml = f90nml.read(args['emissions_namelist_path'])
     
-    js.num_doms = len(js.domains)
-    js.wps_nml['share']['max_dom'] = js.num_doms
-    js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * js.num_doms
-    js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * js.num_doms
+    # Parse and setup the domain configuration
+    js.domain_conf = WPSDomainConf(js.domains)
+
+    num_doms = len(js.domain_conf)
+    js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * num_doms
+    js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * num_doms
     js.wps_nml['share']['interval_seconds'] = 3600
 
-    logging.info("number of domains defined is %d." % js.num_doms)
+    logging.info("number of domains defined is %d." % num_doms)
 
     # build directories in workspace
     js.wps_dir = osp.abspath(osp.join(js.workspace_dir, js.job_id, 'wps'))
@@ -279,10 +260,7 @@ def execute(args):
 
     # step 2: process domain information and patch namelist for geogrid
     js.wps_nml['geogrid']['geog_data_path'] = args['geogrid_path']
-
-    # FIXME: only one domain works now
-    process_domains(js)
-
+    js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
     # do steps 2 & 3 & 4 in parallel (two execution streams)
@@ -309,7 +287,7 @@ def execute(args):
     proc_q.close()
 
     # step 5: execute metgrid after ensuring all grids will be processed
-    js.wps_nml['share']['active_grid'] = [True] * js.num_doms
+    js.domain_conf.prepare_for_metgrid(js.wps_nml)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
     logging.info("running METGRID")
@@ -326,17 +304,16 @@ def execute(args):
 
     # step 7: patch input namelist, fire namelist, emissions namelist (if required)
     #         and execute real.exe
-    time_ctrl = update_time_control(js.start_utc, js.end_utc, js.num_doms)
+    time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
-    js.wrf_nml['domains']['max_dom'] = js.num_doms
     update_namelist(js.wrf_nml, js.grib_source.namelist_keys())
     if 'ignitions' in args:
-        update_namelist(js.wrf_nml, update_ignitions(js.ignitions, js.num_doms))
+        update_namelist(js.wrf_nml, update_ignitions(js.ignitions, num_doms))
 
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
         f90nml.write(js.ems_nml, osp.join(js.wrf_dir, 'namelist.fire_emissions'), force=True)
-        js.wrf_nml['dynamics']['tracer_opt'] = [2] * js.num_doms
+        js.wrf_nml['dynamics']['tracer_opt'] = [2] * num_doms
 
     f90nml.write(js.wrf_nml, osp.join(js.wrf_dir, 'namelist.input'), force=True)
 

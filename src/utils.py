@@ -188,6 +188,9 @@ def update_ignitions(ign_specs, max_dom):
         dom_id = int(dom_str)
         nml_igns['ifire'][dom_id-1] = 2
         nml_igns['fire_num_ignitions'][dom_id-1] = len(dom_igns)
+        nml_igns['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
+        nml_igns['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
+
 
         # for each ignition 
         for ndx,ign in enumerate(dom_igns):
