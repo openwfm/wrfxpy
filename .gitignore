@@ -60,5 +60,5 @@ target/
 temp/
 
 # input/output directories
-ingest/
-wksp/
+/ingest/
+/wksp/

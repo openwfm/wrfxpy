@@ -275,6 +275,11 @@ class WPSDomainLCC(object):
         # for top-level domains, these are fixed to 1
         self._update_entry(nml_doms, 'parent_grid_ratio', self.parent_cell_size_ratio)
         self._update_entry(nml_doms, 'parent_time_step_ratio', self.parent_time_step_ratio)
+
+        # ensure boundary conditions are correctly read in (top level is specified, rest is nested)
+        nml_bdy = nml['bdy_control']
+        self._update_entry(nml_bdy, 'specified', self.top_level)
+        self._update_entry(nml_bdy, 'nested', not self.top_level)
     
     
     def _update_entry(self, section, key, value):
