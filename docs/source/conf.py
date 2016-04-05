@@ -20,7 +20,11 @@ import shlex
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('../..'))
+sys.path.insert(0, os.path.abspath('../../src'))
+sys.path.insert(0, os.path.abspath('../../src/ingest'))
+sys.path.insert(0, os.path.abspath('../../src/vis'))
+sys.path.insert(0, os.path.abspath('../../src/wrf'))
+sys.path.insert(0, os.path.abspath('../../src/fmda'))
 
 # -- General configuration ------------------------------------------------
 
@@ -54,7 +58,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'wrfxpy'
-copyright = u'2016, Martin Vejmelka'
+copyright = u'2016, UC Denver, Martin Vejmelka'
 author = u'Martin Vejmelka'
 
 # The version info for the project you're documenting, acts as replacement for
