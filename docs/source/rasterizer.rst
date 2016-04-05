@@ -1,7 +1,7 @@
-wrf_raster module
+rasterizer module
 =================
 
-.. automodule:: wrf_raster
+.. automodule:: rasterizer
     :members:
     :undoc-members:
     :show-inheritance:

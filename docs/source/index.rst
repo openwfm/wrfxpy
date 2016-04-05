@@ -9,7 +9,7 @@ Welcome to wrfxpy's documentation!
 .. toctree::
    :maxdepth: 1
 
-   intro
+   introduction
    tutorial
    configuration
 
