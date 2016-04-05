@@ -253,6 +253,7 @@ class WPSDomainLCC(object):
         """
         nml_tc = nml['time_control']
         self._update_entry(nml_tc, 'history_interval', self.history_interval)
+        self._update_entry(nml_tc, 'input_from_file', True)
 
         nml_doms = nml['domains']
         self._update_entry(nml_doms, 'grid_id', self.dom_id)

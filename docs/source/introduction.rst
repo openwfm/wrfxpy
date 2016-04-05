@@ -12,6 +12,7 @@ In particular, the modules herein can:
 * execute geogrid, ungrib, metgrid, real, WRF
 * monitor WRF execution
 * postprocess `netCDF files <http://www.unidata.ucar.edu/software/netcdf/>`_ to generate raster images or KMZ raster files
+* update catalogs with products
 
 Prerequisites
 =============

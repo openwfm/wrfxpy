@@ -2,12 +2,13 @@
 
 import matplotlib as mpl
 mpl.use('AGG')
-import matplotlib.pyplot as plt
 import simplekml as kml
-from mpl_toolkits.basemap import Basemap
 import numpy as np
 import netCDF4 as nc4
-import sys, os, StringIO, utils, json, logging
+import sys
+import os
+import json
+import logging
 import os.path as osp
 import traceback
 

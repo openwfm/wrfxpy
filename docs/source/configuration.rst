@@ -195,6 +195,16 @@ The following keys are compulsory.
 * ``wall_time_hrs : [int]`` the wall time to request from the schedule in hours
 * ``qman : [string]`` the queue manager to use, must be ``sge``
 
+Fuel moisture data assimilation
+===============================
+
+The key ``fuel_moisture_da`` is optional.  If given, it needs to contain two keys:
+
+* ``domains : [list(int)]`` a list of domains for which to run data assimilation
+* ``mesowest_token : [string]`` the Mesowest API access token (you must obtain one here `Mesowest <http://mesowest.org/>`_)
+
+The data assimilation code will download 10-hr fuel moisture observations from stations in the domain area and assimilate them into the equilibrium.
+
 
 Postprocessing
 ==============

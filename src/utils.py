@@ -182,16 +182,21 @@ def update_ignitions(ign_specs, max_dom):
              "fire_ignition_start_time", "fire_ignition_end_time", 
              "fire_ignition_radius", "fire_ignition_ros" ]
 
-    nml_igns = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom,
-                 'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom }
+    nml_fire = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom,
+                 'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom,
+                 'fmoist_run' : [False] * max_dom, 'fmoist_interp' : [False] * max_dom,
+                 'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom }
+
     for dom_str, dom_igns in ign_specs.iteritems():
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
-        nml_igns['ifire'][dom_id-1] = 2
-        nml_igns['fire_num_ignitions'][dom_id-1] = len(dom_igns)
-        nml_igns['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
-        nml_igns['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
-
+        nml_fire['ifire'][dom_id-1] = 2
+        nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
+        nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
+        nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
+        nml_fire['fmoist_run'][dom_id-1] = True # use the fuel moisture model
+        nml_fire['fmoist_interp'][dom_id-1] = True # interpolate fm onto fire mesh
+        nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
 
         # for each ignition 
         for ndx,ign in enumerate(dom_igns):
@@ -199,9 +204,9 @@ def update_ignitions(ign_specs, max_dom):
             lat, lon = ign['lat'], ign['long']
             vals = [ lat, lat, lon, lon, start, start+dur, 200, 1 ]
             kv = dict(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals]))
-            nml_igns.update(kv)
+            nml_fire.update(kv)
 
-    return { 'fire' : nml_igns }
+    return { 'fire' : nml_fire }
 
 
 def timespec_to_utc_hour(ts_str, from_time = None):

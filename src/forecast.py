@@ -491,9 +491,18 @@ def process_arguments(args):
 
 if __name__ == '__main__':
 
+    # load the system configuration
+    sys_cfg = None
+    try:
+        sys_cfg = json.load(open('etc/conf.json'))
+    except IOError:
+        print('Cannot find system configuration, have you created etc/conf.json?')
+        sys.exit(2)
+
     # load configuration JSON
     cfg_str = open(sys.argv[1]).read()
     args = json.loads(cfg_str, 'ascii')
+    args.update(sys_cfg)
 
     # configure the basic logger
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
