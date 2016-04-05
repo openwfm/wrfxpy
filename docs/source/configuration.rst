@@ -25,6 +25,9 @@ The first domain is always the top-level domain, and subsequent domains are alwa
 such that their parent is always defined before they are.  Each domain can be precomputed or
 dynamically placed.  In the following, we detail configuration of each type.
 
+Note: in the input namelist, wrfxpy will set the top level domain as ``specified``, while
+all other domains will be ``nested``.
+
 All domains must have the following keys (if omitted, their defaults will be used):
 
 * ``history_interval : [integer]`` the history interval in minutes, default is 60
@@ -179,12 +182,13 @@ All of the following keys are required.
 * ``wps_namelist_path : [string]`` the WPS namelist template
 * ``wrf_namelist_path : [string]`` the WRF namelist template
 * ``fire_namelist_path : [string]`` the fire namelist template
+* ``emissions_namelist_path : [string]`` the file_emissions namelist template
 
 
 Parallel job configuration
 ==========================
 
-The following keys are compulstory.
+The following keys are compulsory.
 
 * ``num_nodes : [int]`` the number of parallel nodes to use for WRF execution
 * ``ppn : [int]`` the number of processors per node to request
