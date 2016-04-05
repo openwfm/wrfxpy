@@ -3,25 +3,53 @@
   "workspace_dir": "wksp",
   "wps_install_dir": "/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/WPS",
   "wrf_install_dir": "/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/WRFV3",
-  "grib_source": "HRRR",
+  "grib_source": "NAM",
   "wps_namelist_path": "etc/nlists/colorado-3k.wps",
   "wrf_namelist_path": "etc/nlists/colorado-3k.input",
   "fire_namelist_path": "etc/nlists/colorado-3k.fire",
+  "emissions_namelist_path": "etc/nlists/colorado-3k.fire_emissions",
   "geogrid_path": "/share_home/mvejmelka/Packages/WPS-GEOG",
   "sys_install_dir": "/share_home/mvejmelka/Projects/wrfxpy-dev",
   "num_nodes": 10,
   "ppn": 12,
   "wall_time_hrs": 3,
   "qman": "sge",
-  "start_utc": "2016-01-23_08:00:00",
-  "end_utc": "2016-01-23_12:00:00",
-  "precomputed" : {
-    "geo_em.d01.nc" : "precomputed/colorado/geo_em.d01.nc",
-    "geo_em.d02.nc" : "precomputed/colorado/geo_em.d02.nc"
+  "start_utc": "2016-03-23_08:00:00",
+  "end_utc": "2016-03-23_18:00:00",
+  "domains" : {
+    "1" : {
+      "time_step" : 60,
+      "cell_size" : [12000,12000],
+      "domain_size" : [101, 101],
+      "center_latlon" : [39, -105.663],
+      "truelats" : [37, 40.5],
+      "stand_lon" : -105.5,
+      "history_interval" : 120,
+      "subgrid_ratio" :[1,1],
+      "geog_res" : "30s"
+    },
+    "2" : {
+      "parent_id" : 1,
+      "parent_cell_size_ratio" : 4,
+      "parent_time_step_ratio" : 4,
+      "subgrid_ratio" : [1, 1],
+      "parent_start" : [30, 30],
+      "parent_end" : [71, 71],
+      "history_interval" : 120,
+      "geog_res" : "30s"
+    },
+    "3" : {
+      "parent_id" : 2,
+      "parent_cell_size_ratio" : 3,
+      "parent_time_step_ratio" : 3,
+      "subgrid_ratio" : [40, 40],
+      "bounding_box" : [-104.5, 39.1, -103.8, 40.5],
+      "history_interval" : 30,
+      "geog_res" : ".3s"
+    }
   },
   "ignitions" : {
-     "1" : [],
-     "2" : [ {
+     "3" : [ {
       "start_delay_s" : 600,
       "duration_s" : 240,
       "lat" : 39.894264,
@@ -29,7 +57,6 @@
        } ]
   },
   "postproc" : {
-      "1" : [ "T2" ],
-      "2" : [ "T2" ]
+      "3" : [ "T2", "WINDSPD", "WINDVEC", "FIRE_AREA", "SMOKE_INT", "FGRNHFX", "FLINEINT" ]
   }
 }

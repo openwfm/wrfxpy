@@ -182,10 +182,11 @@ def update_ignitions(ign_specs, max_dom):
              "fire_ignition_start_time", "fire_ignition_end_time", 
              "fire_ignition_radius", "fire_ignition_ros" ]
 
-    nml_igns = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom }
+    nml_igns = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom,
+                 'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom }
     for dom_str, dom_igns in ign_specs.iteritems():
-        # ensure fire model is switched on in every domain with ignitions
         dom_id = int(dom_str)
+        # ensure fire model is switched on in every domain with ignitions
         nml_igns['ifire'][dom_id-1] = 2
         nml_igns['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_igns['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
