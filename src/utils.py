@@ -25,6 +25,7 @@ import os.path as osp
 import glob
 import numpy as np
 import math
+import paramiko
 
 
 def ensure_dir(path):
@@ -260,5 +261,38 @@ def find_closest_grid_point(slon, slat, glon, glat):
     return np.unravel_index(closest, glon.shape)
 
 
-# FIXME: coordinate lookups and transforms go here
+#
+#  SSH utilities for moving files to visualization server
+#
+def send_simulation_output(from_dir, to_dir, host, user, ssh_key):
+    """
+    Send an entire directory of results a directory here on localhost to a directory on
+    the remote host.
+
+    :param from_dir: directory with results
+    :param to_dir: remote directory
+    :param host: the remote hostname
+    :param user: the username for remote login
+    :param ssh_key: the ssh key to use (must be passwordless)
+    """
+
+    ssh = paramiko.SSHClient()
+    ssh.load_system_host_keys()
+    ssh.connect(host, username=user, key_filename=ssh_key)
+    sftp = ssh.open_sftp()
+    # assume target directory does not exist
+    sftp.chdir(osp.dirname(to_dir))
+    try:
+        sftp.mkdir(osp.basename(to_dir))
+    except IOError:
+        pass
+    sftp.chdir(to_dir)
+    for file in os.listdir(from_dir):
+        sftp.put(osp.join(from_dir, file), osp.join(to_dir, file))
+    sftp.close()
+    ssh.close()
+
+
+
+
 
