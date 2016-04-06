@@ -344,14 +344,14 @@ name=SLOPECAT
 ===============================
 name=NFUEL_CAT
         priority=1
-	dest_type=categorical
-	dominant_only=NFUEL_CAT
-	z_dim_name=fuel_cat
-    halt_on_missing = no
-    fill_missing = 14
-	interp_option=default:nearest_neighbor+average_16pt+search
-	abs_path=default:/share_home/akochans/LANDFIRE_DATA/COLORADO/fuel/WPS
-	subgrid=yes
+        dest_type=categorical
+        dominant_only=NFUEL_CAT
+        z_dim_name=fuel_cat
+        halt_on_missing = no
+        fill_missing = 14
+        interp_option=default:nearest_neighbor+average_16pt+search
+        rel_path=default:adam_fuel_cat
+        subgrid=yes
 ==============================
 name=ZSF
         priority = 1
@@ -359,10 +359,9 @@ name=ZSF
         df_dx=DZDXF
         df_dy=DZDYF
         smooth_option = smth-desmth_special; smooth_passes=1
-	    halt_on_missing = no
+        halt_on_missing = no
         fill_missing = 0
         interp_option = default:average_gcell(4.0)+four_pt+average_4pt
-        abs_path=.3s:/share_home/akochans/LANDFIRE_DATA/COLORADO/topo/WPS
-        abs_path=default:/share_home/akochans/LANDFIRE_DATA/COLORADO/topo/WPS
-	subgrid=yes
+        rel_path=default:adam_topo
+        subgrid=yes
 ==============================
