@@ -35,3 +35,8 @@ The simplest way to satisfy these requirements is to install `Anaconda Python <h
 
 This should install all prerequisites.
 
+*wrfxpy* is installed by cloning a GitHub repository
+
+::
+
+  git clone https://github.com/vejmelkam/wrfxpy.git
