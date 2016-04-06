@@ -15,10 +15,6 @@
   "qman": "sge",
   "start_utc": "T-90",
   "end_utc": "T+240",
-  "fuel_moisture_da" : {
-    "domains" : [ 1 ],
-    "mesowest_token" : "d98b58462fe24c83b1444922f0e98d70"
-  },
   "domains" : {
     "1" : { 
       "cell_size" : [1000, 1000],
