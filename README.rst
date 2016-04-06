@@ -19,7 +19,7 @@ In particular, the code enables the user to:
 .. |docs| image:: https://readthedocs.org/projects/wrfxpy/badge/?version=latest
     :alt: Documentation Status
     :scale: 100%
-    :target: https://wrfxpy.rtfd.org
+    :target: https://wrfxpy.readthedocs.org/en/latest/
 
 
 
