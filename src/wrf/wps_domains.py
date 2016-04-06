@@ -108,6 +108,47 @@ class WPSDomainLCC(object):
         self.precomputed = False
 
 
+    def _init_from_precomputed(self, cfg):
+        """
+        Initialize the domain from an existing geo_em.dXX.nc file.
+
+        :param path: path to the geo_em file
+        """
+        path = cfg['precomputed']
+        self.precomputed_path = path
+        self.history_interval = cfg.get('history_interval', 60)
+        self.precomputed = True
+        d = netCDF4.Dataset(path)
+        self.subgrid_ratio = (int(d.getncattr('sr_x')), int(d.getncattr('sr_y')))
+        self.geog_res = '30s' # not in geo_em file and does not matter (no processing will be done)
+        self.dom_id = int(d.getncattr('grid_id'))
+        self.parent_id = int(d.getncattr('parent_id'))
+        self.parent_cell_size_ratio = int(d.getncattr('parent_grid_ratio'))
+        if self.top_level:
+            # this is a top-level domain
+            self.domain_size = (int(d.getncattr('i_parent_end')), int(d.getncattr('j_parent_end')))
+            self.cell_size = (float(d.getncattr('DX')), float(d.getncattr('DY')))
+            self.ref_latlon = (float(d.getncattr('CEN_LAT')),float(d.getncattr('CEN_LON')))
+            self.truelats = (float(d.getncattr('TRUELAT1')), float(d.getncattr('TRUELAT2')))
+            self.stand_lon = float(d.getncattr('STAND_LON'))
+            self.time_step = cfg.get('time_step', max(1, int(6*min(self.cell_size)/1000)))
+            self.parent_start = (1, 1)
+            self.parent_time_step_ratio = 1
+            self._init_projection()
+        else:
+            # this is a child domain
+            self.parent_start = (int(d.getncattr('i_parent_start')), int(d.getncattr('j_parent_start')))
+            self.parent_end = (int(d.getncattr('i_parent_end')), int(d.getncattr('j_parent_end')))
+            # precomputed files don't remember grid size but rather directly parent end/start
+            pstart, pend, pgr = self.parent_start, self.parent_end, self.parent_cell_size_ratio
+            self.domain_size = (pgr * (pend[0] - pstart[0] + 1) + 1, pgr * (pend[1] - pstart[1] + 1) + 1)
+            self.parent_time_step_ratio = cfg['parent_time_step_ratio']
+            self.cell_size = [float(x) / self.parent_cell_size_ratio for x in self.parent.cell_size]
+
+        # only used if this is a top-level domain but we read it in anyway
+        d.close()
+
+
     def _init_projection(self):
         """
         This function is based on code by Pavel Krc <krc@cs.cas.cz>, minor changes applied.
@@ -156,56 +197,22 @@ class WPSDomainLCC(object):
                      (proj_j - self.offset_j) / self.cell_size[1])
         else:
             pi, pj = self.parent.latlon_to_ij(lat, lon)
-            return ((pi - self.parent_start[0]) * self.parent_cell_size_ratio,
-                    (pj - self.parent_start[1]) * self.parent_cell_size_ratio)
+            pcsr, ps = self.parent_cell_size_ratio, self.parent_start
+            delta = (pcsr - 1) / 2
+            return ((pi - ps[0] + 1.) * pcsr + delta,
+                    (pj - ps[1] + 1.) * pcsr + delta)
 
     
     def ij_to_latlon(self, i, j):
-        lon, lat = pyproj.transform(self.lambert_grid, self.latlon_sphere,
-                j * self.cell_size[1] + self.offset_j,
-                i * self.cell_size[0] + self.offset_i)
-        return lat, lon
-
-
-    def _init_from_precomputed(self, cfg):
-        """
-        Initialize the domain from an existing geo_em.dXX.nc file.
-
-        :param path: path to the geo_em file
-        """
-        path = cfg['precomputed']
-        self.precomputed_path = path
-        self.history_interval = cfg.get('history_interval', 60)
-        self.precomputed = True
-        d = netCDF4.Dataset(path)
-        self.subgrid_ratio = (int(d.getncattr('sr_x')), int(d.getncattr('sr_y')))
-        self.geog_res = '30s' # not in geo_em file and does not matter (no processing will be done)
-        self.dom_id = int(d.getncattr('grid_id'))
-        self.parent_id = int(d.getncattr('parent_id'))
-        self.parent_cell_size_ratio = int(d.getncattr('parent_grid_ratio'))
         if self.top_level:
-            # this is a top-level domain
-            self.domain_size = (int(d.getncattr('i_parent_end')), int(d.getncattr('j_parent_end')))
-            self.cell_size = (float(d.getncattr('DX')), float(d.getncattr('DY')))
-            self.ref_latlon = (float(d.getncattr('CEN_LAT')),float(d.getncattr('CEN_LON')))
-            self.truelats = (float(d.getncattr('TRUELAT1')), float(d.getncattr('TRUELAT2')))
-            self.stand_lon = float(d.getncattr('STAND_LON'))
-            self.time_step = cfg.get('time_step', max(1, int(6*min(self.cell_size)/1000)))
-            self.parent_start = (1, 1)
-            self.parent_time_step_ratio = 1
-            self._init_projection()
+            lon, lat = pyproj.transform(self.lambert_grid, self.latlon_sphere,
+                    j * self.cell_size[1] + self.offset_j,
+                    i * self.cell_size[0] + self.offset_i)
+            return lat, lon
         else:
-            # this is a child domain
-            self.parent_start = (int(d.getncattr('i_parent_start')), int(d.getncattr('j_parent_start')))
-            self.parent_end = (int(d.getncattr('i_parent_end')), int(d.getncattr('j_parent_end')))
-            # precomputed files don't remember grid size but rather directly parent end/start
-            pstart, pend, pgr = self.parent_start, self.parent_end, self.parent_cell_size_ratio
-            self.domain_size = (pgr * (pend[0] - pstart[0] + 1) + 1, pgr * (pend[1] - pstart[1] + 1) + 1)
-            self.parent_time_step_ratio = cfg['parent_time_step_ratio']
-            self.cell_size = [float(x) / self.parent_cell_size_ratio for x in self.parent.cell_size]
-
-        # only used if this is a top-level domain but we read it in anyway
-        d.close()
+            pcsr, ps = self.parent_cell_size_ratio, self.parent_start
+            delta = (pcsr - 1) / 2
+            return self.parent.ij_to_latlon((i-delta)/pcsr+ps[0]-1., (j-delta)/pcsr+ps[1]-1.) 
 
     
     def update_wpsnl(self, nml):
