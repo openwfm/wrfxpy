@@ -1,0 +1,42 @@
+{
+  "grid_code": "colo2dv1",
+  "workspace_dir": "wksp",
+  "wps_install_dir": "/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/WPS",
+  "wrf_install_dir": "/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/WRFV3",
+  "grib_source": "NAM",
+  "wps_namelist_path": "etc/nlists/colorado-3k.wps",
+  "wrf_namelist_path": "etc/nlists/colorado-3k.input",
+  "fire_namelist_path": "etc/nlists/colorado-3k.fire",
+  "geogrid_path": "/share_home/mvejmelka/Packages/WPS-GEOG",
+  "sys_install_dir": "/share_home/mvejmelka/Projects/wrfxpy-dev",
+  "num_nodes": 10,
+  "ppn": 12,
+  "wall_time_hrs": 3,
+  "qman": "sge",
+  "start_utc": "T-90",
+  "end_utc": "T+240",
+  "fuel_moisture_da" : {
+    "domains" : [ 1 ],
+    "mesowest_token" : "d98b58462fe24c83b1444922f0e98d70"
+  },
+  "domains" : {
+    "1" : { 
+      "cell_size" : [1000, 1000],
+      "domain_size" : [91, 91],
+      "center_latlon" : [39.1, -105.9],
+      "truelats" : [38.5, 39.6],
+      "stand_lon" : -105.9,
+      "time_step" : 5,
+      "history_interval" : 15,
+      "geog_res" : "0.3s",
+      "subgrid_ratio" : [50, 50]
+    }
+  },
+  "email_notification" : {
+    "to" : "vejmelkam@gmail.com",
+    "events" : [ "start", "geogrid", "grib2", "ungrib", "metgrid", "wrf_submit", "wrf_exec", "complete" ]
+  },
+ "postproc" : {
+      "2" : [ "T2", "PSFC", "WINDSPD", "WINDVEC" ]
+  }
+}
