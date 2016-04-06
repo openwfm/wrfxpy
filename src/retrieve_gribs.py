@@ -24,6 +24,7 @@ from utils import esmf_to_utc
 
 import logging
 import sys
+import os.path as osp
 
 ## Standalone script that can be used to simply download files
 if __name__ == '__main__':

@@ -35,7 +35,11 @@ class GribError(Exception):
 
 class GribSource(object):
     """
-    Parent class of all grib sources.
+    The parent class of all GRIB2 sources that implements common functionality, for example
+
+    - local GRIB2 validation (file size check)
+    - GRIB2 retrieval with retries (smart check whether server implements http-range)
+    - symlinking GRIB2 files for ungrib
     """
 
     def __init__(self, ingest_dir):
@@ -48,33 +52,43 @@ class GribSource(object):
 
     def vtables(self):
         """
-        Returns the vtables that must be set for use with this source.
+        Returns the vtables that must be used with this source as a table with keys:
+        geogrid_vtable, ungrib_table, metgrid_table.
+
+        :return: a dictionary mapping vtable keys to specific table files
         """
         return {}
 
     def namelist_keys(self):
         """
-        Returns the namelist keys that must be modified in namelist.input with this GRIB source.
+        Some GRIB2 source files require that in namelist.input, certain parameters have
+        particular values.  Such keys should be returned here.
+
+        :return: a dictionary mapping section names to keys that must be modified.
         """
         return {}
 
     def retrieve_gribs(self, from_utc, to_utc, ref_utc = None):
         """
-        Attempts to retrieve the GRIB files for the forecast range.
+        Attempts to retrieve the GRIB files for the forecast time range.
+        It should be first verified whether the GRIB2 files are available locally.
+        For any unavailable files, downloads should be initiated.
 
         :param from_utc: forecast start time
         :param to_utc: forecast end time
-        :param ref_utc: a reference time which defines 'now' for the purpose of retrieval, None results in ref_utc being replaced with the UTC time when requesting, so the retrieval functions simply 'do the right thing'
+        :param ref_utc: a reference time which defines 'now' for the purpose of
+                        retrieval, None means datetime.utcnow().
         :return: a list of paths to local GRIB files
         """
         pass
 
     def download_grib(self, url_base, rel_path, max_retries=3):
         """
-        Download a GRIB file from a GRIB service and stream to rel_path in ingest_dir.
+        Download a GRIB file from a GRIB service and stream to <rel_path> in ingest_dir.
 
         :param url_base: the base URL part of the GRIB service
         :param rel_path: the relative path of the file (w.r.t GRIB base url and w.r.t self.ingest_dir)
+        :param max_retries: how many times we may retry to download the file
         """
         url = url_base + '/' + rel_path
         r = requests.get(url, stream=True)
@@ -166,7 +180,6 @@ class HRRR(GribSource):
 
         HRRR requires that ''num_metgrid_soil_levels'' is set to 8.
         """
-        #return { 'domains' : { 'num_metgrid_soil_levels': 8 }}
         return {}
 
     def retrieve_gribs(self, from_utc, to_utc, ref_utc=None):
@@ -220,20 +233,19 @@ class HRRR(GribSource):
 
     def compute_manifest(self, cycle_start, fc_hours):
         """
-        Computes the relative paths of required GRIB files.
+        Computes the relative paths of required GRIB2 files.
 
-        Note, the system is built so that relative paths are the same in local cache
-        and in remote system w.r.t. URL base.
+        HRRR provides 16 GRIB2 files, one per hour and performs a cycle every hour.
 
         :param cycle_start: UTC time of cycle start
         :param fc_hours: final forecast hour 
         """
+        path_tmpl = 'hrrr.%04d%02d%02d/hrrr.t%02dz.wrfprsf%02d.grib2'
         year, mon, day, hour = cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
-        return map(lambda x: self.path_tmpl % (year, mon, day, hour, x), range(fc_hours+1))
+        return map(lambda x: path_tmpl % (year, mon, day, hour, x), range(fc_hours+1))
 
     # instance variables
     remote_url = 'http://www.ftp.ncep.noaa.gov/data/nccf/nonoperational/com/hrrr/prod'
-    path_tmpl = 'hrrr.%04d%02d%02d/hrrr.t%02dz.wrfprsf%02d.grib2'
 
 
 class NAM218(GribSource):
@@ -263,6 +275,7 @@ class NAM218(GribSource):
         """
         return { 'domains' : { 'num_metgrid_levels': 40, 'num_metgrid_soil_levels' : 4 }}
 
+    
     def retrieve_gribs(self, from_utc, to_utc, ref_utc=None):
         """
         Attempts to retrieve the files to satisfy the simulation request from_utc - to_utc.
@@ -284,71 +297,86 @@ class NAM218(GribSource):
         if ref_utc is None:
             ref_utc = datetime.now(pytz.UTC)
 
-        # select cycle (at least two hours behind real-time), out of the four NAM 218 cycles per day
-        # which occurr at [0, 6, 12, 18] hours
-        ref_utc_2 = ref_utc - timedelta(hours=2)
-        ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
-        cycle_start = min(from_utc, ref_utc_2)
-        cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
+        # it is possible that a cycle output is delayed and unavailable when we expect it (3 hours after cycle time)
+        # in this case, the NAM grib source supports using previous cycles (up to 2)
+        cycle_shift = 0
+        while cycle_shift < 3:
+    
+            # select cycle (at least two hours behind real-time), out of the four NAM 218 cycles per day
+            # which occurr at [0, 6, 12, 18] hours
+            ref_utc_2 = ref_utc - timedelta(hours=3)
+            ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
+            cycle_start = min(from_utc, ref_utc_2)
+            cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
+            cycle_start -= timedelta(hours=6*cycle_shift)
 
-        # check if the request is even satisfiable
-        delta_end = to_utc - cycle_start
-        fc_hours = delta_end.days * 24 + int(delta_end.seconds / 3600)
+            # check if the request is even satisfiable
+            delta_end = to_utc - cycle_start
+            fc_hours = delta_end.days * 24 + int(delta_end.seconds / 3600)
 
-        if fc_hours > 84:
-            raise GribError('Unsatisfiable: NAM 218 initial and boundary conditions are only available for 84 hours.')
+            if fc_hours > 84:
+                raise GribError('Unsatisfiable: NAM 218 initial and boundary conditions are only available for 84 hours.')
 
-        delta_start = from_utc - cycle_start
-        fc_start = delta_start.days * 24 + int(delta_start.seconds / 3600)
+            delta_start = from_utc - cycle_start
+            fc_start = delta_start.days * 24 + int(delta_start.seconds / 3600)
 
-        logging.info('NAM218: from_utc=%s to_utc=%s fc [%d,%d] cycle %s' % (str(from_utc), str(to_utc), fc_start, fc_hours, str(cycle_start)))
+            logging.info('NAM218: from_utc=%s to_utc=%s attemting retrieval for fc [%d,%d] of cycle %s' %
+                          (str(from_utc), str(to_utc), fc_start, fc_hours, str(cycle_start)))
 
-        # computes the relative paths of the desired files (the manifest)
-        manifest = self.compute_manifest(cycle_start, fc_start, fc_hours)
+            # computes the relative paths of the desired files (the manifest)
+            manifest = self.compute_manifest(cycle_start, fc_start, fc_hours)
 
-        # check what's available locally
-        nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), manifest)
+            # check what's available locally
+            nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), manifest)
 
-        # check if GRIBs we don't are available remotely
-        url_base = self.remote_url
-        unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
-        if len(unavailables) > 0:
-            raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
+            # check if GRIBs we don't are available remotely
+            url_base = self.remote_url
+            unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
+            if len(unavailables) > 0:
+                logging.warning('NAM218: failed retrieving cycle data for cycle %s, unavailables %s' % (cycle_start, repr(unavailables)))
+                cycle_shift += 1
+                continue
 
-        # download all gribs we need
-        map(lambda x: self.download_grib(url_base, x), nonlocals)
+            # download all gribs we need
+            map(lambda x: self.download_grib(url_base, x), nonlocals)
 
-        # return manifest
-        return manifest
+            # return manifest
+            return manifest
 
+        raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles.' % repr(unavailables))
+    
     def compute_manifest(self, cycle_start, fc_start, fc_hours):
         """
         Computes the relative paths of required GRIB files.
 
-        Note, the system is built so that relative paths are the same in local cache
-        and in remote system w.r.t. URL base.
+        NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
+        every 3 hours, starting with 39 and ending with 84.
 
         :param cycle_start: UTC time of cycle start
         :param fc_start: index of first file we need
         :param fc_hours: final forecast hour 
         """
+        path_tmpl = 'nam.%04d%02d%02d/nam.t%02dz.awphys%02d.grb2.tm00'
         fc_seq = range(fc_start, 36) + range(max(fc_start, 39), 85, 3)
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
         fc_list.append(fc_seq[len(fc_list)])
         
         year, mon, day, hour = cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
-        return map(lambda x: self.path_tmpl % (year, mon, day, hour, x), fc_list)
+        return map(lambda x: path_tmpl % (year, mon, day, hour, x), fc_list)
 
     # instance variables
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
-    path_tmpl = 'nam.%04d%02d%02d/nam.t%02dz.awphys%02d.grb2.tm00'
 
 
 
 class NARR(GribSource):
     """
     The NARR (North American Regional Reanalysis) grib source as provided by NOMADS.
+
+    NARR is different from other GRIB2 sources since it does not really have cycles.
+    It's a reanalysis product computed with a large delay (18 months at this time) and
+    the conditions are encoded every 3 hours [0, 3, 6, 9, ..., 21] every day.
     """
 
     def __init__(self, ingest_dir):
@@ -388,23 +416,18 @@ class NARR(GribSource):
         from_utc = from_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
         to_utc = to_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
 
-        if ref_utc is None:
-            ref_utc = datetime.now(pytz.UTC)
+        # NARR is only available with a large delay and is available in 3 hour increments
+        # current delay is about 18 months, so ref_utc is not even used here.
+        start_utc = from_utc.replace(hour = from_utc.hour - from_utc.hour % 3)
+        end_utc = to_utc + timedelta(hours=2,minutes=59,seconds=59)
+        end_utc = end_utc.replace(hour=end_utc.hour - end_utc.hour % 3)
 
-        # select cycle (at least two hours behind real-time), out of the four NAM 218 cycles per day
-        # which occurr at [0, 6, 12, 18] hours
-        cycle_start = min(from_utc, ref_utc - timedelta(hours=2))
-        cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
-
-        # check if the request is even satisfiable
-        delta = to_utc - cycle_start
-        fc_hours = delta.days * 24 + delta.seconds / 3600
-
-        if fc_hours > 21:
-            raise GribError('Unsatisfiable: NARR initial and boundary conditions are only available for 21 hours in one cycle.')
-
-        # computes the relative paths of the desired files (the manifest)
-        manifest = self.compute_manifest(cycle_start, fc_hours)
+        # compute the manifest here
+        at_time = start_utc
+        manifest = []
+        while at_time <= end_utc:
+            manifest.append(self.make_relative_url(at_time))
+            at_time += timedelta(hours=3)
 
         # check what's available locally
         nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), manifest)
@@ -415,34 +438,25 @@ class NARR(GribSource):
         if len(unavailables) > 0:
             raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
 
-        # download all gribs we need
+        # download all gribs not available remotely
         map(lambda x: self.download_grib(url_base, x), nonlocals)
 
         # return manifest
         return manifest
 
-    def compute_manifest(self, cycle_start, fc_hours):
+    def make_relative_url(self, utc_time):
         """
-        Computes the relative paths of required GRIB files.
+        Build the relative URL of the NARR GRIB2 file, which is based on the UTC time.
 
-        Note, the system is built so that relative paths are the same in local cache
-        and in remote system w.r.t. URL base.
-
-        :param cycle_start: UTC time of cycle start
-        :param fc_hours: final forecast hour 
+        :param utc_time: the UTC time
+        :return: the relative URL
         """
-        fc_seq = range(0, 22, 3)
-        year, mon, day, hour = cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
-        # get all time points up to fc_hours plus one (we must cover entire timespan)
-        fc_list = [x for x in fc_seq if x < fc_hours]
-        fc_list.append(fc_seq[len(fc_list)])
-        return map(lambda x: self.path_tmpl % (year, mon, year, mon, day, year, mon, day, x), fc_list)
+        path_tmpl = '%04d%02d/%04d%02d%02d/narr-a_221_%04d%02d%02d_%02d00_000.grb'
+        year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
+        return path_tmpl % (year, mon, year, mon, day, year, mon, day, hour)
 
     # instance variables
     remote_url = 'http://nomads.ncdc.noaa.gov/data/narr'
-    path_tmpl = '%04d%02d/%04d%02d%02d/narr-a_221_%04d%02d%02d_%02d00_000.grb'
-
-
 
 
 ## Utility functions
