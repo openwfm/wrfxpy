@@ -24,6 +24,8 @@ The *wrfxpy* system needs the following software to be installed:
 * `simplekml <https://simplekml.readthedocs.org/en/latest/>`_ to build KMZ files
 * `f90nml <https://pypi.python.org/pypi/f90nml>`_ to manipulate Fortran namelists
 * `pyproj <https://pypi.python.org/pypi/pyproj>`_ to place domains dynamically in LCC projection
+* `paramiko <https://pypi.python.org/pypi/paramiko>`_ to communicate over SSH with remote hosts
+* `netCDF4 <https://pypi.python.org/pypi/netCDF4>`_ to manipulate WPS and WRF files
 
 The simplest way to satisfy these requirements is to install `Anaconda Python <https://www.continuum.io/downloads>`_ and then run the following commands:
 
