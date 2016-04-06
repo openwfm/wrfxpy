@@ -320,7 +320,7 @@ class NAM218(GribSource):
             delta_start = from_utc - cycle_start
             fc_start = delta_start.days * 24 + int(delta_start.seconds / 3600)
 
-            logging.info('NAM218: from_utc=%s to_utc=%s attemting retrieval for fc [%d,%d] of cycle %s' %
+            logging.info('NAM218: from_utc=%s to_utc=%s attempting retrieval for fc [%d,%d] of cycle %s' %
                           (str(from_utc), str(to_utc), fc_start, fc_hours, str(cycle_start)))
 
             # computes the relative paths of the desired files (the manifest)
