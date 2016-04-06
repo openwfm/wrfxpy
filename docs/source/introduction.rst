@@ -29,7 +29,7 @@ The simplest way to satisfy these requirements is to install `Anaconda Python <h
 
 ::
 
-  conda install basemap netcdf4 pyproj
+  conda install basemap netcdf4 pyproj paramiko
   conda install --channel https://conda.anaconda.org/IOOS simplekml
   pip install f90nml
 

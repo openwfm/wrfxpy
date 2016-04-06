@@ -10,7 +10,7 @@ Welcome to wrfxpy's documentation!
    :maxdepth: 1
 
    introduction
-   tutorial
+   quickstart
    configuration
 
 
