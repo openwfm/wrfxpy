@@ -31,10 +31,11 @@ class OutputCheckFailed(Exception):
 
 class Executor(object):
     """
-    A class that handles execution of external processes for the system.
+    A class that handles execution of external processes for the system with
+    make-like functionality.
 
-    This class works for executables where we first run them and then check the output
-    for indications of success.
+    This class works for serially (not using MPI) and synchronously
+    (not using a queuing system) launched executables.
     """
 
     def __init__(self, work_dir, exec_name):
@@ -51,7 +52,11 @@ class Executor(object):
         """
         Execute the file in given working directory.
 
-        Output redirection: stdout goes to <exec_name>.stdout, stderr goes to <exec_name>.stderr
+        The execute method first checks whether the expected output is present and
+        if it indicates success, if yes, nothing is executed.  If not, the file is executed
+        and its output is redirected: stdout goes to <exec_name>.stdout, stderr goes to <exec_name>.stderr
+        Then the output is checked for markers indicating success, if found, function returns.
+        Otherwise an exception is raised indicating the external process failed.
 
         :return: raises OutputCheckFailed if return code is non-zero
         """
