@@ -25,7 +25,6 @@ import os.path as osp
 import glob
 import numpy as np
 import math
-import paramiko
 
 
 def ensure_dir(path):
@@ -202,7 +201,7 @@ def update_ignitions(ign_specs, max_dom):
         # for each ignition 
         for ndx,ign in enumerate(dom_igns):
             start, dur = ign['start_delay_s'], ign['duration_s']
-            lat, lon = ign['lat'], ign['long']
+            lat, lon = ign['latlon']
             vals = [ lat, lat, lon, lon, start, start+dur, 200, 1 ]
             kv = dict(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals]))
             nml_fire.update(kv)
@@ -291,8 +290,5 @@ def send_simulation_output(from_dir, to_dir, host, user, ssh_key):
         sftp.put(osp.join(from_dir, file), osp.join(to_dir, file))
     sftp.close()
     ssh.close()
-
-
-
 
 
