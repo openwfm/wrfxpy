@@ -25,7 +25,7 @@ class Mock(MagicMock):
     def __getattr__(cls, name):
             return Mock()
 
-MOCK_MODULES = ['netCDF4', 'numpy', 'pyproj']
+MOCK_MODULES = ['netCDF4', 'numpy', 'pyproj', 'mpl_toolkits']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 
