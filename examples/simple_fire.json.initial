@@ -1,5 +1,5 @@
 {
-  "grid_code": "test",
+  "grid_code": "test-fire",
   "grib_source": "NAM",
   "wps_namelist_path": "etc/nlists/default.wps",
   "wrf_namelist_path": "etc/nlists/default.input",
@@ -10,8 +10,8 @@
   "ppn": 12,
   "wall_time_hrs": 3,
   "qman": "sge",
-  "start_utc": "T-90",
-  "end_utc": "T+300",
+  "start_utc": "T-30",
+  "end_utc": "T+180",
   "domains" : {
     "1" : { 
       "cell_size" : [1000, 1000],
@@ -22,15 +22,14 @@
       "time_step" : 5,
       "history_interval" : 15,
       "geog_res" : "0.3s",
-      "subgrid_ratio" : [50, 50]
+      "subgrid_ratio" : [40, 40]
     }
   },
   "ignitions" : {
      "1" : [ {
       "start_delay_s" : 600,
       "duration_s" : 240,
-      "lat" : 39.894264,
-      "long" : -103.903222
+      "latlon" : [39.894264, -103.903222]
      } ]
   },
   "postproc" : {
