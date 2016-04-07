@@ -12,6 +12,7 @@ injects the domain configuration into a WPS nmelist file and into an input
 namelist file.  Please refer to the domain configuration description in :doc:`forecasting`.
 
 Example::
+
   ./domain_setup.sh my_domains.json namelist.wps namelist.input
 
 Assuming that ``my_domains.json`` contains the following::
@@ -36,6 +37,7 @@ cell sie, 91 x 91 domain size, 20m fire grid).
 .. note::
   The namelist files are *overwritten*.
 
+
 Grib retrieval
 ==============
 
@@ -43,6 +45,7 @@ The script ``grib_retr.sh`` accepts fourth arguments, the grib source identifier
 the UTC start, the end time of a simulation in ESMF format and the ingest directory.
 
 Example::
+
   ./grib_retr.sh HRRR 2016-03-26_14:00:00 2016-03-26_19:00:00 ingest
 
 This will find out which GRIB2 files are required to perform this simulation and
@@ -63,6 +66,7 @@ to base the filenames and the skip (the script will process every skip-th frame)
 The script always generates PNG files and KMZ files for each variable and timestamp.
 
 Example::
+
   ./postprocess.sh /path/to/wrfout T2,PSFC my_directory/file_prefix 1
 
 Alternatively, instead of listing the variables, a more detailed configuration controlling
@@ -90,13 +94,6 @@ are not shown and fix the scale from 0 to 6.
   For the default and more information on values that can be set, examine ``src/vis/var_wisdom.py``.
 
 
- 
-
-  
-
-
-
-
 Fuel moisture DA
 ================
 
@@ -104,6 +101,7 @@ The script ``apply_fmda.sh`` accepts a single wrfinput path argument and
 performs a data assimilation step using background covariance.
 
 Example::
+
   ./apply_fmda.sh wrfinput_d01
 
 The script will read in the timestamp from the wrfinput file, determine it's
