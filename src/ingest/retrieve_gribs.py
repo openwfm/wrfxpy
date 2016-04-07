@@ -67,5 +67,3 @@ if __name__ == '__main__':
     print(repr(grib_src.namelist_keys()))
 
 
-
-

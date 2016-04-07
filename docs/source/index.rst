@@ -12,7 +12,8 @@ Welcome to wrfxpy's documentation!
    introduction
    installation
    quickstart
-   configuration
+   forecasting
+   standalones
 
 
 Indices and tables

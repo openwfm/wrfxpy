@@ -1,9 +1,13 @@
-Configuration keys
+Forecasting 
 ******************
 
-The script `src/forecast.py` requires a JSON configuration file to control its execution,
-for an example refer to the :doc:`quickstart`.  The configuration file is JSON dictionary
-with the keys described in the following sections.  Not all keys are required.
+The script ``forecast.sh`` serves to run weather forecasts, fire danger forecasts and fire
+simulations depending on its settings.
+
+The script requires a JSON configuration file to control its execution, for an example refer
+to the :doc:`quickstart`.  The configuration file is JSON dictionary with the keys described
+in the following sections.  Not all keys are required.
+
 
 Domains
 =======
@@ -152,17 +156,22 @@ The value must be a dictionary mapping ``geo_em.dYY.nc`` files to their actual l
 WRF-SFIRE inputs
 ================
 
-All of the following keys except ``precomputed`` are required.
+All of the following keys are required.
 
 * ``grid_code : [string]`` the grid code is part of the job id and semantically should identify the configured grid
-* ``grib_source : [string]`` must be HRRR
-* ``geogrid_path : [string]`` the path to ``WPS GEOG`` data, refer to WPS documentation
+* ``grib_source : [string]`` must be one of NAM, NARR or HRRR
+* ``geogrid_path : [string]`` the path to ``WPS GEOG`` data directory 
 * ``start_utc : [esmf_time]`` the start time of the simulation in ESMF format
 * ``end_utc : [esmf_time]`` the end time of the simulation in ESMF format
 
 The keys in the remainder of this section are optional.
 
-* ``ignitions : [dict]`` (optional) is a dictionary of domains (string identifier, e.g. "1") to a list of ignitions that should be added to the domain, each being a dictionary with keys as shown in example.  Including this option causes the fire model to be switched on in each domain listed.  A total of five ignitions is allowed (combined for all domains).  If a domain is listed without any ignitions, the fire model is switched on and computes spread rates etc for fire danger forecasting.
+* ``ignitions : [dict]`` (optional) is a dictionary of domains (string identifier, e.g. "1") to a list of ignitions that should be added to the domain, each being a dictionary with keys as shown in example.  Including this option causes the fire model to be switched on in each domain listed.  A total of five ignitions is allowed (combined for all domains).  
+  
+.. tip::  
+  If a domain is listed without any ignitions, the fire model is switched on and computes quantities
+  related to fire danger, such as fire spread rates, fuel moisture values, etc.
+
 
 Namelist templates
 ==================
@@ -178,7 +187,7 @@ All of the following keys are required.
 Parallel job configuration
 ==========================
 
-The following keys are compulsory.
+The following keys are required.
 
 * ``num_nodes : [int]`` the number of parallel nodes to use for WRF execution
 * ``ppn : [int]`` the number of processors per node to request
@@ -191,9 +200,18 @@ Fuel moisture data assimilation
 The key ``fuel_moisture_da`` is optional.  If given, it needs to contain two keys:
 
 * ``domains : [list(int)]`` a list of domains for which to run data assimilation
-* ``mesowest_token : [string]`` the Mesowest API access token (you must obtain one here `Mesowest <http://mesowest.org/>`_)
+
+.. important::
+  In addition to this, the file ``etc/tokens.json`` must contain the key ``mesowest_token : [string]``,
+  which will be used to access the Mesowest API (you must obtain one here `Mesowest <http://mesowest.org/>`_).
 
 The data assimilation code will download 10-hr fuel moisture observations from stations in the domain area and assimilate them into the equilibrium.
+
+Example::
+
+  "fuel_moisture_da" : {
+    "domains" : [ 1 ]
+  }
 
 
 Postprocessing
@@ -201,4 +219,12 @@ Postprocessing
 
 The key ``postproc``, when present contains a dictionary keyed by domain id (string), which identifies the variables to postprocess for each domain.
 For each listed variable, a PNG and a KMZ file is created and if required, a colorbar (configured in ``var_wisdom``).
+
+Example::
+
+  "postproc" : {
+    "1" : ["T2", "PSFC", "WINDSPD" ]
+  }
+
+
   

@@ -82,6 +82,6 @@ This example configuration runs a fire simulation with the following settings:
   - generate surface temperature maps, wind information and fire fields for domain 1, the where the fire is burning
 
 .. tip::
-  To learn how to configure jobs in more detail, refer to :doc:`configuration`.
+  To learn how to configure jobs in more detail, refer to :doc:`forecasting`.
 
 

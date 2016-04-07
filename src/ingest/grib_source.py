@@ -26,6 +26,7 @@ import os.path as osp
 import sys
 import logging
 
+
 class GribError(Exception):
     """
     Raised when a GribSource cannot retrieve GRIBs.
