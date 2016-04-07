@@ -103,5 +103,5 @@ class FM10Observation:
     """
     Returns a string representation.
     """
-    return "%s %s pos: [%g,%g] val: %g (%g)" % (str(self.tm),self.varid,self.lat,self.lon,self.obs_val,self.obs_var)
+    return "%s loc: [%g,%g] val: %g var: %g" % (str(self.tm),self.lat,self.lon,self.obs_val,self.get_variance())
 

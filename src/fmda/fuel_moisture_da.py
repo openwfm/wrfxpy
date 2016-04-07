@@ -43,7 +43,7 @@ def check_overlap(wrf_path,ts_now):
   if ts_now in outts:
     return True
   else:
-    print("INFO: previous forecast [%s - %s] exists, running DA till %s" % (str(outts[0]),str(outts[-1]),str(ts_now)))
+    logging.info("FMDA previous forecast [%s - %s] exists, running DA till %s" % (str(outts[0]),str(outts[-1]),str(ts_now)))
     return False
 
 
@@ -85,7 +85,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, wrf_model):
             fms = stinfo['OBSERVATIONS']['fuel_moisture_set_1']
 
             for ts,fm_obs in zip(dts,fms):
-                o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs),ngp)
+                o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp)
                 obs_t = obs_data.get(ts, [])
                 obs_t.append(o)
                 obs_data[ts] = obs_t
@@ -94,52 +94,51 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, wrf_model):
 
 
 def execute_da_step(model, model_time, covariates, fm10):
-  """
-  Execute a single DA step from the current state/extended parameters and covariance matrix using
-  the <covariates> and observations <fm10>.  Assimilation time window is fixed at 60 mins.
+    """
+    Execute a single DA step from the current state/extended parameters and covariance matrix using
+    the <covariates> and observations <fm10>.  Assimilation time window is fixed at 60 mins.
 
-  :param model: a FuelMoistureModel
-  :param model_time: the current model time
-  :param covariates: the covariate fields to take into account to model the spatial structure of the FM field
-  :param fm10: the 10-hr fuel moisture observations
-  """
-  valid_times = [z for z in fm10.keys() if abs((z - model_time).total_seconds()) < 1800]
-  logging.info('FMDA there are %d valid times at model time %s' % (len(valid_times), str(model_time)))
+    :param model: a FuelMoistureModel
+    :param model_time: the current model time
+    :param covariates: the covariate fields to take into account to model the spatial structure of the FM field
+    :param fm10: the 10-hr fuel moisture observations
+    """
+    valid_times = [z for z in fm10.keys() if abs((z - model_time).total_seconds()) < 1800]
+    logging.info('FMDA there are %d valid times at model time %s' % (len(valid_times), str(model_time)))
 
-  if len(valid_times) > 0:
+    if len(valid_times) > 0:
 
-    # retrieve all observations for current time
-    obs_valid_now = []
-    for z in valid_times:
-        obs_valid_now.extend(fm10[z])
+        # retrieve all observations for current time
+        obs_valid_now = []
+        for z in valid_times:
+            obs_valid_now.extend(fm10[z])
 
-    fmc_gc = model.get_state()
-    dom_shape = fmc_gc.shape[:2]
+        fmc_gc = model.get_state()
+        dom_shape = fmc_gc.shape[:2]
 
-    # construct covariate storage
-    Xd3 = min(len(covariates) + 1, len(obs_valid_now))
-    X = np.zeros((dom_shape[0], dom_shape[1], Xd3))
-    X[:,:,0] = fmc_gc[:,:,1]
-    for i,c in zip(range(Xd3-1),covariates):
-        X[:,:,i+1] = covariates[i]
+        # construct covariate storage
+        Xd3 = min(len(covariates) + 1, len(obs_valid_now))
+        X = np.zeros((dom_shape[0], dom_shape[1], Xd3))
+        X[:,:,0] = fmc_gc[:,:,1]
+        for i,c in zip(range(Xd3-1),covariates):
+            X[:,:,i+1] = covariates[i]
 
-    print(np.sum(X,axis=0))
+        # run the trend surface model (clamp output to [0.0 - 2.5] to be safe)
+        Kf_fn, Vf_fn = fit_tsm(obs_valid_now, X)
+        Kf_fn[Kf_fn < 0.0] = 0.0
+        Kf_fn[Kf_fn > 2.5] = 2.5
 
-    # run the trend surface model (clamp output to [0.0 - 2.5] to be safe)
-    Kf_fn, Vf_fn = fit_tsm(obs_valid_now, X)
-    Kf_fn[Kf_fn < 0.0] = 0.0
-    Kf_fn[Kf_fn > 2.5] = 2.5
+        Kg = np.zeros((dom_shape[0], dom_shape[1], 6))
 
-    Kg = np.zeros((dom_shape[0], dom_shape[1], 6))
-
-    # run the data assimilation step now
-    logging.info("Mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g\n" %
-      (np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,0]), np.mean(fmc_gc[:,:,1]), np.mean(fmc_gc[:,:,2])))
-    model.kalman_update_single2(Kf_fn[:,:,np.newaxis], Vf_fn[:,:,np.newaxis,np.newaxis], 1, Kg)
-    logging.info("Mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g\n" %
-      (np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,0]), np.mean(fmc_gc[:,:,1]), np.mean(fmc_gc[:,:,2])))
-
-
+        # run the data assimilation step now
+        logging.info("Mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g" %
+          (np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,0]), np.mean(fmc_gc[:,:,1]), np.mean(fmc_gc[:,:,2])))
+        model.kalman_update_single2(Kf_fn[:,:,np.newaxis], Vf_fn[:,:,np.newaxis,np.newaxis], 1, Kg)
+        logging.info("Mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g" %
+          (np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,0]), np.mean(fmc_gc[:,:,1]), np.mean(fmc_gc[:,:,2])))
+    else:
+        logging.warning('FMDA no valid observations found, skipping data assimilation.')
+      
 def run_data_assimilation(wrf_model, fm10, wrf_model_prev = None):
     """
     Run the fuel moisture and DA for all time steps in the model wrf_model.
@@ -216,7 +215,7 @@ def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
   tss = wrfin.get_gmt_times()
   tm_start, tm_end = tss[0], tss[-1]
   dom_shape = lat.shape
-  logging.info('FMDA domain size is %d x %d grid points with extent (%g to %g) lons (%g to %g)' %
+  logging.info('FMDA domain size is %d x %d grid points with lats (%g to %g) and lons (%g to %g)' %
               (dom_shape[0], dom_shape[1],np.amin(lat),np.amax(lat),np.amin(lon),np.amax(lon)))
 
   # compute the diagonal distance between grid points
@@ -244,11 +243,17 @@ def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 3:
-        print('usage: %s <wrf-file> <mesowest_token>' % sys.argv[0])
+    if len(sys.argv) != 2:
+        print('usage: %s <wrf-file>' % sys.argv[0])
         sys.exit(1)
 
-    #cfg = json.load(open(sys.argv[1]))
-    assimilate_fm10_observations(sys.argv[1], None, sys.argv[2])
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    #retrieve our mesowest token from the store
+    tokens = json.load(open('etc/tokens.json'))
+    mesowest_token = tokens['mesowest']
+
+    logging.info('FMDA opening %s for assimilation' % sys.argv[1])
+    assimilate_fm10_observations(sys.argv[1], None, mesowest_token)
     sys.exit(0)
 
