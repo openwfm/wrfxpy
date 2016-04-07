@@ -54,6 +54,49 @@ will download them into subdirectories of the ``ingest`` directory.
   been downloaded are not re-downloaded.
 
 
+Postprocessing
+==============
+
+The script ``postprocess.sh`` accepts four arguments, the wrfout file to process,
+the variables to postprocess (or an instruction file, see below), the prefix on which
+to base the filenames and the skip (the script will process every skip-th frame).
+The script always generates PNG files and KMZ files for each variable and timestamp.
+
+Example::
+  ./postprocess.sh /path/to/wrfout T2,PSFC my_directory/file_prefix 1
+
+Alternatively, instead of listing the variables, a more detailed configuration controlling
+the colormaps, ranges and other parameters can be specified::
+
+  ./postprocess.sh /path/to/wrfout @var_instructions my_directory/file_prefix 1
+
+Where the file ``var_instructions`` contains::
+
+  {
+    "FGRNHFX" : {
+        "name" : "Grnd Heat flux",
+        "colorbar" : "W/m^2",
+        "colormap" : "jet",
+        "transparent_values" : [0, 1],
+        "scale" : [0, 6]
+    }
+  }
+
+Will show the colorbar in ``W/m^2`` units and change the displayed variable name to
+``Grnd Heat flux``, set the colormap to ``jet``, ensure that values between 0 and 1
+are not shown and fix the scale from 0 to 6.
+
+.. tip::
+  For the default and more information on values that can be set, examine ``src/vis/var_wisdom.py``.
+
+
+ 
+
+  
+
+
+
+
 Fuel moisture DA
 ================
 
@@ -69,5 +112,6 @@ valid at that time available in the region.  Then the equilibrium fuel moisture
 content is computed and adjusted with respect to the observations using the
 background covariance.  The updated values are written back into the fuel moisture
 file.
+
 
 
