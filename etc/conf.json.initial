@@ -2,5 +2,11 @@
   "workspace_dir": "wksp",
   "wps_install_dir": "path/to/WPS",
   "wrf_install_dir": "path/to/WRF",
-  "sys_install_dir": "/path/to/wrfxpy"
+  "sys_install_dir": "/path/to/wrfxpy",
+
+  "shuttle_ssh_key": "path/to/your/priv_ssh_key/to/remote/host",
+  "shuttle_remote_user" : "your_username",
+  "shuttle_remote_host" : "remote_hostname",
+  "shuttle_remote_root" : "remote director for output storage"
+}
 } 
