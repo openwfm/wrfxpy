@@ -1,9 +1,6 @@
-netCDF4
 MesoPy
 simplekml
-numpy
 f90nml
 paramiko
-pyproj
 basemap
 
