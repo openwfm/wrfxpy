@@ -71,10 +71,6 @@ Please set the following values:
   }
 
 
-.. warning::
-
-  The ``geogrid_path`` key below must be replaced with the path to your WPS-GEOG data.
-
 This example configuration runs a fire simulation with the following settings:
 
   - a single domain configuration with a domain placed approximately around an ignition point 
@@ -84,7 +80,8 @@ This example configuration runs a fire simulation with the following settings:
   - use the default WPS/WRF/fire/emissions namelists as base
   - ignite the fire 600s after the start of the simulation and deactivate the ignition after 4 minutes.
   - generate surface temperature maps, wind information and fire fields for domain 1, the where the fire is burning
-   
-For a detailed overview of the configuration keys, refer to :doc:`configuration`.
+
+.. tip::
+  To learn how to configure jobs in more detail, refer to :doc:`configuration`.
 
 
