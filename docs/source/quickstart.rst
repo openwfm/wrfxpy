@@ -6,40 +6,31 @@ Quickstart
   It is imperative that a working WRF-SFIRE installation is available.
   Installation and configuration of WRF-SFIRE is outside the scope of this documentation,
   please refer to the `OpenWFM <http://www.openwfm.org>`_ website for instructions.
-
-
-System setup
-============
-  First, the system must be configured.  Copy the file ``etc/conf.json.initial`` into
-  ``etc/conf.json`` and set the paths therein to point to the three correct directories:
-  ``WPS`` directory, ``WRF`` directory and the directory ``wrfxpy`` is installed in.
+  WPS-GEOG data must also be available for WPS including fuel and high-resolution topography.
 
 
 First fire forecast
 ===================
 
-To perform a fire forecast, the script ``src/forecast.py`` has to be executed with
+To perform a fire forecast, the script ``forecast.sh`` has to be executed with
 a JSON configuration file as an argument, for example:
 
 ::
 
-  python src/forecast.py examples/colorado.json
+  ./forecast.sh <file here>
 
-An example configuration script is ``examples/colorado.json`` in the working directory,
-also listed here:
-
-**NOTE** The ``geogrid_path`` below must be replaced with the path to your WPS-GEOG data
+An example configuration script is ``examples/simple_fire.json``, also listed here:
 
 ::
 
   {
-    "grid_code": "colo2dv1",
+    "grid_code": "test",
     "grib_source": "NAM",
     "wps_namelist_path": "etc/nlists/colorado-3k.wps",
     "wrf_namelist_path": "etc/nlists/colorado-3k.input",
     "fire_namelist_path": "etc/nlists/colorado-3k.fire",
     "emissions_namelist_path": "etc/nlists/colorado-3k.fire_emissions",
-    "geogrid_path": "/path/to/WPS geo data",
+    "geogrid_path": "/path/to/your/WPS-GEOG",
     "num_nodes": 10,
     "ppn": 12,
     "wall_time_hrs": 3,
@@ -48,59 +39,44 @@ also listed here:
     "end_utc": "T+300",
     "domains" : {
       "1" : {
-        "time_step" : 60,
-        "cell_size" : [12000,12000],
-        "domain_size" : [101, 101],
-        "center_latlon" : [39, -105.663],
-        "truelats" : [37, 40.5],
-        "stand_lon" : -105.5,
-        "history_interval" : 120,
-        "subgrid_ratio" :[1,1],
-        "geog_res" : "30s"
-      },
-      "2" : {
-        "parent_id" : 1,
-        "parent_cell_size_ratio" : 4,
-        "parent_time_step_ratio" : 4,
-        "subgrid_ratio" : [1, 1],
-        "parent_start" : [30, 30],
-        "parent_end" : [71, 71],
-        "history_interval" : 120,
-        "geog_res" : "30s"
-      },
-      "3" : {
-        "parent_id" : 2,
-        "parent_cell_size_ratio" : 3,
-        "parent_time_step_ratio" : 3,
-        "subgrid_ratio" : [40, 40],
-        "bounding_box" : [-104.5, 39.1, -103.8, 40.5],
-        "history_interval" : 30,
-        "geog_res" : ".3s"
+        "cell_size" : [1000, 1000],
+        "domain_size" : [91, 91],
+        "center_latlon" : [39.1, -105.9],
+        "truelats" : [38.5, 39.6],
+        "stand_lon" : -105.9,
+        "time_step" : 5,
+        "history_interval" : 15,
+        "geog_res" : "0.3s",
+        "subgrid_ratio" : [50, 50]
       }
     },
     "ignitions" : {
-       "3" : [ {
+       "1" : [ {
         "start_delay_s" : 600,
         "duration_s" : 240,
         "lat" : 39.894264,
         "long" : -103.903222
-         } ]
+       } ]
     },
-    "postproc" : {
-        "3" : [ "T2", "WINDSPD", "WINDVEC", "FIRE_AREA", "SMOKE_INT", "FGRNHFX", "FLINEINT" ]
+   "postproc" : {
+      "1" : [ "T2", "PSFC", "WINDSPD", "WINDVEC", "FIRE_AREA", "FGRNHFX", "FLINEINT", "SMOKE_INT" ]
     }
   }
 
+
+.. warning::
+
+  The ``geogrid_path`` key below must be replaced with the path to your WPS-GEOG data.
+
 This example configuration runs a fire simulation with the following settings:
 
-  - a three domain configuration, where the first two are statically placed and the third is computed
-    from a required bounding box as a child of the second
+  - a single domain configuration with a domain placed approximately around an ignition point 
   - use `NAM <http://www.nco.ncep.noaa.gov/pmb/products/nam/>`_ as the source for initial and boundary conditions
-  - start the simulation at time now minus 30 mins and execute a 5 hour simulation
+  - start at time now minus 30 mins and run a 5 hour simulation
   - use 10 nodes, 12 CPU cores per node, allow a wall time of 3 hrs, the queue manager is ``SGE`` (Sun Grid Engine)
-  - use the WPS/WRF/fire namelist templates as indicated (a template is simply a valid namelist)
-  - ignite the fire 600s after the start of the simulation  (8:10 AM UTC) at the given location and deactivate the ignition after 4 minutes.
-  - generate surface temperature maps, wind information and fire fields in domain 3, the where the fire is burning
+  - use the default WPS/WRF/fire/emissions namelists as base
+  - ignite the fire 600s after the start of the simulation and deactivate the ignition after 4 minutes.
+  - generate surface temperature maps, wind information and fire fields for domain 1, the where the fire is burning
    
 For a detailed overview of the configuration keys, refer to :doc:`configuration`.
 

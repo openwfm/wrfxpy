@@ -12,33 +12,5 @@ In particular, the modules herein can:
 * execute geogrid, ungrib, metgrid, real, WRF
 * monitor WRF execution
 * postprocess `netCDF files <http://www.unidata.ucar.edu/software/netcdf/>`_ to generate raster images or KMZ raster files
-* update catalogs with products
+* assemble simulation outputs into coherent packages for visualization
 
-Prerequisites
-=============
-
-The *wrfxpy* system needs the following software to be installed:
-
-* `Python 2.7+ <https://www.python.org/download/releases/2.7/>`_
-* `Basemap <http://matplotlib.org/basemap/>`_  to render the rasters
-* `simplekml <https://simplekml.readthedocs.org/en/latest/>`_ to build KMZ files
-* `f90nml <https://pypi.python.org/pypi/f90nml>`_ to manipulate Fortran namelists
-* `pyproj <https://pypi.python.org/pypi/pyproj>`_ to place domains dynamically in LCC projection
-* `paramiko <https://pypi.python.org/pypi/paramiko>`_ to communicate over SSH with remote hosts
-* `netCDF4 <https://pypi.python.org/pypi/netCDF4>`_ to manipulate WPS and WRF files
-
-The simplest way to satisfy these requirements is to install `Anaconda Python <https://www.continuum.io/downloads>`_ and then run the following commands:
-
-::
-
-  conda install basemap netcdf4 pyproj paramiko
-  conda install --channel https://conda.anaconda.org/IOOS simplekml
-  pip install f90nml
-
-This should install all prerequisites.
-
-*wrfxpy* is installed by cloning a GitHub repository
-
-::
-
-  git clone https://github.com/vejmelkam/wrfxpy.git

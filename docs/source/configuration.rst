@@ -1,19 +1,9 @@
 Configuration keys
 ******************
 
-The script `forecast.py` requires a JSON configuration file to control its execution,
-for an example refer to the :doc:`tutorial`.  The configuration file is JSON dictionary
+The script `src/forecast.py` requires a JSON configuration file to control its execution,
+for an example refer to the :doc:`quickstart`.  The configuration file is JSON dictionary
 with the keys described in the following sections.  Not all keys are required.
-
-Directories
-===========
-
-All of the following keys are required.
-
-* ``workspace_dir : [string]`` the path in which jobs are executed
-* ``wps_install_dir : [string]`` the path to a working installation of WPS
-* ``wrf_install_dir : [string]`` the path to a working installation of WRF
-* ``sys_install_dir : [string]`` the system installation directory
 
 Domains
 =======
@@ -28,7 +18,7 @@ dynamically placed.  In the following, we detail configuration of each type.
 Note: in the input namelist, wrfxpy will set the top level domain as ``specified``, while
 all other domains will be ``nested``.
 
-All domains must have the following keys (if omitted, their defaults will be used):
+All domains must have the following keys:
 
 * ``history_interval : [integer]`` the history interval in minutes, default is 60
 * ``parent_id : [integer]`` the id of the parent domain (can omit for parent domain with id=1)
@@ -42,7 +32,7 @@ Example:
   "domains" : {
     "1" : {
       "time_step" : 5,
-      "precomputed" : "precomputed/my_grids/colorado_domain_1.nc",
+      "precomputed" : "path/to/precomputed/geo_em.dYY.nc",
       "history_interval" : 15
     }
 
