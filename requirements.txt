@@ -1,4 +1,3 @@
-wrfxpy
 netCDF4
 MesoPy
 simplekml
