@@ -1,13 +1,11 @@
 Quickstart
 **********
 
-.. warning::
+.. important::
 
   It is imperative that a working WRF-SFIRE installation is available.
-  Installation and configuration of WRF-SFIRE is outside the scope of this documentation,
-  please refer to the `OpenWFM <http://www.openwfm.org>`_ website for instructions.
-  WPS-GEOG data must also be available for WPS including fuel and high-resolution topography.
-
+  Please first follow the installation instructions :doc:`installation`.
+  
 
 First fire forecast
 ===================
@@ -17,19 +15,28 @@ a JSON configuration file as an argument, for example:
 
 ::
 
-  ./forecast.sh <file here>
+  ./forecast.sh <json-configuration-file>
 
-An example configuration script is ``examples/simple_fire.json``, also listed here:
+An example configuration script is ``examples/simple_fire.json``, also listed here for
+convenience.  The script has most of the values filled out but there are some placeholders.
+
+Please set the following values:
+
+  * ``geogrid_path`` should point to the directory with your WPS-GEOG data
+  * ``num_nodes`` are the number of nodes to use for the parallel job
+  * ``ppn`` the number of processors per node to use
+  * ``wall_time_hrs`` number of hours of wall time to reserve for the job
+  * ``qman`` the queue manager type, currently only Sun Grid Engine is supported (``sge``)
 
 ::
 
   {
     "grid_code": "test",
     "grib_source": "NAM",
-    "wps_namelist_path": "etc/nlists/colorado-3k.wps",
-    "wrf_namelist_path": "etc/nlists/colorado-3k.input",
-    "fire_namelist_path": "etc/nlists/colorado-3k.fire",
-    "emissions_namelist_path": "etc/nlists/colorado-3k.fire_emissions",
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
     "geogrid_path": "/path/to/your/WPS-GEOG",
     "num_nodes": 10,
     "ppn": 12,
