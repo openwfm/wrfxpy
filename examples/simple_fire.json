@@ -5,7 +5,7 @@
   "wrf_namelist_path": "etc/nlists/default.input",
   "fire_namelist_path": "etc/nlists/default.fire",
   "emissions_namelist_path": "etc/nlists/default.fire_emissions",
-  "geogrid_path": "/share_home/mvejmelka/Packages/WPS-GEOG",
+  "geogrid_path": "/path/to/your/WPS-GEOG",
   "num_nodes": 10,
   "ppn": 12,
   "wall_time_hrs": 3,

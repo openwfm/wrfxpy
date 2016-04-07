@@ -24,14 +24,8 @@ import sys
 
 class FuelMoistureModel:
     """
-    A pure-python implementation of individual moisture models running on a grid.
+    A pure-python implementation of independent moisture models running on a grid.
     """
-    Tk = np.array([1.0, 10.0, 100.0, 1000.0]) * 3600    # nominal fuel delays
-    r0 = 0.05                                           # threshold rainfall [mm/h]
-    rk = 8.0                                            # saturation rain intensity [mm/h]
-    Trk = 14.0 * 3600                                   # time constant for wetting model [s]
-    S = 2.5                                             # saturation intensity [dimensionless]
-
 
     def __init__(self, m0, Tk=None, P0=None):
         """
@@ -41,6 +35,12 @@ class FuelMoistureModel:
         :param Tk: drying/wetting time constants of simulated fuels (one per fuel), default [1 10 100 1000]
         :param P0: initial state error covariance
         """
+        self.Tk = np.array([1.0, 10.0, 100.0, 1000.0]) * 3600    # nominal fuel delays
+        self.r0 = 0.05                                           # threshold rainfall [mm/h]
+        self.rk = 8.0                                            # saturation rain intensity [mm/h]
+        self.Trk = 14.0 * 3600                                   # time constant for wetting model [s]
+        self.S = 2.5                                             # saturation intensity [dimensionless]
+
         s0, s1, k = m0.shape
         if Tk is not None:
             self.Tk = Tk

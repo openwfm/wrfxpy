@@ -1,6 +1,6 @@
+mock
 MesoPy
 simplekml
 f90nml
 paramiko
-basemap
 

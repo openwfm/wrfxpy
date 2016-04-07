@@ -3,7 +3,18 @@ Installation
 
 Recommended method
 ==================
+We recommend using the `Anaconda Python <https://www.continuum.io/downloads>`_ distribution.
+Alternative installation instructions are given at the bottom.
 
+WPS/WRF-SFIRE
+-------------
+Please follow the instructions on `OpenWFM <http://www.openwfm.org>`_ to run WPS/WRF with real data.
+Ensure that you have working WPS/WRF installation is available and compatible with the MPI on your cluster.
+Note that *wrfxpy* will not modify the WPS/WRF installation, instead for each job, it will clone their directories
+into its workspace.
+
+Python and packages
+-------------------
 Download and install the Python 2 `Anaconda Python <https://www.continuum.io/downloads>`_ distribution for your platform.  We recommend an installation into the users home directory.
 
 Install pre-requisites: 
@@ -16,6 +27,9 @@ Install pre-requisites:
   pip install MesoPy
 
 Note that ``conda`` and ``pip`` are package managers available in the Anaconda Python distribution.
+
+wrfxpy and configuration
+------------------------
 
 Next, clone the *wrfxpy* code:
 
@@ -31,13 +45,17 @@ And finally, configure the system:
   cp conf.json.initial conf.json
   <your-favorite-editor-here> conf.json
 
-And tell *wrfxpy* where your WPS and WRFV3 system is located by editing the directories and where it is located.  If you need to move the workspace directory somewhere else, change the ``workspace_dir`` key.
+And tell *wrfxpy* where your WPS and WRFV3 system is located by editing the directories.  If you need to move the workspace directory somewhere else, change the ``workspace_dir`` key.
+
+.. attention::
+  You are now ready for your first fire simulation, continue with :doc:`quickstart`.
+  
 
 
-Custom method
-=============
+Custom installation
+===================
 
-A different python distribution and installation can be used if needed.  Below is a list of libraries the system requires:
+If Anaconda python is not practical, a different python distribution can be used.  Below is a list of packages the system requires:
 
 * `Python 2.7+ <https://www.python.org/download/releases/2.7/>`_
 * `Basemap <http://matplotlib.org/basemap/>`_  to render the rasters
@@ -48,18 +66,11 @@ A different python distribution and installation can be used if needed.  Below i
 * `netCDF4 <https://pypi.python.org/pypi/netCDF4>`_ to manipulate WPS and WRF files
 * `MesoPy <https://pypi.python.org/pypi/MesoPy>`_ to retrieve fuel moisture observations from Mesowest
 
-The simplest way to satisfy these requirements is to install `Anaconda Python <https://www.continuum.io/downloads>`_ and then run the following commands:
-
-::
-
-  conda install basemap netcdf4 pyproj paramiko
-  conda install --channel https://conda.anaconda.org/IOOS simplekml
-  pip install f90nml
-
-This should install all prerequisites.
-
 *wrfxpy* is installed by cloning a GitHub repository
 
 ::
 
   git clone https://github.com/vejmelkam/wrfxpy.git
+
+Configure *wrfxpy* by editing ``etc/conf.json`` as above and then continue with :doc:`quickstart`.
+

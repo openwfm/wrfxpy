@@ -20,6 +20,8 @@ The ``wrf`` module contains functions related to WRF/WPS.
    :members:
 
 
+.. autoexception:: wrf.wrf_exec.OutputCheckFailed
+   :members:
 
 .. autoclass:: wrf.wrf_exec.Executor
    :members:
