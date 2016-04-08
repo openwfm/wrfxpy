@@ -332,7 +332,7 @@ def execute(args):
 
     # step 8: execute wrf.exe on parallel backend
     js.task_id = "sim-" + js.grid_code + "-" + utc_to_esmf(js.start_utc)[:10]
-    WRF(js.wrf_dir, js.qman).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
+    WRF(js.wrf_dir, js.qsys).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
 
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
@@ -431,45 +431,6 @@ def verify_inputs(args):
                     failing = True
     if failing:
         raise ValueError('One or more unrecognized variables in postproc.')
-
-
-def test():
-
-    args = {'grid_code': 'colo2dv1',
-            'workspace_dir': 'wksp',
-            'wps_install_dir': '/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/WPS',
-            'wrf_install_dir': '/share_home/mvejmelka/Packages/wrf-fire.openwfm.clamping2/WRFV3',
-            'grib_source': HRRR('ingest'),
-            'wps_namelist_path': 'etc/nlists/colorado-3k.wps',
-            'wrf_namelist_path': 'etc/nlists/colorado-3k.input.tracers',
-            'fire_namelist_path': 'etc/nlists/colorado-3k.fire',
-            'emissions_namelist_path' : 'etc/nlists/colorado-3k.fire_emissions',
-            'precomputed' : { 'geo_em.d01.nc' : 'precomputed/colorado/geo_em.d01.nc',
-                              'geo_em.d02.nc' : 'precomputed/colorado/geo_em.d02.nc' },
-            'geogrid_path': '/share_home/mvejmelka/Packages/WPS-GEOG',
-            'sys_install_dir': '/share_home/mvejmelka/Projects/wrfxpy-dev',
-            'postproc' : {
-                "2" : [ "T2", "PSFC", "WINDSPD", "WINDVEC", "FIRE_AREA", "FIRE_HFX", "SMOKE_INT", "F_ROS" ]
-            },
-            "ignitions" : {
-                "2" : [ {
-                    "start_delay_s" : 600,
-                    "duration_s" : 240,
-                    "lat" : 39.894264,
-                    "long" : -103.903222
-                    } ]
-            },
-            'num_nodes': 10,
-            'ppn': 12,
-            'wall_time_hrs': 3,
-            'qman': 'sge',
-            'start_utc': datetime(2016, 1, 17, 16, 0, 0),
-            'end_utc': datetime(2016, 1, 17, 22, 0, 0)
-           }
-
-    verify_inputs(args)
-
-    execute(args)
 
 
 def process_arguments(args):

@@ -9,7 +9,7 @@
   "num_nodes": 10,
   "ppn": 12,
   "wall_time_hrs": 3,
-  "qman": "sge",
+  "qsys": "gross",
   "start_utc": "T-30",
   "end_utc": "T+180",
   "domains" : {
