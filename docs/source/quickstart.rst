@@ -26,7 +26,7 @@ Please set the following values:
   * ``num_nodes`` are the number of nodes to use for the parallel job
   * ``ppn`` the number of processors per node to use
   * ``wall_time_hrs`` number of hours of wall time to reserve for the job
-  * ``qman`` the queue manager type, currently only Sun Grid Engine is supported (``sge``)
+  * ``qsys`` the queueing subsystem id which point into ``etc/clusters.json``
 
 ::
 
@@ -41,7 +41,7 @@ Please set the following values:
     "num_nodes": 10,
     "ppn": 12,
     "wall_time_hrs": 3,
-    "qman": "sge",
+    "qsys": "sge",
     "start_utc": "T-30",
     "end_utc": "T+300",
     "domains" : {
