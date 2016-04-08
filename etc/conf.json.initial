@@ -8,5 +8,4 @@
   "shuttle_remote_user" : "your_username",
   "shuttle_remote_host" : "remote_hostname",
   "shuttle_remote_root" : "remote director for output storage"
-}
 } 
