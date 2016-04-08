@@ -376,8 +376,11 @@ def execute(args):
                 var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                 wrfout_path = osp.join(js.wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(js.start_utc))) 
-                pp.vars2kmz(wrfout_path, dom_id, esmf_time, var_list)
-                pp.vars2png(wrfout_path, dom_id, esmf_time, var_list)
+ 		try:
+                    pp.vars2kmz(wrfout_path, dom_id, esmf_time, var_list)
+                    pp.vars2png(wrfout_path, dom_id, esmf_time, var_list)
+		except Exception as e:
+		    logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
 
 
 def verify_inputs(args):

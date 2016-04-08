@@ -257,12 +257,8 @@ class Submitter(object):
             f.write(script_tmpl % args)
 
         ret = check_output([qsub, script_path], cwd=self.work_dir)
-        try:
-            self.job_code = job_code_f(ret)
-        except ValueError as e:
-            raise OutputCheckFailed('Failed to capture job code from submit with error %s from ret %s' % (e, ret))
-
-
+       
+ 
 class WRF(Submitter):
     """
     Handles job submission for wrf.exe into a job manager.
