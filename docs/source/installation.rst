@@ -13,6 +13,14 @@ Ensure that you have working WPS/WRF installation is available and compatible wi
 Note that *wrfxpy* will not modify the WPS/WRF installation, instead for each job, it will clone their directories
 into its workspace.
 
+.. attention::
+
+  Past this point, you should be able to run a fire simulation yourself,
+  that is have a working ``WPS/WRF-SFIRE`` installation including ``WPS-GEOG``
+  and fuels/topography downloaded.  You should be able to submit a parallel
+  job into your cluster/supercomputer to run ``wrf.exe``
+
+
 Python and packages
 -------------------
 Download and install the Python 2 `Anaconda Python <https://www.continuum.io/downloads>`_ distribution for your platform.  We recommend an installation into the users home directory.
@@ -28,8 +36,8 @@ Install pre-requisites:
 
 Note that ``conda`` and ``pip`` are package managers available in the Anaconda Python distribution.
 
-wrfxpy and configuration
-------------------------
+wrfxpy
+------
 
 Next, clone the *wrfxpy* code:
 
@@ -37,7 +45,10 @@ Next, clone the *wrfxpy* code:
   
   git clone https://github.com/vejmelkam/wrfxpy.git
 
-And finally, configure the system:
+configuration
+-------------
+
+And finally, configure the system directories, ``WPS/WRF-SFIRE`` locations and workspace location.
 
 ::
   
@@ -45,10 +56,43 @@ And finally, configure the system:
   cp conf.json.initial conf.json
   <your-favorite-editor-here> conf.json
 
-And tell *wrfxpy* where your WPS and WRFV3 system is located by editing the directories.  If you need to move the workspace directory somewhere else, change the ``workspace_dir`` key.
+And tell *wrfxpy* where your WPS and WRFV3 system is located by editing the directories.
+
+Next, *wrfxpy* needs to know how jobs are submitted on your cluster.  Create an entry for your cluster, here we use ``speedy`` as an example::
+
+  {
+    "speedy" : {
+      "qsub_cmd" : "qsub",
+      "qsub_script" : "etc/qsub/speedy.sub"
+    }
+  }
+
+And then the file ``etc/qsub/speedy.sub`` should contain a submission script template, that makes use of the following variables supplied by *wrfxpy* based on job configuration:
+
+* ``%(nodes)d`` the number of nodes requested
+* ``%(ppn)d`` the number of processors per node requested
+* ``%(wall_time_hrs)d`` the number of hours requested
+* ``%(exec_path)d`` the path to the wrf.exe that should be executed
+* ``%(cwd)d`` the job working directory
+* ``%(task_id)d`` a task id that can be used to identify the job
+* ``%(np)d`` the total number of processes requested, equals ``nodes`` x ``ppn``
+
+Note that not all keys need to be used, as shown in the ``speedy`` example::
+
+  #$ -S /bin/bash
+  #$ -N %(task_id)s
+  #$ -wd %(cwd)s
+  #$ -l h_rt=%(wall_time_hrs)d:00:00
+  #$ -pe mpich %(np)d
+  mpirun_rsh -np %(np)d -hostfile $TMPDIR/machines %(exec_path)s
+
+The script template should be derived from a working submission script.
+
 
 .. attention::
   You are now ready for your first fire simulation, continue with :doc:`quickstart`.
+
+
   
 
 
