@@ -1,0 +1,7 @@
+#$ -S /bin/bash
+#$ -N %(task_id)s
+#$ -wd %(cwd)s
+#$ -l h_rt=%(wall_time_hrs)02d:00:00
+#$ -pe mpich %(np)d
+mpirun_rsh -np %(np)d -hostfile $TMPDIR/machines %(exec_path)s
+

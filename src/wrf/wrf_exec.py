@@ -21,6 +21,8 @@ from subprocess import check_call, check_output
 import os
 import os.path as osp
 import re
+import json
+
 
 class OutputCheckFailed(Exception):
     """
@@ -219,17 +221,19 @@ class Submitter(object):
     Class that abstract jobs that must be submitted to a queue manager.
     """
 
-    def __init__(self, work_dir, qman):
+    def __init__(self, work_dir, qsys_id):
         """
         Initialize with working directory and queue manager id.
 
         :param work_dir: where the job is to be run
-        :param qman: id of queue manager, affects job submission script construction
+        :param qsys_id: the id of the queue system/template to use (points to etc/clusters.json)
         """
+        self.qsys_infos = json.load(open('etc/clusters.json'))
         self.work_dir = work_dir
-        if qman not in self.qman_infos:
-            raise ValueError('Invalid queue manager, must be one of %s' % repr(self.queue_managers.keys()))
-        self.qman = qman
+        if qsys_id not in self.qsys_infos:
+            raise ValueError('Invalid queue system, must be one of %s' % repr(self.qsys_infos.keys()))
+        self.qsys_id = qsys_id
+
 
     def submit(self, task_id, exec_path, nodes, ppn, wall_time_hrs):
         """
@@ -241,10 +245,9 @@ class Submitter(object):
         :param ppn: processors per nodes to request
         :param wall_time_hrs: wall time to request for job
         """
-        qman_info = self.qman_infos[self.qman]
-        qsub = qman_info['qsub_cmd']
-        script_tmpl = qman_info['qsub_script']
-        job_code_f = qman_info['job_code_f']
+        qsys = self.qsys_infos[self.qsys_id]
+        qsub = qsys['qsub_cmd']
+        script_tmpl = open(qsys['qsub_script']).read()
 
         args = {'nodes': nodes, 'ppn': ppn, 'wall_time_hrs': wall_time_hrs,
                 'exec_path': exec_path, 'cwd': self.work_dir, 'task_id': task_id, 'np': nodes * ppn}
@@ -258,16 +261,6 @@ class Submitter(object):
             self.job_code = job_code_f(ret)
         except ValueError as e:
             raise OutputCheckFailed('Failed to capture job code from submit with error %s from ret %s' % (e, ret))
-
-    qman_infos = {
-        'sge': {
-            'qsub_cmd': 'qsub',
-            'job_code_f': lambda x: int(re.match(r'Your job (\d+)', x).group(1)),
-            'qsub_script': '#$ -S /bin/bash\n' '#$ -N %(task_id)s\n' '#$ -wd %(cwd)s\n'
-                           '#$ -l h_rt=%(wall_time_hrs)02d:00:00\n' '#$ -pe mpich %(np)d\n'
-                           'mpirun_rsh -np %(np)d -hostfile $TMPDIR/machines %(exec_path)s\n'
-        }
-    }
 
 
 class WRF(Submitter):

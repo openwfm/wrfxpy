@@ -1,0 +1,12 @@
+#!/bin/bash
+#$ -pe orte %(np)d
+#$ -cwd
+#$ -j y
+#$ -S /bin/bash
+cat $0
+cp $PE_HOSTFILE pe_hostfile
+awk '{print $1 " slots=" $2}' < pe_hostfile | sed 's/\.local//' > hostfile
+echo hostfile:
+cat hostfile
+echo NSLOTS=$NSLOTS
+/usr/mpi/gcc/openmpi-1.7.4/bin/mpirun -np $NSLOTS -hostfile hostfile %(exec_path)s
