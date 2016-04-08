@@ -203,7 +203,7 @@ The key ``fuel_moisture_da`` is optional.  If given, it needs to contain two key
 
 .. important::
   In addition to this, the file ``etc/tokens.json`` must contain the key ``mesowest_token : [string]``,
-  which will be used to access the Mesowest API (you must obtain one here `Mesowest <http://mesowest.org/>`_).
+  which will be used to access the Mesowest API (you must obtain one here `Mesowest <http://synopticlabs.org/api/signup/>`_).
 
 The data assimilation code will download 10-hr fuel moisture observations from stations in the domain area and assimilate them into the equilibrium.
 
