@@ -301,7 +301,7 @@ class Postprocessor(object):
                 else:
                     kmz_path,_,_,_ = self._scalar2kmz(d, var, tndx, outpath_base)
                 kmz_name = osp.basename(kmz_path)
-                self._update_manifest(ts_esmf, var, { 'kml' : kmz_name })
+                self._update_manifest(dom_id, ts_esmf, var, { 'kml' : kmz_name })
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s into KMZ" % (e.message, var, ts_esmf))
                 logging.warning(traceback.print_exc())
@@ -332,13 +332,13 @@ class Postprocessor(object):
                 if var in ['WINDVEC']:
                     raster_path, coords = self._vector2png(d, var, tndx, outpath_base)
                     raster_name = osp.basename(raster_path)
-                    self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'coords' : coords})
+                    self._update_manifest(dom_id, ts_esmf, var, { 'raster' : raster_name, 'coords' : coords})
                 else:
                     raster_path, cb_path, coords = self._scalar2png(d, var, tndx, outpath_base)
                     mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords}
                     if cb_path is not None:
                         mf_upd['colorbar'] = osp.basename(cb_path)
-                    self._update_manifest(ts_esmf, var, mf_upd)
+                    self._update_manifest(dom_id, ts_esmf, var, mf_upd)
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s into PNG" % (e.message, var, ts_esmf))
                 logging.warning(traceback.print_exc())
@@ -368,7 +368,7 @@ class Postprocessor(object):
                         kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, outpath_base, cleanup=False)
                         raster_name = osp.basename(raster_path)
                         kmz_name = osp.basename(kmz_path)
-                        self._update_manifest(ts_esmf, var, { 'raster' : raster_name, 'coords' : coords, 'kml' : kmz_name})
+                        self._update_manifest(dom_id, ts_esmf, var, { 'raster' : raster_name, 'coords' : coords, 'kml' : kmz_name})
                     else:
                         kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, outpath_base, cleanup=False)
                         mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords, 'kml' : osp.basename(kmz_path) }
@@ -386,31 +386,37 @@ class Postprocessor(object):
                                 mf_upd['colorbar'] = fixed_colorbars[var]
                             else:
                                 mf_upd['colorbar'] = osp.basename(cb_path)
-                        self._update_manifest(ts_esmf, var, mf_upd)
+                        self._update_manifest(dom_id, ts_esmf, var, mf_upd)
                 except Exception as e:
                     logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
                     logging.warning(traceback.print_exc())
 
 
-
-
-    def _update_manifest(self,ts_esmf,var,kv):
+    def _update_manifest(self,dom_id,ts_esmf,var,kv):
         """
         Adds a key-value set to the dictionary storing metadata for time ts_esmf and variable var.
 
+        :param dom_id: the domain id (1, 2, 3, ...)
         :param ts_esmf: ESMF time string 
         :param var: variable name
         :param kv: key-value dictionary to merge
         """
-        # update the manifest with the ts_esmf/var info
-        td = self.manifest.get(ts_esmf, {})
-        self.manifest[ts_esmf] = td
+        # update the manifest with the domain/ts_esmf/var info
+        dom = self.manifest.get(str(dom_id), {})
+        self.manifest[str(dom_id)] = dom
+
+        # extract timestamp
+        td = dom.get(ts_esmf, {})
+        dom[ts_esmf] = td
+
+        # store variable in timestamp
         vd = td.get(var, {})
         td[var] = vd
         vd.update(kv)
         mf_path = os.path.join(self.output_path, self.product_name + '.json')
-        json.dump(self.manifest, open(mf_path, 'w'))
 
+        # synchronize the file
+        json.dump(self.manifest, open(mf_path, 'w'))
 
 
 
