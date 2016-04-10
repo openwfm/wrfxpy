@@ -120,7 +120,7 @@ and uploads the entire local directory with simulation results to the remote hos
 
 Examples::
 
-  ./ssh_shuttle.sh wksp/mu-simulation/products test_fire_april test_fire_april
+  ./ssh_shuttle.sh wksp/my-simulation/products test_fire_april test_fire_april
 
-The script scans all the files in ``wksp/mu-simulation/products`` and uses SFTP to put them onto the remote hots.  The remote directory must be either an absolute path or (recommended) should be relative to the remote host root setup in ``conf.json``.  The identifier will be used as the description and also as the key under which the simulation is stored in ``catalog.json`` on the remote host.
+The script scans all the files in ``wksp/my-simulation/products`` and uses SFTP to put them onto the remote host.  The remote directory must be either an absolute path or (recommended) should be relative to the remote host root setup in ``conf.json``.  The identifier will be used as the description and also as the key under which the simulation is stored in ``catalog.json`` on the remote host.
 
