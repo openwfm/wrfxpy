@@ -166,11 +166,33 @@ All of the following keys are required.
 
 The keys in the remainder of this section are optional.
 
-* ``ignitions : [dict]`` (optional) is a dictionary of domains (string identifier, e.g. "1") to a list of ignitions that should be added to the domain, each being a dictionary with keys as shown in example.  Including this option causes the fire model to be switched on in each domain listed.  A total of five ignitions is allowed (combined for all domains).  
+* ``ignitions : [dict]`` (optional) is a dictionary of domains (string identifier, e.g. "1") to a list of ignitions that should be added to the domain, each being a dictionary with the following keys:
   
-.. tip::  
-  If a domain is listed without any ignitions, the fire model is switched on and computes quantities
-  related to fire danger, such as fire spread rates, fuel moisture values, etc.
+* ``start_delay_s : [int]`` number of seconds between simulation start and ignition
+* ``duration_s : [int]`` the length of time the ignition is active
+* ``latlon : [int]`` the latitude and longitude of the ignition point
+
+  Including this option causes the fire model to be switched on in each domain listed.  A total of five ignitions is allowed (combined for all domains).  For example
+
+::
+
+  "ignitions" : {
+    "1" : [],
+    "2" : [ {
+      "start_delay_s" : 600,
+      "duration_s" : 240,
+      "latlon" : [39.894264, -103.903222]
+    } ]
+  }
+
+
+This would ignite a single fire 10 minutes after simulation start at the given lat/lon, hold the ignition for 4 minutes.  In the first domain, the fuel moisture model will be switched on and fire danger calculations will be performed.
+
+.. important::  
+  * All ignitions are point ignitions.
+  * All ignitions have a rate of spread parameter set to 1m/s and the maximum radius 200 m, see `WRF-SFIRE documentation <http://www.openwfm.org/wiki/WRF-Fire_ignition>`_
+  * If a domain is listed without any ignitions, the fire model is switched on and computes quantities related to fire danger, such as fire spread rates, fuel moisture values, etc.
+ 
 
 
 Namelist templates
