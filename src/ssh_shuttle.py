@@ -21,6 +21,9 @@
 import paramiko
 import os
 import os.path as osp
+import logging
+import json
+import glob
 
 
 class SSHShuttle(object):
@@ -51,6 +54,8 @@ class SSHShuttle(object):
         ssh.connect(self.host, username=self.user, key_filename=self.key)
         self.ssh = ssh
         self.sftp = ssh.open_sftp()
+        # change to the remote root immediately
+        self.sftp.chdir(self.root)
 
     
     def disconnect(self):
@@ -61,24 +66,32 @@ class SSHShuttle(object):
         self.ssh.close()
 
     
-    def send_directory(self, local_dir, remote_path):
+    def send_directory(self, local_dir, remote_path, exclude_files = []):
         """
         Send an entire directory of local files to the remote
         relative path.  Ensures remote directory exists.
 
         :param local_dir: the local directory to send
         :param remote_path: the remote path, appended to remote root if not absolute path
+        :param exclude_files: files to be excluded from the directory, default is []
+        :return: the filenames that were put via SFTP
         """
         if remote_path[0] != '/':
            remote_path = osp.join(self.root, remote_path)
 
+        prev_cwd = self.sftp.getcwd()
         self.chdir(remote_path, True)
 
+        exclude_set = set(exclude_files)
+        sent_files = []
         for filename in os.listdir(local_dir):
-            self.sftp.put(osp.join(local_dir, filename), filename)
+            if filename not in exclude_set:
+	            self.sftp.put(osp.join(local_dir, filename), filename)
+	            sent_files.append(filename)
 
-	# restore previous working directory
-	self.chdir(self.root)
+        # restore previous working directory
+        self.chdir(prev_cwd)
+        return sent_files
 
 
     def put(self, local_path, remote_path):
@@ -124,26 +137,24 @@ class SSHShuttle(object):
         self.sftp.chdir(remote_dir)
 
 
-if __name__ == '__main__':
-    import sys, json, logging, glob
+def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = None, exclude_files = []):
+    """
+    Executes all steps required to send a local product directory to a remote visualization
+    server for display.
 
-    if len(sys.argv) != 4:
-        print('usage: %s <local-dir> <remote-relative-dir> <sim-name>' % sys.argv[0])
-        sys.exit(1)
-
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-    local_dir = sys.argv[1]
-    remote_dir = sys.argv[2]
-    sim_name = sys.argv[3]
-
-    cfg = json.load(open('etc/conf.json'))
-
+    :para cfg: the configuration file for the shuttle
+    :param local_dir: the local product directory
+    :param remote_dir: the remote directory (relative to remote root set in conf.json)
+    :param sim_name: the simulation name and id
+    :param description: the description to be placed into the catalog file
+    :param exclude_files: filenames that are not skipped during the upload, default is []
+    :return: a list of the files that was sent
+    """
     s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
     logging.info('SHUTTLE sending local direcory %s to remote host' % local_dir)
-    s.send_directory(local_dir, remote_dir)
+    sent_files = s.send_directory(local_dir, remote_dir, exclude_files)
 
     # identify the catalog file
     manifest_file = glob.glob(osp.join(local_dir, '*.json'))[0]
@@ -162,7 +173,7 @@ if __name__ == '__main__':
 
     cat = json.load(open(cat_local))
     cat[sim_name] = { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
-                      'description' : sim_name,
+                      'description' : description if description is not None else sim_name,
                       'from_utc' : times[0],
                       'to_utc' : times[-1] }
     json.dump(cat, open(cat_local, 'w'))
@@ -171,4 +182,23 @@ if __name__ == '__main__':
     logging.info('SHUTTLE operations completed, closing connection.')
 
     s.disconnect()
+    return sent_files
 
+
+if __name__ == '__main__':
+    import sys 
+
+    if len(sys.argv) != 4:
+        print('usage: %s <local-dir> <remote-relative-dir> <sim-name>' % sys.argv[0])
+        sys.exit(1)
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    local_dir = sys.argv[1]
+    remote_dir = sys.argv[2]
+    sim_name = sys.argv[3]
+
+    cfg = json.load(open('etc/conf.json'))
+
+    send_product_to_server(cfg, local_dir, remote_dir, sim_name, None, [])
+ 
