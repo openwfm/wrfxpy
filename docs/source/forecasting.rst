@@ -242,11 +242,27 @@ Postprocessing
 The key ``postproc``, when present contains a dictionary keyed by domain id (string), which identifies the variables to postprocess for each domain.
 For each listed variable, a PNG and a KMZ file is created and if required, a colorbar (configured in ``var_wisdom``).
 
-Example::
+Additionally, if a remote visualization server is configured in ``etc/conf.json``, the postprocessed rasters can be automatically sent either during the forecast itself or after the forecast is complete.
+
+Example without remote shuttling::
 
   "postproc" : {
-    "1" : ["T2", "PSFC", "WINDSPD" ]
+    "1" : ["T2", "PSFC", "WINDSPD" ],
+    "2" : ["T2", "FIRE_AREA", "WINDVEC"]
   }
 
+In this example, the postprocessed raster files are generated in the ``products`` subdirectory of the workspace directory where the job is executing.
 
-  
+
+Example with remote shuttling::
+
+  "postproc" : {
+    "1" : ["T2", "PSFC", "WINDSPD" ],
+    "shuttle" : "on_completion",
+    "description" : "This should be a user-readable string that will be displayed to the user"
+  }
+
+The second example will send the complete visualization package to the remote server after the forecast is complete.
+The ``description`` string should be a short descriptive identifier of the simulation.
+This text will be shown to the user in the initial catalog menu on *wrfxweb* and thus also shouldn't be too long.
+
