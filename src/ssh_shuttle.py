@@ -73,20 +73,35 @@ class SSHShuttle(object):
            remote_path = osp.join(self.root, remote_path)
 
         self.chdir(remote_path, True)
-        for file in os.listdir(local_dir):
-            self.put(osp.join(local_dir, file), file)
+
+        for filename in os.listdir(local_dir):
+            self.sftp.put(osp.join(local_dir, filename), filename)
+
+	# restore previous working directory
+	self.chdir(self.root)
 
 
     def put(self, local_path, remote_path):
         """
         Calls SFTP put to transfer the local file to the remote host.
-        If the remote path is not absolute, the current directory on
-        the remote host will be used.
 
         :param local_path: path to the local file
         :param remote_path: relative or absolute path to remote file
         """
         self.sftp.put(local_path, remote_path)
+
+    
+    def get(self, remote_path, local_path):
+        """
+        Uses an SFTP get operation to transfer the remote file to
+        the local filesystem.  The remote path can be absolute or 
+        relative to the stored root.
+
+        :param remote_path: remote path
+        :param local_path: local path
+        """
+	print('remote cwd is %s' % self.sftp.getcwd())
+        self.sftp.get(remote_path, local_path)
 
 
     def chdir(self, remote_dir, ensure_exists=False):
@@ -107,4 +122,53 @@ class SSHShuttle(object):
                 # don't worry if directory already exists
                 pass
         self.sftp.chdir(remote_dir)
+
+
+if __name__ == '__main__':
+    import sys, json, logging, glob
+
+    if len(sys.argv) != 4:
+        print('usage: %s <local-dir> <remote-relative-dir> <sim-name>' % sys.argv[0])
+        sys.exit(1)
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    local_dir = sys.argv[1]
+    remote_dir = sys.argv[2]
+    sim_name = sys.argv[3]
+
+    cfg = json.load(open('etc/conf.json'))
+
+    s = SSHShuttle(cfg)
+    logging.info('SHUTTLE connecting to remote host %s' % s.host)
+    s.connect()
+    logging.info('SHUTTLE sending local direcory %s to remote host' % local_dir)
+    s.send_directory(local_dir, remote_dir)
+
+    # identify the catalog file
+    manifest_file = glob.glob(osp.join(local_dir, '*.json'))[0]
+    logging.info('SHUTTLE found local manifest file %s' % manifest_file)
+
+    # identify the start/end UTC time (all domains have same simulation extent)
+    mf = json.load(open(manifest_file))
+    dom = mf[mf.keys()[0]]
+    times = sorted(dom.keys())
+    logging.info('SHUTTLE detected local start/end UTC times as %s - %s' % (times[0], times[-1]))
+
+    # retrieve the catalog & update it
+    logging.info('SHUTTLE updating catalog file on remote host')
+    cat_local = osp.join(cfg['workspace_dir'], 'catalog.json')
+    s.get('catalog.json', cat_local)
+
+    cat = json.load(open(cat_local))
+    cat[sim_name] = { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
+                      'description' : sim_name,
+                      'from_utc' : times[0],
+                      'to_utc' : times[-1] }
+    json.dump(cat, open(cat_local, 'w'))
+    s.put(cat_local, 'catalog.json')
+
+    logging.info('SHUTTLE operations completed, closing connection.')
+
+    s.disconnect()
 
