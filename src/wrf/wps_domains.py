@@ -41,6 +41,7 @@ class WPSDomainLCC(object):
         self.subgrid_ratio = cfg.get('subgrid_ratio', (1, 1))
         self.geog_res = str(cfg.get('geog_res', '30s'))
         self.history_interval = cfg.get('history_interval', 60)
+	self.frames_per_outfile = cfg.get('frames_per_outfile', 128)
         if 'precomputed' in cfg:
             self._init_from_precomputed(cfg)
         else:
@@ -260,6 +261,7 @@ class WPSDomainLCC(object):
         """
         nml_tc = nml['time_control']
         self._update_entry(nml_tc, 'history_interval', self.history_interval)
+        self._update_entry(nml_tc, 'frames_per_outfile', self.frames_per_outfile)
         self._update_entry(nml_tc, 'input_from_file', True)
 
         nml_doms = nml['domains']
