@@ -217,13 +217,13 @@ class Postprocessor(object):
             cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixel,yunits=kml.Units.pixel)
             cbo.color = kml.Color.rgb(255,255,255,a=150)
             cbo.visibility = 1
-            doc.addfile(cb_path)
+            #doc.addfile(cb_path)
             cbo.icon.href=cb_path
 
         # add ground overlay
         ground = doc.newgroundoverlay(name=var,color='80ffffff')
         ground.gxlatlonquad.coords = corner_coords
-        doc.addfile(raster_path)
+        #doc.addfile(raster_path)
         ground.icon.href = raster_path
 
         # build output file
@@ -259,7 +259,7 @@ class Postprocessor(object):
         # add ground overlay
         ground = doc.newgroundoverlay(name=var,color='80ffffff')
         ground.gxlatlonquad.coords = corner_coords
-        doc.addfile(raster_path)
+        #doc.addfile(raster_path)
         ground.icon.href = raster_path
 
         # build output file

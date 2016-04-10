@@ -32,6 +32,8 @@ from vis.var_wisdom import get_wisdom_variables
 from ingest.grib_source import HRRR, NAM218, NARR
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
+from ssh_shuttle import send_product_to_server
+
 import f90nml
 from datetime import datetime, timedelta
 import time, re, json, sys, logging
@@ -351,11 +353,13 @@ def execute(args):
     logging.info('Detected rsl.error.0000')
 
     # step 10: track log output and check for history writes fro WRF
-    pp_instr, pp = {}, None
+    pp = None
+    already_sent_files, max_pp_dom = [], -1
     if js.postproc is not None:
         js.pp_dir = osp.join(js.workspace_dir, js.job_id, "products")
         make_dir(js.pp_dir)
         pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
+	max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
 
     while True:
         line = wrf_out.readline().strip()
@@ -372,15 +376,25 @@ def execute(args):
             esmf_time,domain_str = re.match(r'.*wrfout_d.._([0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             dom_id = int(domain_str)
             logging.info("Detected history write for domain %d for time %s." % (dom_id, esmf_time))
-            if str(dom_id) in js.postproc:
+            if js.postproc is not None and str(dom_id) in js.postproc:
                 var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                 wrfout_path = osp.join(js.wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(js.start_utc))) 
  		try:
-                    pp.vars2kmz(wrfout_path, dom_id, esmf_time, var_list)
                     pp.vars2png(wrfout_path, dom_id, esmf_time, var_list)
+                    pp.vars2kmz(wrfout_path, dom_id, esmf_time, var_list)
 		except Exception as e:
 		    logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+                # if this is the last processed domain
+                if dom_id == max_pp_dom and js.postproc.get('shuttle', None) == 'incremental':
+                    desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                    sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc, already_sent_files)
+                    logging.info('sent %d files to visualization server.'  % len(sent_files_1))
+                    already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+
+    if js.postproc.get('shuttle', None) == 'on_completion':
+        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc)
 
 
 def verify_inputs(args):
@@ -427,7 +441,7 @@ def verify_inputs(args):
     wvs = get_wisdom_variables()
     failing = False
     if 'postproc' in args:
-        for dom in args['postproc'].keys():
+        for dom in filter(lambda x: len(x) == 1, args['postproc'].keys()):
             for vname in args['postproc'][dom]:
                 if vname not in wvs:
                     logging.error('unrecognized variable %s in postproc key for domain %s.' % (vname, dom))
