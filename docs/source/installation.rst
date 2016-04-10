@@ -48,15 +48,28 @@ Next, clone the *wrfxpy* code:
 configuration
 -------------
 
-And finally, configure the system directories, ``WPS/WRF-SFIRE`` locations and workspace location.
+And finally, a ``etc/conf.json`` file must be created with the keys discussed below.  A template file ``etc/conf.json.initial`` is provided as a starting point.
+
+Configure the system directories, ``WPS/WRF-SFIRE`` locations and workspace locations by editing the following keys:
 
 ::
-  
-  cd wrfxpy/etc
-  cp conf.json.initial conf.json
-  <your-favorite-editor-here> conf.json
 
-And tell *wrfxpy* where your WPS and WRFV3 system is located by editing the directories.
+  "workspace_dir": "wksp"
+  "wps_install_dir": "path/to/WPS"
+  "wrf_install_dir": "path/to/WRF"
+  "sys_install_dir": "/path/to/wrfxpy"
+
+Optionally, the *wrfxpy* installation can be connected to a visualization server `wrfxweb <https://github.com/vejmelkam/wrfxweb>`_.  The following keys are all optional (and only used if the postprocessed results of simulations are uploaded).
+
+::
+
+  "shuttle_ssh_key": "path/to/your/priv_ssh_key/to/remote/host",
+  "shuttle_remote_user" : "remote_username",
+  "shuttle_remote_host" : "remote_hostname",
+  "shuttle_remote_root" : "remote directory for output storage"
+
+This concludes the ``etc/conf.json`` file.
+
 
 Next, *wrfxpy* needs to know how jobs are submitted on your cluster.  Create an entry for your cluster, here we use ``speedy`` as an example::
 
