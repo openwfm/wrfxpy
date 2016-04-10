@@ -62,3 +62,9 @@ temp/
 # input/output directories
 /ingest/
 /wksp/
+
+# config files
+etc/conf.json
+etc/tokens.json
+etc/clusters.json
+
