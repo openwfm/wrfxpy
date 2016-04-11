@@ -272,6 +272,48 @@ class Postprocessor(object):
         
         return kmz_path, raster_path, corner_coords
 
+    
+    def process_vars(self, wrfout_path, dom_id, ts_esmf, vars):
+        """
+        Postprocess a list of scalar or vector fields at a given simulation time into PNG and KMZ
+        files.
+
+        :param wrfout_path: WRF file to process
+        :param dom_id: the domain identifier
+        :param ts_esmf: time stamp in ESMF format
+        :param vars: list of variables to process
+        """
+        # open the netCDF dataset
+        d = nc4.Dataset(wrfout_path)
+
+        # extract ESMF string times and identify timestamp of interest
+        times = [''.join(x) for x in d.variables['Times'][:]]
+        if ts_esmf not in times:
+            raise PostprocError("Invalid timestamp %s" % ts_esmf)
+        tndx = times.index(ts_esmf)
+
+        # build an output file per variable
+        for var in vars:
+            try:
+                outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
+                kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
+                if var in ['WINDVEC']:
+                    kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, outpath_base, cleanup=False)
+                else:
+                    kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, outpath_base, cleanup=False)
+                    if cb_path is not None:
+                        mf_upd['colorbar'] = osp.basename(cb_path)
+
+                mf_upd['kml'] = osp.basename(kmz_path)
+                mf_upd['raster'] = osp.basename(raster_path)
+                mf_upd['coords'] = coords
+                self._update_manifest(dom_id, ts_esmf, var, mf_upd)
+            except Exception as e:
+                logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
+                logging.warning(traceback.print_exc())
+        
+        d.close()
+
 
     def vars2kmz(self, wrfout_path, dom_id, ts_esmf, vars):
         """
@@ -302,6 +344,8 @@ class Postprocessor(object):
                     kmz_path,_,_,_ = self._scalar2kmz(d, var, tndx, outpath_base)
                 kmz_name = osp.basename(kmz_path)
                 self._update_manifest(dom_id, ts_esmf, var, { 'kml' : kmz_name })
+
+
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s into KMZ" % (e.message, var, ts_esmf))
                 logging.warning(traceback.print_exc())

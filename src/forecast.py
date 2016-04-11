@@ -381,18 +381,19 @@ def execute(args):
                 var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                 wrfout_path = osp.join(js.wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(js.start_utc))) 
- 		try:
-                    #pp.vars2kmz(wrfout_path, dom_id, esmf_time, var_list)
-                    pp.vars2png(wrfout_path, dom_id, esmf_time, var_list)
-		except Exception as e:
-		    logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
-                # if this is the last processed domain
-                if dom_id == max_pp_dom and js.postproc.get('shuttle', None) == 'incremental':
-                    desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                    sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc, already_sent_files)
-                    logging.info('sent %d files to visualization server.'  % len(sent_files_1))
-                    already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+            try:
+                pp.process_vars(wrfout_path, dom_id, esmf_time, var_list)
+            except Exception as e:
+                logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
 
+            # if this is the last processed domain for this timestamp in incremental mode, upload to server
+            if dom_id == max_pp_dom and js.postproc.get('shuttle', None) == 'incremental':
+                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc, already_sent_files)
+                logging.info('sent %d files to visualization server.'  % len(sent_files_1))
+                already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+
+    # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc)
