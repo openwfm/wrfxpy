@@ -29,26 +29,30 @@ import socket
 def print_header(header):
     print('\033[31m** %s **\033[0m' % header)
 
+
 def print_question(question):
     print('\033[95m%s\033[0m' % question)
 
+
 def print_answer(ans):
-    print('\033[1;33m-> %s\033[0m' % ans)
+    print('\033[94m-> %s\033[0m\n\n' % ans)
+
 
 def read_string(default):
     read_in = sys.stdin.readline().strip('\n')
     return read_in if read_in != '' else default
+
     
 def read_integer(default):
     return int(read_string(default))
 
 
 def read_location(default):
-    return map(float, read_string(default).split(','))
+    return tuple(map(float, read_string(default).split(',')))
 
 
 def read_size(default):
-    return map(int, read_string(default).split(','))
+    return tuple(map(int, read_string(default).split(',')))
 
 
 def select_grib_source(start_time):
@@ -62,9 +66,10 @@ def select_grib_source(start_time):
 def read_time_indicator(default):
     s = read_string(default)
     if len(s)==0:
-        return utils.esmf_to_utc(default).replace(tzinfo=pytz.UTC)
+        return utils.timespec_to_utc(default)
     else:
-        return utils.timespec_to_utc(s).replace(tzinfo=pytz.UTC)
+        return utils.timespec_to_utc(s)
+
 
 def read_boolean(default):
     s = read_string(default)
@@ -83,6 +88,12 @@ def questionnaire():
     :return: a dictionary with the configuration of a fire simulation
     """
     cfg = {}
+
+    cfg['wps_namelist_path'] = 'etc/nlists/default.wps'
+    cfg['wrf_namelist_path'] = 'etc/nlists/default.input'
+    cfg['fire_namelist_path'] = 'etc/nlists/default.fire'
+    cfg['emissions_namelist_path'] = 'etc/nlists/default.fire_emissions'
+
     print_question('Enter a name for your job [default = experiment]:')
     cfg['grid_code'] = read_string('experiment')
     print_answer('Name is %s' % cfg['grid_code'])
@@ -92,60 +103,70 @@ def questionnaire():
 
     print_question('Enter the ignition point as lat, lon [default = 39.1, -104.3]:')
     ign_latlon = read_location('39.1, -104.3')
+    print_answer('Ignition point is at latlon %g %g' % ign_latlon)
 
     print_question('Enter the ignition time in UTC timezone as an ESMF string or relative time')
-    print('Examples: 2016-03-30_16:00:00 or T-60 or T+30 (minutes), [default = T-60]')
-    ign_utc = read_time_indicator('T-60') 
-    print('Ignition time is %s\n' % str(ign_utc))
+    print('Examples: 2016-03-30_16:00:00 or T-60 or T+30 (minutes), [default = now]')
+    ign_utc = read_time_indicator('T+0') 
+    print_answer('Ignition time is %s\n' % str(ign_utc))
 
     print_question('Enter the duration of the ignition process in seconds [default = 240]')
     ign_dur = read_integer('240')
+    print_answer('The ignition will remain active for %d seconds.' % ign_dur)
 
     newline()
     print_header('SIMULATION section')
 
-    start_utc = None
+    start_utc = utils.round_time_to_hour(ign_utc - timedelta(minutes=30))
     while True:
         print_question('Enter the start time of the simulation in UTC timezone [default = 30 mins before ignition time]')
-        start_utc = read_time_indicator(utils.utc_to_esmf(ign_utc - timedelta(minutes=30)))
+        start_utc = read_time_indicator(utils.utc_to_esmf(start_utc))
+        start_utc = utils.round_time_to_hour(start_utc)
         if start_utc < ign_utc:
             break
         print('Simulation start must be before ignition time %s' % utils.utc_to_esmf(ign_utc))
     cfg['start_utc'] = utils.utc_to_esmf(start_utc)
+    print_answer('Simulation will start at %s.' % cfg['start_utc'])
     
-    end_utc = None 
+    end_utc = start_utc + timedelta(hours=5)
     while True:
         print_question('Enter the end time of the simulation [default = start_time + 5 hours]')
-        end_utc= read_time_indicator(utils.utc_to_esmf(start_utc + timedelta(hours=5)))
+        end_utc = read_time_indicator(utils.utc_to_esmf(end_utc))
+        end_utc = utils.round_time_to_hour(end_utc, True)
         if end_utc > ign_utc:
             break
         print('Simulation end must be after ignition time %s' % utils.utc_to_esmf(ign_utc))
     cfg['end_utc'] = utils.utc_to_esmf(end_utc)
+    print_answer('Simulation will end at %s.' % cfg['end_utc'])
 
     print_question('Please enter the cell size in meters for the atmospheric mesh [default 1000]')
     cell_size = read_integer('1000')
+    print_answer('The cell size is %d meters.' % cell_size)
 
     print_question('Enter the number of grid cells in the longitudinal and latitudinal position [default 61, 61]')
     domain_size = read_size('61, 61')
+    print_answer('The domain size is %d x %d grid points.' % domain_size)
 
     print_question('Enter the refinement ratio for the fire grid [default=40]')
     refinement = read_integer('40')
+    print_answer('The refinement ratio is %d for a fire mesh size of %g meters.' % (refinement, float(cell_size)/refinement))
 
     print_question('Enter the interval between output frames in minutes [default=15]')
     history_interval = read_integer('15')
+    print_answer('The interval between output frames is %d minutes.' % history_interval)
 
     cfg['grib_source'] = select_grib_source(start_utc)
     print_answer('Selected GRIB2 source %s' % cfg['grib_source'])
 
-    
     def_geog_path = None
     try:
-        def_geog_path = json.load(open('etc/conf.json'))['default_geogrid_path']
+        def_geog_path = json.load(open('etc/conf.json'))['wps_geog_path']
     except Exception as e:
         print(e)
         pass
     print_question('Enter the path to geogrid information (WPS-GEOG) [default=%s]' % def_geog_path)
-    cfg['geogrid_path'] = read_string(def_geog_path)
+    cfg['wps_geog_path'] = read_string(def_geog_path)
+    print_answer('The WPS-GEOG path is %s' % cfg['wps_geog_path'])
 
     cfg['domains'] = { '1' : {
         'cell_size' : (cell_size,cell_size),
@@ -160,34 +181,23 @@ def questionnaire():
         }
     }
 
-    cfg['ignitions'] = { '1' : [ { 'start_delay_s' : (ign_utc - start_utc).total_seconds(),
+    cfg['ignitions'] = { '1' : [ { 'time_utc' : utils.utc_to_esmf(ign_utc),
                                    'duration_s' : ign_dur,
                                    'latlon' : ign_latlon } ] }
 
 
-    print_header('NAMELISTS')
-
-    print_question('WPS [default etc/nlists/default.wps]')
-    cfg['wps_namelist_path'] = read_string('etc/nlists/default.wps')
-
-    print_question('Input [default etc/nlists/default.input]')
-    cfg['wrf_namelist_path'] = read_string('etc/nlists/default.input')
-
-    print_question('Fire [default etc/nlists/default.fire]')
-    cfg['fire_namelist_path'] = read_string('etc/nlists/default.fire')
-
-    print_question('Emissions [default etc/nlists/default.fire_emissions]')
-    cfg['emissions_namelist_path'] = read_string('etc/nlists/default.fire_emissions')
-
     print_header('PARALLEL JOB configuration')
     print_question('Enter number of parallel nodes [default=8]')
     cfg['num_nodes'] = read_integer('8')
+    print_answer('Parallel job will use %d nodes.' % cfg['num_nodes'])
 
     print_question('Enter number of cores per node [default=12]')
     cfg['ppn'] = read_integer('12')
+    print_answer('Parallel job will use %d cores per node.' % cfg['ppn'])
 
     print_question('Enter the max walltime in hours [default=2]')
     cfg['wall_time_hrs'] = read_integer('2')
+    print_answer('Parallel job will reserve %d hours of walltime.' % cfg['wall_time_hrs'])
 
     qsys_opts = queuing_systems()
     while True:
@@ -197,10 +207,12 @@ def questionnaire():
         if cfg['qsys'] in qsys_opts:
             break
         print('Invalid queuing system selected, please try again')
+    print_answer('Parallel job will submit for %s' % cfg['qsys'])
 
     print_header('POSTPROCESSING')
     print_question('Which variables should wrfxpy postprocess? [default T2,PSFC,WINDSPD,WINDVEC,FIRE_AREA,FGRNHFX,FLINEINT,SMOKE_INT]')
     pp_vars = read_string('T2,PSFC,WINDSPD,WINDVEC,FIRE_AREA,FGRNHFX,FLINEINT,SMOKE_INT').split(',')
+    print_answer('Will postprocess %d variables.' % len(pp_vars))
 
     print_question('Send variables to visualization server? [default=no]')
     shuttle = read_boolean('no')

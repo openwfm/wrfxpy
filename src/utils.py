@@ -84,6 +84,18 @@ def utc_to_esmf(utc):
     return "%04d-%02d-%02d_%02d:%02d:%02d" % (utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second)
 
 
+def round_time_to_hour(utc, up=False):
+    """
+    Round the utc time to the nearest hour up or down.
+
+    :param utc: the datetime
+    :param up: round up (next hour)?
+    :return: a new datetime rounded as specified
+    """
+    tm = utc + timedelta(hours=1, seconds=-1) if up else utc
+    return tm.replace(minute=0, second=0)
+
+
 def compute_fc_hours(start_utc, end_utc):
     """
     Compute the number of forecast hours.  Rounds up in case of incomplete hours.
@@ -165,17 +177,21 @@ def update_namelist(nml, with_keys):
         nml[section].update(section_dict)
 
 
-def update_ignitions(ign_specs, max_dom):
+def render_ignitions(js, max_dom):
     """
     Build a dictionary with which we can update the input namelist with passed ignition specifications.
 
-    :param ign_specs: the ignition specifications
+    :param js: the job state
     :param max_dom: the maximum number of domains
     """
     def set_ignition_val(dom_id, v):
         dvals = [0] * max_dom
         dvals[dom_id-1] = v
         return dvals
+
+    # extract the original ignition specs and the original start time
+    ign_specs = js.ignitions
+    orig_start_time = js.orig_start_utc
 
     keys = [ "fire_ignition_start_lat", "fire_ignition_end_lat",
              "fire_ignition_start_lon", "fire_ignition_end_lon", 
@@ -200,7 +216,9 @@ def update_ignitions(ign_specs, max_dom):
 
         # for each ignition 
         for ndx,ign in enumerate(dom_igns):
-            start, dur = ign['start_delay_s'], ign['duration_s']
+            start_time = timespec_to_utc(ign['time_utc'], orig_start_time)
+            start = int((start_time - js.start_utc).total_seconds())
+            dur = ign['duration_s']
             lat, lon = ign['latlon']
             vals = [ lat, lat, lon, lon, start, start+dur, 200, 1 ]
             kv = dict(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals]))
@@ -222,7 +240,7 @@ def timespec_to_utc(ts_str, from_time = None):
     """
     if ts_str[0] == 'T':
         if from_time is None:
-            from_time = datetime.utcnow()
+            from_time = datetime.utcnow().replace(tzinfo=pytz.UTC)
         min_shift = int(ts_str[1:])
         return from_time + timedelta(minutes = min_shift)
     else:
@@ -255,37 +273,5 @@ def find_closest_grid_point(slon, slat, glon, glat):
     """
     closest = np.argmin((slon - glon)**2 + (slat - glat)**2)
     return np.unravel_index(closest, glon.shape)
-
-
-#
-#  SSH utilities for moving files to visualization server
-#
-def send_simulation_output(from_dir, to_dir, host, user, ssh_key):
-    """
-    Send an entire directory of results a directory here on localhost to a directory on
-    the remote host.
-
-    :param from_dir: directory with results
-    :param to_dir: remote directory
-    :param host: the remote hostname
-    :param user: the username for remote login
-    :param ssh_key: the ssh key to use (must be passwordless)
-    """
-
-    ssh = paramiko.SSHClient()
-    ssh.load_system_host_keys()
-    ssh.connect(host, username=user, key_filename=ssh_key)
-    sftp = ssh.open_sftp()
-    # assume target directory does not exist
-    sftp.chdir(osp.dirname(to_dir))
-    try:
-        sftp.mkdir(osp.basename(to_dir))
-    except IOError:
-        pass
-    sftp.chdir(to_dir)
-    for file in os.listdir(from_dir):
-        sftp.put(osp.join(from_dir, file), osp.join(to_dir, file))
-    sftp.close()
-    ssh.close()
 
 

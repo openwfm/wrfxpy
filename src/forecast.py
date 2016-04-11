@@ -24,8 +24,8 @@ from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
 from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
-                  update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions, make_dir, \
-                  timespec_to_utc
+                  update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
+                  timespec_to_utc, round_time_to_hour
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -43,6 +43,7 @@ from multiprocessing import Process, Queue
 import smtplib
 from email.mime.text import MIMEText
 
+import traceback
 
 class Dict(dict):
     """
@@ -82,7 +83,7 @@ class JobState(Dict):
         self.ignitions = args.get('ignitions', None)
         self.fmda = self.parse_fmda(args)
         self.postproc = args['postproc']
-        self.wrfxpy_dir = args['sys_install_dir']
+        self.wrfxpy_dir = args['sys_install_path']
 
     
     def resolve_grib_source(self, gs_name):
@@ -179,6 +180,7 @@ def retrieve_gribs_and_run_ungrib(js, q):
 
     except Exception as e:
         logging.error('GRIB2/UNGRIB step failed with exception %s' % repr(e))
+        traceback.print_exc()
         q.put('FAILURE')
 
 
@@ -210,17 +212,17 @@ def execute(args):
 
     :param args: a dictionary with the following keys
     :param grid_code: the (unique) code of the grid that is used
-    :param sys_install_dir: system installation directory
+    :param sys_install_path: system installation directory
     :param start_utc: start time of simulation in UTC
     :param end_utc: end time of simulation in UTC
-    :param workspace_dir: workspace directory
+    :param workspace_path: workspace directory
     :param wps_install_path: installation directory of WPS that will be used
     :param wrf_install_path: installation directory of WRF that will be used
     :param grib_source: a string identifying a valid GRIB2 source
     :param wps_namelist_path: the path to the namelist.wps file that will be used as template
     :param wrf_namelist_path: the path to the namelist.input file that will be used as template
     :param fire_namelist_path: the path to the namelist.fire file that will be used as template
-    :param geogrid_path: the path to the geogrid data directory providing terrain/fuel data
+    :param wps_geog_path: the path to the geogrid data directory providing terrain/fuel data
     :param email_notification: dictionary containing keys address and events indicating when a mail should be fired off
     """
     logging.basicConfig(level=logging.INFO)
@@ -250,8 +252,8 @@ def execute(args):
     logging.info("number of domains defined is %d." % num_doms)
 
     # build directories in workspace
-    js.wps_dir = osp.abspath(osp.join(js.workspace_dir, js.job_id, 'wps'))
-    js.wrf_dir = osp.abspath(osp.join(js.workspace_dir, js.job_id, 'wrf'))
+    js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
+    js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
 
     logging.info("cloning WPS into %s" % js.wps_dir)
 
@@ -260,7 +262,7 @@ def execute(args):
     cln.clone_wps(js.wps_dir, js.grib_source.vtables(), [])
 
     # step 2: process domain information and patch namelist for geogrid
-    js.wps_nml['geogrid']['geog_data_path'] = args['geogrid_path']
+    js.wps_nml['geogrid']['geog_data_path'] = args['wps_geog_path']
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
@@ -309,7 +311,7 @@ def execute(args):
     js.wrf_nml['time_control'].update(time_ctrl)
     update_namelist(js.wrf_nml, js.grib_source.namelist_keys())
     if 'ignitions' in args:
-        update_namelist(js.wrf_nml, update_ignitions(js.ignitions, num_doms))
+        update_namelist(js.wrf_nml, render_ignitions(js, num_doms))
 
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
@@ -355,7 +357,7 @@ def execute(args):
     pp = None
     already_sent_files, max_pp_dom = [], -1
     if js.postproc is not None:
-        js.pp_dir = osp.join(js.workspace_dir, js.job_id, "products")
+        js.pp_dir = osp.join(js.workspace_path, js.job_id, "products")
         make_dir(js.pp_dir)
         pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
 	max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
@@ -458,8 +460,10 @@ def process_arguments(args):
     :param args: the input arguments
     """
     # resolve possible relative time specifications
-    args['start_utc'] = timespec_to_utc(args['start_utc'])
-    args['end_utc'] = timespec_to_utc(args['end_utc'], args['start_utc'])
+    start_utc = timespec_to_utc(args['start_utc'])
+    args['orig_start_utc'] = start_utc
+    args['start_utc'] = round_time_to_hour(start_utc)
+    args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
 
     for k, v in args.iteritems():
         if type(v) == unicode:
@@ -478,8 +482,8 @@ if __name__ == '__main__':
 
     # load configuration JSON
     # note: the execution flow allows us to override anything in the etc/conf.json file
-    args = open(sys.argv[1]).read()
-    job_args = json.loads(cfg_str, 'ascii')
+    job_args = json.load(open(sys.argv[1]), 'ascii')
+    args = sys_cfg
     args.update(job_args)
 
     # configure the basic logger
