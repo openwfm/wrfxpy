@@ -35,14 +35,14 @@ class WRFCloner(object):
         Initialize with WRF/WPS installation directories from which clones will be built.
 
         #param args: a dictionary of arguments containing the following keys
-                sys_install_dir: installation directory of the current system
-                wrf_install_dir: WRF installation directory
-                wps_install_dir: WPS installation directory
+                sys_install_path: installation directory of the current system
+                wrf_install_path: WRF installation directory
+                wps_install_path: WPS installation directory
         :return:
         """
-        self.sys_idir = args['sys_install_dir']
-        self.wrf_idir = args['wrf_install_dir']
-        self.wps_idir = args['wps_install_dir']
+        self.sys_idir = args['sys_install_path']
+        self.wrf_idir = args['wrf_install_path']
+        self.wps_idir = args['wps_install_path']
 
     def clone_wps(self, tgt, vtables, with_files):
         """
