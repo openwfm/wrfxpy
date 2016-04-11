@@ -209,9 +209,9 @@ def update_ignitions(ign_specs, max_dom):
     return { 'fire' : nml_fire }
 
 
-def timespec_to_utc_hour(ts_str, from_time = None):
+def timespec_to_utc(ts_str, from_time = None):
     """
-    Converts relative time specifications into a UTC datetime which is rounded down to the nearest hour.
+    Converts relative time specifications into a UTC datetime.
 
     ts_str can be an ESMF time, in which case this function returns esmf_to_utc(ts_str) rounded
     down, or it can be in the format 'T+YY' or 'T-YY' and then it's a relative specification of minutes
@@ -224,12 +224,9 @@ def timespec_to_utc_hour(ts_str, from_time = None):
         if from_time is None:
             from_time = datetime.utcnow()
         min_shift = int(ts_str[1:])
-        dt = from_time + timedelta(minutes = min_shift)
-        return dt.replace(minute = 0, second = 0)
+        return from_time + timedelta(minutes = min_shift)
     else:
-        dt = esmf_to_utc(ts_str)
-        return dt.replace(minute = 0, second = 0)
-
+        return esmf_to_utc(ts_str)
 
 
 #

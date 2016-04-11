@@ -25,7 +25,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, update_ignitions, make_dir, \
-                  timespec_to_utc_hour
+                  timespec_to_utc
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -381,8 +381,8 @@ def execute(args):
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                 wrfout_path = osp.join(js.wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(js.start_utc))) 
  		try:
+                    #pp.vars2kmz(wrfout_path, dom_id, esmf_time, var_list)
                     pp.vars2png(wrfout_path, dom_id, esmf_time, var_list)
-                    pp.vars2kmz(wrfout_path, dom_id, esmf_time, var_list)
 		except Exception as e:
 		    logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
                 # if this is the last processed domain
@@ -459,8 +459,8 @@ def process_arguments(args):
     :param args: the input arguments
     """
     # resolve possible relative time specifications
-    args['start_utc'] = timespec_to_utc_hour(args['start_utc'])
-    args['end_utc'] = timespec_to_utc_hour(args['end_utc'], args['start_utc'])
+    args['start_utc'] = timespec_to_utc(args['start_utc'])
+    args['end_utc'] = timespec_to_utc(args['end_utc'], args['start_utc'])
 
     for k, v in args.iteritems():
         if type(v) == unicode:
