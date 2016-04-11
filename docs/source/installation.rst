@@ -54,10 +54,11 @@ Configure the system directories, ``WPS/WRF-SFIRE`` locations and workspace loca
 
 ::
 
-  "workspace_dir": "wksp"
-  "wps_install_dir": "path/to/WPS"
-  "wrf_install_dir": "path/to/WRF"
-  "sys_install_dir": "/path/to/wrfxpy"
+  "workspace_path": "wksp"
+  "wps_install_path": "path/to/WPS"
+  "wrf_install_path": "path/to/WRF"
+  "sys_install_path": "/path/to/wrfxpy"
+  "wps_geog_path" : "/path/to/wps-geogrid"
 
 Optionally, the *wrfxpy* installation can be connected to a visualization server `wrfxweb <https://github.com/vejmelkam/wrfxweb>`_.  The following keys are all optional (and only used if the postprocessed results of simulations are uploaded).
 
@@ -69,7 +70,6 @@ Optionally, the *wrfxpy* installation can be connected to a visualization server
   "shuttle_remote_root" : "remote directory for output storage"
 
 This concludes the ``etc/conf.json`` file.
-
 
 Next, *wrfxpy* needs to know how jobs are submitted on your cluster.  Create an entry for your cluster, here we use ``speedy`` as an example::
 

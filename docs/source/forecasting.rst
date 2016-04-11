@@ -168,7 +168,7 @@ The keys in the remainder of this section are optional.
 
 * ``ignitions : [dict]`` (optional) is a dictionary of domains (string identifier, e.g. "1") to a list of ignitions that should be added to the domain, each being a dictionary with the following keys:
   
-* ``start_delay_s : [int]`` number of seconds between simulation start and ignition
+* ``time_utc : [esmf_time]`` time of ignition
 * ``duration_s : [int]`` the length of time the ignition is active
 * ``latlon : [int]`` the latitude and longitude of the ignition point
 
@@ -179,7 +179,7 @@ The keys in the remainder of this section are optional.
   "ignitions" : {
     "1" : [],
     "2" : [ {
-      "start_delay_s" : 600,
+      "time_utc" : "2016-03-30_13:14:00",
       "duration_s" : 240,
       "latlon" : [39.894264, -103.903222]
     } ]
