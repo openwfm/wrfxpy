@@ -27,7 +27,7 @@
   },
   "ignitions" : {
      "1" : [ {
-      "start_delay_s" : 600,
+      "time_utc" : "T+10",
       "duration_s" : 240,
       "latlon" : [39.894264, -103.903222]
      } ]

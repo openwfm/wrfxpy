@@ -168,7 +168,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
 
     # retrieve the catalog & update it
     logging.info('SHUTTLE updating catalog file on remote host')
-    cat_local = osp.join(cfg['workspace_dir'], 'catalog.json')
+    cat_local = osp.join(cfg['workspace_path'], 'catalog.json')
     s.get('catalog.json', cat_local)
 
     cat = json.load(open(cat_local))
