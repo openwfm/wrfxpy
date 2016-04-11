@@ -7,8 +7,24 @@ Quickstart
   Please first follow the installation instructions :doc:`installation`.
   
 
+
 First fire forecast
 ===================
+
+The simplest way to start is to invoke the standalone script
+
+::
+
+  ./simple_forecast.sh
+
+
+The script will ask you a series of questions with sensible defaults and at the
+end will create a JSON configuration file and finish with instructions on how to
+run the simulation.
+
+
+Example fire forecast
+=====================
 
 To perform a fire forecast, the script ``forecast.sh`` has to be executed with
 a JSON configuration file as an argument, for example:
