@@ -1,8 +1,9 @@
 {
-  "workspace_dir": "wksp",
-  "wps_install_dir": "path/to/WPS",
-  "wrf_install_dir": "path/to/WRF",
-  "sys_install_dir": "/path/to/wrfxpy",
+  "workspace_path": "wksp",
+  "wps_install_path": "path/to/WPS",
+  "wrf_install_path": "path/to/WRF",
+  "sys_install_path": "/path/to/wrfxpy",
+  "wps_geog_path" : "/path/to/your/default/wps_geog",
 
   "shuttle_ssh_key": "path/to/your/priv_ssh_key/to/remote/host",
   "shuttle_remote_user" : "your_username",

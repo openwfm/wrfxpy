@@ -209,20 +209,19 @@ def execute(args):
     The args dictionary contains
 
     :param args: a dictionary with the following keys
-        grid_code: the (unique) code of the grid that is used
-        sys_install_dir: system installation directory
-        start_utc: start time of simulation in UTC
-        end_utc: end time of simulation in UTC
-        workspace_dir: workspace directory
-        wps_install_dir: installation directory of WPS that will be used
-        wrf_install_dir: installation directory of WRF that will be used
-        grib_source: a string identifying a valid GRIB2 source
-        wps_namelist_path: the path to the namelist.wps file that will be used as template
-        wrf_namelist_path: the path to the namelist.input file that will be used as template
-        fire_namelist_path: the path to the namelist.fire file that will be used as template
-        geogrid_path: the path to the geogrid data directory providing terrain/fuel data
-        email_notification: dictionary containing keys address and events indicating when a mail should be fired off
-    :return:
+    :param grid_code: the (unique) code of the grid that is used
+    :param sys_install_dir: system installation directory
+    :param start_utc: start time of simulation in UTC
+    :param end_utc: end time of simulation in UTC
+    :param workspace_dir: workspace directory
+    :param wps_install_path: installation directory of WPS that will be used
+    :param wrf_install_path: installation directory of WRF that will be used
+    :param grib_source: a string identifying a valid GRIB2 source
+    :param wps_namelist_path: the path to the namelist.wps file that will be used as template
+    :param wrf_namelist_path: the path to the namelist.input file that will be used as template
+    :param fire_namelist_path: the path to the namelist.fire file that will be used as template
+    :param geogrid_path: the path to the geogrid data directory providing terrain/fuel data
+    :param email_notification: dictionary containing keys address and events indicating when a mail should be fired off
     """
     logging.basicConfig(level=logging.INFO)
 
@@ -405,14 +404,14 @@ def verify_inputs(args):
       args -- dictionary of arguments
     """
     # we don't check if job_id is a valid path
-    required_files = [('sys_install_dir', 'Non-existent system installation directory %s'),
-                      ('workspace_dir', 'Non-existent workspace directory %s'),
-                      ('wps_install_dir', 'Non-existent WPS installation directory %s'),
-                      ('wrf_install_dir', 'Non-existent WRF installation directory %s'),
+    required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
+                      ('workspace_path', 'Non-existent workspace directory %s'),
+                      ('wps_install_path', 'Non-existent WPS installation directory %s'),
+                      ('wrf_install_path', 'Non-existent WRF installation directory %s'),
                       ('wps_namelist_path', 'Non-existent WPS namelist template %s'),
                       ('wrf_namelist_path', 'Non-existent WRF namelist template %s'),
                       ('fire_namelist_path', 'Non-existent fire namelist template %s'),
-                      ('geogrid_path', 'Non-existent geogrid data (WPS-GEOG) path %s')]
+                      ('wps_geog_path', 'Non-existent geogrid data (WPS-GEOG) path %s')]
 
     optional_files = [('emissions_namelist_path', 'Non-existent namelist template %s')]
 
@@ -478,9 +477,10 @@ if __name__ == '__main__':
         sys.exit(2)
 
     # load configuration JSON
-    cfg_str = open(sys.argv[1]).read()
-    args = json.loads(cfg_str, 'ascii')
-    args.update(sys_cfg)
+    # note: the execution flow allows us to override anything in the etc/conf.json file
+    args = open(sys.argv[1]).read()
+    job_args = json.loads(cfg_str, 'ascii')
+    args.update(job_args)
 
     # configure the basic logger
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
