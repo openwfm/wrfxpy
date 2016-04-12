@@ -18,6 +18,8 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from utils import ensure_dir, symlink_unless_exists
+from downloader import download_url, DownloadError
+
 from datetime import datetime, timedelta
 import pytz
 import requests
@@ -92,44 +94,11 @@ class GribSource(object):
         :param max_retries: how many times we may retry to download the file
         """
         url = url_base + '/' + rel_path
-        r = requests.get(url, stream=True)
-        content_size = int(r.headers['Content-Length'])
-
-        # dump the correct file size to an info file next to the grib file
-        # when re-using the GRIB2 file, we check its file size against this record
-        # to avoid using partial files
-        info_path = osp.join(self.ingest_dir, rel_path + '.size')
-        open(ensure_dir(info_path), 'w').write(str(content_size))
-
-        # stream the download to file
         grib_path = osp.join(self.ingest_dir, rel_path)
-        with open(ensure_dir(grib_path), 'wb') as f:
-            for chunk in r.iter_content(1024 * 1024):
-                f.write(chunk)
-        
-        # does the server accept byte range queries? e.g. the NOMADs server does
-        accepts_ranges = 'bytes' in r.headers.get('Accept-Ranges', '')
-        
-        file_size = osp.getsize(grib_path)
-        retries_available = max_retries
-        while file_size < content_size:
-            if retries_available > 0:
-                if accepts_ranges:
-                    # if range queries are supported, try to download only the missing portion of the file
-                    headers = { 'Range' : 'bytes=%d-%d' % (file_size, content_size) }
-                    r = requests.get(url, headers=headers, stream=True)
-                    with open(grib_path, 'ab') as f:
-                        for chunk in r.iter_content(1024 * 1024):
-                            f.write(chunk)
-                    retries_available -= 1
-                else:
-                    # call the entire function recursively, this will attempt to redownload the entire file
-                    # and overwrite previously downloaded data
-                    self.download_grib(url_base, rel_path, max_retries-1)
-            else:
-                os.remove(grib_path)
-                os.remove(info_path)
-                raise GribError('GribSource: failed to download file %s' % url)
+        try:
+            download_url(url, grib_path, max_retries)
+        except DownloadError as e:
+            raise GribError('GribSource: failed to download file %s' % url)
 
     
     def grib_available_locally(self, path):

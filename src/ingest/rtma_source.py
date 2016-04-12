@@ -59,49 +59,29 @@ class RTMA(object):
         """
         ts = datetime.utcnow().replace(tzinfo=pytz.UTC, hour=hour, minute=0, second=0, microsecond=0)
 
-        retry = True
-        while retry:
-            retry = False
-            vars_paths = map(lambda x: (x, self._local_var_path(ts, x)), self.var_list)
-            logging.info('RTMA retrieving variables %s for hour %d.' % (self.var_list, hour))
-            nonlocals = filter(lambda x: not self._is_var_available_locally(x[1]), vars_paths)
-            logging.info('RTMA %d files not available locally %s.' % (len(nonlocals), [x[0] for x in nonlocals]))
+        vars_paths = map(lambda x: (x, self._local_var_path(ts, x)), self.var_list)
+        logging.info('RTMA retrieving variables %s for hour %d.' % (self.var_list, hour))
+        nonlocals = filter(lambda x: not self._is_var_cached(x[1]), vars_paths)
+        if nonlocals:
+            nl_vars = [x[0] for x in nonlocals]
+            logging.info('RTMA variables %s are not available locally, trying to download.' % nl_vars)
 
-            not_ready = []
-            for var, local_path in nonlocals:
-                if self._is_var_ready(hour, var):
-                    download_url(self._remote_var_url(hour, var), local_path)
-                    retry = True
-                else:
-                    not_ready.append(var)
-
-            if not_ready:
-                logging.info('RTMA the variables %s are not ready for hour %d.' % (not_ready, hour))
-                # unless a file was downloaded, it makes no sense to check the server immediately again
+        not_ready = []
+        for var, local_path in nonlocals:
+            if self._is_var_ready(hour, var):
+                download_url(self._remote_var_url(hour, var), local_path)
             else:
-                # if all files are available, return
-                break
+                not_ready.append(var)
+
+        if not_ready:
+            logging.info('RTMA the variables %s for hour %d are not ready.' % (not_ready, hour))
+            # unless a file was downloaded, it makes no sense to check the server immediately again
+        else:
+            # if all files are available, return
+            logging.info('RTMA success obtaining variables %s for hour %d.' % (self.var_list, hour))
 
         return not_ready
 
-
-    def _is_var_ready(self, hour, var):
-        """
-        Checks if the variable var is ready for the given forecast hour by comparing its
-        filetime to the timestamp given by the forecast hour.  If the filetime is newer
-        (later) then the variable is ready.
-
-        :param: hour, which hour-of-day 0--23 to work with
-        :return: true if the variable is ready
-        """
-        # find last-modified time of file in UTC timezone
-        r = requests.head(self._remote_var_url(hour, var))
-        last_modif = self._parse_header_timestamp(r.headers['Last-Modified'])
-
-        # the UTC timestamp of the RT hour
-        utc_time = datetime.utcnow().replace(tzinfo=pytz.UTC, hour=hour, minute=0, second=0, microsecond=0)
-
-        return last_modif > utc_time
 
    
     def _local_var_path(self, ts, var):
@@ -114,6 +94,26 @@ class RTMA(object):
         """
         rel_path = 'rtma/%04d%02d%02d/%02d/%s.grib' % (ts.year, ts.month, ts.day, ts.hour, var)
         return osp.join(self.ingest_path, rel_path)
+
+
+    def _is_var_ready(self, hour, var):
+        """
+        Checks if the variable var is ready for the given forecast hour by comparing its
+        filetime to the timestamp given by the forecast hour.  If the filetime is newer
+        (later) then the variable is ready.
+
+        :param hour: which hour-of-day 0--23 to work with
+        :param var: the variable identifier
+        :return: true if the variable is ready
+        """
+        # find last-modified time of file in UTC timezone
+        r = requests.head(self._remote_var_url(hour, var))
+        last_modif = self._parse_header_timestamp(r.headers['Last-Modified'])
+
+        # the UTC timestamp of the RT hour
+        utc_time = datetime.utcnow().replace(tzinfo=pytz.UTC, hour=hour, minute=0, second=0, microsecond=0)
+
+        return last_modif > utc_time
 
 
     @staticmethod
@@ -129,7 +129,7 @@ class RTMA(object):
 
 
     @staticmethod
-    def _is_var_available_locally(path):
+    def _is_var_cached(path):
         """
         Check if the file for the variable is available in the ingest directory
         already and it's filesize is correct.
@@ -158,8 +158,18 @@ class RTMA(object):
 
 
 if __name__ == '__main__':
+    import sys
+
     # configure the basic logger
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+    if len(sys.argv) != 2:
+        print('usage: %s <rt_hour>' % sys.argv[0])
+        sys.exit(1)
+
+    # initialize the RTMA object with standard variables
     rtma = RTMA('ingest', ['utd', 'utemp', 'precipa'])
+
+    # try to download them
+    rtma.retrieve_rtma(int(sys.argv[1]))
 
