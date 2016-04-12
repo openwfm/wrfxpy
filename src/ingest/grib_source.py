@@ -383,6 +383,7 @@ class NARR(GribSource):
     def __init__(self, ingest_dir):
         super(NARR, self).__init__(ingest_dir)
 
+
     def vtables(self):
         """
         Returns the variable tables that must be linked in for use with the NARR data source.
@@ -393,13 +394,16 @@ class NARR(GribSource):
                 'ungrib_vtable': 'Vtable.NARR',
                 'metgrid_vtable': 'METGRID.TBL.NARR'}
 
+
     def namelist_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.input with NARR.
 
-        NAM 218 requires that ''num_metgrid_soil_levels'' is set to 8.
+        NARR requires that ''num_metgrid_soil_levels'' is set to 4.
         """
-        return {}
+        return { 'domains' : { 'num_metgrid_levels' : 30,
+                               'num_metgrid_soil_levels' : 4,
+                               'p_top_requested' : 10000 }}
 
     def retrieve_gribs(self, from_utc, to_utc, ref_utc=None):
         """
