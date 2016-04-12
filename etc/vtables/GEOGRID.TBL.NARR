@@ -335,3 +335,25 @@ name = OL4
         rel_path = 1deg:orogwd_1deg/ol4/
         rel_path = 2deg:orogwd_2deg/ol4/
 ===============================
+name=NFUEL_CAT
+        priority=1
+        dest_type=categorical
+        dominant_only=NFUEL_CAT
+        z_dim_name=fuel_cat
+        halt_on_missing = no
+        fill_missing = 14
+        interp_option=default:nearest_neighbor+average_16pt+search
+        rel_path=default:adam_fuel_cat
+        subgrid=yes
+==============================
+name=ZSF
+        priority = 1
+        dest_type = continuous
+        df_dx=DZDXF
+        df_dy=DZDYF
+        smooth_option = smth-desmth_special; smooth_passes=1
+        halt_on_missing = no
+        fill_missing = 0
+        interp_option = default:average_gcell(4.0)+four_pt+average_4pt
+        rel_path=default:adam_topo
+        subgrid=yes
