@@ -39,6 +39,7 @@ from datetime import datetime, timedelta
 import time, re, json, sys, logging
 import os.path as osp
 from multiprocessing import Process, Queue
+import glob
 
 import smtplib
 from email.mime.text import MIMEText
@@ -202,6 +203,18 @@ def run_geogrid(js, q):
     except Exception as e:
         logging.error('GEOGRID step failed with exception %s' % repr(e))
         q.put('FAILURE')
+
+
+def find_fresh_wrfout(path, dom_id):
+    """
+    Find the latest wrfout for postprocessing.
+
+    :param path: the wrf path directory
+    :param dom_id: the domain for which we search wrfouts
+    :return: the path to the fresh (latest) wrfout
+    """
+    wrfouts = sorted(glob.glob(osp.join(path, 'wrfout_d%02d*' % dom_id)))
+    return osp.join(path, wrfouts[-1])
 
 
 def execute(args):
@@ -380,7 +393,7 @@ def execute(args):
             if js.postproc is not None and str(dom_id) in js.postproc:
                 var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
-                wrfout_path = osp.join(js.wrf_dir,"wrfout_d%02d_%s" % (dom_id, utc_to_esmf(js.start_utc))) 
+                wrfout_path = find_fresh_wrfout(js.wrf_dir, dom_id)
             try:
                 pp.process_vars(wrfout_path, dom_id, esmf_time, var_list)
             except Exception as e:
