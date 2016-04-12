@@ -389,7 +389,9 @@ class NARR(GribSource):
 
         :return: a dictionary of variable tables
         """
-        return {'ungrib_vtable': 'Vtable.NARR'}
+        return {'geogrid_vtable': 'GEOGRID.TBL.NARR',
+                'ungrib_vtable': 'Vtable.NARR',
+                'metgrid_vtable': 'METGRID.TBL.NARR'}
 
     def namelist_keys(self):
         """
