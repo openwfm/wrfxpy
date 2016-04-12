@@ -242,7 +242,7 @@ if __name__ == '__main__':
 
     cfg = questionnaire()
 
-    filename = cfg['grid_code'] + '.json'
+    filename = 'jobs/' + cfg['grid_code'] + '.json'
     json.dump(cfg, open(filename, 'w'), indent=4, separators=(',', ': '))
 
     newline()
