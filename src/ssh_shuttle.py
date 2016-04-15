@@ -113,7 +113,6 @@ class SSHShuttle(object):
         :param remote_path: remote path
         :param local_path: local path
         """
-	print('remote cwd is %s' % self.sftp.getcwd())
         self.sftp.get(remote_path, local_path)
 
 
