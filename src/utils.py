@@ -201,7 +201,8 @@ def render_ignitions(js, max_dom):
     nml_fire = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom,
                  'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom,
                  'fmoist_run' : [False] * max_dom, 'fmoist_interp' : [False] * max_dom,
-                 'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom }
+                 'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
+                 'fire_viscosity' : [0] * max_dom }
 
     for dom_str, dom_igns in ign_specs.iteritems():
         dom_id = int(dom_str)
