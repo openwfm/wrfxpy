@@ -136,6 +136,19 @@ class SSHShuttle(object):
         self.sftp.chdir(remote_dir)
 
 
+    def rmdir(self, remote_dir):
+        """
+        Remove a remote directory.
+
+        :param remote_dir: the directory to remove
+        """
+        abs_path = osp.join(self.root, remote_dir)
+        files = self.sftp.listdir(abs_path)
+        for f in files:
+            self.sftp.remove(osp.join(abs_path, f))
+        self.sftp.rmdir(abs_path)
+
+
 def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = None, exclude_files = []):
     """
     Executes all steps required to send a local product directory to a remote visualization
@@ -175,7 +188,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
                       'description' : description if description is not None else sim_name,
                       'from_utc' : times[0],
                       'to_utc' : times[-1] }
-    json.dump(cat, open(cat_local, 'w'))
+    json.dump(cat, open(cat_local, 'w'), indent=4, separators=(',', ': '))
     s.put(cat_local, 'catalog.json')
 
     logging.info('SHUTTLE operations completed, closing connection.')
