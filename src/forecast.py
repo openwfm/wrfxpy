@@ -334,8 +334,15 @@ def execute(args):
     f90nml.write(js.wrf_nml, osp.join(js.wrf_dir, 'namelist.input'), force=True)
 
     f90nml.write(js.fire_nml, osp.join(js.wrf_dir, 'namelist.fire'), force=True)
+
+    # try to run Real twice as it sometimes fails the first time
+    # it's not clear why this error happens 
+    try:
+        Real(js.wrf_dir).execute().check_output()
+    except Exception as e:
+        logging.error('Real step failed with exception %s, retrying ...' % str(e))
+        Real(js.wrf_dir).execute().check_output()
     
-    Real(js.wrf_dir).execute().check_output()
 
     # step 8: if requested, do fuel moisture DA
     if js.fmda is not None:
