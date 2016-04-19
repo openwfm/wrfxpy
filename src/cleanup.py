@@ -86,8 +86,10 @@ if __name__ == '__main__':
 
     if sys.argv[1] == 'list':
         cat = retrieve_catalog(cfg)
+        print('%-60s desc' % 'id')
+        print('-' * 70)
         for k in cat:
-            print(k)
+            print('%-60s %s' % (k, cat[k]['description']))
     elif sys.argv[1] == 'delete':
         cat = retrieve_catalog(cfg)
         if sys.argv[2] not in cat:

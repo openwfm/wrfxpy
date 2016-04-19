@@ -18,6 +18,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from downloader import download_url, DownloadError
+from utils import esmf_to_utc
 
 import requests
 from datetime import datetime, timedelta
@@ -48,17 +49,17 @@ class RTMA(object):
         self.ingest_path = ingest_path
 
 
-    def retrieve_rtma(self, hour):
+    def retrieve_rtma(self, cycle):
         """
         Attempts to retrieve the variables passed in during initialization.
         Any files already downloaded are not modified.
         Returns a list of variables that have not been downloaded.
 
-        :param hour: the forecast hour (UTC timezone)
+        :param cycle: the cycle (UTC) for which to retrieve the RTMA
         :return: tuple with list of all variables that are not ready yet
                  and dictonary with path to stored files
         """
-        ts = datetime.now(pytz.UTC).replace(hour=hour, minute=0, second=0, microsecond=0)
+        ts = cycle.replace(minute=0, second=0, microsecond=0)
         logging.info('RTMA retrieving variables %s for cycle %s.' % (self.var_list, str(ts)))
 
         vars_paths = map(lambda x: (x, self._local_var_path(ts, x)), self.var_list)
@@ -70,18 +71,18 @@ class RTMA(object):
 
         not_ready = []
         for var, local_path in nonlocals:
-            if self._is_var_ready(hour, var):
-                download_url(self._remote_var_url(hour, var), local_path)
+            if self._is_var_ready(ts, var):
+                download_url(self._remote_var_url(cycle.hour, var), local_path)
                 ready[var] = local_path
             else:
                 not_ready.append(var)
 
         if not_ready:
-            logging.info('RTMA the variables %s for hour %d are not ready.' % (not_ready, hour))
+            logging.info('RTMA the variables %s for hour %d are not ready.' % (not_ready, cycle.hour))
             # unless a file was downloaded, it makes no sense to check the server immediately again
         else:
             # if all files are available, return
-            logging.info('RTMA success obtaining variables %s for hour %d.' % (self.var_list, hour))
+            logging.info('RTMA success obtaining variables %s for hour %d.' % (self.var_list, cycle.hour))
 
         return not_ready, ready
 
@@ -99,27 +100,24 @@ class RTMA(object):
         return osp.join(self.ingest_path, rel_path)
 
 
-    def _is_var_ready(self, hour, var):
+    def _is_var_ready(self, cycle, var):
         """
         Checks if the variable var is ready for the given forecast hour by comparing its
         filetime to the timestamp given by the forecast hour.  If the filetime is newer
         (later) then the variable is ready.
 
-        :param hour: which hour-of-day 0--23 to work with
+        :param cycle: which cycle are we working with (UTC)
         :param var: the variable identifier
         :return: true if the variable is ready
         """
         # find last-modified time of file in UTC timezone
-        url = self._remote_var_url(hour, var)
+        url = self._remote_var_url(cycle.hour, var)
         r = requests.head(url)
         if r.status_code != 200:
-            raise ValueError('Cannot find variable %s for hour %d at url %s' % (var, hour, url))
+            raise ValueError('Cannot find variable %s for hour %d at url %s' % (var, cycle.hour, url))
         last_modif = self._parse_header_timestamp(r.headers['Last-Modified'])
 
-        # the UTC timestamp of the RT hour
-        utc_time = datetime.utcnow().replace(tzinfo=pytz.UTC, hour=hour, minute=0, second=0, microsecond=0)
-
-        return last_modif > utc_time
+        return last_modif > cycle
 
 
     @staticmethod
@@ -170,12 +168,12 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     if len(sys.argv) != 2:
-        print('usage: %s <rt_hour>' % sys.argv[0])
+        print('usage: %s <esmf_time>' % sys.argv[0])
         sys.exit(1)
 
     # initialize the RTMA object with standard variables
     rtma = RTMA('ingest', ['utd', 'utemp', 'precipa'])
 
     # try to download them
-    rtma.retrieve_rtma(int(sys.argv[1]))
+    rtma.retrieve_rtma(esmf_to_utc(sys.argv[1]))
 
