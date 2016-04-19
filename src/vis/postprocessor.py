@@ -20,6 +20,93 @@ class PostprocError(Exception):
     pass
 
 
+
+def scalar_field_to_raster(fa, lats, lons, wisdom):
+    """
+    Render a scalar variable into a geolocated raster and colorbar.
+
+    :param fa: the field to render
+    :param lats: the latitudes
+    :param lons: the longitudes
+    :param wisdom: a configuration dictionary controlling the visualization
+    :return: a tuple with the raster as StringIO, its geolocation and the PNG colorbar StringIO (None if not requested)
+    """
+    # gather wisdom about the variable
+    native_unit = wisdom['native_unit']
+    cmap_name = wisdom['colormap']
+    cmap = mpl.cm.get_cmap(cmap_name)
+
+    if lats.shape != fa.shape:
+        raise PostprocError("Variable size %s does not correspond to grid size %s." % (fa.shape, lats.shape))
+
+    # look at mins and maxes
+    fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
+
+    # determine if we will use the range in the variable or a fixed range
+    scale = wisdom['scale']
+    if scale != 'original':
+        fa_min, fa_max = scale[0], scale[1]
+        fa[fa < fa_min] = fa_min
+        fa[fa > fa_max] = fa_max
+
+    # only create the colorbar if requested
+    cb_png_data = None
+    if wisdom['colorbar'] is not None:
+        cb_unit = wisdom['colorbar']
+        cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
+        #  colorbar + add it to the KMZ as a screen overlay
+        cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
+
+    # check for 'transparent' color value and replace with nans
+    if 'transparent_values' in wisdom:
+        rng = wisdom['transparent_values']
+        fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
+
+    # create the raster & get coordinate bounds
+    raster_png_data,corner_coords = basemap_raster_mercator(lons,lats,fa,fa_min,fa_max,cmap)
+
+    return raster_png_data, corner_coords, cb_png_data
+
+
+def vector_field_to_raster(u, v, lats, lons, wisdom):
+    """
+    Postprocess a vector field into arrows (used for wind).
+    
+    :param u: the vector in the U direction
+    :param v: the vector in the V direction
+    :param lats: the latitudes
+    :param lons: the longitudes
+    :param wisdom: a configuration dictionary controlling the visualization
+    :return: the raster png as a StringIO, and the coordinates
+    """
+    native_unit = wisdom['native_unit']
+
+    if u.shape != lats.shape:
+        raise PostprocError("U field does not correspond to grid size: field %s grid %s." % (u.shape, lats.shape))
+    
+    if v.shape != lats.shape:
+        raise PostprocError("V field does not correspond to grid size: field %s grid %s." % (v.shape, lats.shape))
+
+    # look at mins and maxes
+    fa_min,fa_max = min(np.nanmin(u), np.nanmin(v)),max(np.nanmax(u), np.nanmax(v))
+
+    # determine if we will use the range in the variable or a fixed range
+    scale = wisdom['scale']
+    if scale != 'original':
+        fa_min, fa_max = scale[0], scale[1]
+        u[u < fa_min] = fa_min
+        u[u > fa_max] = fa_max
+        v[v < fa_min] = fa_min
+        v[v > fa_max] = fa_max
+
+    # create the raster & get coordinate bounds, HACK to get better quiver resolution
+    s = 3
+    raster_png_data,corner_coords = basemap_barbs_mercator(u[::s,::s],v[::s,::s],lats[::s,::s],lons[::s,::s])
+
+    return raster_png_data, corner_coords
+
+
+
 class Postprocessor(object):
     """
     Postprocessing of WRF data.
@@ -43,7 +130,9 @@ class Postprocessor(object):
         mf_path = os.path.join(output_path, prod_name + '.json')
         if osp.exists(mf_path):
             self.manifest = json.load(open(mf_path))
-    
+   
+ 
+
     def _scalar2raster(self, d, var, tndx):
         """
         Convert a single variable into a raster and colorbar.
@@ -83,7 +172,7 @@ class Postprocessor(object):
             cb_unit = wisdom['colorbar']
             cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
             #  colorbar + add it to the KMZ as a screen overlay
-            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit,var)
+            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
 
         # check for 'transparent' color value and replace with nans
         if 'transparent_values' in wisdom:

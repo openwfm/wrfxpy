@@ -21,7 +21,10 @@ from fmda.fuel_moisture_da import execute_da_step, retrieve_mesowest_observation
 from fmda.fuel_moisture_model import FuelMoistureModel
 from ingest.grib_file import GribFile, GribMessage
 from ingest.rtma_source import RTMA
-from utils import Dict, ensure_dir
+from utils import Dict, ensure_dir, utc_to_esmf
+from vis.postprocessor import scalar_field_to_raster
+from ssh_shuttle import send_product_to_server
+
 
 import netCDF4
 import numpy as np
@@ -33,6 +36,59 @@ import os.path as osp
 
 from datetime import datetime, timedelta
 import pytz
+
+
+def postprocess_cycle(cycle, region_cfg, wksp_path):
+    """
+    Build rasters from the computed fuel moisture.
+
+    :param cycle: the UTC cycle time
+    :param region_cfg: the region configuration
+    :param wksp_path: the workspace path
+    :return: the postprocessing path
+    """
+    data_path = compute_model_path(cycle, region_cfg.code, wksp_path)
+    year_month = '%04d%02d' % (cycle.year, cycle.month)
+    cycle_dir = 'fmda-%s-%04d%02d%02d-%02d' %  (region_cfg.code, cycle.year, cycle.month, cycle.day, cycle.hour)
+    postproc_path = osp.join(wksp_path, year_month, cycle_dir)
+
+    # open and read in the fuel moisture values
+    d = netCDF4.Dataset(data_path)
+    fmc_gc = d.variables['FMC_GC'][:,:,:]
+    d.close()
+
+    # read in the longitudes and latitudes
+    geo_path = osp.join(wksp_path, '%s-geo.nc' % region_cfg.code)
+    d = netCDF4.Dataset(geo_path)
+    lats = d.variables['XLAT'][:,:]
+    lons = d.variables['XLONG'][:,:]
+    d.close()
+
+    fm_wisdom = {
+       'native_unit' : '-',
+       'colorbar' : '-',
+       'colormap' : 'jet_r',
+       'scale' : [0.0, 0.4]
+    }
+
+    esmf_cycle = utc_to_esmf(cycle) 
+    mf = { "1" : {esmf_cycle : {}}}
+    manifest_name = 'fmda-%s-%04d%02d%02d-%02d.json' %  (region_cfg.code, cycle.year, cycle.month, cycle.day, cycle.hour)
+    ensure_dir(osp.join(postproc_path, manifest_name))
+
+    for i,name in [(0, '1-hr'), (1, '10-hr'), (2, '100-hr')]:
+        fm_wisdom['name'] = '%s fuel moisture' % name
+        raster_png, coords, cb_png = scalar_field_to_raster(fmc_gc[:,:,i], lats, lons, fm_wisdom)
+        raster_name = 'fmda-%s-raster.png' % name
+        cb_name = 'fmda-%s-raster-cb.png' % name
+        with open(osp.join(postproc_path, raster_name), 'w') as f:
+            f.write(raster_png)
+        with open(osp.join(postproc_path, cb_name), 'w') as f:
+            f.write(cb_png) 
+        mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+        json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'))
+
+    return postproc_path
 
 
 def compute_model_path(cycle, region_code, wksp_path):
@@ -50,40 +106,42 @@ def compute_model_path(cycle, region_code, wksp_path):
     return osp.join(wksp_path,region_code,year_month,filename) 
 
 
+
 def find_region_indices(glat,glon,minlat,maxlat,minlon,maxlon):
-  """
-  Find the indices i1:i2 (lat dimension) and j1:j2 (lon dimension)
-  that contain the desired region (minlat-maxlat,minlon-maxlon).
-  
-  :param glat: the grid latitudes
-  :param glon: the grid longitudes
-  :param minlat: the minimum latitude
-  :param maxlat: the maximum latitude
-  :param minlon: the minimum longitude
-  :param maxlon: the maximum longitude
-  :return: dim 0 min/max indices and dim1 min/max indices
-  """
-  i1, i2, j1, j2 = 0, glat.shape[0], 0, glat.shape[1]
-  done = False
-  while not done:
-    done = True
-    tmp = np.where(np.amax(glat[:, j1:j2],axis=1) < minlat)[0][-1]
-    if i1 != tmp:
-      i1 = tmp
-      done = False
-    tmp = np.where(np.amin(glat[:, j1:j2],axis=1) > maxlat)[0][0]
-    if i2 != tmp:
-      i2 = tmp
-      done = False
-    tmp = np.where(np.amax(glon[i1:i2,:],axis=0) < minlon)[0][-1]
-    if j1 != tmp:
-      j1 = tmp
-      done = False
-    tmp = np.where(np.amin(glon[i1:i2,:],axis=0) > maxlon)[0][0]
-    if j2 != tmp:
-      j2 = tmp
-      done = False
-  return i1,i2,j1,j2
+    """
+    Find the indices i1:i2 (lat dimension) and j1:j2 (lon dimension)
+    that contain the desired region (minlat-maxlat,minlon-maxlon).
+
+    :param glat: the grid latitudes
+    :param glon: the grid longitudes
+    :param minlat: the minimum latitude
+    :param maxlat: the maximum latitude
+    :param minlon: the minimum longitude
+    :param maxlon: the maximum longitude
+    :return: dim 0 min/max indices and dim1 min/max indices
+    """
+    i1, i2, j1, j2 = 0, glat.shape[0], 0, glat.shape[1]
+    done = False
+    while not done:
+        done = True
+        tmp = np.where(np.amax(glat[:, j1:j2],axis=1) < minlat)[0][-1]
+        if i1 != tmp:
+            i1 = tmp
+            done = False
+        tmp = np.where(np.amin(glat[:, j1:j2],axis=1) > maxlat)[0][0]
+        if i2 != tmp:
+            i2 = tmp
+            done = False
+        tmp = np.where(np.amax(glon[i1:i2,:],axis=0) < minlon)[0][-1]
+        if j1 != tmp:
+            j1 = tmp
+            done = False
+        tmp = np.where(np.amin(glon[i1:i2,:],axis=0) > maxlon)[0][0]
+        if j2 != tmp:
+            j2 = tmp
+            done = False
+    return i1,i2,j1,j2
+
 
 
 def load_rtma_data(rtma_data, bbox):
@@ -156,7 +214,8 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
         if lookback_length > 0:
             model = fmda_advance_region(cycle - timedelta(hours=1), cfg, rtma, wksp_path, lookback_length - 1, meso_token)
     else:
-        return FuelMoistureModel.from_netcdf(prev_model_path)
+        logging.info('CYCLER found previous model for cycle %s.' % str(prev_cycle))
+        model = FuelMoistureModel.from_netcdf(prev_model_path)
         
     # retrieve the variables and make sure they are available (we should not be here if they are not)
     dont_have_vars, have_vars = rtma.retrieve_rtma(cycle)
@@ -165,8 +224,21 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     logging.info('CYCLER loading RTMA data for cycle %s.' % str(cycle))
     T2, RH, rain, hgt, lats, lons = load_rtma_data(have_vars, cfg.bbox)
     Ed, Ew = compute_equilibria(T2, RH)
-    
+
     dom_shape = T2.shape
+
+    # store the lons/lats for this domain
+    geo_path = osp.join(wksp_path, '%s-geo.nc' % cfg.code)
+    if not osp.isfile(geo_path):
+        d = netCDF4.Dataset(geo_path, 'w', format='NETCDF4')
+        d.createDimension('south_north', dom_shape[0])
+        d.createDimension('west_east', dom_shape[1])
+        xlat = d.createVariable('XLAT', 'f4', ('south_north', 'west_east'))
+        xlat[:,:] = lats
+        xlong = d.createVariable('XLONG', 'f4', ('south_north', 'west_east'))
+        xlong[:,:] = lons
+        d.close()
+    
     
     # the process noise matrix
     Q = np.diag([1e-4,5e-5,1e-5,1e-6,1e-6])
@@ -193,8 +265,13 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     tm_start = cycle - timedelta(minutes=30)
     tm_end = cycle + timedelta(minutes=30)
     fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons)
+    fm10v = []
+    for fm10_obs in fm10.values():
+        for obs in fm10_obs:
+            fm10v.append(obs.get_value())
     
-    logging.info('CYCLER retrieved %d valid observations.' % len(fm10))
+    logging.info('CYCLER retrieved %d valid observations, min/mean/max [%g/%g/%g].' %
+                 (len(fm10),np.amin(fm10v),np.mean(fm10v),np.amax(fm10v)))
     
     # remove rain that is too small to make any difference
     rain[rain < 0.01] = 0
@@ -228,6 +305,7 @@ def is_cycle_computed(cycle, cfg, wksp_path):
 if __name__ == '__main__':
     
     # setup environment
+    sys_cfg = Dict(json.load(open('etc/conf.json')))
     cfg = Dict(json.load(open('etc/rtma_cycler.json')))
     meso_token = json.load(open('etc/tokens.json'))['mesowest']
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -262,6 +340,10 @@ if __name__ == '__main__':
         if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
             logging.info('CYCLER processing region %s for cycle %s' % (region_id, str(cycle)))
             fmda_advance_region(cycle, wrapped_cfg, rtma, cfg.workspace_path, lookback_length, meso_token)
+            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
+            if 'shuttle_remote_host' in sys_cfg:
+                sim_code = 'fmda-' + wrapped_cfg.code
+                send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, region_id + ' FM')
         else:
             logging.info('CYCLER the cycle %s for region %s is already complete, skipping ...' % (str(cycle), str(region_id)))
 

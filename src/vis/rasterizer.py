@@ -29,16 +29,19 @@ import os
 import StringIO
 
 
-def make_colorbar(rng,orientation,size_in,cmap,cb_label,cb_title,dpi=200):
+def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     """
-    rng - [min max]
-    orientation - 'vertical' or 'horizontal'
-    size_in - larger dimension (height for vertical orientation, width for horizontal)
-    cmap - the colormap in use
-    units - the colorbar label (on left side vertically)
-    dpi - dots per inch
+    Create a colorbar to accompany a raseter image.
 
     See: http://matplotlib.org/examples/api/colorbar_only.html for more examples
+    
+    :param rng: the minimum/maximum to display on the colorbar
+    :param orientation: 'vertical' or 'horizontal'
+    :param size_in: larger dimension in inches
+    :param cmap: the colormap in use
+    :param cb_label: the colorbar label
+    :param dpi: dots per inch
+    :return: a StringIO object with the colorbar as PNG data
     """
     kwargs = { 'norm':mpl.colors.Normalize(rng[0],rng[1]),
                'orientation':orientation,
