@@ -25,7 +25,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
-                  timespec_to_utc, round_time_to_hour
+                  timespec_to_utc, round_time_to_hour, Dict
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -46,22 +46,6 @@ from email.mime.text import MIMEText
 
 import traceback
 
-class Dict(dict):
-    """
-    A dictionary that allows member access to its keys.
-    """
-
-    def __init__(self, d):
-        """
-        Updates itself with d.
-        """
-        self.update(d)
-
-    def __getattr__(self, item):
-        return self[item]
-
-    def __setattr__(self, item, value):
-        self[item] = value
 
 
 class JobState(Dict):

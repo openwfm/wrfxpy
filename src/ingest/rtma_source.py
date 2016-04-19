@@ -55,12 +55,14 @@ class RTMA(object):
         Returns a list of variables that have not been downloaded.
 
         :param hour: the forecast hour (UTC timezone)
-        :return: all variables that are not ready yet (empty return == success)
+        :return: tuple with list of all variables that are not ready yet
+                 and dictonary with path to stored files
         """
-        ts = datetime.utcnow().replace(tzinfo=pytz.UTC, hour=hour, minute=0, second=0, microsecond=0)
+        ts = datetime.now(pytz.UTC).replace(hour=hour, minute=0, second=0, microsecond=0)
+        logging.info('RTMA retrieving variables %s for cycle %s.' % (self.var_list, str(ts)))
 
         vars_paths = map(lambda x: (x, self._local_var_path(ts, x)), self.var_list)
-        logging.info('RTMA retrieving variables %s for hour %d.' % (self.var_list, hour))
+        ready = dict(filter(lambda x: self._is_var_cached(x[1]), vars_paths))
         nonlocals = filter(lambda x: not self._is_var_cached(x[1]), vars_paths)
         if nonlocals:
             nl_vars = [x[0] for x in nonlocals]
@@ -70,6 +72,7 @@ class RTMA(object):
         for var, local_path in nonlocals:
             if self._is_var_ready(hour, var):
                 download_url(self._remote_var_url(hour, var), local_path)
+                ready[var] = local_path
             else:
                 not_ready.append(var)
 
@@ -80,7 +83,7 @@ class RTMA(object):
             # if all files are available, return
             logging.info('RTMA success obtaining variables %s for hour %d.' % (self.var_list, hour))
 
-        return not_ready
+        return not_ready, ready
 
 
    
@@ -107,7 +110,10 @@ class RTMA(object):
         :return: true if the variable is ready
         """
         # find last-modified time of file in UTC timezone
-        r = requests.head(self._remote_var_url(hour, var))
+        url = self._remote_var_url(hour, var)
+        r = requests.head(url)
+        if r.status_code != 200:
+            raise ValueError('Cannot find variable %s for hour %d at url %s' % (var, hour, url))
         last_modif = self._parse_header_timestamp(r.headers['Last-Modified'])
 
         # the UTC timestamp of the RT hour

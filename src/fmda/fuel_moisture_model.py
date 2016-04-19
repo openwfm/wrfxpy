@@ -35,11 +35,11 @@ class FuelMoistureModel:
         :param Tk: drying/wetting time constants of simulated fuels (one per fuel), default [1 10 100 1000]
         :param P0: initial state error covariance
         """
-        self.Tk = np.array([1.0, 10.0, 100.0, 1000.0]) * 3600    # nominal fuel delays
-        self.r0 = 0.05                                           # threshold rainfall [mm/h]
-        self.rk = 8.0                                            # saturation rain intensity [mm/h]
-        self.Trk = 14.0 * 3600                                   # time constant for wetting model [s]
-        self.S = 2.5                                             # saturation intensity [dimensionless]
+        self.Tk = np.array([1.0, 10.0, 100.0]) * 3600    # nominal fuel delays
+        self.r0 = 0.05                                   # threshold rainfall [mm/h]
+        self.rk = 8.0                                    # saturation rain intensity [mm/h]
+        self.Trk = 14.0 * 3600                           # time constant for wetting model [s]
+        self.S = 2.5                                     # saturation intensity [dimensionless]
 
         s0, s1, k = m0.shape
         if Tk is not None:
@@ -76,13 +76,13 @@ class FuelMoistureModel:
 
     def advance_model(self, Ed, Ew, r, dt, mQ=None):
         """
-        This model captures the moisture dynamics at each grid point independently.
+        Advance the model by one time step of length dt
 
-        Ed - drying equilibrium [grid shape]
-        Ew - wetting equilibrium [grid shape]
-        r - rain intensity for time unit [grid shape] [mm/h]
-        dt - integration step [scalar] [s]
-        mQ - the proess noise matrix [shape dim x dim, common across grid points]
+        :param Ed: drying equilibrium [grid shape]
+        :param Ew: wetting equilibrium [grid shape]
+        :param r: rain intensity during the dt time unit [grid shape] [mm/h]
+        :param dt: integration step in seconds
+        :param mQ: the proess noise matrix [shape dim x dim, common across grid points]
         """
         Tk = self.Tk
         k = Tk.shape[0]                 # number of fuel classes
@@ -106,7 +106,7 @@ class FuelMoistureModel:
 
         dS = m_ext[:, :, k + 1]
 
-        print('GMM: EdA (%g,%g,%g)  EwA (%g,%g,%g)' % (np.amin(EdA),np.mean(EdA),np.amax(EdA), np.amin(EwA),np.mean(EdA),np.amax(EdA)))
+        #print('GMM: EdA (%g,%g,%g)  EwA (%g,%g,%g)' % (np.amin(EdA),np.mean(EdA),np.amax(EdA), np.amin(EwA),np.mean(EdA),np.amax(EdA)))
 
         assert np.all(EdA >= EwA)
 
@@ -213,6 +213,8 @@ class FuelMoistureModel:
     def get_state(self):
         """
         Return the current state for all grid points. READ-ONLY under normal circumstances.
+        
+        :return: the extended state with dimensions dom[0] x dom[1] x (k+2)
         """
         return self.m_ext
 
@@ -220,6 +222,8 @@ class FuelMoistureModel:
     def get_state_covar(self):
         """
         Return the state covariance for all grid points. READ-ONLY under normal circumstances.
+        
+        :return: the state covariance with dimensions dom[0] x dom[1] x (k+2) x (k+2)
         """
         return self.P
 
@@ -228,10 +232,9 @@ class FuelMoistureModel:
         """
         Updates the state using the observation at the grid point.
 
-          O - the observations [shape grid_size x len(fuel_types)]
-          V - the (diagonal) variance matrix of the measurements [shape grid_size x len(fuel_types) x len(fuel_types)]
-          fuel_types - the fuel types for which the observations exist (used to construct observation vector)
-
+        :param O: the observations [shape grid_size x len(fuel_types)]
+        :param V: the (diagonal) variance matrix of the measurements [shape grid_size x len(fuel_types) x len(fuel_types)]
+        :param fuel_types: the fuel types for which the observations exist (used to construct observation vector)
         """
         m_ext, P, H, P2 = self.m_ext, self.P, self.H, self.P2
         H[:] = 0.0
@@ -266,7 +269,13 @@ class FuelMoistureModel:
 
     def kalman_update_single(self, O, V, fuel_type, Kg=None):
         """
-        Perform an optimized Kalman update assuming there is only one fuel type.
+        Perform an optimized Kalman update assuming there is only one observed fuel type.
+        This function is more efficient.
+
+        :param O: the observations [shape grid_size x len(fuel_types)]
+        :param V: the (diagonal) variance matrix of the measurements [shape grid_size x len(fuel_types) x len(fuel_types)]
+        :param fuel_type: the fuel type for which the observations exist (used to construct observation operator)
+        :param Kg: the output Kalman gain
         """
         m_ext, P, P2 = self.m_ext, self.P, self.P2
 
@@ -300,6 +309,15 @@ class FuelMoistureModel:
 
 
     def kalman_update_single2(self, O, V, fuel_type, Kg):
+        """
+        Perform an optimized Kalman update assuming there is only one observed fuel type.
+        This function is more efficient again than kalman_update_single, since it's vectorized.
+
+        :param O: the observations [shape grid_size x len(fuel_types)]
+        :param V: the (diagonal) variance matrix of the measurements [shape grid_size x len(fuel_types) x len(fuel_types)]
+        :param fuel_type: the fuel type for which the observations exist (used to construct observation operator)
+        :param Kg: the output Kalman gain
+        """
 
         m_ext, P = self.m_ext, self.P
 
@@ -326,3 +344,59 @@ class FuelMoistureModel:
             for j in range(dom_shape[1]):
                 P[i, j, :, :] -= np.dot(Kg[i, j, :, np.newaxis], P[i, j, fuel_type:fuel_type + 1, :])
 
+
+    def to_pickle(self, path):
+        """
+        Store the model in a cPickle file.
+        
+        :param path: the path where to store the model
+        """
+        cPickle.dump(self, path)
+                
+
+    def to_netcdf(self, path):
+        """
+        Store the model in a netCDF file that attempts to be displayable
+        using standard tools and loosely follows the WRF 'standard'.
+        
+        :param path: the path where to store the model
+        """
+        import netCDF4
+        
+        d = netCDF4.Dataset(path, 'w', format='NETCDF4')
+        
+        d0, d1, k = self.m_ext.shape
+
+        d.createDimension('fuel_moisture_classes_stag', k)
+        d.createDimension('south_north', d0)
+        d.createDimension('west_east', d1)
+        ncfmc = d.createVariable('FMC_GC', 'f4', ('south_north', 'west_east','fuel_moisture_classes_stag'))
+        ncfmc[:,:,:] = self.m_ext
+        ncfmc_cov = d.createVariable('FMC_COV', 'f4', ('south_north', 'west_east','fuel_moisture_classes_stag', 'fuel_moisture_classes_stag'))
+        ncfmc_cov[:,:,:,:] = self.P
+        
+        d.close()
+        
+        
+    @classmethod
+    def from_netcdf(cls, path):
+        """
+        Construct a fuel moisture model from data stored in a netCDF file.
+        
+        :param path: the path to the netCDF4 file
+        """
+        import netCDF4
+        d = netCDF4.Dataset(path)
+        
+        ncfmc = d.variables['FMC_GC'][:,:,:]
+        d0, d1, k = ncfmc.shape
+        P = d.variables['FMC_COV'][:,:,:,:]
+        
+        Tk = np.array([1.0, 10.0, 100.0]) * 3600
+        
+        fm = FuelMoistureModel(ncfmc[:,:,:k-2], Tk)
+        
+        fm.m_ext[:,:,k-2:] = ncfmc[:,:,k-2:]
+        fm.P[:,:,:,:] = P
+        return fm
+        

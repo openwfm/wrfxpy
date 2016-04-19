@@ -47,13 +47,16 @@ def check_overlap(wrf_path,ts_now):
     return False
 
 
-def retrieve_mesowest_observations(meso_token, tm_start, tm_end, wrf_model):
+def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
     """
     Retrieve observation data from Mesowest and repackage them as a time-indexed
     dictionary of lists of observations.
 
-    :param meso_obss: the structure returned from the Mesowest query
-
+    :param meso_token: the mesowest API access token
+    :param tm_start: the start of the observation window
+    :param tm_end: the end of the observation window
+    :param glat: the lattitudes of the grid points
+    :param glon: the longitudes of the grid points
     """
     def decode_meso_time(t):
         # example: '2016-03-30T00:30:00Z'
@@ -62,17 +65,19 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, wrf_model):
     def meso_time(dt):
         # example: 201603311600
         return '%04d%02d%02d%02d%02d' % (dt.year, dt.month, dt.day, dt.hour, dt.minute)
+        
+    # the bbox for mesowest is: (min(lon), min(lat), max(lon), max(lat)).
+    min_lat, max_lat = np.amin(glat), np.amax(glat)
+    min_lon, max_lon = np.amin(glon), np.amax(glon)
 
     # retrieve data from Mesowest API (http://mesowest.org/api/)
     m = Meso(meso_token)
     meso_obss = m.timeseries(meso_time(tm_start - timedelta(minutes=30)),
                           meso_time(tm_end + timedelta(minutes=30)),
-                          showemptystations = '0', bbox='%g,%g,%g,%g' % wrf_model.get_domain_extent(),
+                          showemptystations = '0', bbox='%g,%g,%g,%g' % (min_lon, min_lat, max_lon, max_lat),
                           vars='fuel_moisture')
 
 
-    glat, glon = wrf_model.get_lats(), wrf_model.get_lons()
-   
     # repackage all the observations into a time-indexed structure which groups
     # observations at the same time together
     obs_data = {}
@@ -85,10 +90,11 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, wrf_model):
             fms = stinfo['OBSERVATIONS']['fuel_moisture_set_1']
 
             for ts,fm_obs in zip(dts,fms):
-                o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp)
-                obs_t = obs_data.get(ts, [])
-                obs_t.append(o)
-                obs_data[ts] = obs_t
+                if fm_obs is not None:
+                    o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp)
+                    obs_t = obs_data.get(ts, [])
+                    obs_t.append(o)
+                    obs_data[ts] = obs_t
 
     return obs_data
 
@@ -104,7 +110,6 @@ def execute_da_step(model, model_time, covariates, fm10):
     :param fm10: the 10-hr fuel moisture observations
     """
     valid_times = [z for z in fm10.keys() if abs((z - model_time).total_seconds()) < 1800]
-    logging.info('FMDA there are %d valid times at model time %s' % (len(valid_times), str(model_time)))
 
     if len(valid_times) > 0:
 
@@ -113,11 +118,14 @@ def execute_da_step(model, model_time, covariates, fm10):
         for z in valid_times:
             obs_valid_now.extend(fm10[z])
 
+        logging.info('FMDA found %d valid observations at model time %s' % (len(obs_valid_now), str(model_time)))
+
         fmc_gc = model.get_state()
         dom_shape = fmc_gc.shape[:2]
 
         # construct covariate storage
         Xd3 = min(len(covariates) + 1, len(obs_valid_now))
+        logging.info('FMDA is using %d covariates' % Xd3)
         X = np.zeros((dom_shape[0], dom_shape[1], Xd3))
         X[:,:,0] = fmc_gc[:,:,1]
         for i,c in zip(range(Xd3-1),covariates):
@@ -128,17 +136,18 @@ def execute_da_step(model, model_time, covariates, fm10):
         Kf_fn[Kf_fn < 0.0] = 0.0
         Kf_fn[Kf_fn > 2.5] = 2.5
 
-        Kg = np.zeros((dom_shape[0], dom_shape[1], 6))
+        Kg = np.zeros((dom_shape[0], dom_shape[1], fmc_gc.shape[2]))
 
         # run the data assimilation step now
-        logging.info("Mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g" %
+        logging.info("FMDA mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g" %
           (np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,0]), np.mean(fmc_gc[:,:,1]), np.mean(fmc_gc[:,:,2])))
         model.kalman_update_single2(Kf_fn[:,:,np.newaxis], Vf_fn[:,:,np.newaxis,np.newaxis], 1, Kg)
-        logging.info("Mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g" %
+        logging.info("FMDA mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g" %
           (np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,0]), np.mean(fmc_gc[:,:,1]), np.mean(fmc_gc[:,:,2])))
     else:
         logging.warning('FMDA no valid observations found, skipping data assimilation.')
       
+
 def run_data_assimilation(wrf_model, fm10, wrf_model_prev = None):
     """
     Run the fuel moisture and DA for all time steps in the model wrf_model.
@@ -222,7 +231,7 @@ def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
   grid_dist_km = great_circle_distance(lon[0,0], lat[0,0], lon[1,1], lat[1,1])
  
   # retrieve fuel moisture observations via the Mesowest API
-  fm10 = retrieve_mesowest_observations(mesowest_token, tm_start, tm_end, wrfin)
+  fm10 = retrieve_mesowest_observations(mesowest_token, tm_start, tm_end, wrfin.get_lats(), wrfin.get_lons())
 
   logging.info('FMDA retrieved %d observations from Mesowest.' % len(fm10))
 
