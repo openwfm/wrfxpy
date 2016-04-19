@@ -1,6 +1,6 @@
 {
     "workspace_path" : "wksp_fmda",
-    "lookback_length" : 12,
+    "lookback_length" : 18,
     "regions" : {
        "Northwest GACC" : {
          "code" : "NWCC",

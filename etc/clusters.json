@@ -4,7 +4,7 @@
     "qsub_script" : "etc/qsub/gross.sub"
   },
   "colibri" : {
-    "qsub_cmd" : "qsub",
+    "qsub_cmd" : "qsub -q hex",
     "qsub_script" : "etc/qsub/colibri.sub"
   }
 }
