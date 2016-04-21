@@ -38,8 +38,8 @@ cell sie, 91 x 91 domain size, 20m fire grid).
   The namelist files are *overwritten*.
 
 
-Grib retrieval
-==============
+Grib retrieval and examination
+==============================
 
 The script ``grib_retr.sh`` accepts fourth arguments, the grib source identifier,
 the UTC start, the end time of a simulation in ESMF format and the ingest directory.
@@ -55,6 +55,16 @@ will download them into subdirectories of the ``ingest`` directory.
   Using the *wrfxpy* ingest directory (or the same directory) consistently will make
   best use of the transparent local caching functionality.  Any files that have already
   been downloaded are not re-downloaded.
+
+The script ``grib_tool.sh`` allows the user to list the contents of a GRIB1/2 file and
+to convert it to a netCDF file.
+
+Examples::
+
+  ./grib_tool.sh list <grib-filename>
+
+  ./grib_tool.sh to_netcdf <input-grib-filename> <message-to-convert> <output-netcdf-file>
+
 
 
 Postprocessing
@@ -123,4 +133,19 @@ Examples::
   ./ssh_shuttle.sh wksp/my-simulation/products test_fire_april test_fire_april
 
 The script scans all the files in ``wksp/my-simulation/products`` and uses SFTP to put them onto the remote host.  The remote directory must be either an absolute path or (recommended) should be relative to the remote host root setup in ``conf.json``.  The identifier will be used as the description and also as the key under which the simulation is stored in ``catalog.json`` on the remote host.
+
+Data cleanup
+============
+
+The script ``cleanup.sh`` provides functionality to:
+
+* list all simulations that are available on a configured visualization server,
+* remove a selected simulation, freeing up diskspace.
+
+Examples::
+
+  ./cleanup.sh list
+
+  ./cleanup.sh delete <simulation-id-from-list>
+
 
