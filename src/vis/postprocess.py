@@ -20,7 +20,7 @@
 
 import logging
 import sys
-
+import os
 # Postprocessor must be imported first since it selects the Agg backend
 from vis.postprocessor import Postprocessor
 from vis.rasterizer import make_colorbar, basemap_raster_mercator, basemap_barbs_mercator
