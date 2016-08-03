@@ -165,12 +165,15 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
-    logging.info('SHUTTLE sending local direcory %s to remote host' % local_dir)
-    sent_files = s.send_directory(local_dir, remote_dir, exclude_files)
 
     # identify the catalog file
+    manifest_pattern = osp.join(local_dir, '*.json')
+    logging.info('looking for local manifest file %s' % manifest_pattern)
     manifest_file = glob.glob(osp.join(local_dir, '*.json'))[0]
     logging.info('SHUTTLE found local manifest file %s' % manifest_file)
+
+    logging.info('SHUTTLE sending local direcory %s to remote host' % local_dir)
+    sent_files = s.send_directory(local_dir, remote_dir, exclude_files)
 
     # identify the start/end UTC time (all domains have same simulation extent)
     mf = json.load(open(manifest_file))
