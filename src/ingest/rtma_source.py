@@ -128,7 +128,8 @@ class RTMA(object):
         :param hour: the forecast hour
         :param var: the variable to download
         """
-        rtma_base = 'http://weather.noaa.gov/pub/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus/'
+        # rtma_base = 'http://weather.noaa.gov/pub/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus/'
+        rtma_base = 'http://tgftp.nws.noaa.gov/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus/'
         return rtma_base + '/RT.%02d/' % hour + 'ds.%s.bin' % var
 
 
