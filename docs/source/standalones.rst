@@ -32,7 +32,7 @@ Assuming that ``my_domains.json`` contains the following::
   } 
 
 Then both namelists will be setup for a single-domain configuration (1km grid
-cell sie, 91 x 91 domain size, 20m fire grid).
+cell size, 91 x 91 domain size, 20m fire grid).
 
 .. note::
   The namelist files are *overwritten*.
