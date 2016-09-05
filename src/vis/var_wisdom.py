@@ -34,7 +34,7 @@ _var_wisdom = {
         'name' : 'fire area',
         'native_unit' : '-',
         'colorbar' : None,
-        'colormap' : 'gray',
+        'colormap' : 'hot_r',
         'transparent_values' : [-np.inf, 0],
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['FIRE_AREA'][t,:,:],
@@ -54,7 +54,7 @@ _var_wisdom = {
         'name' : 'relative humidity',
         'native_unit' : '-',
         'colorbar' : '-',
-        'colormap' : 'jet_r',
+        'colormap' : 'viridis_r',
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['RH_FIRE'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
@@ -82,7 +82,7 @@ _var_wisdom = {
         'name' : 'surface pressure',
         'native_unit' : 'Pa',
         'colorbar' : 'Pa',
-        'colormap' : 'jet',
+        'colormap' : 'rainbow',
         'scale' : 'original',
         'retrieve_as' : lambda d, t: d.variables['PSFC'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
@@ -124,7 +124,7 @@ _var_wisdom = {
        'name' : 'fuel categories',
        'native_unit' : 'fuel_type',
        'colorbar' : 'fuel_type',
-       'colormap' : 'jet',
+       'colormap' : 'Dark2',
        'scale' : 'original',
        'retrieve_as' : lambda d,t: d.variables['NFUEL_CAT'][t,:,:],
        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
@@ -133,7 +133,7 @@ _var_wisdom = {
        'name' : 'terrain height',
        'native_unit' : 'm',
        'colorbar' : 'm',
-       'colormap' : 'jet',
+       'colormap' : 'terrain',
        'scale' : 'original',
        'retrieve_as' : lambda d,t: d.variables['ZSF'][t,:,:],
        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
@@ -142,7 +142,7 @@ _var_wisdom = {
        'name' : 'fuel moisture',
        'native_unit' : '-',
        'colorbar' : '-',
-       'colormap' : 'jet_r',
+       'colormap' : 'gist_earth_r',
        'scale' : [0.0, 0.5],
        'retrieve_as' : lambda d,t: d.variables['FMC_G'][t,:,:],
        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
