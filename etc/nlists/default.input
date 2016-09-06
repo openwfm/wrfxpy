@@ -36,7 +36,7 @@
  s_sn                                = 1,    1,
  e_sn                                = 100,  161,
  s_vert                              = 1,    1,  1
- e_vert                              = 41,   41, 41,
+ e_vert                              = 41,   41, 41, 41,
  num_metgrid_levels                  = 41,  
  num_metgrid_soil_levels             = 9, 
  dx                                  = 12000, 3000,
@@ -56,16 +56,16 @@
  /
 
 &physics
- mp_physics                          = 8,  8, 8,
- ra_lw_physics                       = 4,  4, 4,
- ra_sw_physics                       = 4,  4, 4,
- radt                                = 15, 15, 15,
- sf_sfclay_physics                   = 5,  5, 5,
- sf_surface_physics                  = 3,  3, 3,
- bl_pbl_physics                      = 5,  5, 5,
- bldt                                = 0,  0, 0,
- cu_physics                          = 1,  0, 0,
- cudt                                = 5,  0, 0,
+ mp_physics                          = 8,  8, 8, 8,
+ ra_lw_physics                       = 4,  4, 4, 4,
+ ra_sw_physics                       = 4,  4, 4, 4,
+ radt                                = 15, 15, 15, 15,
+ sf_sfclay_physics                   = 5,  5, 5, 5,
+ sf_surface_physics                  = 3,  3, 3, 3,
+ bl_pbl_physics                      = 5,  5, 5, 5,
+ bldt                                = 0,  0, 0, 0
+ cu_physics                          = 1,  0, 0, 0,
+ cudt                                = 5,  0, 0, 0,
  isfflx                              = 1,
  ifsnow                              = 1,
  icloud                              = 1,
@@ -93,15 +93,15 @@
  dampcoef                            = 0.2,   0.2,
  khdif                               = 0,     0,
  kvdif                               = 0,     0,
- smdiv                               = 0.1,   0.1,
- emdiv                               = 0.01,  0.01,
- epssm                               = 0.1,   0.1,
- time_step_sound                     = 4,     4,
- h_mom_adv_order                     = 5,     5,
- v_mom_adv_order                     = 5,     5,
- h_sca_adv_order                     = 5,     5,
- v_sca_adv_order                     = 5,     5,
- non_hydrostatic                     = .true.,.true.
+ smdiv                               = 0.1,   0.1,  0.1,  0.1,
+ emdiv                               = 0.01,  0.01, 0.01, 0.01,
+ epssm                               = 0.1,   0.1,  0.1,  0.1,
+ time_step_sound                     = 4,     4,    4,   4,
+ h_mom_adv_order                     = 5,     5,    5,   5, 
+ v_mom_adv_order                     = 5,     5,    5,   5,
+ h_sca_adv_order                     = 5,     5,    5,   5,
+ v_sca_adv_order                     = 5,     5,    5,   5, 
+ non_hydrostatic                     = .true.,.true.,.true.,.true., 
  /
 
 &fire ! be sure to set sr_x,sr_y in domains-namelist (to set refinement in x,y)
