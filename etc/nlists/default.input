@@ -89,8 +89,8 @@
  km_opt                              = 4,
  damp_opt                            = 3,
  base_temp                           = 290.
- zdamp                               = 5000., 5000.,
- dampcoef                            = 0.2,   0.2,
+ zdamp                               = 5000., 5000., 5000., 5000.,
+ dampcoef                            = 0.2,   0.2,   0.2,   0.2,
  khdif                               = 0,     0,
  kvdif                               = 0,     0,
  smdiv                               = 0.1,   0.1,  0.1,  0.1,
