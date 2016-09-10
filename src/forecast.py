@@ -222,7 +222,7 @@ def execute(args):
     :param wps_geog_path: the path to the geogrid data directory providing terrain/fuel data
     :param email_notification: dictionary containing keys address and events indicating when a mail should be fired off
     """
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     # initialize the job state from the arguments
     js = JobState(args)
@@ -271,10 +271,13 @@ def execute(args):
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
     grib_proc = Process(target=retrieve_gribs_and_run_ungrib, args=(js, proc_q))
 
+
+    logging.info('starting GEOGRID and GRIB2/UNGRIB')
     geogrid_proc.start()
     grib_proc.start()
 
     # wait until both tasks are done
+    logging.info('waiting until both tasks are done')
     geogrid_proc.join()
     grib_proc.join()
 
@@ -312,6 +315,7 @@ def execute(args):
 
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
+        logging.debug('namelist.fire_emissions given, turning on tracers')
         f90nml.write(js.ems_nml, osp.join(js.wrf_dir, 'namelist.fire_emissions'), force=True)
         js.wrf_nml['dynamics']['tracer_opt'] = [2] * num_doms
 
@@ -492,7 +496,7 @@ if __name__ == '__main__':
     args.update(job_args)
 
     # configure the basic logger
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
     process_arguments(args)
 
@@ -501,4 +505,6 @@ if __name__ == '__main__':
 
     # execute the job
     execute(args)
+    
+    logging.info('forecast.py done')
 

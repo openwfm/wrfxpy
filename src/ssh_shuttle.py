@@ -24,6 +24,7 @@ import os.path as osp
 import logging
 import json
 import glob
+from sys import exit
 
 
 class SSHShuttle(object):
@@ -162,21 +163,35 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     :param exclude_files: filenames that are not skipped during the upload, default is []
     :return: a list of the files that was sent
     """
+    
+    logging.debug('SHUTTLE send_product_to_server')
+    logging.debug('SHUTTLE configuration %s' % cfg)
+    logging.debug('SHUTTLE local directory    %s' % local_dir)
+    logging.debug('SHUTTLE remote directory   %s' % remote_dir)
+    logging.debug('SHUTTLE simulation name    %s' % sim_name)
+    logging.debug('SHUTTLE description        %s' % description)
+   
     s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
 
     # identify the catalog file
     manifest_pattern = osp.join(local_dir, '*.json')
-    logging.info('looking for local manifest file %s' % manifest_pattern)
-    manifest_file = glob.glob(osp.join(local_dir, '*.json'))[0]
-    logging.info('SHUTTLE found local manifest file %s' % manifest_file)
+    #logging.info('looking for local manifest file %s' % manifest_pattern)
+    json_files=glob.glob(osp.join(local_dir, '*.json'));
+    if len(json_files)==1:
+       manifest_file = json_files[0]
+       logging.info('SHUTTLE found local manifest file %s' % manifest_file)
+    else:
+       logging.critical('SHUTTLE did not find a unique local manifest file %s' % manifest_pattern)
+       sys.exit(1)
 
     logging.info('SHUTTLE sending local direcory %s to remote host' % local_dir)
     sent_files = s.send_directory(local_dir, remote_dir, exclude_files)
 
     # identify the start/end UTC time (all domains have same simulation extent)
     mf = json.load(open(manifest_file))
+    logging.debug('manifest %s' % mf)
     dom = mf[mf.keys()[0]]
     times = sorted(dom.keys())
     logging.info('SHUTTLE detected local start/end UTC times as %s - %s' % (times[0], times[-1]))
@@ -207,7 +222,7 @@ if __name__ == '__main__':
         print('usage: %s <local-dir> <remote-relative-dir> <sim-name>' % sys.argv[0])
         sys.exit(1)
 
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
     local_dir = sys.argv[1]
     remote_dir = sys.argv[2]
