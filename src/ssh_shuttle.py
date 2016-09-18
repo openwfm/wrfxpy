@@ -164,12 +164,12 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     :return: a list of the files that was sent
     """
     
-    logging.debug('SHUTTLE send_product_to_server')
+    logging.info('SHUTTLE send_product_to_server')
     logging.debug('SHUTTLE configuration %s' % cfg)
-    logging.debug('SHUTTLE local directory    %s' % local_dir)
-    logging.debug('SHUTTLE remote directory   %s' % remote_dir)
-    logging.debug('SHUTTLE simulation name    %s' % sim_name)
-    logging.debug('SHUTTLE description        %s' % description)
+    logging.info('SHUTTLE local directory    %s' % local_dir)
+    logging.info('SHUTTLE remote directory   %s' % remote_dir)
+    logging.info('SHUTTLE simulation name    %s' % sim_name)
+    logging.info('SHUTTLE description        %s' % description)
    
     s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)

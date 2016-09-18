@@ -207,6 +207,7 @@ def run_data_assimilation(wrf_model, fm10, wrf_model_prev = None):
         if i > 0:
             model.advance_model(Ed[i,:,:], Ew[i,:,:], rain[i,:,:], (ts - tss[i-1]).seconds, Q)
 
+        logging.info('FMDA calling execute_da_step with %d covariates' % len(covariates))
         execute_da_step(model, ts, covariates, fm10)
 
         # overwrite the WRF model variables for this time step

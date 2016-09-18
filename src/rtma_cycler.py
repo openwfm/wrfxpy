@@ -230,6 +230,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # store the lons/lats for this domain
     geo_path = osp.join(wksp_path, '%s-geo.nc' % cfg.code)
     if not osp.isfile(geo_path):
+        logging.info('CYCLER initializing new file %s.' % (geo_path))
         d = netCDF4.Dataset(geo_path, 'w', format='NETCDF4')
         d.createDimension('south_north', dom_shape[0])
         d.createDimension('west_east', dom_shape[1])
@@ -238,6 +239,8 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
         xlong = d.createVariable('XLONG', 'f4', ('south_north', 'west_east'))
         xlong[:,:] = lons
         d.close()
+    else:
+        logging.info('CYCLER file already exists:  %s.' % (geo_path))
     
     
     # the process noise matrix
@@ -282,8 +285,10 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
         covs.append(rain)
     execute_da_step(model, cycle, covs, fm10)
     
-    # store the new model
-    model.to_netcdf(ensure_dir(compute_model_path(cycle, cfg.code, wksp_path)))
+    # store the new model  
+    path = compute_model_path(cycle, cfg.code, wksp_path)
+    logging.info('CYCLER writing model variables to:  %s.' % path)
+    model.to_netcdf(ensure_dir(path))
     
     return model
     
@@ -337,6 +342,7 @@ if __name__ == '__main__':
     # check for each region, if we are up to date w.r.t. RTMA data available
     for region_id,region_cfg in cfg.regions.iteritems():
         wrapped_cfg = Dict(region_cfg)
+        #if 1:   # to run every time for debugging
         if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
             logging.info('CYCLER processing region %s for cycle %s' % (region_id, str(cycle)))
             fmda_advance_region(cycle, wrapped_cfg, rtma, cfg.workspace_path, lookback_length, meso_token)
