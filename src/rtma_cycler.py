@@ -86,6 +86,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
         with open(osp.join(postproc_path, cb_name), 'w') as f:
             f.write(cb_png) 
         mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+        logging.info('writing manifest file %s' % osp.join(postproc_path, manifest_name) )
         json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'))
 
     return postproc_path
@@ -342,8 +343,8 @@ if __name__ == '__main__':
     # check for each region, if we are up to date w.r.t. RTMA data available
     for region_id,region_cfg in cfg.regions.iteritems():
         wrapped_cfg = Dict(region_cfg)
-        #if 1:   # to run every time for debugging
-        if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
+        if 1:   # to run every time for debugging
+        #if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
             logging.info('CYCLER processing region %s for cycle %s' % (region_id, str(cycle)))
             fmda_advance_region(cycle, wrapped_cfg, rtma, cfg.workspace_path, lookback_length, meso_token)
             pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   

@@ -386,9 +386,12 @@ class FuelMoistureModel:
         :param path: the path to the netCDF4 file
         """
         import netCDF4
+
+        print "reading from netCDF file", path
         d = netCDF4.Dataset(path)
-        
         ncfmc = d.variables['FMC_GC'][:,:,:]
+        print "FuelMoistureModel.from_netcdf: reading FMC_GC shape",ncfmc.shape
+
         d0, d1, k = ncfmc.shape
         P = d.variables['FMC_COV'][:,:,:,:]
         
