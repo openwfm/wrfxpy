@@ -191,7 +191,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
 
     # identify the start/end UTC time (all domains have same simulation extent)
     mf = json.load(open(manifest_file))
-    print 'manifest:', json.dumps(mf, indent=4, separators=(',', ': '))
+    #print 'manifest:', json.dumps(mf, indent=4, separators=(',', ': '))
     logging.debug('manifest %s' % mf)
     dom = mf[mf.keys()[0]]
     times = sorted(dom.keys())
@@ -208,7 +208,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
                       'from_utc' : times[0],
                       'to_utc' : times[-1] }
     logging.debug('catalog %s' % cat)
-    print 'catalog:', json.dumps(cat, indent=4, separators=(',', ': '))
+    #print 'catalog:', json.dumps(cat, indent=4, separators=(',', ': '))
     json.dump(cat, open(cat_local, 'w'), indent=4, separators=(',', ': '))
     s.put(cat_local, 'catalog.json')
 

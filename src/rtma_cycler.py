@@ -343,8 +343,8 @@ if __name__ == '__main__':
     # check for each region, if we are up to date w.r.t. RTMA data available
     for region_id,region_cfg in cfg.regions.iteritems():
         wrapped_cfg = Dict(region_cfg)
-        if 1:   # to run every time for debugging
-        #if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
+        #if 1:   # to run every time for debugging
+        if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
             logging.info('CYCLER processing region %s for cycle %s' % (region_id, str(cycle)))
             fmda_advance_region(cycle, wrapped_cfg, rtma, cfg.workspace_path, lookback_length, meso_token)
             pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
