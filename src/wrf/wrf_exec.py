@@ -110,9 +110,9 @@ class Geogrid(Executor):
             raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
 
         if 'Successful completion of geogrid.' not in open(output_path).read():
-            raise OutputCheckFailed(
-                    "Execution of geogrid.exe was not successfull, examine %s for details." % output_path)
-
+            print "Execution of %s was not successful." % self.exec_name
+            print "Examine %s for details." % output_path
+            raise OutputCheckFailed()
 
 class Ungrib(Executor):
     """
@@ -136,8 +136,10 @@ class Ungrib(Executor):
         """
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of ungrib.' not in open(output_path).read():
-            raise OutputCheckFailed(
-                    "Execution of ungrib.exe was not successful, examine %s for details." % output_path)
+            print open(osp.join(self.work_dir, self.exec_name + '.stderr')).read() 
+            print 'Execution of %s was not successful.' % self.exec_name
+            print 'Examine %s for details.' % output_path
+            raise OutputCheckFailed()
 
 
 class Metgrid(Executor):
@@ -162,8 +164,10 @@ class Metgrid(Executor):
         """
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of metgrid.' not in open(output_path).read():
-            raise OutputCheckFailed(
-                    "Execution of metgrid.exe was not successful, examine %s for details." % output_path)
+            print open(osp.join(self.work_dir, self.exec_name + '.stderr')).read() 
+            print "Execution of %s was not successful." % self.exec_name
+            print "Examine %s for details." % output_path
+            raise OutputCheckFailed()
 
 
 class Real(Executor):
@@ -187,6 +191,8 @@ class Real(Executor):
         This method is redefined here as real.exe needs special treatment.  DMPAR compilation of WRF
         causes real.exe to output stdout and stderr into rsl.out.0000 and rsl.error.0000 respectively.
         We don't redirect these (we can't) but we rename the output files after the fact.
+
+        NOTE: on some machines it is OK to run real.exe from command line, but generally mpirun is required! 
 
         :return: raises OutputCheckFailed if return code is non-zero
         """
@@ -217,8 +223,9 @@ class Real(Executor):
             raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
 
         if 'SUCCESS COMPLETE REAL_EM INIT' not in open(output_path).read():
-            raise OutputCheckFailed(
-                    "Execution of real.exe was not successful, examine %s for details." % output_path)
+            print "Execution of %s was not successful." % self.exec_name
+            print "Examine %s for details." % output_path
+            raise OutputCheckFailed()
 
 
 class Submitter(object):
