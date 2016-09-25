@@ -95,6 +95,7 @@ class GribSource(object):
         """
         url = url_base + '/' + rel_path
         grib_path = osp.join(self.ingest_dir, rel_path)
+        logging.info('Downloading %s as %s' % (url,grib_path))
         try:
             download_url(url, grib_path, max_retries)
         except DownloadError as e:
@@ -124,6 +125,7 @@ class GribSource(object):
         :return:
         """
         for rel_path, grib_name in zip(manifest, generate_grib_names()):
+            logging.info('Linking %s -> %s' % ( osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, grib_name)) )
             symlink_unless_exists(osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, grib_name))
 
 
@@ -404,12 +406,13 @@ class NARR(GribSource):
         manifest = []
         while at_time <= end_utc:
             manifest.append(self.make_relative_url(at_time))
+            logging.info('Adding to manifest input file %s' % self.make_relative_url(at_time))
             at_time += timedelta(hours=3)
 
         # check what's available locally
         nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), manifest)
 
-        # check if GRIBs we don't are available remotely
+        # check if GRIBs we don't have are available remotely
         url_base = self.remote_url
         unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
         if len(unavailables) > 0:
