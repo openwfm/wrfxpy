@@ -103,16 +103,20 @@ def utc_to_esmf(utc):
     return "%04d-%02d-%02d_%02d:%02d:%02d" % (utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second)
 
 
-def round_time_to_hour(utc, up=False):
+def round_time_to_hour(utc, up=False, period_hours=1):
     """
     Round the utc time to the nearest hour up or down.
 
     :param utc: the datetime
-    :param up: round up (next hour)?
+    :param up: round up 
+    :param hours: round to multiple of this from the start of day
     :return: a new datetime rounded as specified
     """
     tm = utc + timedelta(hours=1, seconds=-1) if up else utc
-    return tm.replace(minute=0, second=0)
+    tm = tm.replace(minute=0, second=0)
+    h = period_hours * ((tm.hour + period_hours - 1 if up else tm.hour) / period_hours)
+    tm = tm + timedelta(hours=h-tm.hour) if h > tm.hour else tm - timedelta(hours=tm.hour - h) 
+    return tm 
 
 
 def compute_fc_hours(start_utc, end_utc):

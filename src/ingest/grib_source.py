@@ -219,6 +219,7 @@ class HRRR(GribSource):
     # instance variables
     # remote_url = 'http://www.ftp.ncep.noaa.gov/data/nccf/nonoperational/com/hrrr/prod'
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/'
+    period_hours = 1
 
 
 class NAM218(GribSource):
@@ -340,6 +341,7 @@ class NAM218(GribSource):
 
     # instance variables
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
+    period_hours = 1
 
 
 
@@ -354,7 +356,6 @@ class NARR(GribSource):
 
     def __init__(self, ingest_dir):
         super(NARR, self).__init__(ingest_dir)
-
 
     def vtables(self):
         """
@@ -437,7 +438,7 @@ class NARR(GribSource):
 
     # instance variables
     remote_url = 'http://nomads.ncdc.noaa.gov/data/narr'
-
+    period_hours = 3
 
 ## Utility functions
 

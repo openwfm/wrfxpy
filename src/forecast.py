@@ -60,8 +60,10 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
-        self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
         self.grib_source = self.resolve_grib_source(self.grib_source)
+        self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
+        self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
+        self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
         self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(self.fc_hrs)
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
