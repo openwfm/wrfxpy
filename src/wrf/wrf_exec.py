@@ -70,11 +70,10 @@ class Executor(object):
         except:
             pass
 
+        logging.info('executing %s in %s' % (self.exec_name, self.work_dir))
         exec_name = self.exec_name
         stdout_file = open(osp.join(self.work_dir, exec_name + '.stdout'), 'w')
         stderr_file = open(osp.join(self.work_dir, exec_name + '.stderr'), 'w')
-        logging.debug('EXECUTE: executing %s' % exec_name)
-        logging.debug('EXECUTE: work directory %s' % self.work_dir)
         logging.debug('EXECUTE: stdout %s' % stdout_file)
         logging.debug('EXECUTE: stderr %s' % stderr_file)
         check_call(exec_name, cwd=self.work_dir, stdout=stdout_file, stderr=stderr_file)

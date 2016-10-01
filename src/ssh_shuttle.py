@@ -25,6 +25,7 @@ import logging
 import json
 import glob
 from sys import exit
+import pprint
 
 
 class SSHShuttle(object):
@@ -165,11 +166,11 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     """
     
     logging.info('SHUTTLE send_product_to_server')
-    logging.debug('SHUTTLE configuration %s' % cfg)
     logging.info('SHUTTLE local directory    %s' % local_dir)
     logging.info('SHUTTLE remote directory   %s' % remote_dir)
     logging.info('SHUTTLE simulation name    %s' % sim_name)
     logging.info('SHUTTLE description        %s' % description)
+    logging.info('SHUTTLE configuration:\n%s' % pprint.pformat(cfg,indent=4))
    
     s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
@@ -225,7 +226,7 @@ if __name__ == '__main__':
         print('usage: %s <local-dir> <remote-relative-dir> <sim-name>' % sys.argv[0])
         sys.exit(1)
 
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     local_dir = sys.argv[1]
     remote_dir = sys.argv[2]

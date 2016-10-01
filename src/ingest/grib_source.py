@@ -95,7 +95,6 @@ class GribSource(object):
         """
         url = url_base + '/' + rel_path
         grib_path = osp.join(self.ingest_dir, rel_path)
-        logging.info('Downloading %s as %s' % (url,grib_path))
         try:
             download_url(url, grib_path, max_retries)
         except DownloadError as e:

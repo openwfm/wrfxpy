@@ -498,7 +498,7 @@ if __name__ == '__main__':
     args.update(job_args)
 
     # configure the basic logger
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     process_arguments(args)
 

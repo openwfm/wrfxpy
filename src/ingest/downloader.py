@@ -19,6 +19,7 @@
 
 import requests
 import os.path as osp
+import logging
 
 from utils import ensure_dir
 
@@ -42,6 +43,9 @@ def download_url(url, local_path, max_retries=3):
     :param local_path: the path to the local file
     :param max_retries: how many times we may retry to download the file
     """
+
+    logging.info('download_url %s as %s' % (url,local_path))
+
     r = requests.get(url, stream=True)
     content_size = int(r.headers['Content-Length'])
 
@@ -63,6 +67,7 @@ def download_url(url, local_path, max_retries=3):
     file_size = osp.getsize(local_path)
     while file_size < content_size:
         if retries_available > 0:
+            logging.info('download_url trying again, retries available %d' % retries_available)
             if accepts_ranges:
                 # if range queries are supported, try to download only the missing portion of the file
                 headers = { 'Range' : 'bytes=%d-%d' % (file_size, content_size) }
