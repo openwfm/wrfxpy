@@ -32,7 +32,7 @@ from vis.var_wisdom import get_wisdom_variables
 from ingest.grib_source import HRRR, NAM218, NARR
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
-from ssh_shuttle import send_product_to_server
+from ssh_shuttle import send_product_to_server, rm_product_from_server
 
 import f90nml
 from datetime import datetime, timedelta
@@ -45,6 +45,7 @@ import smtplib
 from email.mime.text import MIMEText
 
 import traceback
+import pprint
 
 
 
@@ -72,6 +73,8 @@ class JobState(Dict):
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
 
+    def dump(self, title):
+        logging.debug(title + ' JobState:\n' + pprint.pformat(self,indent=4))
     
     def resolve_grib_source(self, gs_name):
         """
@@ -224,7 +227,6 @@ def execute(args):
     :param wps_geog_path: the path to the geogrid data directory providing terrain/fuel data
     :param email_notification: dictionary containing keys address and events indicating when a mail should be fired off
     """
-    logging.basicConfig(level=logging.DEBUG)
 
     # initialize the job state from the arguments
     js = JobState(args)
@@ -254,6 +256,7 @@ def execute(args):
     js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
 
+    js.dump('Initial')
     logging.info("cloning WPS into %s" % js.wps_dir)
 
     # step 1: clone WPS and WRF directories
@@ -483,12 +486,16 @@ def process_arguments(args):
 
 if __name__ == '__main__':
 
+    # configure the basic logger
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    # logging.basicConfig(level=logging.DEBUG)
+
     # load the system configuration
     sys_cfg = None
     try:
         sys_cfg = json.load(open('etc/conf.json'))
     except IOError:
-        print('Cannot find system configuration, have you created etc/conf.json?')
+        logging.critical('Cannot find system configuration, have you created etc/conf.json?')
         sys.exit(2)
 
     # load configuration JSON
@@ -496,9 +503,6 @@ if __name__ == '__main__':
     job_args = json.load(open(sys.argv[1]), 'ascii')
     args = sys_cfg
     args.update(job_args)
-
-    # configure the basic logger
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     process_arguments(args)
 
