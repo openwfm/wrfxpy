@@ -401,15 +401,13 @@ def execute(args):
 
             # if this is the last processed domain for this timestamp in incremental mode, upload to server
             if dom_id == max_pp_dom and js.postproc.get('shuttle', None) == 'incremental':
-                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc, already_sent_files)
+                sent_files_1 = send_product_to_server(js, already_sent_files)
                 logging.info('sent %d files to visualization server.'  % len(sent_files_1))
                 already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
 
     # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':
-        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc)
+        send_product_to_server(js)
 
 
 def verify_inputs(args,sys_cfg):
@@ -511,9 +509,9 @@ if __name__ == '__main__':
 
     # load configuration JSON
     # note: the execution flow allows us to override anything in the etc/conf.json file
-    # dump(sys_cfg,'sys_cfg')
+    # dump(sys_cfg,'sys_cfg read')
     job_args = json.load(open(sys.argv[1]), 'ascii')
-    # dump(job_args,'job_args')
+    # dump(job_args,'job_args read')
     args = sys_cfg
     args.update(job_args)
 
