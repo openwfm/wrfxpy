@@ -25,14 +25,14 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
-                  timespec_to_utc, round_time_to_hour, Dict
+                  timespec_to_utc, round_time_to_hour, Dict, dump
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
 from ingest.grib_source import HRRR, NAM218, NARR
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
-from ssh_shuttle import send_product_to_server, rm_product_from_server
+from ssh_shuttle import send_product_to_server
 
 import f90nml
 from datetime import datetime, timedelta
@@ -256,7 +256,7 @@ def execute(args):
     js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
 
-    js.dump('Initial')
+    # js.dump('Initial')
     logging.info("cloning WPS into %s" % js.wps_dir)
 
     # step 1: clone WPS and WRF directories
@@ -412,13 +412,24 @@ def execute(args):
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc)
 
 
-def verify_inputs(args):
+def verify_inputs(args,sys_cfg):
     """
     Check if arguments (eventually) supplied to execute(...) are valid - if not exception is thrown.
 
     Arguments:
       args -- dictionary of arguments
     """
+    # dump(sys_cfg,'sys_cfg')
+    # dump(args,'args')
+
+    for key in sys_cfg:
+        if key in args:
+            if  sys_cfg[key] != args[key]:
+               logging_error('system configuration %s=%s attempted change to %s' 
+                   % (key, sys_cfg[key], args[key]))
+               raise ValueError('System configuration values may not be overwritten.') 
+
+
     # we don't check if job_id is a valid path
     required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
                       ('workspace_path', 'Non-existent workspace directory %s'),
@@ -500,14 +511,16 @@ if __name__ == '__main__':
 
     # load configuration JSON
     # note: the execution flow allows us to override anything in the etc/conf.json file
+    # dump(sys_cfg,'sys_cfg')
     job_args = json.load(open(sys.argv[1]), 'ascii')
+    # dump(job_args,'job_args')
     args = sys_cfg
     args.update(job_args)
 
     process_arguments(args)
 
-    # sanity check
-    verify_inputs(args)
+    # sanity check, also that nothing in etc/conf got overrident
+    verify_inputs(args,sys_cfg)
 
     # execute the job
     execute(args)

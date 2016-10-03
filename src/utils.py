@@ -25,6 +25,8 @@ import os.path as osp
 import glob
 import numpy as np
 import math
+import pprint
+import logging
 
 
 class Dict(dict):
@@ -45,6 +47,8 @@ class Dict(dict):
     def __setattr__(self, item, value):
         self[item] = value
 
+def dump(obj,title):
+    logging.info(title + ':\n' + pprint.pformat(obj,indent=4))
 
 def ensure_dir(path):
     """
