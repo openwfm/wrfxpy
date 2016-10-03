@@ -231,6 +231,7 @@ def execute(args):
     # initialize the job state from the arguments
     js = JobState(args)
 
+    print 'job_id=%s' % js.job_id
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     send_email(js, 'start', 'Job %s started.' % js.job_id)
 
@@ -255,6 +256,10 @@ def execute(args):
     # build directories in workspace
     js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
+
+    # record arguments
+    args_file = osp.abspath(osp.join(js.workspace_path, js.job_id, 'args.json'))
+    json.dump(args, open(args_file, 'w'), indent=4, separators=(',', ': '))
 
     # js.dump('Initial')
     logging.info("cloning WPS into %s" % js.wps_dir)

@@ -150,6 +150,45 @@ class SSHShuttle(object):
             self.sftp.remove(osp.join(abs_path, f))
         self.sftp.rmdir(abs_path)
 
+def delete_product_from_server(cfg, job_id):
+    """
+    Executes all steps required to send a local product directory to a remote visualization
+    server for display.
+
+    :param cfg: the configuration file for the shuttle and the job
+    :param job_id: the job name 
+    """
+    
+    remote_dir = job_id
+    sim_name = job_id
+
+    logging.info('SHUTTLE delete_product_from_server')
+    logging.info('SHUTTLE remote directory   %s' % remote_dir)
+    logging.info('SHUTTLE simulation name    %s' % sim_name)
+    logging.info('SHUTTLE configuration:\n%s' % pprint.pformat(cfg,indent=4))
+   
+    s = SSHShuttle(cfg)
+    logging.info('SHUTTLE connecting to remote host %s' % s.host)
+    s.connect()
+
+    logging.info('SHUTTLE removing remote directory %s' % remote_dir)
+    s.rmdir(remote_dir)
+
+    # retrieve the catalog & update it
+    logging.info('SHUTTLE updating catalog file on remote host')
+    cat_local = osp.join(cfg['workspace_path'], 'catalog.json')
+    s.get('catalog.json', cat_local)
+
+    cat = json.load(open(cat_local))
+    del cat[sim_name]
+    logging.debug('catalog %s' % cat)
+    json.dump(cat, open(cat_local, 'w'), indent=4, separators=(',', ': '))
+    s.put(cat_local, 'catalog.json')
+
+    logging.info('SHUTTLE operation completed, closing connection.')
+    s.disconnect()
+
+
 def send_product_to_server(cfg, exclude_files = []):
     """
     Executes all steps required to send a local product directory to a remote visualization
