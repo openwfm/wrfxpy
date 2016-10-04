@@ -19,7 +19,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-from ingest.grib_source import HRRR, NAM218, NARR
+from ingest.grib_source import HRRR, NAM218, NAM227, NARR
 from utils import esmf_to_utc
 
 import logging
@@ -46,6 +46,8 @@ if __name__ == '__main__':
         grib_src = HRRR(ingest_dir)
     elif grib_src_name == 'NAM':
         grib_src = NAM218(ingest_dir)
+    elif grib_src_name == 'NAM227':
+        grib_src = NAM227(ingest_dir)
     elif grib_src_name == 'NARR':
         grib_src = NARR(ingest_dir)
     else:
