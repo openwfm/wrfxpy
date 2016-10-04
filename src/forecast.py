@@ -25,11 +25,11 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
-                  timespec_to_utc, round_time_to_hour, Dict, dump
+                  timespec_to_utc, round_time_to_hour, Dict
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
-from ingest.grib_source import HRRR, NAM218, NARR
+from ingest.grib_source import HRRR, NAM218, NAM227, NARR
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
 from ssh_shuttle import send_product_to_server
@@ -45,7 +45,6 @@ import smtplib
 from email.mime.text import MIMEText
 
 import traceback
-import pprint
 
 
 
@@ -61,10 +60,8 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
-        self.grib_source = self.resolve_grib_source(self.grib_source)
-        self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
-        self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
         self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
+        self.grib_source = self.resolve_grib_source(self.grib_source)
         self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(self.fc_hrs)
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
@@ -73,8 +70,6 @@ class JobState(Dict):
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
 
-    def dump(self, title):
-        logging.debug(title + ' JobState:\n' + pprint.pformat(self,indent=4))
     
     def resolve_grib_source(self, gs_name):
         """
@@ -86,6 +81,8 @@ class JobState(Dict):
             return HRRR('ingest')
         elif gs_name == 'NAM':
             return NAM218('ingest')
+        elif gs_name == 'NAM227':
+            return NAM227('ingest')
         elif gs_name == 'NARR':
             return NARR('ingest')
         else:
@@ -227,11 +224,11 @@ def execute(args):
     :param wps_geog_path: the path to the geogrid data directory providing terrain/fuel data
     :param email_notification: dictionary containing keys address and events indicating when a mail should be fired off
     """
+    logging.basicConfig(level=logging.INFO)
 
     # initialize the job state from the arguments
     js = JobState(args)
 
-    print 'job_id=%s' % js.job_id
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     send_email(js, 'start', 'Job %s started.' % js.job_id)
 
@@ -257,11 +254,6 @@ def execute(args):
     js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
 
-    # record arguments
-    args_file = osp.abspath(osp.join(js.workspace_path, js.job_id, 'args.json'))
-    json.dump(args, open(args_file, 'w'), indent=4, separators=(',', ': '))
-
-    # js.dump('Initial')
     logging.info("cloning WPS into %s" % js.wps_dir)
 
     # step 1: clone WPS and WRF directories
@@ -281,13 +273,10 @@ def execute(args):
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
     grib_proc = Process(target=retrieve_gribs_and_run_ungrib, args=(js, proc_q))
 
-
-    logging.info('starting GEOGRID and GRIB2/UNGRIB')
     geogrid_proc.start()
     grib_proc.start()
 
     # wait until both tasks are done
-    logging.info('waiting until both tasks are done')
     geogrid_proc.join()
     grib_proc.join()
 
@@ -325,7 +314,6 @@ def execute(args):
 
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
-        logging.debug('namelist.fire_emissions given, turning on tracers')
         f90nml.write(js.ems_nml, osp.join(js.wrf_dir, 'namelist.fire_emissions'), force=True)
         js.wrf_nml['dynamics']['tracer_opt'] = [2] * num_doms
 
@@ -406,33 +394,24 @@ def execute(args):
 
             # if this is the last processed domain for this timestamp in incremental mode, upload to server
             if dom_id == max_pp_dom and js.postproc.get('shuttle', None) == 'incremental':
-                sent_files_1 = send_product_to_server(js, already_sent_files)
+                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc, already_sent_files)
                 logging.info('sent %d files to visualization server.'  % len(sent_files_1))
                 already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
 
     # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':
-        send_product_to_server(js)
+        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc)
 
 
-def verify_inputs(args,sys_cfg):
+def verify_inputs(args):
     """
     Check if arguments (eventually) supplied to execute(...) are valid - if not exception is thrown.
 
     Arguments:
       args -- dictionary of arguments
     """
-    # dump(sys_cfg,'sys_cfg')
-    # dump(args,'args')
-
-    for key in sys_cfg:
-        if key in args:
-            if  sys_cfg[key] != args[key]:
-               logging_error('system configuration %s=%s attempted change to %s' 
-                   % (key, sys_cfg[key], args[key]))
-               raise ValueError('System configuration values may not be overwritten.') 
-
-
     # we don't check if job_id is a valid path
     required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
                       ('workspace_path', 'Non-existent workspace directory %s'),
@@ -457,8 +436,8 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
-    if args['grib_source'] not in ['HRRR', 'NAM', 'NARR']:
-        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NARR')
+    if args['grib_source'] not in ['HRRR', 'NAM','NAM227', 'NARR']:
+        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NAM227, NARR')
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
@@ -500,33 +479,28 @@ def process_arguments(args):
 
 if __name__ == '__main__':
 
-    # configure the basic logger
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    # logging.basicConfig(level=logging.DEBUG)
-
     # load the system configuration
     sys_cfg = None
     try:
         sys_cfg = json.load(open('etc/conf.json'))
     except IOError:
-        logging.critical('Cannot find system configuration, have you created etc/conf.json?')
+        print('Cannot find system configuration, have you created etc/conf.json?')
         sys.exit(2)
 
     # load configuration JSON
     # note: the execution flow allows us to override anything in the etc/conf.json file
-    # dump(sys_cfg,'sys_cfg read')
     job_args = json.load(open(sys.argv[1]), 'ascii')
-    # dump(job_args,'job_args read')
     args = sys_cfg
     args.update(job_args)
 
+    # configure the basic logger
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
     process_arguments(args)
 
-    # sanity check, also that nothing in etc/conf got overrident
-    verify_inputs(args,sys_cfg)
+    # sanity check
+    verify_inputs(args)
 
     # execute the job
     execute(args)
-    
-    logging.info('forecast.py done')
 
