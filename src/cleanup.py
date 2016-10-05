@@ -85,7 +85,7 @@ def local_rmdir(cfg, dirname):
     logging.info('Deleting directory %s' % work_dir)
     try:
         shutil.rmtree(work_dir)
-        logging.debug('Directory %s deleted OK' % work_dir)
+        logging.debug('Directory %s deleted' % work_dir)
         return 0
     except:
         logging.error('Deleting directory %s failed' % work_dir)
@@ -115,14 +115,14 @@ if __name__ == '__main__':
             if osp.isdir(f):
                 ff = osp.basename(f)
                 if ff not in cat:
-                    logging.error('%s not found in the catalog' % ff)
+                    logging.error('%s not in the catalog' % ff)
                     if sys.argv[2] == 'delete':
                         local_rmdir(cfg, f)
     elif sys.argv[1] == 'delete':
         name = sys.argv[2]
         cat = retrieve_catalog(cfg)
         if name not in cat:
-            logging.error('Cannot find simulation %s' % name)
+            logging.error('Simulation %s not in the catalog' % name)
         else:
             logging.info('Deleting simulation %s' % name)
             remote_rmdir(cfg, name)
