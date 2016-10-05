@@ -215,8 +215,8 @@ class HRRR(GribSource):
         return map(lambda x: path_tmpl % (year, mon, day, hour, x), range(fc_hours+1))
 
     # instance variables
-    remote_url = 'http://www.ftp.ncep.noaa.gov/data/nccf/nonoperational/com/hrrr/prod'
-
+#    remote_url = 'http://www.ftp.ncep.noaa.gov/data/nccf/nonoperational/com/hrrr/prod'
+    remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/'
 
 class NAM218(GribSource):
     """
