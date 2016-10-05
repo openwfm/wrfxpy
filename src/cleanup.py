@@ -82,10 +82,10 @@ def remote_rmdir(cfg, dirname):
 
 def local_rmdir(cfg, dirname):
     work_dir = osp.abspath(osp.join(cfg['workspace_path'], dirname))
-    logging.info('Deleting directory %s' % work_dir)
+    logging.debug('Deleting directory %s' % work_dir)
     try:
         shutil.rmtree(work_dir)
-        logging.debug('Directory %s deleted' % work_dir)
+        logging.info('Deleted directory %s' % work_dir)
         return 0
     except:
         logging.error('Deleting directory %s failed' % work_dir)
@@ -124,12 +124,11 @@ if __name__ == '__main__':
         if name not in cat:
             logging.error('Simulation %s not in the catalog' % name)
         else:
-            logging.info('Deleting simulation %s' % name)
-            remote_rmdir(cfg, name)
-            local_rmdir(cfg,name)
+            logging.info('Deleting simulation %s from the catalog' % name)
             del cat[name]
             store_catalog(cfg, cat)
-            
+        remote_rmdir(cfg, name)
+        local_rmdir(cfg,name)
     else:
         logging.error('command line not understood %s' % sys.argv)
         
