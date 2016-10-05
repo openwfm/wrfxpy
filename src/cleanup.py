@@ -20,8 +20,11 @@
 from ssh_shuttle import SSHShuttle
 import json
 import os
+import os.path as osp
 import sys
 import logging
+import shutil
+import glob
 
 
 def retrieve_catalog(cfg):
@@ -67,19 +70,35 @@ def remote_rmdir(cfg, dirname):
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
     logging.info('SHUTTLE removing directory %s' % dirname)
-    s.rmdir(dirname)
-    logging.info('SHUTTLE delete complete.')
-    s.disconnect()
+    try:
+        s.rmdir(dirname)
+        logging.info('SHUTTLE delete successful.')
+        s.disconnect()
+        return 0
+    except:
+        logging.info('SHUTTLE cannot delete directory %s' % dirname)
+        s.disconnect()
+        return 'Error'
 
+def local_rmdir(cfg, dirname):
+    work_dir = osp.abspath(osp.join(cfg['workspace_path'], dirname))
+    logging.info('Deleting directory %s' % work_dir)
+    try:
+        shutil.rmtree(work_dir)
+        logging.debug('Directory %s deleted OK' % work_dir)
+        return 0
+    except:
+        logging.error('Deleting directory %s failed' % work_dir)
+        return 'Error'
 
 if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    commands = [ 'list', 'delete' ]
+    commands = [ 'list', 'delete' , 'workspace' ]
     
     if len(sys.argv) < 2:
-        print('usage: %s [list|delete <name>]' % sys.argv[0])
+        print('usage: %s [list|delete <name>|workspace check|workspace delete]' % sys.argv[0])
         sys.exit(1)
 
     cfg = json.load(open('etc/conf.json'))
@@ -88,16 +107,29 @@ if __name__ == '__main__':
         cat = retrieve_catalog(cfg)
         print('%-60s desc' % 'id')
         print('-' * 70)
-        for k in cat:
+        for k in sorted(cat):
             print('%-60s %s' % (k, cat[k]['description']))
-    elif sys.argv[1] == 'delete':
+    elif sys.argv[1] == 'workspace':
         cat = retrieve_catalog(cfg)
-        if sys.argv[2] not in cat:
-            print('Cannot find simulation %s' % sys.argv[2])
+        for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
+            if osp.isdir(f):
+                ff = osp.basename(f)
+                if ff not in cat:
+                    logging.error('%s not found in the catalog' % ff)
+                    if sys.argv[2] == 'delete':
+                        local_rmdir(cfg, f)
+    elif sys.argv[1] == 'delete':
+        name = sys.argv[2]
+        cat = retrieve_catalog(cfg)
+        if name not in cat:
+            logging.error('Cannot find simulation %s' % name)
         else:
-            del cat[sys.argv[2]]
+            logging.info('Deleting simulation %s' % name)
+            remote_rmdir(cfg, name)
+            local_rmdir(cfg,name)
+            del cat[name]
             store_catalog(cfg, cat)
-            remote_rmdir(cfg, sys.argv[2])
+            
     else:
         logging.error('command line not understood %s' % sys.argv)
         
