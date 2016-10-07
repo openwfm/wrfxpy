@@ -29,7 +29,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
-from ingest.grib_source import HRRR, NAM218, NARR
+from ingest.grib_source import HRRR, NAM218, NAM227, NARR
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
 from ssh_shuttle import send_product_to_server
@@ -86,6 +86,8 @@ class JobState(Dict):
             return HRRR('ingest')
         elif gs_name == 'NAM':
             return NAM218('ingest')
+        elif gs_name == 'NAM227':
+            return NAM227('ingest')
         elif gs_name == 'NARR':
             return NARR('ingest')
         else:
@@ -451,8 +453,8 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
-    if args['grib_source'] not in ['HRRR', 'NAM', 'NARR']:
-        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NARR')
+    if args['grib_source'] not in ['HRRR', 'NAM','NAM227', 'NARR']:
+        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NAM227, NARR')
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
