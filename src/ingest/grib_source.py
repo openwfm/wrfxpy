@@ -340,7 +340,7 @@ class NAM218(GribSource):
 
     # instance variables
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
-    period_hours = 1
+    period_hours = 3
 
 
 class NAM227(GribSource):
@@ -439,7 +439,7 @@ class NAM227(GribSource):
             return manifest
 
         raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles.' % repr(unavailables))
-    
+
     def compute_manifest(self, cycle_start, fc_start, fc_hours):
         """
         Computes the relative paths of required GRIB files.
@@ -462,6 +462,7 @@ class NAM227(GribSource):
 
     # instance variables
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
+    period_hours = 3
 
 class NARR(GribSource):
     """
