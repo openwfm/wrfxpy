@@ -69,20 +69,20 @@ def remote_rmdir(cfg, dirname):
     s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
-    logging.info('SHUTTLE removing directory %s' % dirname)
+    logging.info('SHUTTLE removing remote directory %s' % dirname)
     try:
         s.rmdir(dirname)
         logging.info('SHUTTLE delete successful.')
         s.disconnect()
         return 0
     except:
-        logging.info('SHUTTLE cannot delete directory %s' % dirname)
+        logging.error('SHUTTLE cannot delete directory %s' % dirname)
         s.disconnect()
         return 'Error'
 
 def local_rmdir(cfg, dirname):
     work_dir = osp.abspath(osp.join(cfg['workspace_path'], dirname))
-    logging.debug('Deleting directory %s' % work_dir)
+    logging.info('Deleting directory %s' % work_dir)
     try:
         shutil.rmtree(work_dir)
         logging.info('Deleted directory %s' % work_dir)
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     commands = [ 'list', 'delete' , 'workspace' ]
     
     if len(sys.argv) < 2:
-        print('usage: %s [list|delete <name>|workspace check|workspace delete]' % sys.argv[0])
+        print('usage: %s [list|delete <name>|workspace|workspace delete]' % sys.argv[0])
         sys.exit(1)
 
     cfg = json.load(open('etc/conf.json'))
@@ -110,6 +110,7 @@ if __name__ == '__main__':
         for k in sorted(cat):
             print('%-60s %s' % (k, cat[k]['description']))
     elif sys.argv[1] == 'workspace':
+        logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
         cat = retrieve_catalog(cfg)
         for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
             if osp.isdir(f):
@@ -120,6 +121,8 @@ if __name__ == '__main__':
                         local_rmdir(cfg, f)
     elif sys.argv[1] == 'delete':
         name = sys.argv[2]
+        remote_rmdir(cfg, name)
+        local_rmdir(cfg,name)
         cat = retrieve_catalog(cfg)
         if name not in cat:
             logging.error('Simulation %s not in the catalog' % name)
@@ -127,9 +130,8 @@ if __name__ == '__main__':
             logging.info('Deleting simulation %s from the catalog' % name)
             del cat[name]
             store_catalog(cfg, cat)
-        remote_rmdir(cfg, name)
-        local_rmdir(cfg,name)
     else:
         logging.error('command line not understood %s' % sys.argv)
+        print('usage: %s [list|delete <name>|workspace|workspace delete]' % sys.argv[0])
         
 

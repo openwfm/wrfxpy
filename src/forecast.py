@@ -44,6 +44,8 @@ import glob
 import smtplib
 from email.mime.text import MIMEText
 
+import pickle
+
 import traceback
 import pprint
 
@@ -73,8 +75,16 @@ class JobState(Dict):
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
 
-    def dump(self, title):
+    def log(self, title):
         logging.debug(title + ' JobState:\n' + pprint.pformat(self,indent=4))
+
+    def save(self, file):
+        with open(file,'w') as output:
+            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL )
+    
+    def load(self, file):
+        with open(file,'r') as input:
+            self=pickle.load(input)
     
     def resolve_grib_source(self, gs_name):
         """
@@ -232,6 +242,9 @@ def execute(args):
 
     # initialize the job state from the arguments
     js = JobState(args)
+
+    js.save("job_state")
+    
 
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     send_email(js, 'start', 'Job %s started.' % js.job_id)
