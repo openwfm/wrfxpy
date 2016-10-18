@@ -74,6 +74,7 @@ class JobState(Dict):
         self.fmda = self.parse_fmda(args)
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
+        self.args = args
 
     def log(self, title):
         logging.debug(title + ' JobState:\n' + pprint.pformat(self,indent=4))
@@ -250,12 +251,12 @@ def execute(args):
     send_email(js, 'start', 'Job %s started.' % js.job_id)
 
     # read in all namelists
-    js.wps_nml = f90nml.read(args['wps_namelist_path'])
-    js.wrf_nml = f90nml.read(args['wrf_namelist_path'])
-    js.fire_nml = f90nml.read(args['fire_namelist_path'])
+    js.wps_nml = f90nml.read(js.args['wps_namelist_path'])
+    js.wrf_nml = f90nml.read(js.args['wrf_namelist_path'])
+    js.fire_nml = f90nml.read(js.args['fire_namelist_path'])
     js.ems_nml = None
-    if 'emissions_namelist_path' in args:
-        js.ems_nml = f90nml.read(args['emissions_namelist_path'])
+    if 'emissions_namelist_path' in js.args:
+        js.ems_nml = f90nml.read(js.args['emissions_namelist_path'])
     
     # Parse and setup the domain configuration
     js.domain_conf = WPSDomainConf(js.domains)
@@ -271,14 +272,13 @@ def execute(args):
     js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
 
-    logging.info("cloning WPS into %s" % js.wps_dir)
-
     # step 1: clone WPS and WRF directories
-    cln = WRFCloner(args)
+    logging.info("cloning WPS into %s" % js.wps_dir)
+    cln = WRFCloner(js.args)
     cln.clone_wps(js.wps_dir, js.grib_source.vtables(), [])
 
     # step 2: process domain information and patch namelist for geogrid
-    js.wps_nml['geogrid']['geog_data_path'] = args['wps_geog_path']
+    js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
@@ -329,7 +329,7 @@ def execute(args):
     time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
     update_namelist(js.wrf_nml, js.grib_source.namelist_keys())
-    if 'ignitions' in args:
+    if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, num_doms))
 
     # if we have an emissions namelist, automatically turn on the tracers
