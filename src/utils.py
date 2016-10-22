@@ -27,6 +27,9 @@ import numpy as np
 import math
 import pprint
 import logging
+import dill 
+import json
+import pickle
 
 
 class Dict(dict):
@@ -47,8 +50,35 @@ class Dict(dict):
     def __setattr__(self, item, value):
         self[item] = value
 
+def save(obj, file):
+    with open(file,'wb') as output:
+        dill.dump(obj, output )
+
+def load(file):
+    with open(file,'rb') as input:
+        returnitem = dill.load(input)
+        return returnitem
+
 def dump(obj,title):
     logging.info(title + ':\n' + pprint.pformat(obj,indent=4))
+
+def check_obj(obj, title):
+    if pprint.isreadable(obj):
+        logging.info(title + " is readable")
+    else:
+        logging.info(title + " is NOT readable")
+    try:
+        json.dumps(obj)
+        logging.info(title + " is JSON serializable")
+    except TypeError as err:
+        logging.error(title + " is not JSON serializable")
+        logging.error(err)
+    try:
+        s=pickle.dumps(obj,pickle.HIGHEST_PROTOCOL)
+        pickle.loads(s)
+        logging.info(title + " can be pickled")
+    except:
+        logging.error(title + " could not be picked and unpickled")
 
 def ensure_dir(path):
     """

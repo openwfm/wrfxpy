@@ -378,7 +378,7 @@ class Postprocessor(object):
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:]]
         if ts_esmf not in times:
-            raise PostprocError("Invalid timestamp %s" % ts_esmf)
+            raise PostprocError("process_vars: Invalid timestamp %s" % ts_esmf)
         tndx = times.index(ts_esmf)
 
         # build an output file per variable
@@ -419,7 +419,7 @@ class Postprocessor(object):
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:]]
         if ts_esmf not in times:
-            raise PostprocError("Invalid timestamp %s" % ts_esmf)
+            raise PostprocError("vars2kmz: Invalid timestamp %s" % ts_esmf)
         tndx = times.index(ts_esmf)
 
         # build one KMZ per variable
@@ -455,7 +455,7 @@ class Postprocessor(object):
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:]]
         if ts_esmf not in times:
-            raise PostprocError("Invalid timestamp %s" % ts_esmf)
+            raise PostprocError("vars2png: Invalid timestamp %s" % ts_esmf)
         tndx = times.index(ts_esmf)
 
         # build one KMZ per variable

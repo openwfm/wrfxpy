@@ -25,7 +25,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
-                  timespec_to_utc, round_time_to_hour, Dict, dump
+                  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -43,8 +43,6 @@ import glob
 
 import smtplib
 from email.mime.text import MIMEText
-
-import pickle
 
 import traceback
 import pprint
@@ -76,17 +74,6 @@ class JobState(Dict):
         self.wrfxpy_dir = args['sys_install_path']
         self.args = args
 
-    def log(self, title):
-        logging.debug(title + ' JobState:\n' + pprint.pformat(self,indent=4))
-
-    def save(self, file):
-        with open(file,'w') as output:
-            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL )
-    
-    def load(self, file):
-        with open(file,'r') as input:
-            self=pickle.load(input)
-    
     def resolve_grib_source(self, gs_name):
         """
         Creates the right GribSource object from the name.
@@ -131,7 +118,6 @@ class JobState(Dict):
                                 'origin' : emails.get('from', 'wrfxpy@gross.ucdenver.edu')})
         else:
             self.emails = None
-
 
 def send_email(js, event, body):
     """
@@ -241,11 +227,8 @@ def execute(args):
     :param email_notification: dictionary containing keys address and events indicating when a mail should be fired off
     """
 
-    # initialize the job state from the arguments
+    # step 0 initialize the job state from the arguments
     js = JobState(args)
-
-    js.save("job_state")
-    
 
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     send_email(js, 'start', 'Job %s started.' % js.job_id)
@@ -271,6 +254,12 @@ def execute(args):
     # build directories in workspace
     js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
+
+    #save(js,'job_state')
+    #js=load('job_state')
+    dump(js,'Initial job state')
+    check_obj(args,'args')
+    check_obj(js,'Initial job state')
 
     # step 1: clone WPS and WRF directories
     logging.info("cloning WPS into %s" % js.wps_dir)
