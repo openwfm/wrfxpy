@@ -11,6 +11,7 @@ import json
 import logging
 import os.path as osp
 import traceback
+from utils import dump, traceargs
 
 from vis.rasterizer import make_colorbar, basemap_raster_mercator, basemap_barbs_mercator
 from vis.var_wisdom import convert_value, get_wisdom
@@ -121,6 +122,8 @@ class Postprocessor(object):
         :param wisdom_update: an optional dictionary that maps variables to
                               modifications requested in their visualization wisdom
         """
+        logging.info("Postprocessor: output_path=%s prod_name=%s" % (output_path, prod_name)) 
+        dump(wisdom_update,"Postprocessor: wisdom_update")
         self.output_path = output_path
         self.product_name = prod_name
         self.manifest = {}
@@ -130,9 +133,8 @@ class Postprocessor(object):
         mf_path = os.path.join(output_path, prod_name + '.json')
         if osp.exists(mf_path):
             self.manifest = json.load(open(mf_path))
-   
- 
-
+            dump(self.manifest,"Postprocessor: loaded manifest")
+           
     def _scalar2raster(self, d, var, tndx):
         """
         Convert a single variable into a raster and colorbar.
@@ -372,6 +374,8 @@ class Postprocessor(object):
         :param ts_esmf: time stamp in ESMF format
         :param vars: list of variables to process
         """
+        traceargs()
+
         # open the netCDF dataset
         d = nc4.Dataset(wrfout_path)
 
