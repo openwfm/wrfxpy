@@ -30,6 +30,7 @@ import logging
 import dill 
 import json
 import pickle
+import inspect
 
 
 class Dict(dict):
@@ -59,8 +60,16 @@ def load(file):
         returnitem = dill.load(input)
         return returnitem
 
+def traceargs():
+    frame = inspect.currentframe()
+    args, _, _, values = inspect.getargvalues(frame)
+    for i in args:
+        print "    %s:\n%s" % (i, pprint.pformat(values[i]))
+    
 def dump(obj,title):
-    logging.info(title + ':\n' + pprint.pformat(obj,indent=4))
+    frame = inspect.currentframe()
+    outframe = inspect.getouterframes(frame, 2) 
+    logging.info(outframe[1][1] + ':' + outframe[1][3] + ":" + title + ':\n' + pprint.pformat(obj,width=-1))
 
 def check_obj(obj, title):
     if pprint.isreadable(obj):
