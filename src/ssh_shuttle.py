@@ -150,22 +150,21 @@ class SSHShuttle(object):
             self.sftp.remove(osp.join(abs_path, f))
         self.sftp.rmdir(abs_path)
 
-def send_product_to_server(cfg, exclude_files = []):
+
+def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = None, exclude_files = []):
     """
     Executes all steps required to send a local product directory to a remote visualization
     server for display.
 
-    :param cfg: the configuration file for the shuttle and the job
+    :para cfg: the configuration file for the shuttle
+    :param local_dir: the local product directory
+    :param remote_dir: the remote directory (relative to remote root set in conf.json)
+    :param sim_name: the simulation name and id
+    :param description: the description to be placed into the catalog file
     :param exclude_files: filenames that are not skipped during the upload, default is []
     :return: a list of the files that was sent
     """
     
-    job_id = cfg.job_id
-    local_dir = osp.join(cfg.workspace_path, job_id, "products")    
-    remote_dir = job_id
-    sim_name = job_id
-    description = cfg.postproc['description'] if 'description' in cfg.postproc else cfg.job_id
-
     logging.info('SHUTTLE send_product_to_server')
     logging.info('SHUTTLE local directory    %s' % local_dir)
     logging.info('SHUTTLE remote directory   %s' % remote_dir)
