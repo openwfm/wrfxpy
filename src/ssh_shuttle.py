@@ -38,6 +38,7 @@ class SSHShuttle(object):
         """
         Initialize via a configuration with keys:
           shuttle_sshkey, shuttle_remote_host, shuttle_remote_user and shuttle_remote_root
+          plus anything else that shuttle will need from cfg
         
         :param cfg: dictionary with configuration keys
         """
@@ -45,6 +46,7 @@ class SSHShuttle(object):
         self.user = cfg['shuttle_remote_user']
         self.root = cfg['shuttle_remote_root']
         self.key = cfg['shuttle_ssh_key']
+        self.workspace_path = cfg['workspace_path']
 
     
     def connect(self):
@@ -200,7 +202,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
 
     # retrieve the catalog & update it
     logging.info('SHUTTLE updating catalog file on remote host')
-    cat_local = osp.join(cfg['workspace_path'], 'catalog.json')
+    cat_local = osp.join(s.workspace_path, 'catalog.json')
     s.get('catalog.json', cat_local)
 
     cat = json.load(open(cat_local))
