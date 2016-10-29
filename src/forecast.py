@@ -354,14 +354,15 @@ def execute(args):
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
   
     jsub=Dict({})
-    for key in {'wrf_dir','workspace_path','job_id','postproc','grid_code'}:
+    for key in {'wrf_dir','job_id','postproc','grid_code'}:
         jsub[key]=js[key]
 
     asub={}
-    for key in {'shuttle_remote_host','shuttle_remote_user','shuttle_remote_root','shuttle_ssh_key','workspace_path'}:
-        asub[key]=args[key]
+    for key in {'shuttle_remote_host','shuttle_remote_user','shuttle_remote_root','shuttle_ssh_key',\
+          'workspace_path'}:
+        jsub[key]=args[key]
 
-    postprocess_output(jsub,asub)
+    postprocess_output(jsub,jsub)
 
 def postprocess_output(js,args):
     dump(js,'postprocess_output: js')
@@ -384,7 +385,7 @@ def postprocess_output(js,args):
     pp = None
     already_sent_files, max_pp_dom = [], -1
     if js.postproc is not None:
-        js.pp_dir = osp.join(js.workspace_path, js.job_id, "products")
+        js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
         make_dir(js.pp_dir)
         pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
 	max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
