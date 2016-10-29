@@ -24,7 +24,7 @@ import os.path as osp
 import logging
 import json
 import glob
-from sys import exit
+import sys 
 import pprint
 
 
@@ -222,7 +222,6 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
 
 
 if __name__ == '__main__':
-    import sys 
 
     if len(sys.argv) != 4:
         print('usage: %s <local-dir> <remote-relative-dir> <sim-name>' % sys.argv[0])
