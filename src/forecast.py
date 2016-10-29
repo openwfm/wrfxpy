@@ -353,6 +353,10 @@ def execute(args):
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
 
+    postprocess_output(js,args)
+
+def postprocess_output(js,args):
+
     # step 9: wait for appearance of rsl.error.0000 and open it
     wrf_out = None
     while wrf_out is None:
