@@ -352,10 +352,20 @@ def execute(args):
 
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
+  
+    jsub=Dict({})
+    for key in {'wrf_dir','workspace_path','job_id','postproc','grid_code'}:
+        jsub[key]=js[key]
 
-    postprocess_output(js,args)
+    asub={}
+    for key in {'shuttle_remote_host','shuttle_remote_user','shuttle_remote_root','shuttle_ssh_key','workspace_path'}:
+        asub[key]=args[key]
+
+    postprocess_output(jsub,asub)
 
 def postprocess_output(js,args):
+    dump(js,'postprocess_output: js')
+    dump(args,'postprocess_output: args')
 
     # step 9: wait for appearance of rsl.error.0000 and open it
     wrf_out = None
@@ -364,11 +374,11 @@ def postprocess_output(js,args):
             wrf_out = open(osp.join(js.wrf_dir, 'rsl.error.0000'))
             break
         except IOError:
-            logging.info('forecast: waiting 10 seconds for rsl.error.0000 file')
+            logging.info('postprocess_output: waiting 10 seconds for rsl.error.0000 file')
         
         time.sleep(5)
     
-    logging.info('Detected rsl.error.0000')
+    logging.info('postprocess_output: Detected rsl.error.0000')
 
     # step 10: track log output and check for history writes fro WRF
     pp = None
@@ -386,7 +396,7 @@ def postprocess_output(js,args):
             continue
 
         if "SUCCESS COMPLETE WRF" in line:
-            send_email(js, 'complete', 'Job %s - wrf job complete SUCCESS.' % js.job_id)
+            # send_email(js, 'complete', 'Job %s - wrf job complete SUCCESS.' % js.job_id)
             logging.info("WRF completion detected.")
             break
 
