@@ -304,14 +304,9 @@ def execute(args):
     send_email(js, 'metgrid', 'Job %s - metgrid complete.' % js.job_id)
     logging.info("cloning WRF into %s" % js.wrf_dir)
 
-    # step 6: clone wrf directory, symlink all met_em* files
+    # step 6: clone wrf directory, symlink all met_em* files, make namelists
     cln.clone_wrf(js.wrf_dir, [])
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
-
-    logging.info("running REAL")
-
-    # step 7: patch input namelist, fire namelist, emissions namelist (if required)
-    #         and execute real.exe
     time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
     update_namelist(js.wrf_nml, js.grib_source.namelist_keys())
@@ -328,6 +323,9 @@ def execute(args):
 
     f90nml.write(js.fire_nml, osp.join(js.wrf_dir, 'namelist.fire'), force=True)
 
+    # step 7: execute real.exe
+    
+    logging.info("running REAL")
     # try to run Real twice as it sometimes fails the first time
     # it's not clear why this error happens 
     try:
@@ -337,7 +335,7 @@ def execute(args):
         Real(js.wrf_dir).execute().check_output()
     
 
-    # step 8: if requested, do fuel moisture DA
+    # step 7b: if requested, do fuel moisture DA
     if js.fmda is not None:
         logging.info('running fuel moisture data assimilation')
         for dom in js.fmda.domains:
@@ -354,19 +352,21 @@ def execute(args):
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
   
     jsub=Dict({})
-    for key in {'wrf_dir','job_id','postproc','grid_code'}:
+    for key in {'job_id','postproc','grid_code'}:
         jsub[key]=js[key]
 
-    asub={}
-    for key in {'shuttle_remote_host','shuttle_remote_user','shuttle_remote_root','shuttle_ssh_key',\
-          'workspace_path'}:
-        jsub[key]=args[key]
+    jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
+    json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
-    postprocess_output(jsub,jsub)
+    process_output(js.job_id)
 
-def postprocess_output(js,args):
-    dump(js,'postprocess_output: js')
-    dump(args,'postprocess_output: args')
+def process_output(job_id):
+    args = load_sys_cfg()
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
+    logging.info('process_output: loading job description from %s' % jobfile)
+    js = Dict(json.load(open(jobfile,'r')))
+
+    js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
 
     # step 9: wait for appearance of rsl.error.0000 and open it
     wrf_out = None
@@ -375,11 +375,11 @@ def postprocess_output(js,args):
             wrf_out = open(osp.join(js.wrf_dir, 'rsl.error.0000'))
             break
         except IOError:
-            logging.info('postprocess_output: waiting 10 seconds for rsl.error.0000 file')
+            logging.info('process_output: waiting 10 seconds for rsl.error.0000 file')
         
         time.sleep(5)
     
-    logging.info('postprocess_output: Detected rsl.error.0000')
+    logging.info('process_output: Detected rsl.error.0000')
 
     # step 10: track log output and check for history writes fro WRF
     pp = None
@@ -509,13 +509,7 @@ def process_arguments(args):
         if type(v) == unicode:
             args[k] = v.encode('ascii')
 
-
-if __name__ == '__main__':
-
-    # configure the basic logger
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    # logging.basicConfig(level=logging.DEBUG)
-
+def load_sys_cfg():
     # load the system configuration
     sys_cfg = None
     try:
@@ -523,8 +517,17 @@ if __name__ == '__main__':
     except IOError:
         logging.critical('Cannot find system configuration, have you created etc/conf.json?')
         sys.exit(2)
+    return Dict(sys_cfg)
+
+
+if __name__ == '__main__':
+
+    # configure the basic logger
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    # logging.basicConfig(level=logging.DEBUG)
 
     # load configuration JSON
+    sys_cfg = load_sys_cfg()
     # note: the execution flow allows us to override anything in the etc/conf.json file
     # dump(sys_cfg,'sys_cfg')
     job_args = json.load(open(sys.argv[1]), 'ascii')
