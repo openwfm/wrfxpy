@@ -189,15 +189,18 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
        logging.critical('SHUTTLE did not find a unique local manifest file %s' % manifest_pattern)
        sys.exit(1)
 
-    logging.info('SHUTTLE sending local direcory %s to remote host' % local_dir)
+    logging.info('SHUTTLE sending local directory %s to remote host' % local_dir)
     sent_files = s.send_directory(local_dir, remote_dir, exclude_files)
 
-    # identify the start/end UTC time (all domains have same simulation extent)
+    # identify the start/end UTC time (all domains may not have the same simulation extent)
     mf = json.load(open(manifest_file))
     #print 'manifest:', json.dumps(mf, indent=4, separators=(',', ': '))
     logging.debug('manifest %s' % mf)
-    dom = mf[mf.keys()[0]]
-    times = sorted(dom.keys())
+    k=[]
+    for i in mf.keys():
+        dom = mf[i]
+        k = k + dom.keys()
+    times = sorted(k)
     logging.info('SHUTTLE detected local start/end UTC times as %s - %s' % (times[0], times[-1]))
 
     # retrieve the catalog & update it
@@ -215,9 +218,11 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     json.dump(cat, open(cat_local, 'w'), indent=1, separators=(',',':'))
     s.put(cat_local, 'catalog.json')
 
-    logging.info('SHUTTLE operations completed, closing connection.')
+    logging.debug('SHUTTLE operations completed, closing connection.')
 
     s.disconnect()
+
+    logging.info('SHUTTLE sent %d files to visualization server.'  % len(sent_files))
     return sent_files
 
 
