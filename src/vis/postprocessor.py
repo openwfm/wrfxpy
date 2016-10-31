@@ -133,10 +133,10 @@ class Postprocessor(object):
         mf_path = os.path.join(output_path, prod_name + '.json')
         if osp.exists(mf_path):
             self.manifest = json.load(open(mf_path))
-            logging.info('POST: Loaded manifest at %s' % mf_path)
-            dump(self.manifest,"POST: manifest")
+            logging.info('postprocessor: Loaded manifest at %s' % mf_path)
+            # dump(self.manifest,"postprocessor: manifest")
         else:   
-            logging.info('POST: manifest at %s does not exist yet' % mf_path)
+            logging.info('postprocessor: manifest at %s does not exist yet' % mf_path)
             
            
     def _scalar2raster(self, d, var, tndx):
@@ -544,7 +544,6 @@ class Postprocessor(object):
         :param var: variable name
         :param kv: key-value dictionary to merge
         """
-        traceargs()
         # update the manifest with the domain/ts_esmf/var info
         dom = self.manifest.get(str(dom_id), {})
         self.manifest[str(dom_id)] = dom
@@ -557,10 +556,10 @@ class Postprocessor(object):
         vd = td.get(var, {})
         td[var] = vd
         vd.update(kv)
-        mf_path = os.path.join(self.output_path, self.product_name + '.json')
 
         # synchronize the file
-        json.dump(self.manifest, open(mf_path, 'w'))
+        mf_path = os.path.join(self.output_path, self.product_name + '.json')
+        json.dump(self.manifest, open(mf_path, 'w'),indent=1, separators=(',',':'))
 
 
 

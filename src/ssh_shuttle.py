@@ -167,12 +167,12 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     :return: a list of the files that was sent
     """
     
-    logging.info('SHUTTLE send_product_to_server')
-    logging.info('SHUTTLE local directory    %s' % local_dir)
-    logging.info('SHUTTLE remote directory   %s' % remote_dir)
-    logging.info('SHUTTLE simulation name    %s' % sim_name)
-    logging.info('SHUTTLE description        %s' % description)
-    logging.info('SHUTTLE configuration:\n%s' % pprint.pformat(cfg,indent=4))
+    logging.debug('SHUTTLE send_product_to_server')
+    logging.debug('SHUTTLE local directory    %s' % local_dir)
+    logging.debug('SHUTTLE remote directory   %s' % remote_dir)
+    logging.debug('SHUTTLE simulation name    %s' % sim_name)
+    logging.debug('SHUTTLE description        %s' % description)
+    logging.debug('SHUTTLE configuration:\n%s' % pprint.pformat(cfg,indent=4))
    
     s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
@@ -212,7 +212,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
                       'to_utc' : times[-1] }
     logging.debug('catalog %s' % cat)
     #print 'catalog:', json.dumps(cat, indent=4, separators=(',', ': '))
-    json.dump(cat, open(cat_local, 'w'), indent=4, separators=(',', ': '))
+    json.dump(cat, open(cat_local, 'w'), indent=1, separators=(',',':'))
     s.put(cat_local, 'catalog.json')
 
     logging.info('SHUTTLE operations completed, closing connection.')
