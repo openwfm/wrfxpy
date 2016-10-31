@@ -25,7 +25,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
-                  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj
+                  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, make_clean_dir
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -38,6 +38,8 @@ import f90nml
 from datetime import datetime, timedelta
 import time, re, json, sys, logging
 import os.path as osp
+import os
+import stat
 from multiprocessing import Process, Queue
 import glob
 
@@ -355,14 +357,14 @@ def execute(args):
     for key in {'job_id','postproc','grid_code'}:
         jsub[key]=js[key]
 
-    jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
+    jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job_process_output.json'))
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     process_output(js.job_id)
 
 def process_output(job_id):
     args = load_sys_cfg()
-    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job_process_output.json'))
     logging.info('process_output: loading job description from %s' % jobfile)
     js = Dict(json.load(open(jobfile,'r')))
 
@@ -386,7 +388,7 @@ def process_output(job_id):
     already_sent_files, max_pp_dom = [], -1
     if js.postproc is not None:
         js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-        make_dir(js.pp_dir)
+        make_clean_dir(js.pp_dir)
         pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
 	max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
 
@@ -426,6 +428,20 @@ def process_output(job_id):
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc)
 
+def create_process_output_script(job_id):
+    cfg = load_sys_cfg()
+    script_path = osp.join(cfg.workspace_path, job_id,'job_process_output.sh')
+    log_path = osp.join(cfg.workspace_path, job_id,'job_process_output.log')
+    process_script = osp.join(cfg.sys_install_path,'process_output.sh')
+    with open(script_path,'w') as f:
+        f.write('#!/usr/bin/env bash\n')
+        f.write('cd ' + cfg.sys_install_path + '\n')
+        f.write('LOG=' + log_path + '\n')
+        f.write(process_script + ' ' + job_id + ' &> $LOG \n') 
+
+    # make it executable
+    st = os.stat(script_path)
+    os.chmod(script_path, st.st_mode | stat.S_IEXEC)
 
 def verify_inputs(args,sys_cfg):
     """

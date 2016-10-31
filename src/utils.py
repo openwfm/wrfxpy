@@ -31,6 +31,7 @@ import dill
 import json
 import pickle
 import inspect
+import shutil
 
 
 class Dict(dict):
@@ -101,6 +102,14 @@ def ensure_dir(path):
         os.makedirs(path_dir)
     return path
 
+def make_clean_dir(dir):
+    """
+    Create a clean directory; delete first if it exists.
+    """
+    if osp.exists(dir):
+        logging.info('Deleting existing directory %s to make a clean one' % dir)
+        shutil.rmtree(dir)
+    os.makedirs(dir)
 
 def make_dir(dir):
     """
