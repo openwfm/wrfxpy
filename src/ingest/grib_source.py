@@ -192,6 +192,7 @@ class HRRR(GribSource):
 
         # check if GRIBs we don't are available remotely
         url_base = self.remote_url
+        logging.info('Retrieving GRIBs from %s' % url_base)
         unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
         if len(unavailables) > 0:
             raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
@@ -304,6 +305,7 @@ class NAM218(GribSource):
 
             # check if GRIBs we don't are available remotely
             url_base = self.remote_url
+            logging.info('Retrieving GRIBs from %s' % url_base)
             unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
             if len(unavailables) > 0:
                 logging.warning('NAM218: failed retrieving cycle data for cycle %s, unavailables %s' % (cycle_start, repr(unavailables)))
@@ -426,6 +428,7 @@ class NAM227(GribSource):
 
             # check if GRIBs we don't are available remotely
             url_base = self.remote_url
+            logging.info('Attempting to retrieve GRIBs from %s' % url_base)
             unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
             if len(unavailables) > 0:
                 logging.warning('NAM227: failed retrieving cycle data for cycle %s, unavailables %s' % (cycle_start, repr(unavailables)))
@@ -521,6 +524,11 @@ class NARR(GribSource):
         end_utc = to_utc + timedelta(hours=2,minutes=59,seconds=59)
         end_utc = end_utc.replace(hour=end_utc.hour - end_utc.hour % 3)
 
+        if (start_utc < datetime(1979,1,1,tzinfo=pytz.UTC)) | (end_utc > datetime(2014,10,2,tzinfo=pytz.UTC)):
+            logging.error('NARR is available 01Jan1979 - 02Oct2014 only')
+            logging.info('Check https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/north-american-regional-reanalysis-narr')
+            raise GribError('Unsatisfiable: NARR not available for the requested dates')
+
         # compute the manifest here
         at_time = start_utc
         manifest = []
@@ -534,6 +542,7 @@ class NARR(GribSource):
 
         # check if GRIBs we don't have are available remotely
         url_base = self.remote_url
+        logging.info('Retrieving GRIBs from %s' % url_base)
         unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
         if len(unavailables) > 0:
             raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
