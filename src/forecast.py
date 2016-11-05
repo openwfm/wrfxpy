@@ -410,6 +410,7 @@ def process_output(job_id):
             if js.postproc is not None and str(dom_id) in js.postproc:
                 var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
+                # race condition possible!
                 wrfout_path = find_fresh_wrfout(js.wrf_dir, dom_id)
             try:
                 pp.process_vars(wrfout_path, dom_id, esmf_time, var_list)
