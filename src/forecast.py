@@ -357,14 +357,14 @@ def execute(args):
     for key in {'job_id','job_num','postproc','grid_code'}:
         jsub[key]=js[key]
 
-    jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job_process_output.json'))
+    jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     process_output(js.job_id)
 
 def process_output(job_id):
     args = load_sys_cfg()
-    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job_process_output.json'))
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     logging.info('process_output: loading job description from %s' % jobfile)
     js = Dict(json.load(open(jobfile,'r')))
     js.pid = os.getpid()
