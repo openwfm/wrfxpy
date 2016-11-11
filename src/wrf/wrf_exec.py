@@ -302,3 +302,4 @@ class WRF(Submitter):
         """
         ret = super(WRF, self).submit(task_id, "./wrf.exe", nodes, ppn, wall_time_hrs)
         return ret
+

@@ -354,7 +354,7 @@ def execute(args):
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
   
     jsub=Dict({})
-    for key in {'job_id','job_num','postproc','grid_code'}:
+    for key in {'qsys','job_id','job_num','postproc','grid_code'}:
         jsub[key]=js[key]
 
     jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))

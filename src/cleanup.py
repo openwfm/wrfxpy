@@ -25,6 +25,8 @@ import sys
 import logging
 import shutil
 import glob
+import signal
+import subprocess
 
 
 def retrieve_catalog(cfg):
@@ -91,14 +93,27 @@ def local_rmdir(cfg, dirname):
         logging.error('Deleting directory %s failed' % work_dir)
         return 'Error'
 
+def cancel_job(js):
+        job_num = js['job_num']
+        clusters = json.load(open('etc/clusters.json'))
+        cluster = clusters[js['qsys']]
+        logging.info('Deleting parallel job %s' % job_num)
+        ret = subprocess.check_output([cluster['qdel_cmd'], job_num])
+        logging.info(ret)
+
+def kill_process(pid):
+        logging.info('Killing process %s' % pid)
+	os.kill(pid, signal.SIGTERM)
+	os.kill(pid, signal.SIGKILL)
+
 if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    commands = [ 'list', 'delete' , 'workspace' ]
+    commands = [ 'list', 'delete' , 'workspace' , 'cancel']
     
     if len(sys.argv) < 2:
-        print('usage: %s [list|delete <name>|workspace|workspace delete]' % sys.argv[0])
+        print('usage: %s [list|delete <name>|cancel <name>|workspace|workspace delete]' % sys.argv[0])
         sys.exit(1)
 
     cfg = json.load(open('etc/conf.json'))
@@ -130,6 +145,22 @@ if __name__ == '__main__':
             logging.info('Deleting simulation %s from the catalog' % name)
             del cat[name]
             store_catalog(cfg, cat)
+    elif sys.argv[1] == 'cancel':
+        name = sys.argv[2]
+        job_json_file = osp.join(cfg['workspace_path'], name, 'job.json')
+        logging.info('Loading job state from %s' % job_json_file)
+        try:
+            js = json.load(open(job_json_file,'r'))
+        except IOError:
+            logging.error('Cannot open %s' % job_json_file)
+            sys.exit(1)
+        except:
+            logging.error('Cannot load %s' % job_json_file)
+            sys.exit(1)
+
+        cancel_job(js)
+        kill_process(js['pid'])
+
     else:
         logging.error('command line not understood %s' % sys.argv)
         print('usage: %s [list|delete <name>|workspace|workspace delete]' % sys.argv[0])
