@@ -1,10 +1,13 @@
 {
   "gross" : {
     "qsub_cmd" : "qsub",
+    "qsub_job_num_index" : 2,
     "qsub_script" : "etc/qsub/gross.sub"
+
   },
   "colibri" : {
     "qsub_cmd" : "qsub",
+    "qsub_job_num_index" : 2,
     "qsub_script" : "etc/qsub/colibri.sub"
   }
 }

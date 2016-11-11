@@ -255,6 +255,7 @@ class Submitter(object):
         :param nodes: number of nodes to request for parallel job
         :param ppn: processors per nodes to request
         :param wall_time_hrs: wall time to request for job
+        :return: job number string to be used in further queue manager commands 
         """
         qsys = self.qsys_infos[self.qsys_id]
         qsub = qsys['qsub_cmd']
@@ -268,6 +269,9 @@ class Submitter(object):
             f.write(script_tmpl % args)
 
         ret = check_output([qsub, script_path], cwd=self.work_dir)
+        logging.info(ret)
+        job_num = ret.split(' ')[qsys['qsub_job_num_index']]
+	return job_num
        
  
 class WRF(Submitter):
@@ -294,5 +298,7 @@ class WRF(Submitter):
         :param nodes: number of nodes to request for parallel job
         :param ppn: processors per nodes to request
         :param wall_time_hrs: wall time to request for job
+        :return: job number string to be used in further queue manager commands 
         """
-        super(WRF, self).submit(task_id, "./wrf.exe", nodes, ppn, wall_time_hrs)
+        ret = super(WRF, self).submit(task_id, "./wrf.exe", nodes, ppn, wall_time_hrs)
+        return ret

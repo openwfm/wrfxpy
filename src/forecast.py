@@ -343,18 +343,18 @@ def execute(args):
         for dom in js.fmda.domains:
             assimilate_fm10_observations(osp.join(wrf_dir, 'wrfinput_d%02d' % dom), None, js.fmda.token)
 
+    # step 8: execute wrf.exe on parallel backend
     logging.info('submitting WRF job')
     send_email(js, 'wrf_submit', 'Job %s - wrf job submitted.' % js.job_id)
 
-    # step 8: execute wrf.exe on parallel backend
     js.task_id = "sim-" + js.grid_code + "-" + utc_to_esmf(js.start_utc)[:10]
-    WRF(js.wrf_dir, js.qsys).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
+    js.job_num=WRF(js.wrf_dir, js.qsys).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
 
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
   
     jsub=Dict({})
-    for key in {'job_id','postproc','grid_code'}:
+    for key in {'job_id','job_num','postproc','grid_code'}:
         jsub[key]=js[key]
 
     jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job_process_output.json'))
@@ -367,6 +367,8 @@ def process_output(job_id):
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job_process_output.json'))
     logging.info('process_output: loading job description from %s' % jobfile)
     js = Dict(json.load(open(jobfile,'r')))
+    js.pid = os.getpid()
+    json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
 
