@@ -239,6 +239,9 @@ def execute(args):
     jsub=Dict({})
     jsub.pid = os.getpid();
     jsub.job_num = None
+    jsub.old_pid = None
+    jsub.old_job_num = None
+    jsub.state = 'Running'
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
@@ -266,8 +269,8 @@ def execute(args):
     js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
 
-    check_obj(args,'args')
-    check_obj(js,'Initial job state')
+    #check_obj(args,'args')
+    #check_obj(js,'Initial job state')
 
     # step 1: clone WPS and WRF directories
     logging.info("cloning WPS into %s" % js.wps_dir)
@@ -375,7 +378,9 @@ def process_output(job_id):
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     logging.info('process_output: loading job description from %s' % jobfile)
     js = Dict(json.load(open(jobfile,'r')))
+    js.old_pid = js.pid
     js.pid = os.getpid()
+    js.state = 'Processing'
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
@@ -411,6 +416,9 @@ def process_output(job_id):
         if "SUCCESS COMPLETE WRF" in line:
             # send_email(js, 'complete', 'Job %s - wrf job complete SUCCESS.' % js.job_id)
             logging.info("WRF completion detected.")
+            js.old_job_num = js.job_num
+            js.job_num = None
+            json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
             break
 
         if "Timing for Writing wrfout" in line:
@@ -437,6 +445,11 @@ def process_output(job_id):
     if js.postproc.get('shuttle', None) == 'on_completion':
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc)
+
+    js.old_pid = js.pid
+    js.pid = None
+    js.state = 'Completed'
+    json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def create_process_output_script(job_id):
     cfg = load_sys_cfg()

@@ -27,7 +27,7 @@ import shutil
 import glob
 import signal
 import subprocess
-from utils import kill_process
+from utils import kill_process, Dict
 
 
 def retrieve_catalog(cfg):
@@ -67,7 +67,6 @@ def store_catalog(cfg, cat):
     s.disconnect()
     logging.info('SHUTTLE send complete.')
 
-
 def remote_rmdir(cfg, dirname):
     s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
@@ -83,13 +82,6 @@ def remote_rmdir(cfg, dirname):
         s.disconnect()
         return 'Error'
 
-def local_rmout(cfg,dirname):
-    wrf_dir = osp.join(cfg['workspace_path'], dirname,'wrf')
-    files = glob.glob(osp.join(wrf_dir,'rsl.*'))+glob.glob(osp.join(wrf_dir,'wrfout_*'))
-    logging.info('Deleting %s WRF output files in  %s' % (len(files),wrf_dir ))
-    for f in files:
-        os.remove(f)
-
 def local_rmdir(cfg, dirname):
     work_dir = osp.abspath(osp.join(cfg['workspace_path'], dirname))
     logging.info('Deleting directory %s' % work_dir)
@@ -101,56 +93,79 @@ def local_rmdir(cfg, dirname):
         logging.error('Deleting directory %s failed' % work_dir)
         return 'Error'
 
-def cancel_job(js):
-        job_num = js['job_num']
+def cancel_job(job_num,qsys):
         if job_num is not None:
-            logging.info('Deleting parallel job %s.' % job_num)
-            clusters = json.load(open('etc/clusters.json'))
-            cluster = clusters[js['qsys']]
-            ret = subprocess.check_output([cluster['qdel_cmd'], job_num])
-            logging.info(ret)
+            logging.info('Deleting parallel job %s on %s.' % (job_num, qsys))
+            clusters = json.load(open('etc/clusters.json','r'))
+            cluster = clusters[qsys]
+            try:
+                ret = subprocess.check_output([cluster['qdel_cmd'], job_num])
+                logging.info(ret)
+            except:
+                logging.error('Deleting parallel job %s failed.' % job_num)
 
-if __name__ == '__main__':
+# the cleanup functions called as argv[2]:
 
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-    commands = [ 'list', 'delete' , 'workspace' , 'cancel', 'output']
-    
-    if len(sys.argv) < 2:
-        print('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_ids]')
-        sys.exit(1)
-
-    cfg = json.load(open('etc/conf.json'))
-
-    if sys.argv[1] == 'list':
+def list(cfg):
         cat = retrieve_catalog(cfg)
         print('%-60s desc' % 'id')
         print('-' * 70)
         for k in sorted(cat):
             print('%-60s %s' % (k, cat[k]['description']))
-    elif sys.argv[1] == 'workspace':
+
+def workspace(cfg):
         logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
         cat = retrieve_catalog(cfg)
         for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
+            print f
             if osp.isdir(f):
+                print f,'is directory'
                 ff = osp.basename(f)
+                print 'job_id ', ff
                 if ff not in cat:
                     logging.error('%s not in the catalog' % ff)
-                    if sys.argv[2] == 'delete':
-                        local_rmdir(cfg, f)
-    elif sys.argv[1] == 'output':
-        name = sys.argv[2]
-        remote_rmdir(cfg, name)
-        local_rmout(cfg,name)
-        cat = retrieve_catalog(cfg)
-        if name not in cat:
-            logging.error('Simulation %s not in the catalog' % name)
-        else:
-            logging.info('Deleting simulation %s from the catalog' % name)
-            del cat[name]
-            store_catalog(cfg, cat)
-    elif sys.argv[1] == 'delete':
-        name = sys.argv[2]
+                    local_rmdir(cfg, f)
+
+def output(name,cfg):
+    logging.info('Trying to delete WRF output and visualization of job %s' % name)
+    remote_rmdir(cfg, name)
+    local_rmdir(cfg,osp.join(name,'products'))
+    wrf_dir = osp.join(cfg['workspace_path'], name,'wrf')
+    files = glob.glob(osp.join(wrf_dir,'rsl.*'))+glob.glob(osp.join(wrf_dir,'wrfout_*'))
+    logging.info('Deleting %s WRF output files in  %s' % (len(files),wrf_dir ))
+    cat = retrieve_catalog(cfg)
+    for f in files:
+        os.remove(f)
+    if name not in cat:
+        logging.error('Simulation %s not in the catalog' % name)
+    else:
+        logging.info('Deleting simulation %s from the catalog' % name)
+        del cat[name]
+    store_catalog(cfg, cat)
+
+def cancel(name,cfg):
+    logging.info('Trying to cancel job %s' % name)
+    jobfile = osp.join(cfg['workspace_path'], name, 'job.json')
+    logging.info('Loading job state from %s' % jobfile)
+    try:
+        js = Dict(json.load(open(jobfile,'r')))
+    except IOError:
+        logging.error('Cannot open %s' % jobfile)
+    except:
+        logging.error('Cannot load %s' % jobfile)
+    else:
+        if 'job_num' in js:
+            cancel_job(js.job_num,js.qsys)
+            js.old_job_num = js.job_num
+        js.job_num = None
+        if 'pid' in js:
+            kill_process(js.pid)
+            js.old_pid = js.pid
+        js.pid = None
+        json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+
+def delete(name,cfg):
+        logging.info('Trying to delete all files of job %s' % name)
         remote_rmdir(cfg, name)
         local_rmdir(cfg,name)
         cat = retrieve_catalog(cfg)
@@ -160,24 +175,40 @@ if __name__ == '__main__':
             logging.info('Deleting simulation %s from the catalog' % name)
             del cat[name]
             store_catalog(cfg, cat)
-    elif sys.argv[1] == 'cancel':
-        name = sys.argv[2]
-        job_json_file = osp.join(cfg['workspace_path'], name, 'job.json')
-        logging.info('Loading job state from %s' % job_json_file)
-        try:
-            js = json.load(open(job_json_file,'r'))
-        except IOError:
-            logging.error('Cannot open %s' % job_json_file)
+
+if __name__ == '__main__':
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    commands = [ 'list', 'delete' , 'workspace' , 'cancel', 'output']
+
+    
+    if len(sys.argv) < 2 or sys.argv[1] not in commands: 
+        print('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_ids]')
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+    if cmd in ['delete' , 'cancel', 'output']: 
+        if len(sys.argv) == 3:
+            job_id = sys.argv[2]
+        else:
+            print('%s function requires one job id' % cmd)
             sys.exit(1)
-        except:
-            logging.error('Cannot load %s' % job_json_file)
-            sys.exit(1)
 
-        cancel_job(js)
-        kill_process(js['pid'])
+    cfg = json.load(open('etc/conf.json'))
 
-    else:
-        logging.error('command line not understood %s' % sys.argv)
-        print('usage: %s [list|delete <name>|workspace|workspace delete]' % sys.argv[0])
-        
+    if cmd == 'list':
+        list(cfg)
 
+    if cmd == 'workspace':
+        workspace(cfg)
+
+    if cmd == 'output':
+        output(job_id,cfg)
+
+    if cmd == 'cancel':
+        cancel(job_id,cfg)
+
+    if cmd == 'delete':
+        cancel(job_id,cfg)
+        delete(job_id,cfg)
