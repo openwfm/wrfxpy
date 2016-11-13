@@ -32,6 +32,7 @@ import json
 import pickle
 import inspect
 import shutil
+import psutil
 
 
 class Dict(dict):
@@ -89,6 +90,20 @@ def check_obj(obj, title):
         logging.info(title + " can be pickled")
     except:
         logging.error(title + " could not be picked and unpickled")
+
+def kill_process(pid):
+    if pid is not None:
+        logging.info('Killing process %s and children' % pid)
+        try:
+            parent = psutil.Process(pid)
+            try:
+                for child in parent.children(recursive=True):
+                    child.kill()
+                parent.kill()
+            except:
+                logging.error('Could not get them all, check for runaways')
+        except:
+            logging.error('Process %s does not exist' % pid)
 
 def ensure_dir(path):
     """

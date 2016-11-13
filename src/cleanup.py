@@ -27,6 +27,7 @@ import shutil
 import glob
 import signal
 import subprocess
+from utils import kill_process
 
 
 def retrieve_catalog(cfg):
@@ -95,16 +96,12 @@ def local_rmdir(cfg, dirname):
 
 def cancel_job(js):
         job_num = js['job_num']
-        clusters = json.load(open('etc/clusters.json'))
-        cluster = clusters[js['qsys']]
-        logging.info('Deleting parallel job %s' % job_num)
-        ret = subprocess.check_output([cluster['qdel_cmd'], job_num])
-        logging.info(ret)
-
-def kill_process(pid):
-        logging.info('Killing process %s' % pid)
-	os.kill(pid, signal.SIGTERM)
-	os.kill(pid, signal.SIGKILL)
+        if job_num is not None:
+            logging.info('Deleting parallel job %s.' % job_num)
+            clusters = json.load(open('etc/clusters.json'))
+            cluster = clusters[js['qsys']]
+            ret = subprocess.check_output([cluster['qdel_cmd'], job_num])
+            logging.info(ret)
 
 if __name__ == '__main__':
 

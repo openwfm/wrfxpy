@@ -232,6 +232,15 @@ def execute(args):
     # step 0 initialize the job state from the arguments
     js = JobState(args)
 
+    jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
+    make_clean_dir(jobdir)
+
+    jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
+    jsub=Dict({})
+    jsub.pid = os.getpid();
+    jsub.job_num = None
+    json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
+
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     send_email(js, 'start', 'Job %s started.' % js.job_id)
 
@@ -285,8 +294,8 @@ def execute(args):
 
     # wait until both tasks are done
     logging.info('waiting until both tasks are done')
-    geogrid_proc.join()
     grib_proc.join()
+    geogrid_proc.join()
 
     if proc_q.get() != 'SUCCESS':
         return
@@ -353,7 +362,6 @@ def execute(args):
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
   
-    jsub=Dict({})
     for key in {'qsys','job_id','job_num','postproc','grid_code'}:
         jsub[key]=js[key]
 
