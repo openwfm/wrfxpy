@@ -83,6 +83,13 @@ def remote_rmdir(cfg, dirname):
         s.disconnect()
         return 'Error'
 
+def local_rmout(cfg,dirname):
+    wrf_dir = osp.join(cfg['workspace_path'], dirname,'wrf')
+    files = glob.glob(osp.join(wrf_dir,'rsl.*'))+glob.glob(osp.join(wrf_dir,'wrfout_*'))
+    logging.info('Deleting %s WRF output files in  %s' % (len(files),wrf_dir ))
+    for f in files:
+        os.remove(f)
+
 def local_rmdir(cfg, dirname):
     work_dir = osp.abspath(osp.join(cfg['workspace_path'], dirname))
     logging.info('Deleting directory %s' % work_dir)
@@ -107,10 +114,10 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    commands = [ 'list', 'delete' , 'workspace' , 'cancel']
+    commands = [ 'list', 'delete' , 'workspace' , 'cancel', 'output']
     
     if len(sys.argv) < 2:
-        print('usage: %s [list|delete <name>|cancel <name>|workspace|workspace delete]' % sys.argv[0])
+        print('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_ids]')
         sys.exit(1)
 
     cfg = json.load(open('etc/conf.json'))
@@ -131,6 +138,17 @@ if __name__ == '__main__':
                     logging.error('%s not in the catalog' % ff)
                     if sys.argv[2] == 'delete':
                         local_rmdir(cfg, f)
+    elif sys.argv[1] == 'output':
+        name = sys.argv[2]
+        remote_rmdir(cfg, name)
+        local_rmout(cfg,name)
+        cat = retrieve_catalog(cfg)
+        if name not in cat:
+            logging.error('Simulation %s not in the catalog' % name)
+        else:
+            logging.info('Deleting simulation %s from the catalog' % name)
+            del cat[name]
+            store_catalog(cfg, cat)
     elif sys.argv[1] == 'delete':
         name = sys.argv[2]
         remote_rmdir(cfg, name)
