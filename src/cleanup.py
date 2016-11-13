@@ -117,11 +117,8 @@ def workspace(cfg):
         logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
         cat = retrieve_catalog(cfg)
         for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
-            print f
             if osp.isdir(f):
-                print f,'is directory'
                 ff = osp.basename(f)
-                print 'job_id ', ff
                 if ff not in cat:
                     logging.error('%s not in the catalog' % ff)
                     local_rmdir(cfg, f)
@@ -180,20 +177,28 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    commands = [ 'list', 'delete' , 'workspace' , 'cancel', 'output']
+    commands = [ 'list', 'cancel', 'output', 'delete', 'workspace']
 
-    
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
-        print('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_ids]')
+        print('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]')
+        print('list            : show list of current simulations with their job_id and description')
+        print('cancel <job_id> : kill all processes and the WRF parallel job if running')
+        print('output <job id> : delete all WRF output and visualization files only')
+        print('delete <job_id> : delete everything associated with the job')
+        print('workspace       : delete jobs that are not on the visulalization server')
         sys.exit(1)
 
     cmd = sys.argv[1]
     if cmd in ['delete' , 'cancel', 'output']: 
-        if len(sys.argv) == 3:
+        if len(sys.argv) == 3 and not sys.argv[2] == "" :
             job_id = sys.argv[2]
         else:
             print('%s function requires one job id' % cmd)
             sys.exit(1)
+    else:
+        job_id = None
+
+    logging.info('cleanup: command=%s job_id=%s' % (cmd,job_id))
 
     cfg = json.load(open('etc/conf.json'))
 
