@@ -151,6 +151,7 @@ def cancel(name,cfg):
     except:
         logging.error('Cannot load %s' % jobfile)
     else:
+        print(json.dumps(js, indent=4, separators=(',', ': ')))
         if 'job_num' in js:
             cancel_job(js.job_num,js.qsys)
             js.old_job_num = js.job_num
@@ -159,6 +160,7 @@ def cancel(name,cfg):
             kill_process(js.pid)
             js.old_pid = js.pid
         js.pid = None
+        js.status = "Cancelled"
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def delete(name,cfg):
@@ -182,9 +184,9 @@ if __name__ == '__main__':
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
         print('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]')
         print('list            : show list of current simulations with their job_id and description')
-        print('cancel <job_id> : kill all processes and the WRF parallel job if running')
-        print('output <job id> : delete all WRF output and visualization files only')
-        print('delete <job_id> : delete everything associated with the job')
+        print('cancel <job_id> : kill all processes and the WRF parallel job, do not delete any files')
+        print('output <job id> : cancel, and delete all WRF output and visualization files only')
+        print('delete <job_id> : cancel, and delete all files')
         print('workspace       : delete jobs that are not on the visulalization server')
         sys.exit(1)
 
@@ -200,20 +202,21 @@ if __name__ == '__main__':
 
     logging.info('cleanup: command=%s job_id=%s' % (cmd,job_id))
 
-    cfg = json.load(open('etc/conf.json'))
+    cfg = Dict(json.load(open('etc/conf.json')))
 
     if cmd == 'list':
         list(cfg)
 
-    if cmd == 'workspace':
-        workspace(cfg)
-
-    if cmd == 'output':
-        output(job_id,cfg)
-
     if cmd == 'cancel':
         cancel(job_id,cfg)
+
+    if cmd == 'output':
+        cancel(job_id,cfg)
+        output(job_id,cfg)
 
     if cmd == 'delete':
         cancel(job_id,cfg)
         delete(job_id,cfg)
+
+    if cmd == 'workspace':
+        workspace(cfg)

@@ -237,11 +237,15 @@ def execute(args):
 
     jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     jsub=Dict({})
-    jsub.pid = os.getpid();
+    jsub.job_id = js.job_id
+    jsub.pid = os.getpid()
     jsub.job_num = None
     jsub.old_pid = None
     jsub.old_job_num = None
     jsub.state = 'Running'
+    jsub.qsys = js.qsys
+    jsub.postproc = js.postproc
+    jsub.grid_code = js.grid_code 
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
@@ -360,14 +364,11 @@ def execute(args):
     send_email(js, 'wrf_submit', 'Job %s - wrf job submitted.' % js.job_id)
 
     js.task_id = "sim-" + js.grid_code + "-" + utc_to_esmf(js.start_utc)[:10]
-    js.job_num=WRF(js.wrf_dir, js.qsys).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
+    jsub.job_num=WRF(js.wrf_dir, js.qsys).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
 
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
     logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
   
-    for key in {'qsys','job_id','job_num','postproc','grid_code'}:
-        jsub[key]=js[key]
-
     jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
