@@ -160,7 +160,7 @@ def cancel(name,cfg):
             kill_process(js.pid)
             js.old_pid = js.pid
         js.pid = None
-        js.status = "Cancelled"
+        js.state = "Cancelled"
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def delete(name,cfg):

@@ -67,7 +67,12 @@ class JobState(Dict):
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
         self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
-        self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(self.fc_hrs)
+        if 'job_id' in args:
+            logging.info('job_id given in the job description.')
+            self.job_id = args['job_id']
+        else:
+            logging.warning('job_id not given, creating.')
+            self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(self.fc_hrs)
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
         self.ignitions = args.get('ignitions', None)
@@ -249,6 +254,7 @@ def execute(args):
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
+    sys.stdout.flush()
     send_email(js, 'start', 'Job %s started.' % js.job_id)
 
     # read in all namelists
@@ -367,7 +373,7 @@ def execute(args):
     jsub.job_num=WRF(js.wrf_dir, js.qsys).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
 
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
-    logging.info("WRF job submitted with id %s, waiting for rsl.error.0000" % js.task_id)
+    logging.info("WRF job %s submitted with id %s, waiting for rsl.error.0000" % (jsub.job_num, js.task_id))
   
     jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
