@@ -151,7 +151,7 @@ def cancel(name,cfg):
     except:
         logging.error('Cannot load %s' % jobfile)
     else:
-        print(json.dumps(js, indent=4, separators=(',', ': ')))
+        # print(json.dumps(js, indent=4, separators=(',', ': ')))
         if 'job_num' in js:
             cancel_job(js.job_num,js.qsys)
             js.old_job_num = js.job_num
