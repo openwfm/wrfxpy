@@ -25,7 +25,8 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
-                  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, make_clean_dir
+                  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
+                  make_clean_dir, process_create_time
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -244,10 +245,10 @@ def execute(args):
     jsub=Dict({})
     jsub.job_id = js.job_id
     jsub.pid = os.getpid()
+    jsub.process_create_time = process_create_time(jsub.pid)
     jsub.job_num = None
-    jsub.old_pid = None
     jsub.old_job_num = None
-    jsub.state = 'Running'
+    jsub.state = 'Preparing'
     jsub.qsys = js.qsys
     jsub.postproc = js.postproc
     jsub.grid_code = js.grid_code 

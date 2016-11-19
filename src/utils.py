@@ -105,6 +105,21 @@ def kill_process(pid):
         except:
             logging.error('Process %s does not exist' % pid)
 
+def process_create_time(pid):
+    """
+    Check if process exists and return its creation time.
+
+    :param pid: process number
+    :return: the process creation time, None if the process not exist, -1 if pid is None.
+    """
+    if pid is None:
+        return -1
+    else:
+        try:
+            return psutil.Process(pid).create_time()
+        except:
+            return None
+
 def ensure_dir(path):
     """
     Ensure all directories in path exist, for convenience return path itself.
