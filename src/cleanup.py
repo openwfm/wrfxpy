@@ -181,12 +181,19 @@ def output(name,cfg):
 def cancel(name,cfg):
     logging.info('Trying to cancel job %s' % name)
     js, jobfile = load_job_file(name,cfg)
+    if 'state' in js and js.state == 'Cancelled':
+        logging.warning('Job %s was already cancelled, proceeding anyway' % name)
     if js is not None:
-        if 'job_num' in js:
-            cancel_job(js.job_num,js.qsys)
+        if 'job_num' in js and js.job_num is not None:
+            try:
+                logging.info('Trying to delete job %s from the queue scheduler' % js.job_num)
+                cancel_job(js.job_num,js.qsys)
+            except:
+                logging.error('Delete failed, please check your queue scheduler for job %s' % js.job_num)
             js.old_job_num = js.job_num
         js.job_num = None
-        if 'pid' in js:
+        if 'pid' in js and js.pid is not None:
+            logging.info('Trying to kill forecast process %s' % js.pid)
             kill_process(js.pid)
         js.pid = None
         js.state = "Cancelled"
