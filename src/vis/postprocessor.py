@@ -380,7 +380,7 @@ class Postprocessor(object):
         """
         traceargs()
 
-        logging.info('process_vars: looking for time %s in %s' % (ts_esmf,osp.basename(wrfout_path)))
+        logging.info('process_vars: looking for time %s in %s' % (ts_esmf,wrfout_path))
         # open the netCDF dataset
         d = nc4.Dataset(wrfout_path)
 
@@ -394,6 +394,7 @@ class Postprocessor(object):
 
         # build an output file per variable
         for var in vars:
+            logging.info('process_vars: postprocessing %s for time %s' % (var, ts_esmf))
             try:
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
                 kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}

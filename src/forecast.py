@@ -201,16 +201,26 @@ def run_geogrid(js, q):
         q.put('FAILURE')
 
 
-def find_fresh_wrfout(path, dom_id):
+def find_wrfout(path, dom_id, esmf_time):
     """
-    Find the latest wrfout for postprocessing.
+    Find wrfout for postprocessing.
 
     :param path: the wrf path directory
     :param dom_id: the domain for which we search wrfouts
+    :esmf_time: time string to match variable Times
     :return: the path to the fresh (latest) wrfout
     """
-    wrfouts = sorted(glob.glob(osp.join(path, 'wrfout_d%02d*' % dom_id)))
-    return osp.join(path, wrfouts[-1])
+    logging.info('find_wrfout: looking for the first wrfout for domain %s time %s' % (dom_id,esmf_time))
+    wrfouts = sorted(glob.glob(osp.join(path, 'wrfout_d%02d*' % dom_id)),None,None,True) # reverse order
+    wrfouts
+    for wrfout in wrfouts:
+        wrfout_time = re.match(r'.*wrfout_d.._([0-9_\-:]{19})' ,wrfout).groups()[0]
+        if esmf_time >= wrfout_time:
+            logging.info('find_wrfout: found %s' % wrfout)
+            return wrfout
+    logging.warning('wrfout for time %s domain %s not found' % (esmf_time, dom_id))
+    logging.warning('Available wrfouts are: %s' % wrfouts)
+    return None
 
 
 def execute(args):
@@ -431,17 +441,17 @@ def process_output(job_id):
 
         if "Timing for Writing wrfout" in line:
             esmf_time,domain_str = re.match(r'.*wrfout_d.._([0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
+            wrfout_path,domain_str = re.match(r'.*(wrfout_d.._[0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             dom_id = int(domain_str)
             logging.info("Detected history write for domain %d for time %s." % (dom_id, esmf_time))
             if js.postproc is not None and str(dom_id) in js.postproc:
                 var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
-                # race condition possible!
-                wrfout_path = find_fresh_wrfout(js.wrf_dir, dom_id)
-            try:
-                pp.process_vars(wrfout_path, dom_id, esmf_time, var_list)
-            except Exception as e:
-                logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+                wrfout_path = find_wrfout(js.wrf_dir, dom_id, esmf_time)
+                try:
+                    pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
+                except Exception as e:
+                    logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
 
             # in incremental mode, upload to server
             if js.postproc.get('shuttle', None) == 'incremental':
