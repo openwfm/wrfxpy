@@ -26,6 +26,7 @@ import json
 import glob
 import sys 
 import pprint
+import fcntl
 
 
 class SSHShuttle(object):
@@ -46,6 +47,7 @@ class SSHShuttle(object):
         self.user = cfg['shuttle_remote_user']
         self.root = cfg['shuttle_remote_root']
         self.key = cfg['shuttle_ssh_key']
+        self.lock_path = cfg['shuttle_lock_path']
         self.workspace_path = cfg['workspace_path']
 
     
@@ -205,6 +207,9 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
 
     # retrieve the catalog & update it
     logging.info('SHUTTLE updating catalog file on remote host')
+    logging.info('Locking access to the catalog through %s.' % s.lock_path)
+    lfd = open(s.lock_path,'w')
+    fcntl.flock(lfd,fcntl.LOCK_EX)
     cat_local = osp.join(s.workspace_path, 'catalog.json')
     s.get('catalog.json', cat_local)
 
@@ -217,6 +222,9 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     #print 'catalog:', json.dumps(cat, indent=4, separators=(',', ': '))
     json.dump(cat, open(cat_local, 'w'), indent=1, separators=(',',':'))
     s.put(cat_local, 'catalog.json')
+    fcntl.flock(lfd,fcntl.LOCK_UN)
+    lfd.close()
+    logging.info('Catalog lock released.')
 
     logging.debug('SHUTTLE operations completed, closing connection.')
 

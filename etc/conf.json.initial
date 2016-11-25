@@ -5,8 +5,10 @@
   "sys_install_path": "/path/to/wrfxpy",
   "wps_geog_path" : "/path/to/your/default/wps_geog",
 
+
   "shuttle_ssh_key": "path/to/your/priv_ssh_key/to/remote/host",
   "shuttle_remote_user" : "your_username",
   "shuttle_remote_host" : "remote_hostname",
-  "shuttle_remote_root" : "remote director for output storage"
+  "shuttle_remote_root" : "remote director for output storage",
+  "shuttle_lock_path": "/path/to/unique/file/not/NFS/mounted"
 } 
