@@ -49,6 +49,7 @@ from email.mime.text import MIMEText
 
 import traceback
 import pprint
+from cleanup import parallel_job_running
 
 
 
@@ -395,7 +396,12 @@ def process_output(job_id):
     args = load_sys_cfg()
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     logging.info('process_output: loading job description from %s' % jobfile)
-    js = Dict(json.load(open(jobfile,'r')))
+    try:
+        js = Dict(json.load(open(jobfile,'r')))
+    except Exception as e:
+        logging.error('Cannot load the job description file %s' % jobfile)
+        logging.error('%s' % e)
+        sys.exit(1)
     js.old_pid = js.pid
     js.pid = os.getpid()
     js.state = 'Processing'
@@ -410,7 +416,7 @@ def process_output(job_id):
             wrf_out = open(osp.join(js.wrf_dir, 'rsl.error.0000'))
             break
         except IOError:
-            logging.info('process_output: waiting 10 seconds for rsl.error.0000 file')
+            logging.info('process_output: waiting 5 seconds for rsl.error.0000 file')
         
         time.sleep(5)
     
@@ -425,11 +431,20 @@ def process_output(job_id):
         pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
         max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
 
+    wait_lines = 0
+    wait_wrfout = 0
     while True:
         line = wrf_out.readline().strip()
         if not line:
-            time.sleep(0.2)
+            if not parallel_job_running(js):
+                logging.warning('WRF did not run to completion.')
+                break  
+            if not wait_lines:
+                logging.info('Waiting for more output lines')
+            wait_lines = wait_lines + 1 
+            time.sleep(0.5)
             continue
+        wait_lines = 0
 
         if "SUCCESS COMPLETE WRF" in line:
             # send_email(js, 'complete', 'Job %s - wrf job complete SUCCESS.' % js.job_id)
@@ -458,6 +473,11 @@ def process_output(job_id):
                 desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                 sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc, already_sent_files)
                 already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+            wait_wrfout = 0
+        else: 
+            if not wait_wrfout:
+                logging.info('Waiting for wrfout')
+            wait_wrfout = wait_wrfout + 1 
 
     # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':

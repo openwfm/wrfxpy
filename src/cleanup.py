@@ -139,7 +139,10 @@ def parallel_job_running(js):
         if len(ls) >0 and ls[0] == js.job_num:
              ws = True
              break
-    logging.info('WRF job is running: %s name=%s' % (ws, js.job_num))
+    if ws:
+        logging.debug('WRF job %s is running.' % js.job_num)
+    else:
+        logging.info('WRF job %s is not running.' % js.job_num)
     return ws
 
 # the cleanup functions called as argv[2]:
