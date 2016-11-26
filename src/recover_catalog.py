@@ -17,18 +17,22 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('Usage: ./recover_catalog.sh 1.json 2.json ....')
         print('x.json are inputs to forecast.sh as from wrfxctrl, starting with /, no spaces')
+        print('Example: ./recover_catalog.sh ~/Projects/wrfxctrl/jobs/*.json')
         print('Important: must be run from the wrfxpy directory. Before using:')
-        print('In wrfxweb/fdds/simulations: tar cvfz c.tgz */*.json catalog.json')
-        print('Transfer the file and  untar here')
+        print('In wrfxweb/fdds/simulations: tar cvfz ~/c.tgz <simulations to recove>/*.json catalog.json')
+        print('Transfer the file c.tgz and  untar here')
         print('On exit, ./simulations/catalog.json will be updated')
         sys.exit(1)
 
     for js_path in sys.argv[1:]:
-        print js_path
+        # print js_path
         js = json.load(open(js_path,'r'))
+        description = js['postproc']['description']
         #print json.dumps(js, indent=4, separators=(',', ': '))
         jsb=osp.basename(js_path)
         m=glob.glob(osp.join(simulations_path,'*','wfc-'+jsb))
+        print('%s simulations found for %s file %s' % 
+            (len(m), description, js_path))
         for mf in m: 
             #print mf
             manifest=osp.basename(mf)
