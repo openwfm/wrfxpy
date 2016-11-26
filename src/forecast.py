@@ -223,6 +223,24 @@ def find_wrfout(path, dom_id, esmf_time):
     logging.warning('Available wrfouts are: %s' % wrfouts)
     return None
 
+def make_job_file(js):
+    """
+    Create minimal dictionary for the job state
+    :param js: job state from JobState(args)
+    :return: the dictionary
+    """
+    jsub=Dict({})
+    jsub.job_id = js.job_id
+    jsub.pid = os.getpid()
+    jsub.process_create_time = process_create_time(jsub.pid)
+    jsub.job_num = None
+    jsub.old_job_num = None
+    jsub.state = 'Preparing'
+    jsub.qsys = js.qsys
+    jsub.postproc = js.postproc
+    jsub.grid_code = js.grid_code 
+    jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
+    return jsub
 
 def execute(args):
     """
@@ -252,19 +270,9 @@ def execute(args):
     jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
     make_clean_dir(jobdir)
 
-    jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
-    jsub=Dict({})
-    jsub.job_id = js.job_id
-    jsub.pid = os.getpid()
-    jsub.process_create_time = process_create_time(jsub.pid)
-    jsub.job_num = None
-    jsub.old_job_num = None
-    jsub.state = 'Preparing'
-    jsub.qsys = js.qsys
-    jsub.postproc = js.postproc
-    jsub.grid_code = js.grid_code 
-    json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
-
+    jsub = make_job_file(js)
+    json.dump(jsub, open(jsub.jobfile,'w'), indent=4, separators=(',', ': '))
+ 
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     sys.stdout.flush()
     send_email(js, 'start', 'Job %s started.' % js.job_id)
