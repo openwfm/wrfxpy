@@ -29,6 +29,8 @@ import signal
 import subprocess
 from utils import kill_process, Dict, process_create_time
 
+cfg = Dict(json.load(open('etc/conf.json')))
+s = SSHShuttle(cfg)
 
 def retrieve_catalog(cfg):
     """
@@ -36,7 +38,6 @@ def retrieve_catalog(cfg):
     
     :param cfg: the configuration of the remote visualization host
     """
-    s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
     logging.info('SHUTTLE retrieving catalog file.')
@@ -57,7 +58,6 @@ def store_catalog(cfg, cat):
     :param cfg: the configuration of the remote visualization host
     :param cat: the JSON object representing the new catalog
     """
-    s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
     logging.info('SHUTTLE sending catalog file.')
@@ -68,7 +68,6 @@ def store_catalog(cfg, cat):
     logging.info('SHUTTLE send complete.')
 
 def remote_rmdir(cfg, dirname):
-    s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
     logging.info('SHUTTLE removing remote directory %s' % dirname)
@@ -184,9 +183,9 @@ def output(name,cfg):
 def cancel(name,cfg):
     logging.info('Trying to cancel job %s' % name)
     js, jobfile = load_job_file(name,cfg)
-    if 'state' in js and js.state == 'Cancelled':
-        logging.warning('Job %s was already cancelled, proceeding anyway' % name)
     if js is not None:
+        if 'state' in js and js.state == 'Cancelled':
+            logging.warning('Job %s was already cancelled, proceeding anyway' % name)
         if 'job_num' in js and js.job_num is not None:
             try:
                 logging.info('Trying to delete job %s from the queue scheduler' % js.job_num)
@@ -206,6 +205,7 @@ def delete(name,cfg):
         logging.info('Trying to delete all files of job %s' % name)
         remote_rmdir(cfg, name)
         local_rmdir(cfg,name)
+        s.acquire_lock()
         cat = retrieve_catalog(cfg)
         if name not in cat:
             logging.error('Simulation %s not in the catalog' % name)
@@ -213,6 +213,7 @@ def delete(name,cfg):
             logging.info('Deleting simulation %s from the catalog' % name)
             del cat[name]
             store_catalog(cfg, cat)
+        s.release_lock()
 
 def update(name,cfg):
     logging.info('Updating state of job %s' % name)
@@ -277,7 +278,6 @@ if __name__ == '__main__':
 
     logging.info('cleanup: command=%s job_id=%s' % (cmd,job_id))
 
-    cfg = Dict(json.load(open('etc/conf.json')))
 
     if cmd == 'list':
         list(cfg)
