@@ -49,7 +49,7 @@ class SSHShuttle(object):
         self.root = cfg['shuttle_remote_root']
         self.key = cfg['shuttle_ssh_key']
         self.lock_path = cfg['shuttle_lock_path']
-        self.lock_fd = None
+        self.lock_file = None
         self.workspace_path = cfg['workspace_path']
 
     
@@ -163,25 +163,25 @@ class SSHShuttle(object):
         such as updating the catalog.
         """ 
         logging.info('SHUTTLE acquiring lock on %s' % self.lock_path)
-        if self.lock_fd is not None:
+        if self.lock_file is not None:
             logging.warning('SHUTTLE already has a lock.')
-        self.lock_fd = open(self.lock_path,'w')
+        self.lock_file = open(self.lock_path,'w',0)  # unbuffered
         try:
-            fcntl.flock(self.lock_fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            fcntl.flock(self.lock_file,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except IOError as e:
             if e.errno == errno.EACCES or e.errno == errno.EAGAIN:
                 logging.info('SHUTTLE waiting for lock on %s' % self.lock_path)
             else:
                 logging.error("I/O error %s: %s" % (e.errno, e.strerror))
-        fcntl.flock(self.lock_fd,fcntl.LOCK_EX)
+        fcntl.flock(self.lock_file,fcntl.LOCK_EX)
         logging.info('SHUTTLE acquired lock on %s' % self.lock_path)
 
     def release_lock(self):
         logging.info('SHUTTLE releasing lock on %s' % self.lock_path)
-        if self.lock_fd is not None:
-            fcntl.flock(self.lock_fd,fcntl.LOCK_UN)
-            self.lock_fd.close()
-            self.lock_fd = None
+        if self.lock_file is not None:
+            fcntl.flock(self.lock_file,fcntl.LOCK_UN)
+            self.lock_file.close()
+            self.lock_file = None
         else:
             logging.warning('SHUTTLE did not have a lock.')
 
