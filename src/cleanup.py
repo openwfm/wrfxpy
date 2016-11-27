@@ -30,13 +30,12 @@ import subprocess
 from utils import kill_process, Dict, process_create_time
 
 
-def retrieve_catalog(cfg):
+def retrieve_catalog(s):
     """
-    Retrieve the catalog from the remote visualization server.
+    Retrieve the catalog from the remote visualization server
     
-    :param cfg: the configuration of the remote visualization host
+    :param s: SSHShuttle object
     """
-    s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
     logging.info('SHUTTLE retrieving catalog file.')
@@ -49,15 +48,13 @@ def retrieve_catalog(cfg):
     return cat
 
 
-def store_catalog(cfg, cat):
+def store_catalog(s, cat):
     """
-    Store a new version of the catalog on the remote server given
-    by cfg.
+    Store a new version of the catalog on the remote server
 
-    :param cfg: the configuration of the remote visualization host
+    :param s: SSHShuttle object
     :param cat: the JSON object representing the new catalog
     """
-    s = SSHShuttle(cfg)
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
     logging.info('SHUTTLE sending catalog file.')
@@ -67,8 +64,7 @@ def store_catalog(cfg, cat):
     s.disconnect()
     logging.info('SHUTTLE send complete.')
 
-def remote_rmdir(cfg, dirname):
-    s = SSHShuttle(cfg)
+def remote_rmdir(s,dirname):
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
     logging.info('SHUTTLE removing remote directory %s' % dirname)
@@ -147,16 +143,20 @@ def parallel_job_running(js):
 
 # the cleanup functions called as argv[2]:
 
-def list(cfg):
-        cat = retrieve_catalog(cfg)
+def list(s):
+        s.acquire_lock()
+        cat = retrieve_catalog(s)
+        s.release_lock()
         print('%-60s desc' % 'id')
         print('-' * 70)
         for k in sorted(cat):
             print('%-60s %s' % (k, cat[k]['description']))
 
-def workspace(cfg):
+def workspace(s,cfg):
         logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
-        cat = retrieve_catalog(cfg)
+        s.acquire_lock()
+        cat = retrieve_catalog(s)
+        s.release_lock()
         for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
             if osp.isdir(f):
                 ff = osp.basename(f)
@@ -164,22 +164,26 @@ def workspace(cfg):
                     logging.error('%s not in the catalog' % ff)
                     local_rmdir(cfg, f)
 
-def output(name,cfg):
+def output(name,s,cfg):
     logging.info('Trying to delete WRF output and visualization of job %s' % name)
     remote_rmdir(cfg, name)
     local_rmdir(cfg,osp.join(name,'products'))
     wrf_dir = osp.join(cfg['workspace_path'], name,'wrf')
     files = glob.glob(osp.join(wrf_dir,'rsl.*'))+glob.glob(osp.join(wrf_dir,'wrfout_*'))
     logging.info('Deleting %s WRF output files in  %s' % (len(files),wrf_dir ))
-    cat = retrieve_catalog(cfg)
     for f in files:
         os.remove(f)
+
+def delete_from_catalog(s,name)
+    s.acquire_lock()
+    cat = retrieve_catalog(s)
     if name not in cat:
         logging.error('Simulation %s not in the catalog' % name)
     else:
         logging.info('Deleting simulation %s from the catalog' % name)
         del cat[name]
-    store_catalog(cfg, cat)
+    store_catalog(s, cat)
+    s.release_lock()
 
 def cancel(name,cfg):
     logging.info('Trying to cancel job %s' % name)
@@ -206,13 +210,7 @@ def delete(name,cfg):
         logging.info('Trying to delete all files of job %s' % name)
         remote_rmdir(cfg, name)
         local_rmdir(cfg,name)
-        cat = retrieve_catalog(cfg)
-        if name not in cat:
-            logging.error('Simulation %s not in the catalog' % name)
-        else:
-            logging.info('Deleting simulation %s from the catalog' % name)
-            del cat[name]
-            store_catalog(cfg, cat)
+        delete_from_catalog(s,name)
 
 def update(name,cfg):
     logging.info('Updating state of job %s' % name)
@@ -278,6 +276,7 @@ if __name__ == '__main__':
     logging.info('cleanup: command=%s job_id=%s' % (cmd,job_id))
 
     cfg = Dict(json.load(open('etc/conf.json')))
+    s = SSHShuttle(cfg)
 
     if cmd == 'list':
         list(cfg)

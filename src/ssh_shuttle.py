@@ -27,6 +27,7 @@ import glob
 import sys 
 import pprint
 import fcntl
+import collections
 
 
 class SSHShuttle(object):
@@ -154,6 +155,26 @@ class SSHShuttle(object):
             self.sftp.remove(osp.join(abs_path, f))
         self.sftp.rmdir(abs_path)
 
+    def retrieve_catalog(self):
+        """ 
+        Retrieve the catalog from the remote visualization server
+        and update the local copy
+        NOTE: acquire lock before catalog operations
+        
+        """
+        logging.info('SHUTTLE connecting to remote host %s' % s.host)
+        self.connect()
+        logging.info('SHUTTLE retrieving catalog file.')
+        self.get('catalog.json', '_catalog.json')
+    
+        cat = json.load(open('_catalog.json'))
+        s.disconnect()
+        os.remove('_catalog.json')
+        logging.info('SHUTTLE retrieve complete.')
+        return cat 
+
+
+
 
 def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = None, exclude_files = []):
     """
@@ -218,6 +239,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
                       'description' : description if description is not None else sim_name,
                       'from_utc' : times[0],
                       'to_utc' : times[-1] }
+    cat=collections.OrderedDict(sorted(cat.items(), reverse=True))
     logging.debug('catalog %s' % cat)
     #print 'catalog:', json.dumps(cat, indent=4, separators=(',', ': '))
     json.dump(cat, open(cat_local, 'w'), indent=1, separators=(',',':'))
