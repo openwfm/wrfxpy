@@ -28,6 +28,7 @@ import sys
 import pprint
 import fcntl
 import errno
+import collections
 
 
 class SSHShuttle(object):
@@ -246,6 +247,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
                       'description' : description if description is not None else sim_name,
                       'from_utc' : times[0],
                       'to_utc' : times[-1] }
+    cat=collections.OrderedDict(sorted(cat.items(), reverse=True))
     logging.debug('catalog %s' % cat)
     #print 'catalog:', json.dumps(cat, indent=4, separators=(',', ': '))
     json.dump(cat, open(cat_local, 'w'), indent=1, separators=(',',':'))
