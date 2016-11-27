@@ -180,7 +180,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
 
-    # identify the catalog file
+    # identify the manifest file
     manifest_pattern = osp.join(local_dir, '*.json')
     #logging.info('looking for local manifest file %s' % manifest_pattern)
     json_files=glob.glob(osp.join(local_dir, '*.json'));
