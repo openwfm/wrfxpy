@@ -27,6 +27,7 @@ import glob
 import sys 
 import pprint
 import fcntl
+import errno
 
 
 class SSHShuttle(object):
@@ -48,6 +49,7 @@ class SSHShuttle(object):
         self.root = cfg['shuttle_remote_root']
         self.key = cfg['shuttle_ssh_key']
         self.lock_path = cfg['shuttle_lock_path']
+        self.lock_file = None
         self.workspace_path = cfg['workspace_path']
 
     
@@ -154,6 +156,34 @@ class SSHShuttle(object):
             self.sftp.remove(osp.join(abs_path, f))
         self.sftp.rmdir(abs_path)
 
+    def acquire_lock(self):
+        """
+        Block until exclusive lock can be acquired.
+        Used before code that should be executed by one process at a time only,
+        such as updating the catalog.
+        """ 
+        logging.info('SHUTTLE acquiring lock on %s' % self.lock_path)
+        if self.lock_file is not None:
+            logging.warning('SHUTTLE already has a lock.')
+        self.lock_file = open(self.lock_path,'w',0)  # unbuffered
+        try:
+            fcntl.flock(self.lock_file,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except IOError as e:
+            if e.errno == errno.EACCES or e.errno == errno.EAGAIN:
+                logging.info('SHUTTLE waiting for lock on %s' % self.lock_path)
+            else:
+                logging.error("I/O error %s: %s" % (e.errno, e.strerror))
+        fcntl.flock(self.lock_file,fcntl.LOCK_EX)
+        logging.info('SHUTTLE acquired lock on %s' % self.lock_path)
+
+    def release_lock(self):
+        logging.info('SHUTTLE releasing lock on %s' % self.lock_path)
+        if self.lock_file is not None:
+            fcntl.flock(self.lock_file,fcntl.LOCK_UN)
+            self.lock_file.close()
+            self.lock_file = None
+        else:
+            logging.warning('SHUTTLE did not have a lock.')
 
 def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = None, exclude_files = []):
     """
@@ -207,9 +237,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
 
     # retrieve the catalog & update it
     logging.info('SHUTTLE updating catalog file on remote host')
-    logging.info('Locking access to the catalog through %s.' % s.lock_path)
-    lfd = open(s.lock_path,'w')
-    fcntl.flock(lfd,fcntl.LOCK_EX)
+    s.acquire_lock()
     cat_local = osp.join(s.workspace_path, 'catalog.json')
     s.get('catalog.json', cat_local)
 
@@ -222,9 +250,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     #print 'catalog:', json.dumps(cat, indent=4, separators=(',', ': '))
     json.dump(cat, open(cat_local, 'w'), indent=1, separators=(',',':'))
     s.put(cat_local, 'catalog.json')
-    fcntl.flock(lfd,fcntl.LOCK_UN)
-    lfd.close()
-    logging.info('Catalog lock released.')
+    s.release_lock()
 
     logging.debug('SHUTTLE operations completed, closing connection.')
 

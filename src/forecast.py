@@ -242,13 +242,14 @@ def make_job_file(js):
     jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     return jsub
 
-def execute(args):
+def execute(args,job_args):
     """
     Executes a weather/fire simulation.
 
-    The args dictionary contains
+    :param args: a dictionary with all to start the simulationfollowing keys
+    :param job_args: a the original json given the forecast
 
-    :param args: a dictionary with the following keys
+    Keys in args:
     :param grid_code: the (unique) code of the grid that is used
     :param sys_install_path: system installation directory
     :param start_utc: start time of simulation in UTC
@@ -262,6 +263,8 @@ def execute(args):
     :param fire_namelist_path: the path to the namelist.fire file that will be used as template
     :param wps_geog_path: the path to the geogrid data directory providing terrain/fuel data
     :param email_notification: dictionary containing keys address and events indicating when a mail should be fired off
+ 
+    
     """
 
     # step 0 initialize the job state from the arguments
@@ -270,6 +273,7 @@ def execute(args):
     jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
     make_clean_dir(jobdir)
 
+    json.dump(job_args, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
     jsub = make_job_file(js)
     json.dump(jsub, open(jsub.jobfile,'w'), indent=4, separators=(',', ': '))
  
@@ -626,7 +630,7 @@ if __name__ == '__main__':
     verify_inputs(args,sys_cfg)
 
     # execute the job
-    execute(args)
+    execute(args,job_args)
     
     logging.info('forecast.py done')
 
