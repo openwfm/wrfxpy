@@ -31,6 +31,7 @@ import errno
 import collections
 
 
+
 class SSHShuttle(object):
     """
     Supports incremental or one-shot sending of files over to another
@@ -52,12 +53,15 @@ class SSHShuttle(object):
         self.lock_path = cfg['shuttle_lock_path']
         self.lock_file = None
         self.workspace_path = cfg['workspace_path']
+        self.cat_local_path = osp.join(self.workspace_path, 'catalog.json')
+        self.connected=False
 
     
     def connect(self):
         """
         Initiate a connection with the remote server.
         """
+        logging.info('SHUTTLE connecting to remote host %s' % self.host)
         ssh = paramiko.SSHClient()
         ssh.load_system_host_keys()
         ssh.connect(self.host, username=self.user, key_filename=self.key)
@@ -65,14 +69,17 @@ class SSHShuttle(object):
         self.sftp = ssh.open_sftp()
         # change to the remote root immediately
         self.sftp.chdir(self.root)
+        self.connected = True
 
     
     def disconnect(self):
         """
         Close the connections gracefully.
         """
+        logging.info('SHUTTLE operations completed, closing connection.')
         self.sftp.close()
         self.ssh.close()
+        self.connected = False
 
     
     def send_directory(self, local_dir, remote_path, exclude_files = []):
@@ -157,6 +164,9 @@ class SSHShuttle(object):
             self.sftp.remove(osp.join(abs_path, f))
         self.sftp.rmdir(abs_path)
 
+    def has_lock(self):
+        return self.lock_file is not None 
+
     def acquire_lock(self):
         """
         Block until exclusive lock can be acquired.
@@ -164,7 +174,9 @@ class SSHShuttle(object):
         such as updating the catalog.
         """ 
         logging.info('SHUTTLE acquiring lock on %s' % self.lock_path)
-        if self.lock_file is not None:
+        if not self.connected:
+            logging.warning('SHUTTLE is not connected')
+        if self.has_lock():
             logging.warning('SHUTTLE already has a lock.')
         self.lock_file = open(self.lock_path,'w',0)  # unbuffered
         try:
@@ -185,6 +197,35 @@ class SSHShuttle(object):
             self.lock_file = None
         else:
             logging.warning('SHUTTLE did not have a lock.')
+
+    def retrieve_catalog(self):
+        """ 
+        Retrieve the catalog from the remote visualization server
+        and update the local copy
+        NOTE: connect and acquire lock before catalog operations
+        
+        """
+        logging.info('SHUTTLE retrieving catalog file.')
+        if not self.has_lock():
+            logging.warning('SHUTTLE does not have lock, catalog corruption possible.')
+        self.get('catalog.json', self.cat_local_path)
+        cat = json.load(open(self.cat_local_path))
+        logging.info('SHUTTLE retrieve complete.')
+        return cat 
+
+    def store_catalog(self, cat):
+        """
+        Store a new version of the catalog on the remote server
+        NOTE: connect and release lock after catalog operations
+
+        :param cat: the JSON object representing the new catalog
+        """
+        logging.info('SHUTTLE sending catalog file.')
+        if not self.has_lock():
+            logging.warning('SHUTTLE does not have lock, catalog corruption possible.')
+        cat_sorted=collections.OrderedDict(sorted(cat.items(), reverse=True))
+        json.dump(cat_sorted, open(self.cat_local_path, 'w'), indent=1, separators=(',',':'))
+        self.put(self.cat_local_path, 'catalog.json')
 
 def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = None, exclude_files = []):
     """
@@ -208,7 +249,6 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     logging.debug('SHUTTLE configuration:\n%s' % pprint.pformat(cfg,indent=4))
    
     s = SSHShuttle(cfg)
-    logging.info('SHUTTLE connecting to remote host %s' % s.host)
     s.connect()
 
     # identify the manifest file
@@ -239,22 +279,13 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     # retrieve the catalog & update it
     logging.info('SHUTTLE updating catalog file on remote host')
     s.acquire_lock()
-    cat_local = osp.join(s.workspace_path, 'catalog.json')
-    s.get('catalog.json', cat_local)
-
-    cat = json.load(open(cat_local))
+    cat = s.retrieve_catalog()
     cat[sim_name] = { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
                       'description' : description if description is not None else sim_name,
                       'from_utc' : times[0],
                       'to_utc' : times[-1] }
-    cat=collections.OrderedDict(sorted(cat.items(), reverse=True))
-    logging.debug('catalog %s' % cat)
-    #print 'catalog:', json.dumps(cat, indent=4, separators=(',', ': '))
-    json.dump(cat, open(cat_local, 'w'), indent=1, separators=(',',':'))
-    s.put(cat_local, 'catalog.json')
+    s.store_catalog(cat)
     s.release_lock()
-
-    logging.debug('SHUTTLE operations completed, closing connection.')
 
     s.disconnect()
 
@@ -277,4 +308,4 @@ if __name__ == '__main__':
     cfg = json.load(open('etc/conf.json'))
 
     send_product_to_server(cfg, local_dir, remote_dir, sim_name, None, [])
- 
+

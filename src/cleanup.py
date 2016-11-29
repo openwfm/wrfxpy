@@ -30,58 +30,18 @@ import subprocess
 from utils import kill_process, Dict, process_create_time
 
 cfg = Dict(json.load(open('etc/conf.json')))
-s = SSHShuttle(cfg)
 
-def retrieve_catalog(cfg):
-    """
-    Retrieve the catalog from the remote visualization server.
-    
-    :param cfg: the configuration of the remote visualization host
-    """
-    logging.info('SHUTTLE connecting to remote host %s' % s.host)
-    s.connect()
-    logging.info('SHUTTLE retrieving catalog file.')
-    s.get('catalog.json', '_catalog.json')
-
-    cat = json.load(open('_catalog.json'))
-    s.disconnect()
-    os.remove('_catalog.json')
-    logging.info('SHUTTLE retrieve complete.')
-    return cat
-
-
-def store_catalog(cfg, cat):
-    """
-    Store a new version of the catalog on the remote server given
-    by cfg.
-
-    :param cfg: the configuration of the remote visualization host
-    :param cat: the JSON object representing the new catalog
-    """
-    logging.info('SHUTTLE connecting to remote host %s' % s.host)
-    s.connect()
-    logging.info('SHUTTLE sending catalog file.')
-    json.dump(cat, open('_catalog.json', 'w'), indent=4, separators=(',', ': '))
-    s.put('_catalog.json', 'catalog.json')
-    os.remove('_catalog.json')
-    s.disconnect()
-    logging.info('SHUTTLE send complete.')
-
-def remote_rmdir(cfg, dirname):
-    logging.info('SHUTTLE connecting to remote host %s' % s.host)
-    s.connect()
+def remote_rmdir(s,dirname):
     logging.info('SHUTTLE removing remote directory %s' % dirname)
     try:
         s.rmdir(dirname)
         logging.info('SHUTTLE delete successful.')
-        s.disconnect()
         return 0
     except:
         logging.error('SHUTTLE cannot delete directory %s' % dirname)
-        s.disconnect()
         return 'Error'
 
-def local_rmdir(cfg, dirname):
+def local_rmdir(dirname):
     work_dir = osp.abspath(osp.join(cfg['workspace_path'], dirname))
     logging.info('Deleting directory %s' % work_dir)
     try:
@@ -106,7 +66,7 @@ def load_cluster_file(qsys):
     clusters = json.load(open('etc/clusters.json','r'))
     return clusters[qsys]
 
-def load_job_file(job_id,cfg):
+def load_job_file(job_id):
     jobfile = osp.join(cfg['workspace_path'], job_id, 'job.json')
     logging.info('Loading job state from %s' % jobfile)
     try:
@@ -144,45 +104,60 @@ def parallel_job_running(js):
         logging.info('WRF job %s is not running.' % js.job_num)
     return ws
 
-# the cleanup functions called as argv[2]:
-
-def list(cfg):
-        cat = retrieve_catalog(cfg)
-        print('%-60s desc' % 'id')
-        print('-' * 70)
-        for k in sorted(cat):
-            print('%-60s %s' % (k, cat[k]['description']))
-
-def workspace(cfg):
-        logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
-        cat = retrieve_catalog(cfg)
-        for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
-            if osp.isdir(f):
-                ff = osp.basename(f)
-                if ff not in cat:
-                    logging.error('%s not in the catalog' % ff)
-                    local_rmdir(cfg, f)
-
-def output(name,cfg):
-    logging.info('Trying to delete WRF output and visualization of job %s' % name)
-    remote_rmdir(cfg, name)
-    local_rmdir(cfg,osp.join(name,'products'))
-    wrf_dir = osp.join(cfg['workspace_path'], name,'wrf')
-    files = glob.glob(osp.join(wrf_dir,'rsl.*'))+glob.glob(osp.join(wrf_dir,'wrfout_*'))
-    logging.info('Deleting %s WRF output files in  %s' % (len(files),wrf_dir ))
-    cat = retrieve_catalog(cfg)
-    for f in files:
-        os.remove(f)
+def delete_from_catalog(s,name):
+    s.acquire_lock()
+    cat = s.retrieve_catalog()
     if name not in cat:
         logging.error('Simulation %s not in the catalog' % name)
     else:
         logging.info('Deleting simulation %s from the catalog' % name)
         del cat[name]
-    store_catalog(cfg, cat)
+    s.store_catalog(cat)
+    s.release_lock()
 
-def cancel(name,cfg):
+# the cleanup functions called as argv[2]:
+# connecting to remote host if needed
+
+def list(s):
+    s.connect()
+    s.acquire_lock()
+    cat = s.retrieve_catalog()
+    s.release_lock()
+    s.disconnect()
+    print('%-60s desc' % 'id')
+    print('-' * 70)
+    for k in sorted(cat):
+        print('%-60s %s' % (k, cat[k]['description']))
+
+def workspace(s):
+    logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
+    s.connect()
+    s.acquire_lock()
+    cat = s.retrieve_catalog(s)
+    s.release_lock()
+    s.disconnect()
+    for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
+        if osp.isdir(f):
+            ff = osp.basename(f)
+            if ff not in cat:
+                logging.error('%s not in the catalog' % ff)
+                local_rmdir(cfg, f)
+
+def output(s,name):
+    logging.info('Trying to delete WRF output and visualization of job %s' % name)
+    s.connect()
+    remote_rmdir(s, name)
+    s.disconnect()
+    local_rmdir(cfg,osp.join(name,'products'))
+    wrf_dir = osp.join(cfg['workspace_path'], name,'wrf')
+    files = glob.glob(osp.join(wrf_dir,'rsl.*'))+glob.glob(osp.join(wrf_dir,'wrfout_*'))
+    logging.info('Deleting %s WRF output files in  %s' % (len(files),wrf_dir ))
+    for f in files:
+        os.remove(f)
+
+def cancel(name):
     logging.info('Trying to cancel job %s' % name)
-    js, jobfile = load_job_file(name,cfg)
+    js, jobfile = load_job_file(name)
     if js is not None:
         if 'state' in js and js.state == 'Cancelled':
             logging.warning('Job %s was already cancelled, proceeding anyway' % name)
@@ -201,23 +176,17 @@ def cancel(name,cfg):
         js.state = "Cancelled"
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
-def delete(name,cfg):
-        logging.info('Trying to delete all files of job %s' % name)
-        remote_rmdir(cfg, name)
-        local_rmdir(cfg,name)
-        s.acquire_lock()
-        cat = retrieve_catalog(cfg)
-        if name not in cat:
-            logging.error('Simulation %s not in the catalog' % name)
-        else:
-            logging.info('Deleting simulation %s from the catalog' % name)
-            del cat[name]
-            store_catalog(cfg, cat)
-        s.release_lock()
+def delete(s,name):
+    s.connect()
+    logging.info('Trying to delete all files of job %s' % name)
+    remote_rmdir(s,name)
+    local_rmdir(name)
+    delete_from_catalog(s,name)
+    s.disconnect()
 
-def update(name,cfg):
+def update(name):
     logging.info('Updating state of job %s' % name)
-    js, jobfile = load_job_file(name,cfg)
+    js, jobfile = load_job_file(name)
     if js is not None:
         logging.info('Old state is: %s' % js.state)
         if not forecast_process_running(js):
@@ -246,7 +215,6 @@ def update(name,cfg):
                       js.state = 'Forecast stopped'
 
         logging.info('New state is: %s' % js.state)
-
 
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
@@ -277,24 +245,26 @@ if __name__ == '__main__':
         job_id = None
 
     logging.info('cleanup: command=%s job_id=%s' % (cmd,job_id))
+    s = SSHShuttle(cfg)
 
-
+    
     if cmd == 'list':
-        list(cfg)
+        list(s)
 
     if cmd == 'cancel':
-        cancel(job_id,cfg)
+        cancel(job_id)
 
     if cmd == 'output':
-        cancel(job_id,cfg)
-        output(job_id,cfg)
+        cancel(job_id)
+        output(s,job_id)
 
     if cmd == 'delete':
-        cancel(job_id,cfg)
-        delete(job_id,cfg)
+        cancel(job_id)
+        delete(s,job_id)
 
     if cmd == 'workspace':
-        workspace(cfg)
+        workspace(s)
 
     if cmd == 'update':
-        update(job_id,cfg)
+        update(job_id)
+
