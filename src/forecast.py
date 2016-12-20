@@ -622,8 +622,12 @@ if __name__ == '__main__':
     job_args = json.load(open(sys.argv[1]), 'ascii')
     # dump(job_args,'job_args')
     args = sys_cfg
+    keys = job_args.keys()
+    for key in keys:
+        if job_args[key] is None:
+            logging.warning('Job argument %s=None, ignoring' % key) 
+            del job_args[key]
     args.update(job_args)
-
     process_arguments(args)
 
     # sanity check, also that nothing in etc/conf got overrident
