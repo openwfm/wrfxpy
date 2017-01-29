@@ -17,7 +17,20 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+
+# requests library doesn't support ftp downloads
+# they do have requests-ftp, but they do not have confidence in it
+# "This library was cowboyed together in about 4 hours of total work,
+#  has no tests, and relies on a few ugly hacks."
 import requests
+
+# Add ftp functionality? Maybe a conditional on the first six letters of the url 'ftp://'?
+# import urllib
+# or
+# import urllib2
+# or
+# import ftblib
+
 import os.path as osp
 import logging
 

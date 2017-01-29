@@ -68,7 +68,7 @@ class HDFSource(object):
         """
         pass
 
-    def download_grib(self, url_base, rel_path, max_retries=3):
+    def download_hdf(self, url_base, rel_path, max_retries=3):
         """
         Download an HDF file from an HDF service and stream to <rel_path> in ingest_dir.
 
@@ -119,3 +119,41 @@ class MODIS(HDFSource):
 
 
     # do we need vtable stuff? seems specific to gribs.
+    def vtables(self):
+        """
+        returns the variable tables that must be linked in for use with the MODIS data source.
+        :return:
+        """
+        return {}
+
+    def namelist_keys(self):
+        """
+        returns the namelist keys that must be modified in namelist.input with MODIS.
+        (seems specific to gribs)
+        """
+        return{}
+
+    def retrieve_hdfs(self, from_utc, to_utc, ref_utc=None):
+        """
+        Attempts to retrieve the files to satisfy the the simulation request from_utc = to_utc.
+
+        Starts with the most recent cycle avaiable an hour ago, then moves further
+        into the past. For each candidate cycle, the filenames are computed, the local cache is
+        checked for files that are already there. The presence of the remaining files is checked
+        on server, if not available, we try an older cycle, if yes, download is attempted.
+        Once all files are downloaded, the manifest is returned.
+
+        :param from_utc: forecast start time
+        :param to_utc: forecast end time
+        :return: a list of paths to local HDF files
+        """
+        # ensure minutes and seconds are zero, simplifies arithmetic later
+        from_utc = from_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
+        to_utc = to_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
+
+        if ref_utc is None:
+            ref_utc = datetime.now(pytz.UTC)
+
+        # eg. 2017/015/MOD14.A2017015.0410.006.2017015084016.hdf
+        # MOD14.A[YEAR][DAY].[HOUR][MINUTE].006.[junk].hdf
+        # May need to implement julian time so that the increment will work properly
