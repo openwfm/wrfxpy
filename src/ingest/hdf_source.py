@@ -147,13 +147,36 @@ class MODIS(HDFSource):
         :param to_utc: forecast end time
         :return: a list of paths to local HDF files
         """
-        # ensure minutes and seconds are zero, simplifies arithmetic later
-        from_utc = from_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
-        to_utc = to_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
+        # ensure seconds are zero, simplifies arithmetic later
+        from_utc = from_utc.replace(second=0, tzinfo=pytz.UTC)
+        to_utc = to_utc.replace(second=0, tzinfo=pytz.UTC)
 
         if ref_utc is None:
             ref_utc = datetime.now(pytz.UTC)
 
-        # eg. 2017/015/MOD14.A2017015.0410.006.2017015084016.hdf
-        # MOD14.A[YEAR][DAY].[HOUR][MINUTE].006.[junk].hdf
-        # May need to implement julian time so that the increment will work properly
+            # 'allData/6/MOD[DATA]/[YEAR]/[DAY]/MOD[DATA].A[YEAR][DAY].[HOUR][MINUTE].006.*.hdf'
+
+        filepath = 'allData/6/MOD%02d/%04d/%03d/MOD%02d.A%04d%03d.%02d%02d.006.*.hdf'
+        current = from_utc
+        current = current - datetime.timedelta(minutes=current.minute % 5)
+
+        delta5min = datetime.timedelta(minutes=5)
+
+        manifest = []
+        while current < to_utc:
+            # Gives Julian day, used in the URL
+            days = (current - datetime.datetime(current.year, 1,1)).days + 1
+            year, hour, minute = current.year, current.hour, current.minute
+
+
+            # Turns out that the metadata is stored in a strange path on the FTP server
+            # Located at geoMeta/6/{TERRA, AQUA}/[YEAR], all files for the year are kept in this folder
+            # each file contains data for all of the MOD03 granules collected on that day
+
+
+            # Add url for both firedata and geolocation data
+            # 'allData/6/MOD[DATA]/[YEAR]/[DAY]/MOD[DATA].A[YEAR][DAY].[HOUR][MINUTE].006.*.hdf'
+            manifest.append(filename % (03, year, days, 03, year, days, hour, minute))
+            manifest.append(filename % (14, year, days, 14, year, days, hour, minute))
+
+            current = current + delta5min
