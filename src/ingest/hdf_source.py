@@ -109,9 +109,9 @@ class HDFSource(object):
                 symlink_unless_exists(osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, hdf_name))
 
 
-class MODIS(HDFSource):
+class MODIS_TERRA(HDFSource):
     """
-    750m data from the MODIS instrument on the Terra/Aqua satellites
+    750m data from the MODIS instrument on the Terra satellite
     """
 
     def __init__(self, ingest_dir):
@@ -160,23 +160,37 @@ class MODIS(HDFSource):
         current = from_utc
         current = current - datetime.timedelta(minutes=current.minute % 5)
 
-        delta5min = datetime.timedelta(minutes=5)
-
-        manifest = []
+        hdfManifest = []
         while current < to_utc:
             # Gives Julian day, used in the URL
             days = (current - datetime.datetime(current.year, 1,1)).days + 1
             year, hour, minute = current.year, current.hour, current.minute
 
-
-            # Turns out that the metadata is stored in a strange path on the FTP server
-            # Located at geoMeta/6/{TERRA, AQUA}/[YEAR], all files for the year are kept in this folder
-            # each file contains data for all of the MOD03 granules collected on that day
-
-
             # Add url for both firedata and geolocation data
             # 'allData/6/MOD[DATA]/[YEAR]/[DAY]/MOD[DATA].A[YEAR][DAY].[HOUR][MINUTE].006.*.hdf'
-            manifest.append(filename % (03, year, days, 03, year, days, hour, minute))
-            manifest.append(filename % (14, year, days, 14, year, days, hour, minute))
+            hdfManifest.append(filepath % (03, year, days, 03, year, days, hour, minute))
+            hdfManifest.append(filepath % (14, year, days, 14, year, days, hour, minute))
 
-            current = current + delta5min
+            current = current + ddatetime.timedelta(minutes=5)
+
+
+
+        # Turns out that the metadata is stored in a strange path on the FTP server
+        # Located at geoMeta/6/{TERRA, AQUA}/[YEAR]/{MOD, MYD}03_[YEAR]-[MONTH]-[DAY].txt
+        # each file contains data for all of the MOD/MYD 03 granules collected on that day
+
+        # Generate file paths for relevant metadata files
+        filepath = 'geoMeta/6/TERRA/%04d/MOD03_%04d-%02d-%02d.txt'
+        current = from_utc
+        # Start at the beginning of the day so that the easy comparison is correct
+        current = current.replace(second=0, minute=0, hour=0)
+        metaManifest = []
+
+        while current <= to_utc:
+            metaManifest.append(filepath % (current.year, current.year, current.month, current.day))
+            current = current + datetime.timedelta(days = 1)
+
+        # Next step is to remove all locally available, and all that aren't in the lonlat box
+
+        url_base = 'ftp://ladsweb.nascom.nasa.gov/'
+
