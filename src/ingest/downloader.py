@@ -23,13 +23,10 @@
 # "This library was cowboyed together in about 4 hours of total work,
 #  has no tests, and relies on a few ugly hacks."
 import requests
+import urllib2
 
-# Add ftp functionality? Maybe a conditional on the first six letters of the url 'ftp://'?
-# import urllib
-# or
-# import urllib2
-# or
-# import ftblib
+# We'll need this to search for wildcard matches in ftp guessing games
+import fnmatch
 
 import os.path as osp
 import logging
@@ -47,7 +44,7 @@ class DownloadError(Exception):
 def download_url(url, local_path, max_retries=3):
     """
     Download a remote URL to the location local_path with retries.
-    
+
     On download, the file size is first obtained and stored.  When the download completes,
     the file size is compared to the stored file.  This prevents broken downloads from
     contaminating the processing chain.
@@ -58,6 +55,26 @@ def download_url(url, local_path, max_retries=3):
     """
 
     logging.info('download_url %s as %s' % (url,local_path))
+
+    if url[:6] == 'ftp://':
+        # We don't know exactly what the url is, so we need to search for it
+        if '*' in url:
+            url_base = url[:url.rfind('/')+1]
+            # I would like to do this once, instead of every time I need a file from that folder
+            # I think that doing this inside the manifest calculation would be ideal
+            # but right now we need to retrieve all of the file names from the folder for every file
+            dList = urllib2.urlopen(url_base).read().splitlines()
+            filenames = []
+            for l in dList:
+                filenames.append(l.split()[-1])
+            # fnmatch filter does searches with wildcards just like we are used to in bash
+            filtered = fnmatch.filter(filenames, url[urlsplit+1:])
+            if filtered.len() != 1:
+                raise DownloadError('there were %d results for %s' % (filtered.len(), url))
+            else:
+                url = url_base + filtered[0]
+
+        # Now to retrieve the file
 
     r = requests.get(url, stream=True)
     content_size = int(r.headers['Content-Length'])

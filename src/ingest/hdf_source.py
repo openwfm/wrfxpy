@@ -147,7 +147,7 @@ class MODIS_TERRA(HDFSource):
         :param to_utc: forecast end time
         :return: a list of paths to local HDF files
         """
-        # ensure seconds are zero, simplifies arithmetic later
+        # ensure seconds are zero, makes comparisons more straightforward later
         from_utc = from_utc.replace(second=0, tzinfo=pytz.UTC)
         to_utc = to_utc.replace(second=0, tzinfo=pytz.UTC)
 
@@ -156,12 +156,14 @@ class MODIS_TERRA(HDFSource):
 
             # 'allData/6/MOD[DATA]/[YEAR]/[DAY]/MOD[DATA].A[YEAR][DAY].[HOUR][MINUTE].006.*.hdf'
 
+        # compute_hdf_manifest function
+        # requires from_utc and to_utc
         filepath = 'allData/6/MOD%02d/%04d/%03d/MOD%02d.A%04d%03d.%02d%02d.006.*.hdf'
-        current = from_utc
-        current = current - datetime.timedelta(minutes=current.minute % 5)
+        # Make sure that the minutes in the file name is a multiple of 5
+        current = from_utc - datetime.timedelta(minutes=from_utc.minute % 5)
 
         hdfManifest = []
-        while current < to_utc:
+        while current <= to_utc:
             # Gives Julian day, used in the URL
             days = (current - datetime.datetime(current.year, 1,1)).days + 1
             year, hour, minute = current.year, current.hour, current.minute
@@ -171,9 +173,11 @@ class MODIS_TERRA(HDFSource):
             hdfManifest.append(filepath % (03, year, days, 03, year, days, hour, minute))
             hdfManifest.append(filepath % (14, year, days, 14, year, days, hour, minute))
 
-            current = current + ddatetime.timedelta(minutes=5)
+            current = current + datetime.timedelta(minutes=5)
 
 
+        # compute_meta_manifest function
+        # requires from_utc and to_utc
 
         # Turns out that the metadata is stored in a strange path on the FTP server
         # Located at geoMeta/6/{TERRA, AQUA}/[YEAR]/{MOD, MYD}03_[YEAR]-[MONTH]-[DAY].txt
@@ -194,3 +198,4 @@ class MODIS_TERRA(HDFSource):
 
         url_base = 'ftp://ladsweb.nascom.nasa.gov/'
 
+        # This will all need to be done again for MODIS_AQUA and VIIRS
