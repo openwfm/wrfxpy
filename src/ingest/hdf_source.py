@@ -154,7 +154,7 @@ class MODIS_TERRA(HDFSource):
         if ref_utc is None:
             ref_utc = datetime.now(pytz.UTC)
 
-            # 'allData/6/MOD[DATA]/[YEAR]/[DAY]/MOD[DATA].A[YEAR][DAY].[HOUR][MINUTE].006.*.hdf'
+        # 'allData/6/MOD[DATA]/[YEAR]/[DAY]/MOD[DATA].A[YEAR][DAY].[HOUR][MINUTE].006.*.hdf'
 
         # compute_hdf_manifest function
         # requires from_utc and to_utc
