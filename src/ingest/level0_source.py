@@ -202,7 +202,7 @@ class MODIS_AQUA(level0Source):
 
         logging.info('Retrieving level0s from %s' % self.url_base + '/' + self.filepath)
 
-        map(lambda x:self.download_level0(self.url_base, self.filepath + '/' + x), nonlocals)
+        map(lambda x:self.download_level0(self.url_base + '/' + self.filepath, x), nonlocals)
 
         return manifest
 
