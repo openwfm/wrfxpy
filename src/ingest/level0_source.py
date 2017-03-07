@@ -173,6 +173,8 @@ class MODIS_TERRA(level0Source):
 class MODIS_AQUA(level0Source):
     """
     750m data from the MODIS instrument on the Aqua satellite
+    Uniqueness- Requires data from two directories on the source server,
+    modis data denoted with _m, and gbad data denoted with _g
     """
 
     def __init__(self, ingest_dir):
@@ -195,18 +197,21 @@ class MODIS_AQUA(level0Source):
         if ref_utc is None:
             ref_utc = datetime.now(pytz.UTC)
 
-        manifest = self.compute_manifest(from_utc, to_utc)
+        manifest_m = self.compute_manifest_m(from_utc, to_utc)
+        manifest_g = self.compute_manifest_g(from_utc, to_utc)
 
-        nonlocals = filter(lambda x: not self.level0_available_locally(osp.join(self.ingest_dir, x)), manifest)
+        nonlocals_m = filter(lambda x: not self.level0_available_locally(osp.join(self.ingest_dir, x)), manifest_m)
+        nonlocals_g = filter(lambda x: not self.level0_available_locally(osp.join(self.ingest_dir, x)), manifest_g)
 
+        logging.info('Retrieving level0s from %s' % self.url_base + '/' + self.filepath_m)
+        map(lambda x:self.download_level0(self.url_base + '/' + self.filepath_m, x), nonlocals_m)
 
-        logging.info('Retrieving level0s from %s' % self.url_base + '/' + self.filepath)
+        logging.info('Retrieving level0s from %s' % self.url_base + '/' + self.filepath_g)
+        map(lambda x:self.download_level0(self.url_base + '/' + self.filepath_g, x), nonlocals_g)
 
-        map(lambda x:self.download_level0(self.url_base + '/' + self.filepath, x), nonlocals)
+        return manifest_m + manifest_g
 
-        return manifest
-
-    def compute_manifest(self, from_utc, to_utc):
+    def compute_manifest_m(self, from_utc, to_utc):
         current_time = from_utc
 
         days = (current_time - datetime(current_time.year, 1, 1, tzinfo=pytz.UTC)).days + 1
@@ -220,7 +225,7 @@ class MODIS_AQUA(level0Source):
 
         # Filenames have this pattern: P1540064AAAAAAAAAAAAAAyyDDDhhmmss000.PDS
         # Retrieve the directory listing
-        dList = get_dList(self.url_base + '/' + self.filepath)
+        dList = get_dList(self.url_base + '/' + self.filepath_m)
 
         # Search for where our made up file would go, and start at the pair before it
         index = bisect(dList, filename) - 2
@@ -228,7 +233,7 @@ class MODIS_AQUA(level0Source):
 
         level0manifest = []
 
-        while current_time < to_utc and current_file[5:8] == '064':
+        while current_time < to_utc and index < len(dList):
             level0manifest.append(dList[index])
             level0manifest.append(dList[index+1])
 
@@ -244,8 +249,47 @@ class MODIS_AQUA(level0Source):
 
         return level0manifest
 
+    def compute_manifest_g(self, from_utc, to_utc):
+        current_time = from_utc
+
+        days = (current_time - datetime(current_time.year, 1, 1, tzinfo=pytz.UTC)).days + 1
+        year = current_time.year % 100
+
+        # Give an estimate for the first file that we want, we'll search for it later
+        filename = 'P1540957AAAAAAAAAAAAAA%02d%03d%02d%02d%02d001.PDS' % (year, days,
+                                                                          current_time.hour,
+                                                                          current_time.minute,
+                                                                          current_time.second)
+
+        # Filenames have this pattern: P1540957AAAAAAAAAAAAAAyyDDDhhmmss000.PDS
+        # Retrieve the directory listing
+        dList = get_dList(self.url_base + '/' + self.filepath_g)
+
+        # Search for where our made up file would go, and start at the pair before it
+        index = bisect(dList, filename) - 4
+        current_file = dList[index]
+
+        level0manifest = []
+
+        while current_time < to_utc and index < len(dList):
+            level0manifest.append(dList[index])
+            level0manifest.append(dList[index+1])
+
+            index = index + 4
+            current_file = dList[index]
+            # Change time to match the next file, use that time to compare to to_utc
+            current_time = current_time.replace(year = 2000 + int(current_file[22:24]))
+            current_time = current_time.replace(day=1, month=1)
+            current_time = current_time + timedelta(days=int(current_file[24:27]) - 1)
+            current_time = current_time.replace(hour=int(current_file[27:29]),
+                                                minute=int(current_file[29:31]),
+                                                second=int(current_file[31:33]))
+
+        return level0manifest
     url_base = 'ftp://is.sci.gsfc.nasa.gov'
-    filepath = 'gsfcdata/aqua/modis/level0'
+    filepath_m = 'gsfcdata/aqua/modis/level0'
+    filepath_g = 'gsfcdata/aqua/gbad'
+
 
 class VIIRS_NPP(level0Source):
     """
