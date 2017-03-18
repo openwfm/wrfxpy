@@ -565,7 +565,7 @@ class NARR(GribSource):
         return path_tmpl % (year, mon, year, mon, day, year, mon, day, hour)
 
     # instance variables
-    remote_url = 'http://nomads.ncdc.noaa.gov/data/narr'
+    remote_url = 'https://nomads.ncdc.noaa.gov/data/narr'
     period_hours = 3
 
 ## Utility functions
