@@ -441,6 +441,8 @@ def process_output(job_id):
         js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
         make_clean_dir(js.pp_dir)
         pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
+        js.manifest_filename= 'wfc-' + js.grid_code + '.json'
+        logging.debug('Postprocessor created manifest %s',js.manifest_filename)
         max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
 
     wait_lines = 0
@@ -483,7 +485,7 @@ def process_output(job_id):
             # in incremental mode, upload to server
             if js.postproc.get('shuttle', None) == 'incremental':
                 desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc, already_sent_files)
+                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
                 already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
             wait_wrfout = 0
         else: 
@@ -494,7 +496,7 @@ def process_output(job_id):
     # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc)
+        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
     js.old_pid = js.pid
     js.pid = None

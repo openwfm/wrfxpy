@@ -227,7 +227,7 @@ class SSHShuttle(object):
         json.dump(cat_sorted, open(self.cat_local_path, 'w'), indent=1, separators=(',',':'))
         self.put(self.cat_local_path, 'catalog.json')
 
-def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = None, exclude_files = []):
+def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filename, description = None, exclude_files = []):
     """
     Executes all steps required to send a local product directory to a remote visualization
     server for display.
@@ -241,31 +241,22 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     :return: a list of the files that was sent
     """
     
-    logging.debug('SHUTTLE send_product_to_server')
-    logging.debug('SHUTTLE local directory    %s' % local_dir)
-    logging.debug('SHUTTLE remote directory   %s' % remote_dir)
-    logging.debug('SHUTTLE simulation name    %s' % sim_name)
-    logging.debug('SHUTTLE description        %s' % description)
+    logging.info('SHUTTLE send_product_to_server')
+    # logging.info('SHUTTLE local directory    %s' % local_dir)
+    logging.info('SHUTTLE remote directory   %s' % remote_dir)
+    logging.info('SHUTTLE simulation name    %s' % sim_name)
+    logging.info('SHUTTLE manifest file name %s' % manifest_filename)
+    logging.info('SHUTTLE description        %s' % description)
     logging.debug('SHUTTLE configuration:\n%s' % pprint.pformat(cfg,indent=4))
    
     s = SSHShuttle(cfg)
     s.connect()
 
-    # identify the manifest file
-    manifest_pattern = osp.join(local_dir, '*.json')
-    #logging.info('looking for local manifest file %s' % manifest_pattern)
-    json_files=glob.glob(osp.join(local_dir, '*.json'));
-    if len(json_files)==1:
-       manifest_file = json_files[0]
-       logging.info('SHUTTLE found local manifest file %s' % manifest_file)
-    else:
-       logging.critical('SHUTTLE did not find a unique local manifest file %s' % manifest_pattern)
-       sys.exit(1)
-
     logging.info('SHUTTLE sending local directory %s to remote host' % local_dir)
     sent_files = s.send_directory(local_dir, remote_dir, exclude_files)
 
     # identify the start/end UTC time (all domains may not have the same simulation extent)
+    manifest_file = osp.join(local_dir,manifest_filename)
     mf = json.load(open(manifest_file))
     #print 'manifest:', json.dumps(mf, indent=4, separators=(',', ': '))
     logging.debug('manifest %s' % mf)
