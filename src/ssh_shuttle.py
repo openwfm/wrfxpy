@@ -268,15 +268,20 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
     logging.info('SHUTTLE detected local start/end UTC times as %s - %s' % (times[0], times[-1]))
 
     # retrieve the catalog & update it
-    logging.info('SHUTTLE updating catalog file on remote host')
-    s.acquire_lock()
-    cat = s.retrieve_catalog()
-    cat[sim_name] = { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
+    logging.info('SHUTTLE updating local catalog file on remote host')
+    local_cat = { sim_name : { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
                       'description' : description if description is not None else sim_name,
                       'from_utc' : times[0],
                       'to_utc' : times[-1] }
-    s.store_catalog(cat)
-    s.release_lock()
+                }
+    local_cat_path = osp.join(local_dir,'catalog.json')
+    json.dump(local_cat, open(local_cat_path, 'w'), indent=1, separators=(',',':'))
+    remote_cat_path = remote_dir + '/catalog.json'
+    s.put(local_cat_path, remote_cat_path)
+    stdin, stdout, stderr = s.ssh.exec_command('wrfxweb/join_catalog.sh')
+    stdin.flush()
+    print stdout.read()
+    print stderr.read()
 
     s.disconnect()
 
