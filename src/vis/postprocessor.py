@@ -300,8 +300,10 @@ class Postprocessor(object):
         :return: the path to the generated KMZ
         """
         # construct kml file
-        file = kml.Kml(name = var)
-        doc = file.newdocument(name = ts_esmf_begin + ' ' + var)
+
+        name = ts_esmf_begin + ' ' + var
+        file = kml.Kml(name = name)
+        doc = file.newdocument(name = name)
         doc.timespan.begin=ts_esmf_begin.replace('_','T')+'Z'
         if ts_esmf_end is not None:
             doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
@@ -352,9 +354,11 @@ class Postprocessor(object):
         :return: the path to the generated KMZ
         """
         # construct kml file
-        file = kml.Kml(name = var)
 
-        doc = file.newdocument(name = ts_esmf_begin + ' ' + var)
+        name = ts_esmf_begin + ' ' + var
+        file = kml.Kml(name = name)
+
+        doc = file.newdocument(name = name)
         doc.timespan.begin=ts_esmf_begin.replace('_','T')+'Z'
         if ts_esmf_end is not None:
             doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
