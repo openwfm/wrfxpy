@@ -164,6 +164,17 @@ class SSHShuttle(object):
             self.sftp.remove(osp.join(abs_path, f))
         self.sftp.rmdir(abs_path)
 
+    def simple_command(self, command):
+        """
+        Execute command on the remote host with no frills.
+
+        :param command: the command string to be executed
+        """
+        stdin, stdout, stderr = self.ssh.exec_command(command)
+        stdin.flush()
+        print stdout.read()
+        print stderr.read()
+
     def has_lock(self):
         return self.lock_file is not None 
 
@@ -278,10 +289,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
     json.dump(local_cat, open(local_cat_path, 'w'), indent=1, separators=(',',':'))
     remote_cat_path = remote_dir + '/catalog.json'
     s.put(local_cat_path, remote_cat_path)
-    stdin, stdout, stderr = s.ssh.exec_command('wrfxweb/join_catalog.sh')
-    stdin.flush()
-    print stdout.read()
-    print stderr.read()
+    s.simple_command('wrfxweb/join_catalog.sh')
 
     s.disconnect()
 
