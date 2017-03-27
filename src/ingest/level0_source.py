@@ -228,7 +228,7 @@ class MODIS_AQUA(level0Source):
 
         level0manifest = []
 
-        while current_time < to_utc and current_file[5:8] == '064':
+        while current_time < to_utc and index < len(dList):
             level0manifest.append(dList[index])
             level0manifest.append(dList[index+1])
 
