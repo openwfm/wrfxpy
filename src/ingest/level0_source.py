@@ -150,11 +150,14 @@ class MODIS_TERRA(level0Source):
 
         level0manifest = []
 
-        while current_time < to_utc and index < len(dList):
+        while current_time < to_utc:
             level0manifest.append(dList[index])
             level0manifest.append(dList[index+1])
 
             index = index + 2
+            if index >= len(dList):
+                break
+
             current_file = dList[index]
             # Change time to match the next file, use that time to compare to to_utc
             current_time = current_time.replace(year = 2000 + int(current_file[22:24]))
@@ -233,11 +236,14 @@ class MODIS_AQUA(level0Source):
 
         level0manifest = []
 
-        while current_time < to_utc and index < len(dList):
+        while current_time < to_utc:
             level0manifest.append(dList[index])
             level0manifest.append(dList[index+1])
 
             index = index + 2
+            if index >= len(dList):
+                break
+
             current_file = dList[index]
             # Change time to match the next file, use that time to compare to to_utc
             current_time = current_time.replace(year = 2000 + int(current_file[22:24]))
@@ -271,11 +277,14 @@ class MODIS_AQUA(level0Source):
 
         level0manifest = []
 
-        while current_time < to_utc and index < len(dList):
+        while current_time < to_utc:
             level0manifest.append(dList[index])
             level0manifest.append(dList[index+1])
 
             index = index + 4
+            if index >= len(dList):
+                break
+
             current_file = dList[index]
             # Change time to match the next file, use that time to compare to to_utc
             current_time = current_time.replace(year = 2000 + int(current_file[22:24]))
@@ -349,10 +358,13 @@ class VIIRS_NPP(level0Source):
 
         # there are strange gaps in times between files that I can't reconcile
         # so I just take the start of the next file as current_time
-        while current_time < to_utc and index < len(dList):
+        while current_time < to_utc:
             level0manifest.append(dList[index])
 
             index = index + 1
+            if index >= len(dList):
+                break
+
             current_file = dList[index]
             # Change time to match the next file, use that time to compare to to_utc
             current_time = current_time.replace(year=int(current_file[17:21]),

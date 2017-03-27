@@ -80,7 +80,6 @@ def download_url(url, local_path, max_retries=3):
                 os.remove(local_path)
                 logging.info('download_url trying again, retries available %d' % retries_available)
                 if current_retries == 0:
-                    os.remove(local_path)
                     os.remove(info_path)
                     raise DownloadError('failed to download file %s' % url)
                 current_retries -= 1
