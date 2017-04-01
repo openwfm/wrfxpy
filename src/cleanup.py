@@ -27,9 +27,9 @@ import shutil
 import glob
 import signal
 import subprocess
-from utils import kill_process, Dict, process_create_time
+from utils import kill_process, Dict, process_create_time, load_sys_cfg
 
-cfg = Dict(json.load(open('etc/conf.json')))
+cfg = load_sys_cfg()
 
 def remote_rmdir(s,dirname):
     logging.info('SHUTTLE removing remote directory %s' % dirname)
@@ -105,7 +105,6 @@ def parallel_job_running(js):
     return ws
 
 def delete_from_catalog(s,name):
-    s.acquire_lock()
     cat = s.retrieve_catalog()
     if name not in cat:
         logging.error('Simulation %s not in the catalog' % name)
@@ -113,16 +112,13 @@ def delete_from_catalog(s,name):
         logging.info('Deleting simulation %s from the catalog' % name)
         del cat[name]
     s.store_catalog(cat)
-    s.release_lock()
 
 # the cleanup functions called as argv[2]:
 # connecting to remote host if needed
 
 def list(s):
     s.connect()
-    s.acquire_lock()
     cat = s.retrieve_catalog()
-    s.release_lock()
     s.disconnect()
     print('%-60s desc' % 'id')
     print('-' * 70)
@@ -132,9 +128,7 @@ def list(s):
 def workspace(s):
     logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
     s.connect()
-    s.acquire_lock()
     cat = s.retrieve_catalog(s)
-    s.release_lock()
     s.disconnect()
     for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
         if osp.isdir(f):

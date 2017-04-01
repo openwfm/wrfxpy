@@ -26,7 +26,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time
+                  make_clean_dir, process_create_time, load_sys_cfg
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -599,17 +599,6 @@ def process_arguments(args):
     for k, v in args.iteritems():
         if type(v) == unicode:
             args[k] = v.encode('ascii')
-
-def load_sys_cfg():
-    # load the system configuration
-    sys_cfg = None
-    try:
-        sys_cfg = json.load(open('etc/conf.json'))
-    except IOError:
-        logging.critical('Cannot find system configuration, have you created etc/conf.json?')
-        sys.exit(2)
-    return Dict(sys_cfg)
-
 
 if __name__ == '__main__':
 

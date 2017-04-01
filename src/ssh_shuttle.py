@@ -29,6 +29,7 @@ import pprint
 import fcntl
 import errno
 import collections
+from utils import load_sys_cfg
 
 
 
@@ -309,7 +310,7 @@ if __name__ == '__main__':
     remote_dir = sys.argv[2]
     sim_name = sys.argv[3]
 
-    cfg = json.load(open('etc/conf.json'))
+    cfg = load_sys_cfg()
 
     send_product_to_server(cfg, local_dir, remote_dir, sim_name, None, [])
 
