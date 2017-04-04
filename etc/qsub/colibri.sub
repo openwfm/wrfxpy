@@ -3,6 +3,7 @@
 #$ -cwd
 #$ -j y
 #$ -S /bin/bash
+#$ -q wrf.q
 cat $0
 cp $PE_HOSTFILE pe_hostfile
 awk '{print $1 " slots=" $2}' < pe_hostfile | sed 's/\.local//' > hostfile
