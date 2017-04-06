@@ -318,7 +318,7 @@ class NAM218(GribSource):
             # return manifest
             return manifest
 
-        raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles.' % repr(unavailables))
+        raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
     
     def compute_manifest(self, cycle_start, fc_start, fc_hours):
         """
@@ -441,7 +441,7 @@ class NAM227(GribSource):
             # return manifest
             return manifest
 
-        raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles.' % repr(unavailables))
+        raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
 
     def compute_manifest(self, cycle_start, fc_start, fc_hours):
         """
