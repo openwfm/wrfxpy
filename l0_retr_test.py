@@ -29,8 +29,7 @@ print "TESTING SOURCES FOR FILES IN LAST 5 HOURS\n"
 
 for t in source_types:
     print "\nRETRIEVING %s FILES FROM THE LAST 5 HOURS WITH CALL:" % t
-    print './level0_retr.sh %s %s %s %s \n' %
-           (t, five_hours_ago, current_time, local_path)
+    print './level0_retr.sh %s %s %s %s \n' % (t, five_hours_ago, current_time, local_path)
 
     subprocess.call(['./level0_retr.sh', t, five_hours_ago, current_time, local_path])
 
@@ -44,8 +43,7 @@ print "TESTING SOURCES FOR FILES IN LAST 10 HOURS\n"
 
 for t in source_types:
     print "\nRETRIEVING %s FILES FROM THE LAST 10 HOURS WITH CALL:" % t
-    print './level0_retr.sh %s %s %s %s \n' %
-           (t, ten_hours_ago, current_time, local_path)
+    print './level0_retr.sh %s %s %s %s \n' % (t, ten_hours_ago, current_time, local_path)
 
     subprocess.call(['./level0_retr.sh', t, ten_hours_ago, current_time, local_path])
 
