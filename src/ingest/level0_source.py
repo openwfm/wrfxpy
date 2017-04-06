@@ -130,6 +130,13 @@ class MODIS_TERRA(level0Source):
         return manifest
 
     def compute_manifest(self, from_utc, to_utc):
+        """
+        Compute list of files in the source for the given time frame
+
+        :param from_utc: time UTC format
+        :param to_utc: time UTC format
+        :return: list of file names as strings
+        """
         current_time = from_utc
 
         days = (current_time - datetime(current_time.year, 1, 1, tzinfo=pytz.UTC)).days + 1
