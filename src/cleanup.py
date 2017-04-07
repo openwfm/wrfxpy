@@ -104,15 +104,6 @@ def parallel_job_running(js):
         logging.info('WRF job %s is not running.' % js.job_num)
     return ws
 
-def delete_from_catalog(s,name):
-    cat = s.retrieve_catalog()
-    if name not in cat:
-        logging.error('Simulation %s not in the catalog' % name)
-    else:
-        logging.info('Deleting simulation %s from the catalog' % name)
-        del cat[name]
-    s.store_catalog(cat)
-
 # the cleanup functions called as argv[2]:
 # connecting to remote host if needed
 
@@ -175,7 +166,7 @@ def delete(s,name):
     logging.info('Trying to delete all files of job %s' % name)
     remote_rmdir(s,name)
     local_rmdir(name)
-    delete_from_catalog(s,name)
+    s.simple_command('wrfxweb/join_catalog.sh')
     s.disconnect()
 
 def update(name):

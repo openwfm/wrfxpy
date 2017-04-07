@@ -176,40 +176,6 @@ class SSHShuttle(object):
         print stdout.read()
         print stderr.read()
 
-    def has_lock(self):
-        return self.lock_file is not None 
-
-    def acquire_lock(self):
-        """
-        Block until exclusive lock can be acquired.
-        Used before code that should be executed by one process at a time only,
-        such as updating the catalog.
-        """ 
-        logging.info('SHUTTLE acquiring lock on %s' % self.lock_path)
-        if not self.connected:
-            logging.warning('SHUTTLE is not connected')
-        if self.has_lock():
-            logging.warning('SHUTTLE already has a lock.')
-        self.lock_file = open(self.lock_path,'w',0)  # unbuffered
-        try:
-            fcntl.flock(self.lock_file,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except IOError as e:
-            if e.errno == errno.EACCES or e.errno == errno.EAGAIN:
-                logging.info('SHUTTLE waiting for lock on %s' % self.lock_path)
-            else:
-                logging.error("I/O error %s: %s" % (e.errno, e.strerror))
-        fcntl.flock(self.lock_file,fcntl.LOCK_EX)
-        logging.info('SHUTTLE acquired lock on %s' % self.lock_path)
-
-    def release_lock(self):
-        logging.info('SHUTTLE releasing lock on %s' % self.lock_path)
-        if self.lock_file is not None:
-            fcntl.flock(self.lock_file,fcntl.LOCK_UN)
-            self.lock_file.close()
-            self.lock_file = None
-        else:
-            logging.warning('SHUTTLE did not have a lock.')
-
     def retrieve_catalog(self):
         """ 
         Retrieve the catalog from the remote visualization server
@@ -218,26 +184,11 @@ class SSHShuttle(object):
         
         """
         logging.info('SHUTTLE retrieving catalog file.')
-        if not self.has_lock():
-            logging.warning('SHUTTLE does not have lock, catalog corruption possible.')
+        self.simple_command('wrfxweb/join_catalog.sh')
         self.get('catalog.json', self.cat_local_path)
         cat = json.load(open(self.cat_local_path))
         logging.info('SHUTTLE retrieve complete.')
         return cat 
-
-    def store_catalog(self, cat):
-        """
-        Store a new version of the catalog on the remote server
-        NOTE: connect and release lock after catalog operations
-
-        :param cat: the JSON object representing the new catalog
-        """
-        logging.info('SHUTTLE sending catalog file.')
-        if not self.has_lock():
-            logging.warning('SHUTTLE does not have lock, catalog corruption possible.')
-        cat_sorted=collections.OrderedDict(sorted(cat.items(), reverse=True))
-        json.dump(cat_sorted, open(self.cat_local_path, 'w'), indent=1, separators=(',',':'))
-        self.put(self.cat_local_path, 'catalog.json')
 
 def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filename, description = None, exclude_files = []):
     """
