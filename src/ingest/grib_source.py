@@ -331,7 +331,7 @@ class NAM218(GribSource):
         :param fc_start: index of first file we need
         :param fc_hours: final forecast hour 
         """
-        path_tmpl = 'nam.%04d%02d%02d/nam.t%02dz.awphys%02d.grb2.tm00'
+        path_tmpl = 'nam.%04d%02d%02d/nam.t%02dz.awphys%02d.tm00.grib2'
         fc_seq = range(fc_start, 36) + range(max(fc_start, 39), 85, 3)
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
