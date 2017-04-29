@@ -64,7 +64,9 @@ class SSHShuttle(object):
         """
         logging.info('SHUTTLE connecting to remote host %s' % self.host)
         ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.load_system_host_keys()
+        #ssh.load_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
         ssh.connect(self.host, username=self.user, key_filename=self.key)
         self.ssh = ssh
         self.sftp = ssh.open_sftp()
@@ -130,7 +132,13 @@ class SSHShuttle(object):
         :param remote_path: remote path
         :param local_path: local path
         """
-        self.sftp.get(remote_path, local_path)
+        try:
+            self.sftp.get(remote_path, local_path)
+        except IOError as e:
+            logging.error('ssh_shuttle: sftp.get failed: %s' % e.strerror)
+            logging.error('remote_path: %s' % remote_path)
+            logging.error('local_path: %s' % local_path)
+            exit(1)
 
 
     def chdir(self, remote_dir, ensure_exists=False):
