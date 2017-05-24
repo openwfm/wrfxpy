@@ -45,10 +45,10 @@ def json2kml(s,kml_path):
             longitude=s[p]['longitude']
             acq_date=s[p]['acq_date']
             acq_time=s[p]['acq_time']
-            satellite=s[p]['satellite']
-            instrument=s[p]['instrument']
-            confidence=s[p]['confidence']
-            frp=s[p]['frp']
+            satellite=s[p].get('satellite','Not available')
+            instrument=s[p].get('instrument','Not available')
+            confidence=s[p].get('confidence','Not available')
+            frp=s[p].get('frp','Not available')
 
             latitude=float(latitude)
 	    longitude=float(longitude)
