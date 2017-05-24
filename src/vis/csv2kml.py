@@ -29,7 +29,7 @@ def read_csv(csv_path):
 def json2kml(s,kml_path):
 
     with open(kml_path,'w') as kml:
-        with open('partial1.kml','r') as part:
+        with open('src/vis/partial1.kml','r') as part:
             for line in part:
                kml.write(line)
     
@@ -87,8 +87,9 @@ def json2kml(s,kml_path):
 if __name__ == '__main__':
 
 
-    if len(sys.argv) < 3:
-        print('usage: python csv2kml.py csv_file_path kml_file_path')
+    if len(sys.argv) < 3 or not sys.argv[2]:
+        print('usage: csv2kml.sh csv_file_path kml_file_path')
+        #print('usage: python csv2kml.py csv_file_path kml_file_path')
         sys.exit(1)
 
     csv_file_path=sys.argv[1]
