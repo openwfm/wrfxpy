@@ -51,14 +51,23 @@ def json2kml(s,kml_path):
             frp=s[p].get('frp','Not available')
 
             latitude=float(latitude)
-	    longitude=float(longitude)
+            longitude=float(longitude)
             confidence=float(confidence)
             frp=float(frp)
             timestamp=acq_date + 'T' + acq_time[0:2] + ':' + acq_time[2:4] + 'Z'
+            timedescr=acq_date + ' ' + acq_time[0:2] + ':' + acq_time[2:4] + ' UTC'
 
             print([longitude,latitude,acq_date,acq_time,satellite,instrument,confidence,frp])
 
             kml.write('<Placemark>\n<name>Fire detection square</name>\n')
+            kml.write('<description>\nlongitude:  %s\n' % longitude 
+                                  +  'latitude:   %s\n' % latitude
+                                  +  'time:       %s\n' % timedescr
+                                  +  'satellite:  %s\n' % satellite
+                                  +  'instrument: %s\n' % instrument
+                                  +  'confidence: %s\n' % confidence
+                                  +  'FRP:        %s\n' % frp 
+                    + '</description>\n')
             kml.write('<TimeStamp>%s</TimeStamp>\n' % timestamp)
             if confidence < 30:
                 kml.write('<styleUrl> modis_conf_low </styleUrl>\n')
