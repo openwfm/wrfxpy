@@ -11,7 +11,7 @@ def read_csv(csv_path):
     """
 
     print('Reading file %s\n' % csv_path)
-    with open(csv_path,'r') as csv_file:
+    with open(csv_path,'rU') as csv_file:
         reader = csv.reader(csv_file, delimiter=',', quotechar='"')
         row_num=0
         out={}
