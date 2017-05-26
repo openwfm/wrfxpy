@@ -26,25 +26,37 @@ def read_csv(csv_path):
 
         return(out)
 
+def copyto(partial_path,kml):
+    with open(partial_path,'r') as part:
+        for line in part:
+            kml.write(line)
+
 def json2kml(s,kml_path):
 
+    frp_style={-1:'modis_frp_no_data',40:'modis_frp_gt_400'}
+    for i in range(0,40):
+        frp_style[i]='modis_frp_%s_to_%s' % (i*10, i*10+10)
+ 
     with open(kml_path,'w') as kml:
-        with open('src/vis/partial1.kml','r') as part:
-            for line in part:
-               kml.write(line)
-    
+
+        copyto('src/vis/partial1.kml',kml)
+
         r = 6378   # Earth radius
         km_lat = 180/(math.pi*r)  # 1km in degrees latitude
         sq_size_km = 1.0   # square size
 
         type = {'AF':'Active Fires','FRP':'Fire Radiative Power'}
-        type = {'AF':'Active Fires'}
+        #type = {'AF':'Active Fires'}
 
         for t in type:
 
             kml.write('<Folder>\n')
             kml.write('<name>%s</name>\n' % type[t])
+
+            if t=='FRP':
+                copyto('src/vis/partial2.kml',kml)
      
+
             for p in s:
                 latitude=s[p]['latitude']
                 longitude=s[p]['longitude']
@@ -53,7 +65,7 @@ def json2kml(s,kml_path):
                 satellite=s[p].get('satellite','Not available')
                 instrument=s[p].get('instrument','Not available')
                 confidence=s[p].get('confidence','Not available')
-                frp=s[p].get('frp','Not available')
+                frp=s[p].get('frp',0)
     
                 latitude=float(latitude)
                 longitude=float(longitude)
@@ -81,6 +93,9 @@ def json2kml(s,kml_path):
                         kml.write('<styleUrl> modis_conf_med </styleUrl>\n')
                     else:
                         kml.write('<styleUrl> modis_conf_high </styleUrl>\n')
+                elif t=='FRP':
+                    frpx = min(40,math.ceil(frp/10.)-1)
+                    kml.write('<styleUrl> %s </styleUrl>\n' % frp_style[frpx] )
 
                 kml.write('<Polygon>\n<outerBoundaryIs>\n<LinearRing>\n<coordinates>\n')
     
