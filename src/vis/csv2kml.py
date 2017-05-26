@@ -33,62 +33,70 @@ def json2kml(s,kml_path):
             for line in part:
                kml.write(line)
     
-        kml.write('<Folder>\n')
-        kml.write('<name>Detection squares</name>\n')
- 
         r = 6378   # Earth radius
         km_lat = 180/(math.pi*r)  # 1km in degrees latitude
         sq_size_km = 1.0   # square size
 
-        for p in s:
-            latitude=s[p]['latitude']
-            longitude=s[p]['longitude']
-            acq_date=s[p]['acq_date']
-            acq_time=s[p]['acq_time']
-            satellite=s[p].get('satellite','Not available')
-            instrument=s[p].get('instrument','Not available')
-            confidence=s[p].get('confidence','Not available')
-            frp=s[p].get('frp','Not available')
+        type = {'AF':'Active Fires','FRP':'Fire Radiative Power'}
+        type = {'AF':'Active Fires'}
 
-            latitude=float(latitude)
-            longitude=float(longitude)
-            confidence=float(confidence)
-            frp=float(frp)
-            timestamp=acq_date + 'T' + acq_time[0:2] + ':' + acq_time[2:4] + 'Z'
-            timedescr=acq_date + ' ' + acq_time[0:2] + ':' + acq_time[2:4] + ' UTC'
+        for t in type:
 
-            print([longitude,latitude,acq_date,acq_time,satellite,instrument,confidence,frp])
+            kml.write('<Folder>\n')
+            kml.write('<name>%s</name>\n' % type[t])
+     
+            for p in s:
+                latitude=s[p]['latitude']
+                longitude=s[p]['longitude']
+                acq_date=s[p]['acq_date']
+                acq_time=s[p]['acq_time']
+                satellite=s[p].get('satellite','Not available')
+                instrument=s[p].get('instrument','Not available')
+                confidence=s[p].get('confidence','Not available')
+                frp=s[p].get('frp','Not available')
+    
+                latitude=float(latitude)
+                longitude=float(longitude)
+                confidence=float(confidence)
+                frp=float(frp)
+                timestamp=acq_date + 'T' + acq_time[0:2] + ':' + acq_time[2:4] + 'Z'
+                timedescr=acq_date + ' ' + acq_time[0:2] + ':' + acq_time[2:4] + ' UTC'
+    
+                print([longitude,latitude,acq_date,acq_time,satellite,instrument,confidence,frp])
+    
+                kml.write('<Placemark>\n<name>Fire detection square</name>\n')
+                kml.write('<description>\nlongitude:  %s\n' % longitude 
+                                      +  'latitude:   %s\n' % latitude
+                                      +  'time:       %s\n' % timedescr
+                                      +  'satellite:  %s\n' % satellite
+                                      +  'instrument: %s\n' % instrument
+                                      +  'confidence: %s\n' % confidence
+                                      +  'FRP:        %s\n' % frp 
+                        + '</description>\n')
+                kml.write('<TimeStamp><when>%s</when></TimeStamp>\n' % timestamp)
+                if t == 'AF':
+                    if confidence < 30:
+                        kml.write('<styleUrl> modis_conf_low </styleUrl>\n')
+                    elif confidence < 80: 
+                        kml.write('<styleUrl> modis_conf_med </styleUrl>\n')
+                    else:
+                        kml.write('<styleUrl> modis_conf_high </styleUrl>\n')
 
-            kml.write('<Placemark>\n<name>Fire detection square</name>\n')
-            kml.write('<description>\nlongitude:  %s\n' % longitude 
-                                  +  'latitude:   %s\n' % latitude
-                                  +  'time:       %s\n' % timedescr
-                                  +  'satellite:  %s\n' % satellite
-                                  +  'instrument: %s\n' % instrument
-                                  +  'confidence: %s\n' % confidence
-                                  +  'FRP:        %s\n' % frp 
-                    + '</description>\n')
-            kml.write('<TimeStamp>%s</TimeStamp>\n' % timestamp)
-            if confidence < 30:
-                kml.write('<styleUrl> modis_conf_low </styleUrl>\n')
-            elif confidence < 80: 
-                kml.write('<styleUrl> modis_conf_med </styleUrl>\n')
-            else:
-                kml.write('<styleUrl> modis_conf_high </styleUrl>\n')
-            kml.write('<Polygon>\n<outerBoundaryIs>\n<LinearRing>\n<coordinates>\n')
+                kml.write('<Polygon>\n<outerBoundaryIs>\n<LinearRing>\n<coordinates>\n')
+    
+    	        km_lon=km_lat/math.cos(latitude*math.pi/180)  # 1 km in longitude
+                sq2_lat=km_lat * sq_size_km/2;
+                sq2_lon=km_lon * sq_size_km/2;
+                kml.write('%s,%s,0\n' % (longitude - sq2_lon, latitude-sq2_lat))
+                kml.write('%s,%s,0\n' % (longitude - sq2_lon, latitude+sq2_lat))
+                kml.write('%s,%s,0\n' % (longitude + sq2_lon, latitude+sq2_lat))
+                kml.write('%s,%s,0\n' % (longitude + sq2_lon, latitude-sq2_lat))
+                kml.write('%s,%s,0\n' % (longitude - sq2_lon, latitude-sq2_lat))
+    
+                kml.write('</coordinates>\n</LinearRing>\n</outerBoundaryIs>\n</Polygon>\n</Placemark>\n')
+    
+            kml.write('</Folder>\n')
 
-	    km_lon=km_lat/math.cos(latitude*math.pi/180)  # 1 km in longitude
-            sq2_lat=km_lat * sq_size_km/2;
-            sq2_lon=km_lon * sq_size_km/2;
-            kml.write('%s,%s,0\n' % (longitude - sq2_lon, latitude-sq2_lat))
-            kml.write('%s,%s,0\n' % (longitude - sq2_lon, latitude+sq2_lat))
-            kml.write('%s,%s,0\n' % (longitude + sq2_lon, latitude+sq2_lat))
-            kml.write('%s,%s,0\n' % (longitude + sq2_lon, latitude-sq2_lat))
-            kml.write('%s,%s,0\n' % (longitude - sq2_lon, latitude-sq2_lat))
-
-            kml.write('</coordinates>\n</LinearRing>\n</outerBoundaryIs>\n</Polygon>\n</Placemark>\n')
-
-        kml.write('</Folder>\n')
         kml.write('</Document>\n</kml>\n')
     
     print('Created file %s\n' % kml_path)
