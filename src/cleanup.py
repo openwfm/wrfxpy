@@ -83,7 +83,10 @@ def load_job_file(job_id):
 def forecast_process_running(js):
     if 'pid' in js and 'process_create_time' in js:
         fs =  js.process_create_time == process_create_time(js.pid)
-        logging.info('Forecast process is running: %s pid=%s' % (fs, js.pid))
+        if fs:
+           logging.info('Forecast process is running. pid=%s' % (js.pid))
+        else:
+            logging.info('Forecast process is not running')
         return fs
     else:
         logging.warning('Cannot determine if forecast process is running - old job file?')
@@ -91,6 +94,7 @@ def forecast_process_running(js):
 
 def parallel_job_running(js):
     cluster = load_cluster_file(js.qsys)
+    logging.debug('Checking for WRF job %s' % js.job_num)
     ret = subprocess.check_output(cluster['qstat_cmd'])
     ws = False
     for line in ret.split('\n'):
@@ -99,9 +103,9 @@ def parallel_job_running(js):
              ws = True
              break
     if ws:
-        logging.debug('WRF job %s is running.' % js.job_num)
+        logging.info('WRF job %s is running.' % js.job_num)
     else:
-        logging.info('WRF job %s is not running.' % js.job_num)
+        logging.info('WRF job is not running.')
     return ws
 
 # the cleanup functions called as argv[2]:
@@ -173,12 +177,12 @@ def update(name):
     logging.info('Updating state of job %s' % name)
     js, jobfile = load_job_file(name)
     if js is not None:
-        logging.info('Old state is: %s' % js.state)
+        logging.debug('Old state is: %s' % js.state)
         if not forecast_process_running(js):
-            #logging.info('Forecast process is not running')
+            logging.debug('Forecast process is not running')
             js.pid = None
         if not parallel_job_running(js):    
-            #logging.info('WRF is not running')
+            logging.debug('WRF is not running')
             js.old_job_num = js.job_num
             js.job_num = None
         if js.state == 'Completed' or js.state == 'Cancelled':
@@ -199,7 +203,7 @@ def update(name):
                  if js.pid is None and js.job_num is not None:
                       js.state = 'Forecast stopped'
 
-        logging.info('New state is: %s' % js.state)
+        logging.info('State is: %s' % js.state)
 
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
