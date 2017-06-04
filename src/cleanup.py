@@ -87,13 +87,17 @@ def load_job_file(job_id):
 def forecast_process_running(js):
     if 'pid' in js and 'process_create_time' in js:
         fs =  js.process_create_time == process_create_time(js.pid)
-        logging.info('Forecast process is running: %s pid=%s' % (fs, js.pid))
+        if fs:
+           logging.info('Forecast process is running. pid=%s' % (js.pid))
+        else:
+            logging.info('Forecast process is not running')
         return fs
     else:
         logging.warning('Cannot determine if forecast process is running - old job file?')
         return None 
 
 def parallel_job_running(js):
+    logging.debug('Checking for WRF job %s' % js.job_num)
     cluster = load_cluster_file(js.qsys)
     if cluster is None:
         logging.warning('No cluster system, cannot check for WRF job')
@@ -176,12 +180,12 @@ def update(name):
     logging.info('Updating state of job %s' % name)
     js, jobfile = load_job_file(name)
     if js is not None:
-        logging.info('Old state is: %s' % js.state)
+        logging.debug('Old state is: %s' % js.state)
         if not forecast_process_running(js):
-            #logging.info('Forecast process is not running')
+            logging.debug('Forecast process is not running')
             js.pid = None
         if not parallel_job_running(js):    
-            #logging.info('WRF is not running')
+            logging.debug('WRF is not running')
             js.old_job_num = js.job_num
             js.job_num = None
         if js.state == 'Completed' or js.state == 'Cancelled':
@@ -202,7 +206,7 @@ def update(name):
                  if js.pid is None and js.job_num is not None:
                       js.state = 'Forecast stopped'
 
-        logging.info('New state is: %s' % js.state)
+        logging.info('State is: %s' % js.state)
 
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
