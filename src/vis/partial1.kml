@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<kml xmlns="http://earth.google.com/kml/2.1">
+  <Document>
+   
+    <Style id="modis_conf_high">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>501400FF</color>
+      </PolyStyle>
+     </Style>
+
+    <Style id="modis_conf_med">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>501400B4</color>
+      </PolyStyle>
+     </Style>
+
+    <Style id="modis_conf_low">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>5014008C</color>
+      </PolyStyle>
+     </Style>
+
+    <Style id="modis_frp_no_data">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ffffff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_0_to_10">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff00ff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_10_to_20">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff00e2</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_20_to_30">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff00c4</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_30_to_40">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff00a7</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_40_to_50">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff0089</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_50_to_60">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff006c</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_60_to_70">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff004e</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_70_to_80">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff0031</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_80_to_90">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff0014</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_90_to_100">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff2900</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_100_to_110">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff4700</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_110_to_120">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff6600</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_120_to_130">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ff8500</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_130_to_140">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ffa300</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_140_to_150">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ffc200</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_150_to_160">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ffe000</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_160_to_170">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85ffff00</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_170_to_180">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85e2ff00</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_180_to_190">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85c4ff00</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_190_to_200">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85a7ff00</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_200_to_210">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8589ff00</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_210_to_220">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>856cff00</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_220_to_230">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>854eff00</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_230_to_240">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8531ff00</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_240_to_250">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8514ff00</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_250_to_260">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500ff28</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_260_to_270">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500ff46</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_270_to_280">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500ff64</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_280_to_290">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500ff82</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_290_to_300">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500ffa0</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_300_to_310">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500ffbe</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_310_to_320">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500ffdc</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_320_to_330">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500fffa</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_330_to_340">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500e6ff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_340_to_350">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500c7ff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_350_to_360">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500a8ff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_360_to_370">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85008aff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_370_to_380">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85006bff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_380_to_390">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>85004dff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_390_to_400">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>8500fff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="modis_frp_gt_400">
+      <PolyStyle>
+        <outline>1</outline>
+        <color>850000ff</color>
+      </PolyStyle>
+     </Style>
+    <Style id="AOI_boundary">
+      <LineStyle>
+        <width>4</width>
+        <color>4b0000ff</color>
+      </LineStyle>
+    </Style>
+     <Folder>
+       <name>Legend and Logos</name>
+     <ScreenOverlay>
+     <Icon>
+          <href>https://fsapps.nwcg.gov/afm/data/kml/images/modis_mod14_frp/afm_logo.png</href>
+     </Icon>
+       <name>Logo</name>
+       <overlayXY x="0.001" y="0.001" xunits="fraction" yunits="fraction" />
+       <screenXY x="0.001" y="0.001" xunits="fraction" yunits="fraction" />
+       <rotationXY x="0" y="0" xunits="fraction" yunits="fraction" />
+       <size x="0" y="0" xunits="fraction" yunits="fraction" />
+     </ScreenOverlay>
+     </Folder>
+     
