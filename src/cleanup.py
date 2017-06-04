@@ -64,7 +64,11 @@ def cancel_job(job_num,qsys):
 
 def load_cluster_file(qsys):
     clusters = json.load(open('etc/clusters.json','r'))
-    return clusters[qsys]
+    if qsys in clusters:
+        return clusters[qsys]
+    else:
+        logging.warning('Cluster %s not known' % qsys)
+        return None
 
 def load_job_file(job_id):
     jobfile = osp.join(cfg['workspace_path'], job_id, 'job.json')
@@ -91,18 +95,17 @@ def forecast_process_running(js):
 
 def parallel_job_running(js):
     cluster = load_cluster_file(js.qsys)
-    ret = subprocess.check_output(cluster['qstat_cmd'])
-    ws = False
+    if cluster is None:
+        logging.warning('No cluster system, cannot check for WRF job')
+        return False
+    ret = subprocess.check_output(cluster['qstat_cmd'],stderr=subprocess.STDOUT)
     for line in ret.split('\n'):
         ls=line.split()
         if len(ls) >0 and ls[0] == js.job_num:
-             ws = True
-             break
-    if ws:
-        logging.debug('WRF job %s is running.' % js.job_num)
-    else:
-        logging.info('WRF job %s is not running.' % js.job_num)
-    return ws
+             logging.debug('WRF job %s is running.' % js.job_num)
+             return True
+    logging.info('WRF job %s is not running.' % js.job_num)
+    return False 
 
 # the cleanup functions called as argv[2]:
 # connecting to remote host if needed
