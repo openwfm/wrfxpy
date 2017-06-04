@@ -1,0 +1,14 @@
+     <Folder>
+       <name>FRP Legend</name>
+     <ScreenOverlay>
+     <Icon>
+          <href>https://fsapps.nwcg.gov/afm/data/kml/images/modis_mod14_frp/modis_frp_legend.png</href>
+     </Icon>
+       <name>Legend</name>
+       <overlayXY x="0" y="1" xunits="fraction" yunits="fraction" />
+       <screenXY x="0.4" y="1" xunits="fraction" yunits="fraction" />
+       <rotationXY x="0" y="0" xunits="fraction" yunits="fraction" />
+       <size x="0" y="0" xunits="fraction" yunits="fraction" />
+     </ScreenOverlay>
+    </Folder>
+
