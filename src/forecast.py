@@ -423,9 +423,10 @@ def process_output(job_id):
 
     # step 9: wait for appearance of rsl.error.0000 and open it
     wrf_out = None
+    rsl_path = osp.join(js.wrf_dir, 'rsl.error.0000')
     while wrf_out is None:
         try:
-            wrf_out = open(osp.join(js.wrf_dir, 'rsl.error.0000'))
+            wrf_out = open(rsl_path)
             break
         except IOError:
             logging.info('process_output: waiting 5 seconds for rsl.error.0000 file')
@@ -433,6 +434,8 @@ def process_output(job_id):
         time.sleep(5)
     
     logging.info('process_output: Detected rsl.error.0000')
+    js.run_utc = time.ctime(os.path.getmtime(rsl_path))
+    js.processed_utc = time.asctime(time.gmtime())
 
     # step 10: track log output and check for history writes fro WRF
     pp = None
