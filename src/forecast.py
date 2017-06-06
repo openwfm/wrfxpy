@@ -421,6 +421,19 @@ def process_output(job_id):
 
     js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
 
+    pp = None
+    already_sent_files, max_pp_dom = [], -1
+    if js.postproc is None:
+        logging.info('No postprocessing specified, exiting.')
+        return
+
+    js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
+    make_clean_dir(js.pp_dir)
+    pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
+    js.manifest_filename= 'wfc-' + js.grid_code + '.json'
+    logging.debug('Postprocessor created manifest %s',js.manifest_filename)
+    max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
+
     # step 9: wait for appearance of rsl.error.0000 and open it
     wrf_out = None
     rsl_path = osp.join(js.wrf_dir, 'rsl.error.0000')
@@ -430,7 +443,6 @@ def process_output(job_id):
             break
         except IOError:
             logging.info('process_output: waiting 5 seconds for rsl.error.0000 file')
-        
         time.sleep(5)
     
     logging.info('process_output: Detected rsl.error.0000')
@@ -438,16 +450,6 @@ def process_output(job_id):
     js.processed_utc = time.asctime(time.gmtime())
 
     # step 10: track log output and check for history writes fro WRF
-    pp = None
-    already_sent_files, max_pp_dom = [], -1
-    if js.postproc is not None:
-        js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-        make_clean_dir(js.pp_dir)
-        pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
-        js.manifest_filename= 'wfc-' + js.grid_code + '.json'
-        logging.debug('Postprocessor created manifest %s',js.manifest_filename)
-        max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
-
     wait_lines = 0
     wait_wrfout = 0
     while True:
