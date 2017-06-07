@@ -43,6 +43,7 @@ import os
 import stat
 from multiprocessing import Process, Queue
 import glob
+import netCDF4 as nc4
 
 import smtplib
 from email.mime.text import MIMEText
@@ -427,12 +428,47 @@ def process_output(job_id):
         logging.info('No postprocessing specified, exiting.')
         return
 
+    # set up postprocessing
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
     make_clean_dir(js.pp_dir)
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
     max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
+ 
+    if js.postproc.get('from', None) == 'wrfout':
+        logging.info('Postprocessing all wrfout files.')
+        # postprocess all wrfouts
+        for wrfout_path in glob.glob(osp.join(js.wrf_dir,'wrfout_d??_????-??-??_??:??:??')):
+            logging.info("Found %s" % wrfout_path)
+            domain_str,wrfout_esmf_time = re.match(r'.*wrfout_d(0[0-9])_([0-9_\-:]{19})',wrfout_path).groups()
+            dom_id = int(domain_str)
+            d = nc4.Dataset(wrfout_path)
+            # extract ESMF string times
+            times = [''.join(x) for x in d.variables['Times'][:]]
+            d.close()
+            for esmf_time in times:
+                logging.info("Processing domain %d for time %s." % (dom_id, esmf_time))
+                if js.postproc is not None and str(dom_id) in js.postproc:
+                    var_list = [str(x) for x in js.postproc[str(dom_id)]]
+                    logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
+                    try:
+                        pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
+                    except Exception as e:
+                        logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+                # in incremental mode, upload to server
+                if js.postproc.get('shuttle', None) == 'incremental':
+                    desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                    sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+                    already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+
+        # if we are to send out the postprocessed files after completion, this is the time
+        if js.postproc.get('shuttle', None) == 'on_completion':
+            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+
+        json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+        return
 
     # step 9: wait for appearance of rsl.error.0000 and open it
     wrf_out = None
