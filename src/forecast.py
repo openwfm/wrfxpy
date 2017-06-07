@@ -439,7 +439,7 @@ def process_output(job_id):
     if js.postproc.get('from', None) == 'wrfout':
         logging.info('Postprocessing all wrfout files.')
         # postprocess all wrfouts
-        for wrfout_path in glob.glob(osp.join(js.wrf_dir,'wrfout_d??_????-??-??_??:??:??')):
+        for wrfout_path in sorted(glob.glob(osp.join(js.wrf_dir,'wrfout_d??_????-??-??_??:??:??'))):
             logging.info("Found %s" % wrfout_path)
             domain_str,wrfout_esmf_time = re.match(r'.*wrfout_d(0[0-9])_([0-9_\-:]{19})',wrfout_path).groups()
             dom_id = int(domain_str)
@@ -447,7 +447,7 @@ def process_output(job_id):
             # extract ESMF string times
             times = [''.join(x) for x in d.variables['Times'][:]]
             d.close()
-            for esmf_time in times:
+            for esmf_time in sorted(times):
                 logging.info("Processing domain %d for time %s." % (dom_id, esmf_time))
                 if js.postproc is not None and str(dom_id) in js.postproc:
                     var_list = [str(x) for x in js.postproc[str(dom_id)]]
