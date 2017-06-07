@@ -120,6 +120,8 @@ class SSHShuttle(object):
         :param local_path: path to the local file
         :param remote_path: relative or absolute path to remote file
         """
+        if remote_path[0] != '/':
+           remote_path = osp.join(self.root, remote_path)
         self.sftp.put(local_path, remote_path)
 
     
@@ -132,6 +134,8 @@ class SSHShuttle(object):
         :param remote_path: remote path
         :param local_path: local path
         """
+        if remote_path[0] != '/':
+           remote_path = osp.join(self.root, remote_path)
         try:
             self.sftp.get(remote_path, local_path)
         except IOError as e:
@@ -151,6 +155,8 @@ class SSHShuttle(object):
         :param remote_dir: the remote directory
         :param ensure_exists: make the final directory level if it does not exist
         """
+        if remote_dir[0] != '/':
+           remote_dir = osp.join(self.root, remote_dir)
         if ensure_exists:
             self.sftp.chdir(osp.dirname(remote_dir))
             try:
@@ -223,6 +229,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
     s = SSHShuttle(cfg)
     s.connect()
 
+    logging.info('SHUTTLE root directory     %s' % s.root)
     logging.info('SHUTTLE sending local directory %s to remote host' % local_dir)
     sent_files = s.send_directory(local_dir, remote_dir, exclude_files)
 
@@ -249,6 +256,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
     json.dump(local_cat, open(local_cat_path, 'w'), indent=1, separators=(',',':'))
     remote_cat_path = remote_dir + '/catalog.json'
     s.put(local_cat_path, remote_cat_path)
+    # s.simple_command('ls -l %s' % osp.join(s.root,remote_cat_path))
     s.simple_command('wrfxweb/join_catalog.sh')
 
     s.disconnect()
