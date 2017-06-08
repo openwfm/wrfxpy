@@ -1,6 +1,33 @@
 import numpy as np
 
+def get_plume_height(d,t):
+      """
+      Compute plume height
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      tr = d.variables['tr17_1'][t,:,:,:]
+      ph = d.variables['PH'][t,:,:,:]
+      phb = d.variables['PHB'][t,:,:,:]
+      z8w = (phb + ph)/9.81
+      z8c=0.5*(z8w[0:z8w.shape[0]-1,:,:]+z8w[1:,:,:])
+      smoke_int = np.sum(tr, axis = 0)
+      h = np.sum(z8c * tr, axis = 0)
+      smoke_int[smoke_int <= 0] = 1
+      h[smoke_int <= 0] = 0
+      return h/smoke_int
+
 _var_wisdom = {
+     'PLUME_HEIGHT' : {
+        'name' : 'plume height',
+        'native_unit' : 'm',
+        'colorbar' : None,
+        'colormap' : 'jet',
+        'transparent_values' : [-np.inf, 0],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: get_plume_height(d,t),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
      'FGRNHFX' : {
         'name' : 'Ground level heat flux [log]',
         'native_unit' : 'W/m^2',
