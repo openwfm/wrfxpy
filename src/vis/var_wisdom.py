@@ -1,31 +1,88 @@
 import numpy as np
 
-def get_plume_height(d,t):
+smoke_threshold_int = 50
+smoke_threshold = 10
+
+def height8w(d,t):
       """
-      Compute plume height
+      Compute height at mesh bottom a.k.a. w-points 
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      ph = d.variables['PH'][t,:,:,:]  
+      phb = d.variables['PHB'][t,:,:,:]
+      return (phb + ph)/9.81 # geopotential height at W points
+
+def height(d,t):
+      """
+      Compute height of mesh centers
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      z8w = height8w(d,t)
+      return 0.5*(z8w[0:z8w.shape[0]-1,:,:]+z8w[1:,:,:])
+
+def plume_center(d,t):
+      """
+      Compute plume center of mass
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
       tr = d.variables['tr17_1'][t,:,:,:]
-      ph = d.variables['PH'][t,:,:,:]
-      phb = d.variables['PHB'][t,:,:,:]
-      z8w = (phb + ph)/9.81
-      z8c=0.5*(z8w[0:z8w.shape[0]-1,:,:]+z8w[1:,:,:])
       smoke_int = np.sum(tr, axis = 0)
-      h = np.sum(z8c * tr, axis = 0)
-      smoke_int[smoke_int <= 0] = 1
-      h[smoke_int <= 0] = 0
+      z = height(d,t) 
+      h = np.sum(z * tr, axis = 0)
+      h[smoke_int <= smoke_threshold_int] = 0
+      smoke_int[smoke_int <= smoke_threshold_int] = 1
+      #c = np.zeros(tr.shape[1:])
+      #for i in range(0, tr.shape[2]):
+      #    for j in range(0, tr.shape[1]):
+      #        ss=0
+      #        zs=0
+      #        for k in range(tr.shape[0]-1, -1, -1):
+      #                  ss = ss + tr[k,j,i]
+      #                  zs = zs + tr[k,j,i]* z[k,j,i]
+      #        if ss >= smoke_threshold_int:
+      #            c[j,i] = zs/ss
+      # return c
       return h/smoke_int
+
+def plume_height(d,t):
+      """
+      Compute plume height 
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      z =  height(d,t)
+      tr = d.variables['tr17_1'][t,:,:,:]
+      h = np.zeros(tr.shape[1:])
+      for i in range(0, tr.shape[2]):
+          for j in range(0, tr.shape[1]):
+              for k in range(tr.shape[0]-1, -1, -1):
+                   if tr[k,j,i] > smoke_threshold:
+                        h[j,i] = z[k,j,i]
+                        break
+      return h
 
 _var_wisdom = {
      'PLUME_HEIGHT' : {
         'name' : 'plume height',
         'native_unit' : 'm',
-        'colorbar' : None,
+        'colorbar' : 'm',
         'colormap' : 'jet',
         'transparent_values' : [-np.inf, 0],
-        'scale' : 'original',
-        'retrieve_as' : lambda d,t: get_plume_height(d,t),
+        'scale' : [0, 8000],
+        'retrieve_as' : lambda d,t: plume_height(d,t),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'PLUME_CENTER' : {
+        'name' : 'plume height',
+        'native_unit' : 'm',
+        'colorbar' : 'm',
+        'colormap' : 'jet',
+        'transparent_values' : [-np.inf, 0],
+        'scale' : [0, 8000],
+        'retrieve_as' : lambda d,t: plume_center(d,t),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'FGRNHFX' : {
@@ -43,7 +100,7 @@ _var_wisdom = {
         'native_unit' : '-',
         'colorbar' : None,
         'colormap' : 'gray_r',
-        'transparent_values' : [-np.inf, 50],
+        'transparent_values' : [-np.inf, smoke_threshold_int],
         'scale' : 'original',
         'retrieve_as' : lambda d,t: np.sum(d.variables['tr17_1'][t,:,:,:], axis=0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
