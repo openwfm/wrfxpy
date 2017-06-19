@@ -5,11 +5,21 @@
 
 # Test correct functionality of the retrieval of level0 files
 
+import os
 import subprocess
 import datetime
 import shutil
 
-local_path = 'l0_test_ingest'
+# Set root directory of wrfxpy as working directory
+script_path = os.path.realpath(__file__)
+
+# + 6 gets us to wrfxpy
+index = script_path.find('wrfxpy/tests') + 6
+os.chdir(script_path[:index])
+
+
+# Path where the download files should go
+local_path = 'tests/l0_test_ingest'
 
 # Remove data from old tests
 shutil.rmtree(local_path, ignore_errors=True)
