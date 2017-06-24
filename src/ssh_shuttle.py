@@ -264,6 +264,12 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
     logging.info('SHUTTLE sent %d files to visualization server.'  % len(sent_files))
     return sent_files
 
+def ssh_command(command):
+    cfg = load_sys_cfg()
+    s = SSHShuttle(cfg)
+    s.connect()
+    s.simple_command(command)
+    s.disconnect()
 
 if __name__ == '__main__':
 
