@@ -273,7 +273,7 @@ class MODIS_TERRA(data_source):
         for g in geo_list:
             if g[:19] != prefix:
                 prefix = g[:19]
-                file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_af + '/' + str(prefix[7:11]) + '/' str(prefix[11:14])))
+                file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_af + '/' + str(prefix[7:11]) + '/' + str(prefix[11:14])))
 
         manifest = []
 
@@ -494,7 +494,7 @@ class MODIS_AQUA(data_source):
         for g in geo_list:
             if g[:19] != prefix:
                 prefix = g[:19]
-                file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_af + '/' + str(prefix[7:11]) + '/' str(prefix[11:14])))
+                file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_af + '/' + str(prefix[7:11]) + '/' + str(prefix[11:14])))
 
         manifest = []
 
