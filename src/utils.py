@@ -381,3 +381,16 @@ def find_closest_grid_point(slon, slat, glon, glat):
     return np.unravel_index(closest, glon.shape)
 
 
+def load_sys_cfg():
+    # load the system configuration
+    sys_cfg = None
+    try:
+        sys_cfg = Dict(json.load(open('etc/conf.json')))
+    except IOError:
+        logging.critical('Cannot find system configuration, have you created etc/conf.json?')
+        sys.exit(2)
+    # set defaults
+    sys = sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
+    sys_cfg.workspace_path = sys_cfg.get('workspace_path',osp.join(sys,'wksp'))
+    return sys_cfg
+

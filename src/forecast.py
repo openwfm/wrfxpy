@@ -26,7 +26,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time
+                  make_clean_dir, process_create_time, load_sys_cfg
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -43,6 +43,7 @@ import os
 import stat
 from multiprocessing import Process, Queue
 import glob
+import netCDF4 as nc4
 
 import smtplib
 from email.mime.text import MIMEText
@@ -421,28 +422,70 @@ def process_output(job_id):
 
     js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
 
+    pp = None
+    already_sent_files, max_pp_dom = [], -1
+    if js.postproc is None:
+        logging.info('No postprocessing specified, exiting.')
+        return
+
+    # set up postprocessing
+    js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
+    make_clean_dir(js.pp_dir)
+    pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
+    js.manifest_filename= 'wfc-' + js.grid_code + '.json'
+    logging.debug('Postprocessor created manifest %s',js.manifest_filename)
+    max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
+ 
+    if js.postproc.get('from', None) == 'wrfout':
+        logging.info('Postprocessing all wrfout files.')
+        # postprocess all wrfouts
+        for wrfout_path in sorted(glob.glob(osp.join(js.wrf_dir,'wrfout_d??_????-??-??_??:??:??'))):
+            logging.info("Found %s" % wrfout_path)
+            domain_str,wrfout_esmf_time = re.match(r'.*wrfout_d(0[0-9])_([0-9_\-:]{19})',wrfout_path).groups()
+            dom_id = int(domain_str)
+            d = nc4.Dataset(wrfout_path)
+            # extract ESMF string times
+            times = [''.join(x) for x in d.variables['Times'][:]]
+            d.close()
+            for esmf_time in sorted(times):
+                logging.info("Processing domain %d for time %s." % (dom_id, esmf_time))
+                if js.postproc is not None and str(dom_id) in js.postproc:
+                    var_list = [str(x) for x in js.postproc[str(dom_id)]]
+                    logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
+                    try:
+                        pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
+                    except Exception as e:
+                        logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+                # in incremental mode, upload to server
+                if js.postproc.get('shuttle', None) == 'incremental':
+                    desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                    sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+                    already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+
+        # if we are to send out the postprocessed files after completion, this is the time
+        if js.postproc.get('shuttle', None) == 'on_completion':
+            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+
+        json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+        return
+
     # step 9: wait for appearance of rsl.error.0000 and open it
     wrf_out = None
+    rsl_path = osp.join(js.wrf_dir, 'rsl.error.0000')
     while wrf_out is None:
         try:
-            wrf_out = open(osp.join(js.wrf_dir, 'rsl.error.0000'))
+            wrf_out = open(rsl_path)
             break
         except IOError:
             logging.info('process_output: waiting 5 seconds for rsl.error.0000 file')
-        
         time.sleep(5)
     
     logging.info('process_output: Detected rsl.error.0000')
+    js.run_utc = time.ctime(os.path.getmtime(rsl_path))
+    js.processed_utc = time.asctime(time.gmtime())
 
     # step 10: track log output and check for history writes fro WRF
-    pp = None
-    already_sent_files, max_pp_dom = [], -1
-    if js.postproc is not None:
-        js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-        make_clean_dir(js.pp_dir)
-        pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
-        max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
-
     wait_lines = 0
     wait_wrfout = 0
     while True:
@@ -483,7 +526,7 @@ def process_output(job_id):
             # in incremental mode, upload to server
             if js.postproc.get('shuttle', None) == 'incremental':
                 desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc, already_sent_files)
+                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
                 already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
             wait_wrfout = 0
         else: 
@@ -494,7 +537,7 @@ def process_output(job_id):
     # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, desc)
+        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
     js.old_pid = js.pid
     js.pid = None
@@ -597,17 +640,6 @@ def process_arguments(args):
     for k, v in args.iteritems():
         if type(v) == unicode:
             args[k] = v.encode('ascii')
-
-def load_sys_cfg():
-    # load the system configuration
-    sys_cfg = None
-    try:
-        sys_cfg = json.load(open('etc/conf.json'))
-    except IOError:
-        logging.critical('Cannot find system configuration, have you created etc/conf.json?')
-        sys.exit(2)
-    return Dict(sys_cfg)
-
 
 if __name__ == '__main__':
 

@@ -287,19 +287,26 @@ class Postprocessor(object):
         return raster_path, corner_coords
 
 
-    def _scalar2kmz(self, d, var, tndx, out_path, cleanup = True):
+    def _scalar2kmz(self, d, var, tndx, ts_esmf_begin, ts_esmf_end, out_path, cleanup = True):
         """
         Postprocess a single raster variable ``fa`` and store result in out_path.
 
         :param d: the open netCDF file
         :param var: the variable name
         :param tndx: the temporal index of the grid to store
+        :param ts_esmf: time string yyyy-mm-dd_HH:MM:SS
         :param out_path: the path to the KMZ output
         :param cleanup: if true, delete png files
         :return: the path to the generated KMZ
         """
         # construct kml file
-        doc = kml.Kml(name = var)
+
+        name = ts_esmf_begin + ' ' + var
+        file = kml.Kml(name = name)
+        doc = file.newdocument(name = name)
+        doc.timespan.begin=ts_esmf_begin.replace('_','T')+'Z'
+        if ts_esmf_end is not None:
+            doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
 
         # generate the png files
         raster_path, cb_path, corner_coords = self._scalar2png(d, var, tndx, out_path)
@@ -323,7 +330,7 @@ class Postprocessor(object):
 
         # build output file
         kmz_path = out_path + ".kmz"
-        doc.savekmz(kmz_path)
+        file.savekmz(kmz_path)
 
         # cleanup
         if cleanup:
@@ -334,19 +341,27 @@ class Postprocessor(object):
         return kmz_path, raster_path, cb_path, corner_coords
 
 
-    def _vector2kmz(self, d, var, tndx, out_path, cleanup = True):
+    def _vector2kmz(self, d, var, tndx, ts_esmf_begin, ts_esmf_end, out_path, cleanup = True):
         """
         Postprocess a single vector variable ``var`` and store result in out_path.
 
         :param d: the open netCDF file
         :param var: the variable name
         :param tndx: the temporal index of the grid to store
+        :param ts_esmf: time string yyyy-mm-dd_HH:MM:SS
         :param out_path: the path to the KMZ output
         :param cleanup: if True, PNG files are deleted after KMZ is build
         :return: the path to the generated KMZ
         """
         # construct kml file
-        doc = kml.Kml(name = var)
+
+        name = ts_esmf_begin + ' ' + var
+        file = kml.Kml(name = name)
+
+        doc = file.newdocument(name = name)
+        doc.timespan.begin=ts_esmf_begin.replace('_','T')+'Z'
+        if ts_esmf_end is not None:
+            doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
 
         # generate the png files
         raster_path, corner_coords = self._vector2png(d, var, tndx, out_path)
@@ -359,7 +374,7 @@ class Postprocessor(object):
 
         # build output file
         kmz_path = out_path + ".kmz"
-        doc.savekmz(kmz_path)
+        file.savekmz(kmz_path)
 
         # cleanup
         if cleanup:
@@ -399,9 +414,9 @@ class Postprocessor(object):
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
                 kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
                 if var in ['WINDVEC']:
-                    kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, outpath_base, cleanup=False)
+                    kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False)
                 else:
-                    kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, outpath_base, cleanup=False)
+                    kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False)
                     if cb_path is not None:
                         mf_upd['colorbar'] = osp.basename(cb_path)
 
@@ -440,9 +455,9 @@ class Postprocessor(object):
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
                 kmz_path = None
                 if var in ['WINDVEC']:
-                    kmz_path,_,_ = self._vector2kmz(d, var, tndx, outpath_base)
+                    kmz_path,_,_ = self._vector2kmz(d, var, tndx, ts_esmf, outpath_base)
                 else:
-                    kmz_path,_,_,_ = self._scalar2kmz(d, var, tndx, outpath_base)
+                    kmz_path,_,_,_ = self._scalar2kmz(d, var, tndx, ts_esmf, outpath_base)
                 kmz_name = osp.basename(kmz_path)
                 self._update_manifest(dom_id, ts_esmf, var, { 'kml' : kmz_name })
 
@@ -512,12 +527,12 @@ class Postprocessor(object):
                 try:
                     outpath_base = os.path.join(self.output_path, self.product_name + '-' + ts_esmf + '-' + var) 
                     if var in ['WINDVEC']:
-                        kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, outpath_base, cleanup=False)
+                        kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, ts_esmf, outpath_base, cleanup=False)
                         raster_name = osp.basename(raster_path)
                         kmz_name = osp.basename(kmz_path)
                         self._update_manifest(dom_id, ts_esmf, var, { 'raster' : raster_name, 'coords' : coords, 'kml' : kmz_name})
                     else:
-                        kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, outpath_base, cleanup=False)
+                        kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, ts_esmf, outpath_base, cleanup=False)
                         mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords, 'kml' : osp.basename(kmz_path) }
                         if cb_path is not None:
                             # optimization for display when we know colorbar has fixed scale

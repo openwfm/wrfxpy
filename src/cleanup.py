@@ -27,9 +27,9 @@ import shutil
 import glob
 import signal
 import subprocess
-from utils import kill_process, Dict, process_create_time
+from utils import kill_process, Dict, process_create_time, load_sys_cfg
 
-cfg = Dict(json.load(open('etc/conf.json')))
+cfg = load_sys_cfg()
 
 def remote_rmdir(s,dirname):
     logging.info('SHUTTLE removing remote directory %s' % dirname)
@@ -64,7 +64,11 @@ def cancel_job(job_num,qsys):
 
 def load_cluster_file(qsys):
     clusters = json.load(open('etc/clusters.json','r'))
-    return clusters[qsys]
+    if qsys in clusters:
+        return clusters[qsys]
+    else:
+        logging.warning('Cluster %s not known' % qsys)
+        return None
 
 def load_job_file(job_id):
     jobfile = osp.join(cfg['workspace_path'], job_id, 'job.json')
@@ -83,46 +87,36 @@ def load_job_file(job_id):
 def forecast_process_running(js):
     if 'pid' in js and 'process_create_time' in js:
         fs =  js.process_create_time == process_create_time(js.pid)
-        logging.info('Forecast process is running: %s pid=%s' % (fs, js.pid))
+        if fs:
+           logging.info('Forecast process is running. pid=%s' % (js.pid))
+        else:
+            logging.info('Forecast process is not running')
         return fs
     else:
         logging.warning('Cannot determine if forecast process is running - old job file?')
         return None 
 
 def parallel_job_running(js):
+    logging.debug('Checking for WRF job %s' % js.job_num)
     cluster = load_cluster_file(js.qsys)
-    ret = subprocess.check_output(cluster['qstat_cmd'])
-    ws = False
+    if cluster is None:
+        logging.warning('No cluster system, cannot check for WRF job')
+        return False
+    ret = subprocess.check_output(cluster['qstat_cmd'],stderr=subprocess.STDOUT)
     for line in ret.split('\n'):
         ls=line.split()
         if len(ls) >0 and ls[0] == js.job_num:
-             ws = True
-             break
-    if ws:
-        logging.debug('WRF job %s is running.' % js.job_num)
-    else:
-        logging.info('WRF job %s is not running.' % js.job_num)
-    return ws
-
-def delete_from_catalog(s,name):
-    s.acquire_lock()
-    cat = s.retrieve_catalog()
-    if name not in cat:
-        logging.error('Simulation %s not in the catalog' % name)
-    else:
-        logging.info('Deleting simulation %s from the catalog' % name)
-        del cat[name]
-    s.store_catalog(cat)
-    s.release_lock()
+             logging.debug('WRF job %s is running.' % js.job_num)
+             return True
+    logging.info('WRF job %s is not running.' % js.job_num)
+    return False 
 
 # the cleanup functions called as argv[2]:
 # connecting to remote host if needed
 
 def list(s):
     s.connect()
-    s.acquire_lock()
     cat = s.retrieve_catalog()
-    s.release_lock()
     s.disconnect()
     print('%-60s desc' % 'id')
     print('-' * 70)
@@ -132,9 +126,7 @@ def list(s):
 def workspace(s):
     logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
     s.connect()
-    s.acquire_lock()
     cat = s.retrieve_catalog(s)
-    s.release_lock()
     s.disconnect()
     for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
         if osp.isdir(f):
@@ -181,19 +173,19 @@ def delete(s,name):
     logging.info('Trying to delete all files of job %s' % name)
     remote_rmdir(s,name)
     local_rmdir(name)
-    delete_from_catalog(s,name)
+    s.simple_command('wrfxweb/join_catalog.sh')
     s.disconnect()
 
 def update(name):
     logging.info('Updating state of job %s' % name)
     js, jobfile = load_job_file(name)
     if js is not None:
-        logging.info('Old state is: %s' % js.state)
+        logging.debug('Old state is: %s' % js.state)
         if not forecast_process_running(js):
-            #logging.info('Forecast process is not running')
+            logging.debug('Forecast process is not running')
             js.pid = None
         if not parallel_job_running(js):    
-            #logging.info('WRF is not running')
+            logging.debug('WRF is not running')
             js.old_job_num = js.job_num
             js.job_num = None
         if js.state == 'Completed' or js.state == 'Cancelled':
@@ -214,7 +206,7 @@ def update(name):
                  if js.pid is None and js.job_num is not None:
                       js.state = 'Forecast stopped'
 
-        logging.info('New state is: %s' % js.state)
+        logging.info('State is: %s' % js.state)
 
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 

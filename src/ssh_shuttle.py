@@ -29,6 +29,7 @@ import pprint
 import fcntl
 import errno
 import collections
+from utils import load_sys_cfg
 
 
 
@@ -63,7 +64,9 @@ class SSHShuttle(object):
         """
         logging.info('SHUTTLE connecting to remote host %s' % self.host)
         ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.load_system_host_keys()
+        #ssh.load_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
         ssh.connect(self.host, username=self.user, key_filename=self.key)
         self.ssh = ssh
         self.sftp = ssh.open_sftp()
@@ -117,6 +120,8 @@ class SSHShuttle(object):
         :param local_path: path to the local file
         :param remote_path: relative or absolute path to remote file
         """
+        if remote_path[0] != '/':
+           remote_path = osp.join(self.root, remote_path)
         self.sftp.put(local_path, remote_path)
 
     
@@ -129,7 +134,15 @@ class SSHShuttle(object):
         :param remote_path: remote path
         :param local_path: local path
         """
-        self.sftp.get(remote_path, local_path)
+        if remote_path[0] != '/':
+           remote_path = osp.join(self.root, remote_path)
+        try:
+            self.sftp.get(remote_path, local_path)
+        except IOError as e:
+            logging.error('ssh_shuttle: sftp.get failed: %s' % e.strerror)
+            logging.error('remote_path: %s' % remote_path)
+            logging.error('local_path: %s' % local_path)
+            exit(1)
 
 
     def chdir(self, remote_dir, ensure_exists=False):
@@ -142,6 +155,8 @@ class SSHShuttle(object):
         :param remote_dir: the remote directory
         :param ensure_exists: make the final directory level if it does not exist
         """
+        if remote_dir[0] != '/':
+           remote_dir = osp.join(self.root, remote_dir)
         if ensure_exists:
             self.sftp.chdir(osp.dirname(remote_dir))
             try:
@@ -164,39 +179,16 @@ class SSHShuttle(object):
             self.sftp.remove(osp.join(abs_path, f))
         self.sftp.rmdir(abs_path)
 
-    def has_lock(self):
-        return self.lock_file is not None 
-
-    def acquire_lock(self):
+    def simple_command(self, command):
         """
-        Block until exclusive lock can be acquired.
-        Used before code that should be executed by one process at a time only,
-        such as updating the catalog.
-        """ 
-        logging.info('SHUTTLE acquiring lock on %s' % self.lock_path)
-        if not self.connected:
-            logging.warning('SHUTTLE is not connected')
-        if self.has_lock():
-            logging.warning('SHUTTLE already has a lock.')
-        self.lock_file = open(self.lock_path,'w',0)  # unbuffered
-        try:
-            fcntl.flock(self.lock_file,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except IOError as e:
-            if e.errno == errno.EACCES or e.errno == errno.EAGAIN:
-                logging.info('SHUTTLE waiting for lock on %s' % self.lock_path)
-            else:
-                logging.error("I/O error %s: %s" % (e.errno, e.strerror))
-        fcntl.flock(self.lock_file,fcntl.LOCK_EX)
-        logging.info('SHUTTLE acquired lock on %s' % self.lock_path)
+        Execute command on the remote host with no frills.
 
-    def release_lock(self):
-        logging.info('SHUTTLE releasing lock on %s' % self.lock_path)
-        if self.lock_file is not None:
-            fcntl.flock(self.lock_file,fcntl.LOCK_UN)
-            self.lock_file.close()
-            self.lock_file = None
-        else:
-            logging.warning('SHUTTLE did not have a lock.')
+        :param command: the command string to be executed
+        """
+        stdin, stdout, stderr = self.ssh.exec_command(command)
+        stdin.flush()
+        print stdout.read()
+        print stderr.read()
 
     def retrieve_catalog(self):
         """ 
@@ -206,28 +198,13 @@ class SSHShuttle(object):
         
         """
         logging.info('SHUTTLE retrieving catalog file.')
-        if not self.has_lock():
-            logging.warning('SHUTTLE does not have lock, catalog corruption possible.')
+        self.simple_command('wrfxweb/join_catalog.sh')
         self.get('catalog.json', self.cat_local_path)
         cat = json.load(open(self.cat_local_path))
         logging.info('SHUTTLE retrieve complete.')
         return cat 
 
-    def store_catalog(self, cat):
-        """
-        Store a new version of the catalog on the remote server
-        NOTE: connect and release lock after catalog operations
-
-        :param cat: the JSON object representing the new catalog
-        """
-        logging.info('SHUTTLE sending catalog file.')
-        if not self.has_lock():
-            logging.warning('SHUTTLE does not have lock, catalog corruption possible.')
-        cat_sorted=collections.OrderedDict(sorted(cat.items(), reverse=True))
-        json.dump(cat_sorted, open(self.cat_local_path, 'w'), indent=1, separators=(',',':'))
-        self.put(self.cat_local_path, 'catalog.json')
-
-def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = None, exclude_files = []):
+def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filename, description = None, exclude_files = []):
     """
     Executes all steps required to send a local product directory to a remote visualization
     server for display.
@@ -241,31 +218,23 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     :return: a list of the files that was sent
     """
     
-    logging.debug('SHUTTLE send_product_to_server')
-    logging.debug('SHUTTLE local directory    %s' % local_dir)
-    logging.debug('SHUTTLE remote directory   %s' % remote_dir)
-    logging.debug('SHUTTLE simulation name    %s' % sim_name)
-    logging.debug('SHUTTLE description        %s' % description)
+    logging.info('SHUTTLE send_product_to_server')
+    # logging.info('SHUTTLE local directory    %s' % local_dir)
+    logging.info('SHUTTLE remote directory   %s' % remote_dir)
+    logging.info('SHUTTLE simulation name    %s' % sim_name)
+    logging.info('SHUTTLE manifest file name %s' % manifest_filename)
+    logging.info('SHUTTLE description        %s' % description)
     logging.debug('SHUTTLE configuration:\n%s' % pprint.pformat(cfg,indent=4))
    
     s = SSHShuttle(cfg)
     s.connect()
 
-    # identify the manifest file
-    manifest_pattern = osp.join(local_dir, '*.json')
-    #logging.info('looking for local manifest file %s' % manifest_pattern)
-    json_files=glob.glob(osp.join(local_dir, '*.json'));
-    if len(json_files)==1:
-       manifest_file = json_files[0]
-       logging.info('SHUTTLE found local manifest file %s' % manifest_file)
-    else:
-       logging.critical('SHUTTLE did not find a unique local manifest file %s' % manifest_pattern)
-       sys.exit(1)
-
+    logging.info('SHUTTLE root directory     %s' % s.root)
     logging.info('SHUTTLE sending local directory %s to remote host' % local_dir)
     sent_files = s.send_directory(local_dir, remote_dir, exclude_files)
 
     # identify the start/end UTC time (all domains may not have the same simulation extent)
+    manifest_file = osp.join(local_dir,manifest_filename)
     mf = json.load(open(manifest_file))
     #print 'manifest:', json.dumps(mf, indent=4, separators=(',', ': '))
     logging.debug('manifest %s' % mf)
@@ -277,15 +246,18 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, description = N
     logging.info('SHUTTLE detected local start/end UTC times as %s - %s' % (times[0], times[-1]))
 
     # retrieve the catalog & update it
-    logging.info('SHUTTLE updating catalog file on remote host')
-    s.acquire_lock()
-    cat = s.retrieve_catalog()
-    cat[sim_name] = { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
+    logging.info('SHUTTLE updating local catalog file on remote host')
+    local_cat = { sim_name : { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
                       'description' : description if description is not None else sim_name,
                       'from_utc' : times[0],
                       'to_utc' : times[-1] }
-    s.store_catalog(cat)
-    s.release_lock()
+                }
+    local_cat_path = osp.join(local_dir,'catalog.json')
+    json.dump(local_cat, open(local_cat_path, 'w'), indent=1, separators=(',',':'))
+    remote_cat_path = remote_dir + '/catalog.json'
+    s.put(local_cat_path, remote_cat_path)
+    # s.simple_command('ls -l %s' % osp.join(s.root,remote_cat_path))
+    s.simple_command('wrfxweb/join_catalog.sh')
 
     s.disconnect()
 
@@ -305,7 +277,7 @@ if __name__ == '__main__':
     remote_dir = sys.argv[2]
     sim_name = sys.argv[3]
 
-    cfg = json.load(open('etc/conf.json'))
+    cfg = load_sys_cfg()
 
     send_product_to_server(cfg, local_dir, remote_dir, sim_name, None, [])
 

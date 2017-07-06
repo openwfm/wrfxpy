@@ -30,7 +30,7 @@ Install pre-requisites:
 ::
 
   conda install basemap netcdf4 pyproj paramiko
-  conda install --channel https://conda.anaconda.org/IOOS simplekml
+  conda install --channel https://conda.anaconda.org/conda-forge simplekml
   pip install f90nml
   pip install MesoPy
 
@@ -43,7 +43,7 @@ Next, clone the *wrfxpy* code:
 
 ::
   
-  git clone https://github.com/vejmelkam/wrfxpy.git
+  git clone https://github.com/openwfm/wrfxpy.git
 
 configuration
 -------------
