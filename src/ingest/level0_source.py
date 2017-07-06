@@ -17,18 +17,17 @@ import os.path as osp
 import sys
 import logging
 
-class level0Error(Exception):
+class data_sourceError(Exception):
     """
     Raised when a level0 source cannot retreive files
     """
     pass
 
-class level0Source(object):
+class data_source(object):
     """
-    Parent class of all level0 sources that implement common functionality, for example
+    Parent class of all data sources that implement common functionality, for example
     - local validation (file size check)
     - HDF retrieval with retries (smart check whether server implements http-range)
-    - symlinking files
     """
 
     def __init__(self, ingest_dir):
@@ -39,35 +38,127 @@ class level0Source(object):
         """
         self.ingest_dir = osp.abspath(ingest_dir)
 
-    def retrieve_level0s(self, from_utc, to_utc, ret_utc = None):
+
+    def retrieve_data(self, from_utc, to_utc, lonlat):
         """
-        Attempts to retrieve the level0 files for the time range.
-        It should be first verified whether the level0 files are available locally.
+        Retrieves all data (geo and active fire) in the given time range and longitude/latitude box. This function is what end users will use to get data
+
+        :param from_utc: start time
+        :param to_utc: end time
+        :param lonlat: list of form [lowlon, highlon, lowlat, highlat] describing longitude/latitude box
+        :return: list of paths to local files that were retrieved
+        """
+        # I think all data should be ingested into one directory, then whichever files
+        # are needed for a given job can be copied to a new folder with a job name
+
+        two_weeks_ago = datetime.now(pytz.UTC) - timedelta(days=14)
+        manifest = []
+
+        if from_utc > two_weeks_ago:
+            manifest.extend(retrieve_l0(from_utc, to_utc))
+
+        elif to_utc < two_weeks_ago:
+            # filter geo_list on intersection with lonlat, the hdf library i'd want to use here isn't ready yet
+            # geo_list = filter(lambda x: geo_intersects(lonlat, x), retrieve_geo(from_utc, to_utc))
+            geo_list = retrieve_geo(from_utc, to_utc)
+            manifest.extend(geo_list)
+            manifest.extend(retrieve_af(geo_list))
+
+        else:
+            manifest.extend(retrieve_l0(two_weeks_ago + timedelta(minutes=10), to_utc))
+
+            # filter geo_list on intersection with lonlat
+            # geo_list = filter(lambda x: geo_intersect(lonlat, x), retrieve_geo(from_utc, two_weeks_ago))
+            geo_list = retrieve_geo(from_utc, two_weeks_ago)
+            manifest.extend(geo_list)
+            manifest.extend(retrieve_af(geo_list))
+
+        return manifest
+
+
+    def retrieve_geo(self, from_utc, to_utc, ret_utc = None):
+        """
+        Attempts to retrieve geolocation files in the time range
+        First, check if they're available locally, if unavailable proceed to download
+
+        :param from_utc: start time
+        :param to_utc: end time
+        :return: a list of paths to local geolocation files
+        """
+        pass
+
+
+    def compute_geo_manifest(from_utc, to_utc):
+        """
+        Get list of geolocation file names for the given time frame
+
+        :param from_utc: start time UTC
+        :param to_utc: end time UTC
+        :return: list of file names as strings
+        """
+        pass
+
+
+    def retrieve_af(self, geo_list):
+        """
+        Attempts to retrieve active fire files in the time range and latitude/longitude box
+
+        :param geo_list: list containing the relevant geolocation file names
+        :return: a list of paths to the local active fire files
+        """
+        pass
+
+
+    def compute_af_manifest(geo_list):
+        """
+        get list of active fire file names from a set of geolocation files
+
+        :param geo_list: list containing geolocation file names
+        """
+        pass
+
+
+    def retrieve_l0(self, from_utc, to_utc, ret_utc = None):
+        """
+        Attempts to retrieve the firedata files for the time range.
+        It should be first verified whether the firedata files are available locally.
         For any unavailable files, downloads should be initiated.
 
         :param from_utc: start time
         :param to_utc: end time
-        :param ref_utc: reference time which defines 'now,' None means datetime.utcnow().
         :return: a list of paths to local level0 files
         """
         pass
 
-    def download_level0(self, url_base, rel_path, max_retries=3):
-        """
-        Download a level0 file from a level0 service and stream to <rel_path> in ingest_dir.
 
-        :param url_base: the base URL part of the level0 service
+    def compute_l0_manifest(self, from_utc, to_utc):
+        """
+        Compute list of files in the source for the given time frame
+
+        :param from_utc: time UTC format
+        :param to_utc: time UTC format
+        :return: list of file names as strings
+        """
+        pass
+
+
+    def download_file(self, url_base, rel_path, max_retries=3):
+        """
+        Download a file and stream to <rel_path> in ingest_dir.
+
+        :param url_base: the base URL where the file is hosted
         :param rel_path: the relative path of the file
         :param max_retries: how many times we may retry to download the file
         """
         url = url_base + '/' + rel_path
-        level0_path = osp.join(self.ingest_dir, rel_path)
+        path = osp.join(self.ingest_dir, rel_path)
         try:
-            download_url(url, level0_path, max_retries)
+            download_url(url, path, max_retries)
         except DownloadError as e:
-            raise level0Error('level0Source: failed to download file %s' % url)
+            raise data_sourceError('data_source: failed to download file %s' % url)
 
-    def level0_available_locally(self, path):
+
+    def available_locally(self, path):
         """
         Check in a level0 file is available locally and if it's file size checks out.
         :param path: the level0 file path
@@ -79,19 +170,8 @@ class level0Source(object):
         else:
             return False
 
-    def symlink_level0s(self, manifest, wps_dir):
-        """
-        Make symlinks in the from LEVEL0FILE.XYZ to all manifest files into wps_dir.
 
-        :param manifest: relative paths (wrt ingest_dir) to level0 files we want linked
-        :param wps_dir: the WPS directory where we want the symlinks to appear
-        :return:
-        """
-        for rel_path, level0_name in zip(manifest, generate_level0_names()):
-            logging.info('Linking %s -> %s' % (osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, level0_name)))
-            symlink_unless_exists(osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, level0_name))
-
-class MODIS_TERRA(level0Source):
+class MODIS_TERRA(data_source):
     """
     750m data from the MODIS instrument on the Terra satellite
     """
@@ -100,9 +180,114 @@ class MODIS_TERRA(level0Source):
         super(MODIS_TERRA, self).__init__(ingest_dir)
 
 
-    def retrieve_level0s(self, from_utc, to_utc, ref_utc=None):
+    def retrieve_geo(self, from_utc, to_utc):
         """
-        Attempts to retrive the files to satisfy the simulation request from from_utc to to_utc.
+        Attempts to retrieve geolocation files in the time range
+        First, check if they're available locally, if unavailable proceed to download
+
+        :param from_utc: start time
+        :param to_utc: end time
+        :return: a list of paths to local geolocation files
+        """
+
+        manifest = self.compute_geo_manifest(from_utc, to_utc)
+
+        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+
+        logging.info('Retrieving geolocation data from %s' % (self.url_base_hdf + '/' + self.filepath_geo))
+
+        map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_geo + '/' + x[7:11] + '/' + x[11:14], x), nonlocals)
+
+        return manifest
+
+
+    def compute_geo_manifest(from_utc, to_utc):
+        """
+        Get list of geolocation file names for the given time frame
+
+        :param from_utc: start time UTC
+        :param to_utc: end time UTC
+        :return: list of file names as strings
+        """
+
+        # I don't really want to deal with splitting it on years, so we'll recurse on that
+        # from now on we can assume that to and from occur in the same year
+        start_year = from_utc.year
+        if start_year != to_utc.year:
+            return compute_geo_manifest(from_utc, datetime.datetime(year=start_year, month=12,day=31,hour=23,minute=59)) + \
+                   compute_geo_manifest(datetime.datetime(year=start_year+1, month=1, day=1, hour=0, minute=0), to_utc)
+
+        # The source has data for different days in different folders, we'll need to get their paths for each day
+        start_day = (from_utc - datetime.datetime(start_year, 1,1)).days + 1
+        end_day = (to_utc - datetime.datetime(start_year, 1, 1)).days + 1
+
+        file_list = []
+
+        for day in range(start_day, end_day + 1):
+            file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_geo + '/' + str(start_year) + '/' + str(day)))
+
+        # we now have a list with all of the filenames during the days that the query requested, so now we'll trim the stuff at the front and back we don't need
+        # invent a sample filename for the start time, they look like this:
+        # MOD03.AYYYYDDDD.HHMM.006.#############.hdf
+        start_filename = 'MOD03.A%04d%03d.%02d%02d.006.9999999999999.hdf' % (start_year, start_day, from_utc.hour, from_utc.minute)
+
+        # bisect searches for that sample name and returns the index of where that file should go
+        # to make sure we get that data we start at the file before it (-1)
+        start_index = bisect(file_list, start_filename) - 1
+
+        # we'll do the same for the last one
+        end_filename =  'MOD03.A%04d%03d.%02d%02d.006.9999999999999.hdf' % (start_year, to_utc.day, to_utc.hour, to_utc.minute)
+        end_index = bisect(file_list, end_filename)
+
+        return file_list[start_index:end_index]
+
+
+    def retrieve_af(self, geo_list):
+        """
+        Attempts to retrieve active fire files in the time range and latitude/longitude box
+
+        :param geo_list: list containing the relevant geolocation file names
+        :return: a list of paths to the local active fire files
+        """
+        manifest = self.compute_af_manifest(geo_list)
+
+        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+
+        logging.info('Retrieving active fire data from %s' % (self.url_base_hdf + '/' + self.filepath_af))
+
+        map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_af + '/' + x[7:11] + '/' + x[11:14], x), nonlocals)
+
+        return manifest
+
+
+    def compute_af_manifest(geo_list):
+        """
+        get list of active fire file names from a set of geolocation files
+
+        :param geo_list: list containing geolocation file names
+        """
+
+        prefix = ''
+        file_list = []
+
+        for g in geo_list:
+            if g[:19] != prefix:
+                prefix = g[:19]
+                file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_af + '/' + str(prefix[7:11]) + '/' str(prefix[11:14])))
+
+        manifest = []
+
+        # Search for what the name should look like and use that index to add that name to the manifest
+        # this takes n*log(n) time, which I think is pretty good
+        for g in geo_list:
+            manifest.append(file_list[bisect(file_list, 'MOD14' + g[5:24] + '99999999999999.hdf') - 1])
+
+        return manifest
+
+
+    def retrieve_l0(self, from_utc, to_utc):
+        """
+        Attempts to retrieve the files to satisfy the simulation request from from_utc to to_utc.
 
         :param from_utc: start time
         :param to_utc: end time
@@ -113,23 +298,20 @@ class MODIS_TERRA(level0Source):
         # can add a source for older data later, but I don't think it's needed,
         # given the purpose of the project.
         if from_utc < datetime.now(pytz.UTC) - timedelta(days=14):
-            raise level0Error('Requested data older than two weeks')
+            raise data_sourceError('Requested data older than two weeks')
 
-        if ref_utc is None:
-            ref_utc = datetime.now(pytz.UTC)
+        manifest = self.compute_l0_manifest(from_utc, to_utc)
 
-        manifest = self.compute_manifest(from_utc, to_utc)
-
-        nonlocals = filter(lambda x: not self.level0_available_locally(osp.join(self.ingest_dir, x)), manifest)
+        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
 
 
-        logging.info('Retrieving level0s from %s' % (self.url_base + '/' + self.filepath))
+        logging.info('Retrieving level0s from %s' % (self.url_base_l0 + '/' + self.filepath_l0))
 
-        map(lambda x:self.download_level0(self.url_base + '/' + self.filepath, x), nonlocals)
+        map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0, x), nonlocals)
 
         return manifest
 
-    def compute_manifest(self, from_utc, to_utc):
+    def compute_l0_manifest(self, from_utc, to_utc):
         """
         Compute list of files in the source for the given time frame
 
@@ -139,7 +321,7 @@ class MODIS_TERRA(level0Source):
         """
 
         # Retrieve the directory listing
-        dList = get_dList(self.url_base + '/' + self.filepath)
+        dList = get_dList(self.url_base_l0 + '/' + self.filepath_l0)
 
         # We want a list of all of the filenames which land between from_utc and to_utc
 
@@ -198,11 +380,15 @@ class MODIS_TERRA(level0Source):
 
         return level0manifest
 
-    url_base = 'ftp://is.sci.gsfc.nasa.gov'
-    filepath = 'gsfcdata/terra/modis/level0'
+    url_base_l0 = 'ftp://is.sci.gsfc.nasa.gov'
+    filepath_l0 = 'gsfcdata/terra/modis/level0'
+
+    url_base_hdf = 'ftp://ladsweb.nascom.nasa.gov'
+    filepath_geo = 'allData/6/MOD03'
+    filepath_af = 'allData/6/MOD14'
 
 # Near clone of MODIS_TERRA, only changes to url and filename
-class MODIS_AQUA(level0Source):
+class MODIS_AQUA(data_source):
     """
     750m data from the MODIS instrument on the Aqua satellite
     Uniqueness- Requires data from two directories on the source server,
@@ -212,7 +398,116 @@ class MODIS_AQUA(level0Source):
     def __init__(self, ingest_dir):
         super(MODIS_AQUA, self).__init__(ingest_dir)
 
-    def retrieve_level0s(self, from_utc, to_utc, ref_utc=None):
+    def retrieve_geo(self, from_utc, to_utc):
+        """
+        Attempts to retrieve geolocation files in the time range
+        First, check if they're available locally, if unavailable proceed to download
+
+        :param from_utc: start time
+        :param to_utc: end time
+        :return: a list of paths to local geolocation files
+        """
+
+        manifest = self.compute_geo_manifest(from_utc, to_utc)
+
+        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+
+        logging.info('Retrieving geolocation data from %s' % (self.url_base_hdf + '/' + self.filepath_geo))
+
+        map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_geo + '/' + x[7:11] + '/' + x[11:14], x), nonlocals)
+
+        return manifest
+
+
+    def compute_geo_manifest(from_utc, to_utc):
+        """
+        Get list of geolocation file names for the given time frame
+
+        :param from_utc: start time UTC
+        :param to_utc: end time UTC
+        :return: list of file names as strings
+        """
+
+
+        # I don't really want to deal with splitting it on years, so we'll recurse on that
+        # from now on we can assume that to and from occur in the same year
+        start_year = from_utc.year
+        if start_year != to_utc.year:
+            return compute_geo_manifest(from_utc, datetime.datetime(year=start_year, month=12,day=31,hour=23,minute=59)) + \
+                   compute_geo_manifest(datetime.datetime(year=start_year+1, month=1, day=1, hour=0, minute=0), to_utc)
+
+        # The source has data for different days in different folders, we'll need to get their paths for each day
+        start_day = (from_utc - datetime.datetime(start_year, 1,1)).days + 1
+        end_day = (to_utc - datetime.datetime(start_year, 1, 1)).days + 1
+
+        file_list = []
+
+        for day in range(start_day, end_day + 1):
+            file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_geo + '/' + str(start_year) + '/' + str(day)))
+
+        # we now have a list with all of the filenames during the days that the query requested, so now we'll trim the stuff at the front and back we don't need
+        # invent a sample filename for the start time, they look like this:
+        # MYD03.AYYYYDDDD.HHMM.006.#############.hdf
+        start_filename = 'MYD03.A%04d%03d.%02d%02d.006.9999999999999.hdf' % (start_year, start_day, from_utc.hour, from_utc.minute)
+
+        # bisect searches for that sample name and returns the index of where that file should go
+        # to make sure we get that data we start at the file before it (-1)
+        start_index = bisect(file_list, start_filename) - 1
+
+        # we'll do the same for the last one
+        end_filename =  'MYD03.A%04d%03d.%02d%02d.006.9999999999999.hdf' % (start_year, to_utc.day, to_utc.hour, to_utc.minute)
+        end_index = bisect(file_list, end_filename)
+
+        return file_list[start_index:end_index]
+
+
+    def retrieve_af(self, geo_list):
+        """
+        Attempts to retrieve active fire files in the time range and latitude/longitude box
+
+        :param geo_list: list containing the relevant geolocation file names
+        :return: a list of paths to the local active fire files
+        """
+        manifest = self.compute_af_manifest(geo_list)
+
+        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+
+        logging.info('Retrieving active fire data from %s' % (self.url_base_hdf + '/' + self.filepath_af))
+
+        map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_af + '/' + x[7:11] + '/' + x[11:14], x), nonlocals)
+
+        return manifest
+
+
+
+
+    def compute_af_manifest(geo_list):
+        """
+        get list of active fire file names from a set of geolocation files
+
+        :param geo_list: list containing geolocation file names
+        """
+
+        prefix = ''
+        file_list = []
+
+        for g in geo_list:
+            if g[:19] != prefix:
+                prefix = g[:19]
+                file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_af + '/' + str(prefix[7:11]) + '/' str(prefix[11:14])))
+
+        manifest = []
+
+        # Search for what the name should look like and use that index to add that name to the manifest
+        # this takes n*log(n) time, which I think is pretty good
+        for g in geo_list:
+            manifest.append(file_list[bisect(file_list, 'MYD14' + g[5:24] + '99999999999999.hdf') - 1])
+
+        return manifest
+
+
+
+    def retrieve_l0(self, from_utc, to_utc):
         """
         Attempts to retrive the files to satisfy the simulation request from from_utc to to_utc.
 
@@ -225,26 +520,23 @@ class MODIS_AQUA(level0Source):
         # can add a source for older data later, but I don't think it's needed,
         # given the purpose of the project.
         if from_utc < datetime.now(pytz.UTC) - timedelta(days=14):
-            raise level0Error('Requested data older than two weeks')
+            raise data_sourceError('Requested data older than two weeks')
 
-        if ref_utc is None:
-            ref_utc = datetime.now(pytz.UTC)
+        manifest_m = self.compute_l0_manifest_m(from_utc, to_utc)
+        manifest_g = self.compute_l0_manifest_g(from_utc, to_utc)
 
-        manifest_m = self.compute_manifest_m(from_utc, to_utc)
-        manifest_g = self.compute_manifest_g(from_utc, to_utc)
+        nonlocals_m = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest_m)
+        nonlocals_g = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest_g)
 
-        nonlocals_m = filter(lambda x: not self.level0_available_locally(osp.join(self.ingest_dir, x)), manifest_m)
-        nonlocals_g = filter(lambda x: not self.level0_available_locally(osp.join(self.ingest_dir, x)), manifest_g)
+        logging.info('Retrieving level0s from %s' % self.url_base_l0 + '/' + self.filepath_l0_m)
+        map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0_m, x), nonlocals_m)
 
-        logging.info('Retrieving level0s from %s' % self.url_base + '/' + self.filepath_m)
-        map(lambda x:self.download_level0(self.url_base + '/' + self.filepath_m, x), nonlocals_m)
-
-        logging.info('Retrieving level0s from %s' % self.url_base + '/' + self.filepath_g)
-        map(lambda x:self.download_level0(self.url_base + '/' + self.filepath_g, x), nonlocals_g)
+        logging.info('Retrieving level0s from %s' % self.url_base_l0 + '/' + self.filepath_l0_g)
+        map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0_g, x), nonlocals_g)
 
         return manifest_m + manifest_g
 
-    def compute_manifest_m(self, from_utc, to_utc):
+    def compute_l0_manifest_m(self, from_utc, to_utc):
         """
         Compute list of MODIS files in the source for the given time frame
 
@@ -256,7 +548,7 @@ class MODIS_AQUA(level0Source):
         # We want a list of all of the filenames which land between from_utc and to_utc
 
         # Retrieve the directory listing
-        dList = get_dList(self.url_base + '/' + self.filepath_m)
+        dList = get_dList(self.url_base_l0 + '/' + self.filepath_l0_m)
 
         # Gameplan:
         # What would a file that starts exactly at from_utc look like?
@@ -313,7 +605,7 @@ class MODIS_AQUA(level0Source):
 
         return level0manifest
 
-    def compute_manifest_g(self, from_utc, to_utc):
+    def compute_l0_manifest_g(self, from_utc, to_utc):
         """
         Compute list of GBAD files (AQUA specific) in the source for the given time frame
 
@@ -325,7 +617,7 @@ class MODIS_AQUA(level0Source):
         # We want a list of all of the filenames which land between from_utc and to_utc
 
         # Retrieve the directory listing
-        dList = get_dList(self.url_base + '/' + self.filepath_g)
+        dList = get_dList(self.url_base_l0 + '/' + self.filepath_l0_g)
 
         # Gameplan:
         # What would a file that starts exactly at from_utc look like?
@@ -379,19 +671,26 @@ class MODIS_AQUA(level0Source):
                                                 second=int(current_file[31:33]))
 
         return level0manifest
-    url_base = 'ftp://is.sci.gsfc.nasa.gov'
-    filepath_m = 'gsfcdata/aqua/modis/level0'
-    filepath_g = 'gsfcdata/aqua/gbad'
 
 
-class VIIRS_NPP(level0Source):
+    url_base_l0 = 'ftp://is.sci.gsfc.nasa.gov'
+    filepath_l0_m = 'gsfcdata/aqua/modis/level0'
+    filepath_l0_g = 'gsfcdata/aqua/gbad'
+
+    url_base_hdf = 'ftp://ladsweb.nascom.nasa.gov'
+    filepath_geo = 'allData/6/MYD03'
+    filepath_af = 'allData/6/MYD14'
+
+
+
+class VIIRS_NPP(data_source):
     """
     375m data from VIIRS instrument on the NPP satellite
     """
     def __init__(self, ingest_dir):
         super(VIIRS_NPP, self).__init__(ingest_dir)
 
-    def retrieve_level0s(self, from_utc, to_utc, ref_utc=None):
+    def retrieve_l0(self, from_utc, to_utc):
         """
         Attempts to retrive the files to satisfy the simulation request from from_utc to to_utc.
 
@@ -404,23 +703,20 @@ class VIIRS_NPP(level0Source):
         # can add a source for older data later, but I don't think it's needed,
         # given the purpose of the project.
         if from_utc < datetime.now(pytz.UTC) - timedelta(days=14):
-            raise level0Error('Requested data older than two weeks')
+            raise data_sourceError('Requested data older than two weeks')
 
-        if ref_utc is None:
-            ref_utc = datetime.now(pytz.UTC)
+        manifest = self.compute_l0_manifest(from_utc, to_utc)
 
-        manifest = self.compute_manifest(from_utc, to_utc)
-
-        nonlocals = filter(lambda x: not self.level0_available_locally(osp.join(self.ingest_dir, x)), manifest)
+        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
 
 
-        logging.info('Retrieving level0s from %s' % self.url_base + '/' + self.filepath)
+        logging.info('Retrieving level0s from %s' % self.url_base_l0 + '/' + self.filepath_l0)
 
-        map(lambda x:self.download_level0(self.url_base + '/' + self.filepath, x), nonlocals)
+        map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0, x), nonlocals)
 
         return manifest
 
-    def compute_manifest(self, from_utc, to_utc):
+    def compute_l0_manifest(self, from_utc, to_utc):
         """
         Compute list of files in the source for the given time frame
 
@@ -431,7 +727,7 @@ class VIIRS_NPP(level0Source):
         # We want a list of all of the filenames which land between from_utc and to_utc
 
         # Retrieve the directory listing
-        dList = get_dList(self.url_base + '/' + self.filepath)
+        dList = get_dList(self.url_base_l0 + '/' + self.filepath_l0)
 
         # Gameplan:
         # What would a file that starts exactly at from_utc look like?
@@ -480,5 +776,5 @@ class VIIRS_NPP(level0Source):
         return level0manifest
 
 
-    url_base = 'ftp://is.sci.gsfc.nasa.gov'
-    filepath = 'gsfcdata/npp/viirs/level0'
+    url_base_l0 = 'ftp://is.sci.gsfc.nasa.gov'
+    filepath_l0 = 'gsfcdata/npp/viirs/level0'
