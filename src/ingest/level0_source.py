@@ -1,6 +1,7 @@
 #
 # Dalton Burke, UCDenver
 #
+# CONUS = [-124.7844079,-66.9513812,24.7433195,49.3457868]
 
 from utils import ensure_dir, symlink_unless_exists
 from downloader import download_url, DownloadError, get_dList
@@ -9,6 +10,7 @@ from downloader import download_url, DownloadError, get_dList
 from bisect import bisect
 
 from datetime import datetime, timedelta
+from pyhdf import SD
 
 import pytz
 import requests
@@ -51,32 +53,32 @@ class data_source(object):
         # I think all data should be ingested into one directory, then whichever files
         # are needed for a given job can be copied to a new folder with a job name
 
-        two_weeks_ago = datetime.now(pytz.UTC) - timedelta(days=14)
+        two_weeks_ago = datetime.utcnow() - timedelta(days=14)
         manifest = []
 
         if from_utc > two_weeks_ago:
-            manifest.extend(retrieve_l0(from_utc, to_utc))
+            manifest.extend(self.retrieve_l0(from_utc, to_utc))
 
         elif to_utc < two_weeks_ago:
             # filter geo_list on intersection with lonlat, the hdf library i'd want to use here isn't ready yet
-            # geo_list = filter(lambda x: geo_intersects(lonlat, x), retrieve_geo(from_utc, to_utc))
-            geo_list = retrieve_geo(from_utc, to_utc)
+            geo_list = filter(lambda x: geo_intersects(self.ingest_dir + '/' + x, lonlat), self.retrieve_geo(from_utc, to_utc))
+            # geo_list = retrieve_geo(from_utc, to_utc)
             manifest.extend(geo_list)
-            manifest.extend(retrieve_af(geo_list))
+            manifest.extend(self.retrieve_af(geo_list))
 
         else:
-            manifest.extend(retrieve_l0(two_weeks_ago + timedelta(minutes=10), to_utc))
+            manifest.extend(self.retrieve_l0(two_weeks_ago + timedelta(minutes=10), to_utc))
 
             # filter geo_list on intersection with lonlat
-            # geo_list = filter(lambda x: geo_intersect(lonlat, x), retrieve_geo(from_utc, two_weeks_ago))
-            geo_list = retrieve_geo(from_utc, two_weeks_ago)
+            geo_list = filter(lambda x: geo_intersect(self.ingest_dir + '/' + x, lonlat), self.retrieve_geo(from_utc, two_weeks_ago))
+            # geo_list = retrieve_geo(from_utc, two_weeks_ago)
             manifest.extend(geo_list)
-            manifest.extend(retrieve_af(geo_list))
+            manifest.extend(self.retrieve_af(geo_list))
 
         return manifest
 
 
-    def retrieve_geo(self, from_utc, to_utc, ret_utc = None):
+    def retrieve_geo(self, from_utc, to_utc, ref_utc = None):
         """
         Attempts to retrieve geolocation files in the time range
         First, check if they're available locally, if unavailable proceed to download
@@ -118,7 +120,7 @@ class data_source(object):
         pass
 
 
-    def retrieve_l0(self, from_utc, to_utc, ret_utc = None):
+    def retrieve_l0(self, from_utc, to_utc, ref_utc = None):
         """
         Attempts to retrieve the firedata files for the time range.
         It should be first verified whether the firedata files are available locally.
@@ -153,7 +155,9 @@ class data_source(object):
         url = url_base + '/' + rel_path
         path = osp.join(self.ingest_dir, rel_path)
         try:
+            print 'downloading', url
             download_url(url, path, max_retries)
+            print 'done'
         except DownloadError as e:
             raise data_sourceError('data_source: failed to download file %s' % url)
 
@@ -201,7 +205,7 @@ class MODIS_TERRA(data_source):
         return manifest
 
 
-    def compute_geo_manifest(from_utc, to_utc):
+    def compute_geo_manifest(self, from_utc, to_utc):
         """
         Get list of geolocation file names for the given time frame
 
@@ -214,17 +218,17 @@ class MODIS_TERRA(data_source):
         # from now on we can assume that to and from occur in the same year
         start_year = from_utc.year
         if start_year != to_utc.year:
-            return compute_geo_manifest(from_utc, datetime.datetime(year=start_year, month=12,day=31,hour=23,minute=59)) + \
-                   compute_geo_manifest(datetime.datetime(year=start_year+1, month=1, day=1, hour=0, minute=0), to_utc)
+            return compute_geo_manifest(from_utc, datetime(year=start_year, month=12,day=31,hour=23,minute=59)) + \
+                   compute_geo_manifest(datetime(year=start_year+1, month=1, day=1, hour=0, minute=0), to_utc)
 
         # The source has data for different days in different folders, we'll need to get their paths for each day
-        start_day = (from_utc - datetime.datetime(start_year, 1,1)).days + 1
-        end_day = (to_utc - datetime.datetime(start_year, 1, 1)).days + 1
+        start_day = (from_utc - datetime(start_year, 1,1)).days + 1
+        end_day = (to_utc - datetime(start_year, 1, 1)).days + 1
 
         file_list = []
 
         for day in range(start_day, end_day + 1):
-            file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_geo + '/' + str(start_year) + '/' + str(day)))
+            file_list.extend(get_dList(self.url_base_hdf + '/' + self.filepath_geo + '/' + str(start_year) + '/' + str(day)))
 
         # we now have a list with all of the filenames during the days that the query requested, so now we'll trim the stuff at the front and back we don't need
         # invent a sample filename for the start time, they look like this:
@@ -236,7 +240,7 @@ class MODIS_TERRA(data_source):
         start_index = bisect(file_list, start_filename) - 1
 
         # we'll do the same for the last one
-        end_filename =  'MOD03.A%04d%03d.%02d%02d.006.9999999999999.hdf' % (start_year, to_utc.day, to_utc.hour, to_utc.minute)
+        end_filename =  'MOD03.A%04d%03d.%02d%02d.006.9999999999999.hdf' % (start_year, end_day, to_utc.hour, to_utc.minute)
         end_index = bisect(file_list, end_filename)
 
         return file_list[start_index:end_index]
@@ -260,7 +264,7 @@ class MODIS_TERRA(data_source):
         return manifest
 
 
-    def compute_af_manifest(geo_list):
+    def compute_af_manifest(self, geo_list):
         """
         get list of active fire file names from a set of geolocation files
 
@@ -273,7 +277,7 @@ class MODIS_TERRA(data_source):
         for g in geo_list:
             if g[:19] != prefix:
                 prefix = g[:19]
-                file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_af + '/' + str(prefix[7:11]) + '/' + str(prefix[11:14])))
+                file_list.extend(get_dList(self.url_base_hdf + '/' + self.filepath_af + '/' + str(prefix[7:11]) + '/' + str(prefix[11:14])))
 
         manifest = []
 
@@ -297,7 +301,7 @@ class MODIS_TERRA(data_source):
         # This only works for requests going back about the last two weeks
         # can add a source for older data later, but I don't think it's needed,
         # given the purpose of the project.
-        if from_utc < datetime.now(pytz.UTC) - timedelta(days=14):
+        if from_utc < datetime.utcnow() - timedelta(days=14):
             raise data_sourceError('Requested data older than two weeks')
 
         manifest = self.compute_l0_manifest(from_utc, to_utc)
@@ -330,7 +334,7 @@ class MODIS_TERRA(data_source):
         # Filenames have this pattern: P0420064AAAAAAAAAAAAAAyyDDDhhmmss000.PDS
         current_time = from_utc
 
-        days = (current_time - datetime(current_time.year, 1, 1, tzinfo=pytz.UTC)).days + 1
+        days = (current_time - datetime(current_time.year, 1, 1)).days + 1
         year = current_time.year % 100
 
         filename = 'P0420064AAAAAAAAAAAAAA%02d%03d%02d%02d%02d000.PDS' % (year, days,
@@ -419,7 +423,7 @@ class MODIS_AQUA(data_source):
         return manifest
 
 
-    def compute_geo_manifest(from_utc, to_utc):
+    def compute_geo_manifest(self, from_utc, to_utc):
         """
         Get list of geolocation file names for the given time frame
 
@@ -433,17 +437,17 @@ class MODIS_AQUA(data_source):
         # from now on we can assume that to and from occur in the same year
         start_year = from_utc.year
         if start_year != to_utc.year:
-            return compute_geo_manifest(from_utc, datetime.datetime(year=start_year, month=12,day=31,hour=23,minute=59)) + \
-                   compute_geo_manifest(datetime.datetime(year=start_year+1, month=1, day=1, hour=0, minute=0), to_utc)
+            return compute_geo_manifest(from_utc, datetime(year=start_year, month=12,day=31,hour=23,minute=59)) + \
+                   compute_geo_manifest(datetime(year=start_year+1, month=1, day=1, hour=0, minute=0), to_utc)
 
         # The source has data for different days in different folders, we'll need to get their paths for each day
-        start_day = (from_utc - datetime.datetime(start_year, 1,1)).days + 1
-        end_day = (to_utc - datetime.datetime(start_year, 1, 1)).days + 1
+        start_day = (from_utc - datetime(start_year, 1,1)).days + 1
+        end_day = (to_utc - datetime(start_year, 1, 1)).days + 1
 
         file_list = []
 
         for day in range(start_day, end_day + 1):
-            file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_geo + '/' + str(start_year) + '/' + str(day)))
+            file_list.extend(get_dList(self.url_base_hdf + '/' + self.filepath_geo + '/' + str(start_year) + '/' + str(day)))
 
         # we now have a list with all of the filenames during the days that the query requested, so now we'll trim the stuff at the front and back we don't need
         # invent a sample filename for the start time, they look like this:
@@ -481,7 +485,7 @@ class MODIS_AQUA(data_source):
 
 
 
-    def compute_af_manifest(geo_list):
+    def compute_af_manifest(self, geo_list):
         """
         get list of active fire file names from a set of geolocation files
 
@@ -494,7 +498,7 @@ class MODIS_AQUA(data_source):
         for g in geo_list:
             if g[:19] != prefix:
                 prefix = g[:19]
-                file_list.extend(get_dList(self.url_base_hdf + '/' + self.file_path_af + '/' + str(prefix[7:11]) + '/' + str(prefix[11:14])))
+                file_list.extend(get_dList(self.url_base_hdf + '/' + self.filepath_af + '/' + str(prefix[7:11]) + '/' + str(prefix[11:14])))
 
         manifest = []
 
@@ -519,7 +523,7 @@ class MODIS_AQUA(data_source):
         # This only works for requests going back about the last two weeks
         # can add a source for older data later, but I don't think it's needed,
         # given the purpose of the project.
-        if from_utc < datetime.now(pytz.UTC) - timedelta(days=14):
+        if from_utc < datetime.utcnow() - timedelta(days=14):
             raise data_sourceError('Requested data older than two weeks')
 
         manifest_m = self.compute_l0_manifest_m(from_utc, to_utc)
@@ -555,7 +559,7 @@ class MODIS_AQUA(data_source):
         # Filenames have this pattern: P1540064AAAAAAAAAAAAAAyyDDDhhmmss000.PDS
         current_time = from_utc
 
-        days = (current_time - datetime(current_time.year, 1, 1, tzinfo=pytz.UTC)).days + 1
+        days = (current_time - datetime(current_time.year, 1, 1)).days + 1
         year = current_time.year % 100
 
         filename = 'P1540064AAAAAAAAAAAAAA%02d%03d%02d%02d%02d000.PDS' % (year, days,
@@ -624,7 +628,7 @@ class MODIS_AQUA(data_source):
         # Filenames have this pattern: P1540064AAAAAAAAAAAAAAyyDDDhhmmss000.PDS
         current_time = from_utc
 
-        days = (current_time - datetime(current_time.year, 1, 1, tzinfo=pytz.UTC)).days + 1
+        days = (current_time - datetime(current_time.year, 1, 1)).days + 1
         year = current_time.year % 100
 
         filename = 'P1540957AAAAAAAAAAAAAA%02d%03d%02d%02d%02d000.PDS' % (year, days,
@@ -702,7 +706,7 @@ class VIIRS_NPP(data_source):
         # This only works for requests going back about the last two weeks
         # can add a source for older data later, but I don't think it's needed,
         # given the purpose of the project.
-        if from_utc < datetime.now(pytz.UTC) - timedelta(days=14):
+        if from_utc < datetime.utcnow() - timedelta(days=14):
             raise data_sourceError('Requested data older than two weeks')
 
         manifest = self.compute_l0_manifest(from_utc, to_utc)
@@ -778,3 +782,51 @@ class VIIRS_NPP(data_source):
 
     url_base_l0 = 'ftp://is.sci.gsfc.nasa.gov'
     filepath_l0 = 'gsfcdata/npp/viirs/level0'
+
+
+
+
+def geo_intersects(filename, lonlat):
+    """
+    Checks a geolocation file for overlap with a latitude longitude box
+    :filename: name of file to check
+    :lonlat: list, [leftlon, rightlon, botlat, toplat]
+    :return: boolean, true if there was overlap
+    """
+    print "Checking",filename, "..."
+
+    if filename[-4:] != '.hdf':
+        print "ERROR: File", filename, "is not the correct filetype (require hdf)"
+        return False
+
+    if lonlat[0] > lonlat[1]:
+        print "ERROR: Requested box crosses dateline, no support for this yet"
+        return False
+
+    try:
+        hdf = SD.SD(filename)
+    except:
+        print "ERROR: Could not load file " + filename + '\n'
+        return False
+
+    lon = hdf.select('Longitude')
+    lat = hdf.select('Latitude')
+
+    dim1 = len(lon[:])
+    dim2 = len(lon[0])
+
+    minlon = float(lon[0][0])
+    maxlon = float(lon[dim1 - 1][dim2 - 1])
+
+    minlat = float(lat[dim1 - 1][dim2 - 1])
+    maxlat = float(lat[0][0])
+
+    if minlon > maxlon:
+        #print "ERROR: File " + filename + " crosses dateline, no support for this yet\n"
+        return False
+
+
+    lonoverlap = minlon < lonlat[1] and maxlon > lonlat[0]
+    latoverlap = minlat < lonlat[3] and maxlat > lonlat[2]
+
+    return lonoverlap and latoverlap
