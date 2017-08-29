@@ -1,9 +1,4 @@
-from ssh_shuttle import SSHShuttle
-from forecast import load_sys_cfg
-import sys
+from ssh_shuttle import ssh_command 
 
-cfg = load_sys_cfg()
-s = SSHShuttle(cfg)
-s.connect()
 command = ' '.join(sys.argv[1:])
-s.simple_command(command)
+ssh_command(command)

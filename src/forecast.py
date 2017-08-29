@@ -33,7 +33,7 @@ from vis.var_wisdom import get_wisdom_variables
 from ingest.grib_source import HRRR, NAM218, NAM227, NARR
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
-from ssh_shuttle import send_product_to_server
+from ssh_shuttle import send_product_to_server, ssh_command
 
 import f90nml
 from datetime import datetime, timedelta
@@ -242,6 +242,9 @@ def make_job_file(js):
     jsub.grid_code = js.grid_code 
     jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     return jsub
+
+def make_kmz(args):
+    ssh_command('wrfxweb/make_kmz.sh ' + args)
 
 def execute(args,job_args):
     """
@@ -538,6 +541,9 @@ def process_output(job_id):
     if js.postproc.get('shuttle', None) == 'on_completion':
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+
+    if js.postproc.get('shuttle', None) is not None:
+        make_kmz(js.job_id)  # arguments can be added to the job id string
 
     js.old_pid = js.pid
     js.pid = None
