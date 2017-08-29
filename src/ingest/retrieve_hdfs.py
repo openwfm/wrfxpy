@@ -24,7 +24,9 @@ if __name__ == '__main__':
 
     data_src_name = sys.argv[1]
     from_utc = esmf_to_utc(sys.argv[2])
+    from_utc = from_utc.replace(tzinfo=None)
     to_utc = esmf_to_utc(sys.argv[3])
+    to_utc = to_utc.replace(tzinfo=None)
     lonlat = [float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6]), float(sys.argv[7])]
     ingest_dir = osp.abspath(osp.expanduser(sys.argv[8]))
 

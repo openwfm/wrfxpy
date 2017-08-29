@@ -155,9 +155,9 @@ class data_source(object):
         url = url_base + '/' + rel_path
         path = osp.join(self.ingest_dir, rel_path)
         try:
-            print 'downloading', url
+            # print 'downloading', url
             download_url(url, path, max_retries)
-            print 'done'
+            # print 'done'
         except DownloadError as e:
             raise data_sourceError('data_source: failed to download file %s' % url)
 
@@ -794,20 +794,20 @@ def geo_intersects(filename, lonlat):
     :lonlat: list, [leftlon, rightlon, botlat, toplat]
     :return: boolean, true if there was overlap
     """
-    print "Checking",filename, "..."
+    # print "Checking",filename, "..."
 
     if filename[-4:] != '.hdf':
-        print "ERROR: File", filename, "is not the correct filetype (require hdf)"
+        # print "ERROR: File", filename, "is not the correct filetype (require hdf)"
         return False
 
     if lonlat[0] > lonlat[1]:
-        print "ERROR: Requested box crosses dateline, no support for this yet"
+        # print "ERROR: Requested box crosses dateline, no support for this yet"
         return False
 
     try:
         hdf = SD.SD(filename)
     except:
-        print "ERROR: Could not load file " + filename + '\n'
+        # print "ERROR: Could not load file " + filename + '\n'
         return False
 
     lon = hdf.select('Longitude')
@@ -823,7 +823,7 @@ def geo_intersects(filename, lonlat):
     maxlat = float(lat[0][0])
 
     if minlon > maxlon:
-        #print "ERROR: File " + filename + " crosses dateline, no support for this yet\n"
+        # print "ERROR: File " + filename + " crosses dateline, no support for this yet\n"
         return False
 
 
