@@ -38,7 +38,7 @@ class data_source(object):
 
         :param ingest_dir: root of level0 storage
         """
-        self.ingest_dir = osp.abspath(ingest_dir)
+        self.ingest_dir = osp.abspath(osp.expanduser(ingest_dir))
 
 
     def retrieve_data(self, from_utc, to_utc, lonlat):
