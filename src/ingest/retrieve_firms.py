@@ -1,5 +1,5 @@
 #
-# Dalton Burke UCDenver
+# Dalton Burke, CU Denver
 #
 
 #from utils import ensure_dir, symlink_unless_exists

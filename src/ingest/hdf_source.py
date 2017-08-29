@@ -1,5 +1,5 @@
 #
-# Dalton Burke, UC Denver
+# Dalton Burke, CU Denver
 #
 
 

@@ -1,5 +1,5 @@
 #
-# Dalton Burke, UC Denver
+# Dalton Burke, CU Denver
 #
 
 from ingest.level0_source import MODIS_AQUA, MODIS_TERRA, VIIRS_NPP
