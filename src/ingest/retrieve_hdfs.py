@@ -26,19 +26,18 @@ if __name__ == '__main__':
     from_utc = esmf_to_utc(sys.argv[2])
     to_utc = esmf_to_utc(sys.argv[3])
     lonlat = [float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6]), float(sys.argv[7])]
-    ingest_dir = osp.abspath(sys.argv[8])
+    ingest_dir = osp.abspath(osp.expanduser(sys.argv[8]))
 
-    hdf_src = None
     if data_src_name == 'MODIS_AQUA':
         data_src = MODIS_AQUA(ingest_dir)
-    if data_src_name == 'MODIS_TERRA':
+    elif data_src_name == 'MODIS_TERRA':
         data_src = MODIS_TERRA(ingest_dir)
     elif data_src_name == 'VIIRS_NPP':
         data_src = VIIRS_NPP(ingest_dir)
     else:
         raise ValueError('Invalid HDF source %s' % data_src_name)
 
-    logging.info('Initiating download of files from HDF source %s' % grib_src_name)
+    logging.info('Initiating download of files from HDF source %s' % data_src_name)
 
     hdfs = data_src.retrieve_data(from_utc, to_utc, lonlat)
 
