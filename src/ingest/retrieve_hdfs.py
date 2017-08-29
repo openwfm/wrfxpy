@@ -1,5 +1,5 @@
 #
-# Dalton Burke, UC Denver
+# Dalton Burke, CU Denver
 #
 
 from ingest.level0_source import MODIS_AQUA, MODIS_TERRA, VIIRS_NPP
@@ -13,7 +13,7 @@ import os.path as osp
 ## Standalone script that can be used to download files
 if __name__ == '__main__':
     if len(sys.argv) != 9:
-        print('Usage: %s <hdf_source_name> <esmf_from_utc> <esmf_to_utc> <low_long> <high_long> <low_lat> <high_lat> <target_directory>' % sys.argv[0])
+        print('Usage: %s <data_src_name> <esmf_from_utc> <esmf_to_utc> <low_long> <high_long> <low_lat> <high_lat> <target_directory>' % sys.argv[0])
         print('        supported HDF sources: MODIS_AQUA, MODIS_TERRA, VIIRS_NPP')
         print('        time of format YYYY.MM.DD-HH.MM.SS')
         sys.exit(-1)
@@ -27,6 +27,12 @@ if __name__ == '__main__':
     to_utc = esmf_to_utc(sys.argv[3])
     lonlat = [float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6]), float(sys.argv[7])]
     ingest_dir = osp.abspath(osp.expanduser(sys.argv[8]))
+
+    logging.info('data_src_name: %s' % data_src_name)
+    logging.info('from_utc:      %s' % from_utc)
+    logging.info('to_utc:        %s' % to_utc)
+    logging.info('lonlat:        %s:%s %s:%s' % tuple(lonlat))
+    logging.info('ingest_dir:    %s' % ingest_dir)
 
     if data_src_name == 'MODIS_AQUA':
         data_src = MODIS_AQUA(ingest_dir)

@@ -1,5 +1,5 @@
 #
-# Dalton Burke, UCDenver
+# Dalton Burke, CU Denver
 #
 # CONUS = [-124.7844079,-66.9513812,24.7433195,49.3457868]
 
