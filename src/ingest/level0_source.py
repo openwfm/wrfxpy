@@ -411,7 +411,6 @@ class MODIS_AQUA(data_source):
         :param to_utc: end time
         :return: a list of paths to local geolocation files
         """
-
         manifest = self.compute_geo_manifest(from_utc, to_utc)
 
         nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
@@ -449,6 +448,7 @@ class MODIS_AQUA(data_source):
         for day in range(start_day, end_day + 1):
             file_list.extend(get_dList(self.url_base_hdf + '/' + self.filepath_geo + '/' + str(start_year) + '/' + str(day)))
 
+
         # we now have a list with all of the filenames during the days that the query requested, so now we'll trim the stuff at the front and back we don't need
         # invent a sample filename for the start time, they look like this:
         # MYD03.AYYYYDDDD.HHMM.006.#############.hdf
@@ -459,8 +459,9 @@ class MODIS_AQUA(data_source):
         start_index = bisect(file_list, start_filename) - 1
 
         # we'll do the same for the last one
-        end_filename =  'MYD03.A%04d%03d.%02d%02d.006.9999999999999.hdf' % (start_year, to_utc.day, to_utc.hour, to_utc.minute)
+        end_filename =  'MYD03.A%04d%03d.%02d%02d.006.9999999999999.hdf' % (start_year, end_day, to_utc.hour, to_utc.minute)
         end_index = bisect(file_list, end_filename)
+
 
         return file_list[start_index:end_index]
 
