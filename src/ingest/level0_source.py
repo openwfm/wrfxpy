@@ -143,6 +143,30 @@ class data_source(object):
         """
         pass
 
+    def manifest_from_geo(self, geo_list, granule_name):
+
+        # prefix later tells us what url we should be looking at
+        prefix = ''
+        file_list = []
+
+        # pulls directory listing of each relevant page (determined by the 'prefix' of each geo file)
+        # this yields a super set of the active fire files we care about, we'll refine the list in the next part
+        for g in geo_list:
+            if g[:19] != prefix:
+                prefix = g[:19]
+                file_list.extend(get_dList(self.url_base_hdf + '/' + self.filepath_af + '/' + str(prefix[7:11]) + '/' + str(prefix[11:14])))
+
+        # manifest contains the final set of exact filenames we care about
+        manifest = []
+
+        # Search for what the name should look like and use that index to add that name to the manifest
+        # this takes n*log(n) time, which I think is pretty good
+        for g in geo_list:
+            manifest.append(file_list[bisect(file_list, granule_name + g[5:24] + '99999999999999.hdf') - 1])
+
+        return manifest
+
+
 
     def download_file(self, url_base, rel_path, max_retries=3):
         """
@@ -181,7 +205,18 @@ class MODIS_TERRA(data_source):
     """
 
     def __init__(self, ingest_dir):
-        super(MODIS_TERRA, self).__init__(ingest_dir)
+        # if(satellite = 'terra'):
+        #     self.geo_gran = 'MOD03'
+        #     self.af_gran = 'MOD14'
+        # elif(satellite = 'aqua'):
+        #     self.geo_gran = 'MYD03'
+        #     self.af_gran = 'MYD14'
+        # else:
+        #     raise Exception(ValueError)
+
+       super(MODIS_TERRA, self).__init__(ingest_dir)
+
+
 
 
     def retrieve_geo(self, from_utc, to_utc):
@@ -449,7 +484,24 @@ class MODIS_AQUA(data_source):
             file_list.extend(get_dList(self.url_base_hdf + '/' + self.filepath_geo + '/' + str(start_year) + '/' + str(day)))
 
 
-        # we now have a list with all of the filenames during the days that the query requested, so now we'll trim the stuff at the front and back we don't need
+        geoMeta = []
+
+        i = from_utc.replace(hour=0,minute=0,second=0,microsecond=0)
+        end_date = to_utc.replace(hour=0,minute=0,second=0,microsecond=0)
+        gran = 'MYD03'
+        url = 'ftp://ladsweb.nascom.nasa.gov'
+        path = 'geoMeta/6/AQUA'
+
+        while i <= end_date:
+            #geoMeta.append('ftp://ladsweb.nascom.nasa.gov/geoMeta/6/AQUA/' + str(year) + '/MYD03_' + str(year) + '-' + str(month) + '-' + str(day) + '.txt')
+            geoMeta.append('%s/%s/%04d/%s_%04d-%02d-%02d.txt' % (url, path, i.year, gran, i.year, i.month, i.day))
+            i = i + timedelta(days=1)
+
+        #######################################################################################################################################################
+
+        # we now have a list with all of the filenames during the days that the query requested
+        # so now we'll trim the stuff at the front and back we don't need.
+
         # invent a sample filename for the start time, they look like this:
         # MYD03.AYYYYDDDD.HHMM.006.#############.hdf
         start_filename = 'MYD03.A%04d%03d.%02d%02d.006.9999999999999.hdf' % (start_year, start_day, from_utc.hour, from_utc.minute)
@@ -794,20 +846,16 @@ def geo_intersects(filename, lonlat):
     :lonlat: list, [leftlon, rightlon, botlat, toplat]
     :return: boolean, true if there was overlap
     """
-    # print "Checking",filename, "..."
+    logging.info("Checking %s for intersection with given lonlat" % filename)
 
     if filename[-4:] != '.hdf':
-        # print "ERROR: File", filename, "is not the correct filetype (require hdf)"
-        return False
-
-    if lonlat[0] > lonlat[1]:
-        # print "ERROR: Requested box crosses dateline, no support for this yet"
+        logging.info("ERROR: %s is not an hdf file" % filename)
         return False
 
     try:
         hdf = SD.SD(filename)
     except:
-        # print "ERROR: Could not load file " + filename + '\n'
+        logging.info("ERROR: failed to load file: %s" % filename)
         return False
 
     lon = hdf.select('Longitude')
@@ -823,11 +871,65 @@ def geo_intersects(filename, lonlat):
     maxlat = float(lat[0][0])
 
     if minlon > maxlon:
-        # print "ERROR: File " + filename + " crosses dateline, no support for this yet\n"
+        logging.info("File %s crosses dateline (not currently supported), skipping..." % filename)
         return False
-
 
     lonoverlap = minlon < lonlat[1] and maxlon > lonlat[0]
     latoverlap = minlat < lonlat[3] and maxlat > lonlat[2]
 
-    return lonoverlap and latoverlap
+    intersects = lonoverlap and latoverlap
+
+    if intersects:
+        logging.info("File %s intersects given lonlat")
+    else:
+        logging.info("File %s does not intersect given lonlat")
+
+    return intersects
+
+
+def manifest_from_geo(geo_list, granule_name):
+
+    prefix = ''
+    file_list = []
+
+    for g in geo_list:
+        if g[:19] != prefix:
+            prefix = g[:19]
+            file_list.extend(get_dList(self.url_base_hdf + '/' + self.filepath_af + '/' + str(prefix[7:11]) + '/' + str(prefix[11:14])))
+
+    manifest = []
+
+    # Search for what the name should look like and use that index to add that name to the manifest
+    # this takes n*log(n) time, which I think is pretty good
+    for g in geo_list:
+        manifest.append(file_list[bisect(file_list, granule_name + g[5:24] + '99999999999999.hdf') - 1])
+
+    return manifest
+
+# wisdom src/vis, postprocessor
+
+
+# def compute_af_manifest(self, geo_list):
+#     """
+#     get list of active fire file names from a set of geolocation files
+# 
+#     :param geo_list: list containing geolocation file names
+#     """
+# 
+#     prefix = ''
+#     file_list = []
+# 
+#     for g in geo_list:
+#         if g[:19] != prefix:
+#             prefix = g[:19]
+#             file_list.extend(get_dList(self.url_base_hdf + '/' + self.filepath_af + '/' + str(prefix[7:11]) + '/' + str(prefix[11:14])))
+# 
+#     manifest = []
+# 
+#     # Search for what the name should look like and use that index to add that name to the manifest
+#     # this takes n*log(n) time, which I think is pretty good
+#     for g in geo_list:
+#         manifest.append(file_list[bisect(file_list, 'MYD14' + g[5:24] + '99999999999999.hdf') - 1])
+# 
+#     return manifest
+
