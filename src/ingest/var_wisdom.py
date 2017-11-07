@@ -13,93 +13,115 @@ from bisect import bisect
 
 
 
-_hdf_wisdom = {
-      'MODIS_AQUA' : {
-            'GEO': {
-                  'name' : 'MYD03',
-                  'source' : 'laadsweb',
-                  'rel_path' : 'allData/6/',
-                  'lat_path' : 'Latitude',
-                  'lon_path' : 'Longitude',
-            },
-            #'RAD1KM' : {
-            #      'name' : 'MYD021KM',
-            #      'source' : 'laadsweb',
-            #      'lat_path' : 'Latitude',
-            #      'lon_path' : 'Longitude',
-            #},
-            #'RADHKM' : {
-            #      'name' : 'MYD02HKM',
-            #      'source' : 'laadsweb',
-            #      'lat_path' : 'Latitude',
-            #      'lon_path' : 'Longitude',
-            #},
-            'RADQKM' : {
-                  'name' : 'MYD02QKM',
-                  'source' : 'laadsweb',
-                  'rel_path' : 'allData/6/',
-                  'lat_path' : 'Latitude',
-                  'lon_path' : 'Longitude',
-            },
-            'AF': {
-                  'name' : 'MYD14',
-                  'source' : 'laadsweb',
-                  'rel_path' : 'allData/6/'
-
-            },
+_gran_wisdom = {
+    # MODIS_AQUA
+      'MYD03': {
+            'name' : 'MYD03',
+            'type' : 'geolocation',
+            'satellite' : 'MODIS_AQUA',
+            'source' : 'laadsweb',
+            'rel_path' : 'allData/6/',
+            'lat_path' : 'Latitude',
+            'lon_path' : 'Longitude',
       },
-      'MODIS_TERRA' : {
-            'GEO' : {
-                  'name' : 'MOD03',
-                  'source' : 'laadsweb',
-                  'rel_path' : 'allData/6/',
-                  'lat_path' : 'Latitude',
-                  'lon_path' : 'Longitude',
-            },
-            #'RAD1KM' : {
-            #      'name' : 'MOD021KM'
-            #      'source' : 'laadsweb'
-            #      'lat_path' : 'Latitude'
-            #      'lon_path' : 'Longitude'
-            #},
-            #'RADHKM' : {
-            #      'name' : 'MOD02HKM'
-            #      'source' : 'laadsweb'
-            #      'lat_path' : 'Latitude'
-            #      'lon_path' : 'Longitude'
-            #},
-            'RADQKM' : {
-                  'name' : 'MOD02QKM',
-                  'source' : 'laadsweb',
-                  'rel_path' : 'allData/6/',
-                  'lat_path' : 'Latitude',
-                  'lon_path' : 'Longitude',
-            },
-            'AF' : {
-                  'name' : 'MOD14',
-                  'source' : 'laadsweb',
-                  'rel_path' : 'allData/6/',
+      'MYD021KM' : {
+            'name' : 'MYD021KM',
+            'type' : 'radiance',
+            'satellite' : 'MODIS_AQUA',
+            'source' : 'laadsweb',
+            'rel_path' : 'allData/6/',
+            'lat_path' : 'Latitude',
+            'lon_path' : 'Longitude',
+      },
+      #'MYD02HKM' : {
+      #      'name' : 'MYD02HKM',
+      #      'type' : 'radiance'
+      #      'satellite' : 'MODIS_AQUA',
+      #      'source' : 'laadsweb',
+      #      'lat_path' : 'Latitude',
+      #      'lon_path' : 'Longitude',
+      #},
+      #'MYD02QKM' : {
+      #      'name' : 'MYD02QKM',
+      #      'type' : 'radiance'
+      #      'satellite' : 'MODIS_AQUA',
+      #      'source' : 'laadsweb',
+      #      'rel_path' : 'allData/6/',
+      #      'lat_path' : 'Latitude',
+      #      'lon_path' : 'Longitude',
+      #},
+      'MYD14': {
+            'name' : 'MYD14',
+            'type' : 'active fire',
+            'satellite' : 'MODIS_AQUA',
+            'source' : 'laadsweb',
+            'rel_path' : 'allData/6/'
 
-            },
       },
 
-      'VIIRS_NPP' : {
-            'GEO' : {
-                  
-            },
-            'AF' : {
-                  
-            },
+    # MODIS_TERRA
+      'MOD03' : {
+            'name' : 'MOD03',
+            'type' : 'geolocation',
+            'satellite' : 'MODIS_TERRA',
+            'source' : 'laadsweb',
+            'rel_path' : 'allData/6/',
+            'lat_path' : 'Latitude',
+            'lon_path' : 'Longitude',
       },
+      'MOD021KM' : {
+            'name' : 'MOD021KM',
+            'type' : 'radiance',
+            'satellite' : 'MODIS_TERRA',
+            'source' : 'laadsweb',
+            'rel_path' : 'allData/6/',
+            'lat_path' : 'Latitude',
+            'lon_path' : 'Longitude',
+      },
+      #'MOD02HKM' : {
+      #      'name' : 'MOD02HKM',
+      #      'type' : 'radiance',
+      #      'source' : 'laadsweb'
+      #      'satellite' : 'MODIS_TERRA',
+      #      'lat_path' : 'Latitude',
+      #      'lon_path' : 'Longitude',
+      #},
+      #'MOD02QKM' : {
+      #      'name' : 'MOD02QKM',
+      #      'type' : 'radiance',
+      #      'source' : 'laadsweb',
+      #      'satellite' : 'MODIS_TERRA',
+      #      'rel_path' : 'allData/6/',
+      #      'lat_path' : 'Latitude',
+      #      'lon_path' : 'Longitude',
+      #},
+      'MOD14' : {
+            'name' : 'MOD14',
+            'type' : 'active fire',
+            'satellite' : 'MODIS_TERRA',
+            'source' : 'laadsweb',
+            'rel_path' : 'allData/6/',
+
+      },
+
+    # VIIRS_NPP
+      'NPP_IMFTS_L1' : {
+            'name' : 'NPP_IMFTS_L1',
+            'type' : 'geolocation',
+            'satellite' : 'VIIRS_NPP',
+            'source' : 'laadsweb',
+            'rel_path' : 'allData/5000/',
+      },
+
 }
+def get_gran_wisdom(var_name):
+    """Return wisdom for the variable <var_name>."""
+    return _gran_wisdom[var_name]
 
-def get_hdf_wisdom(var_name):
-    """Return rendering wisdom for the variable <var_name>."""
-    return _hdf_wisdom[var_name]
-
-def get_hdf_wisdom_variables():
+def get_gran_wisdom_variables():
     """Return the variables for which wisdom is available."""
-    return _hdf_wisdom.keys()
+    return _gran_wisdom.keys()
+
 
 def laads_retr_manifest(ingest_dir, manifest):
       ingest_dir = osp.abspath(osp.expanduser(ingest_dir))
@@ -188,7 +210,7 @@ def laads_list_manifest(gran, gran_list):
                 file_list.extend(get_dList(url % (prefix[i+2:i+6], prefix[i+6:i+9])))
 
       search_string = gran['name'] + '%s.9999999999999.hdf'
-      manifest = map(lambda x: file_list[bisect(file_list, search_string % x[i:(i+18)])], gran_list)
+      manifest = map(lambda x: file_list[bisect(file_list, search_string % x[i:(i+18)])-1], gran_list)
       return manifest
 
 def laads_file_to_url(filename):
@@ -198,11 +220,11 @@ def laads_file_to_url(filename):
       :return: url for the file
       """
       attr = filename.split('.')
-      coll = attr[3][2:3]
       g_name = attr[0]
+      rel_path = get_gran_wisdom(g_name)['rel_path']
       year = attr[1][1:5]
       day = attr[1][5:9]
-      return 'ftp://ladsweb.nascom.nasa.gov/allData/%s/%s/%s/%s/%s' % (coll, g_name, year, day, filename)
+      return 'ftp://ladsweb.nascom.nasa.gov/%s%s/%s/%s/%s' % (rel_path, g_name, year, day, filename)
 
 
 _source_wisdom = {
@@ -222,36 +244,57 @@ def get_source_wisdom(source_name):
 def get_source_wisdom_variables():
       return _source_wisdom.keys()
 
+_satellite_wisdom = {
+      # Geolocation granule should come first here
+      'MODIS_AQUA'  : ['MYD03','MYD021KM','MYD14'],
+      'MODIS_TERRA' : ['MOD03','MYD021KM','MYD14'],
+      # 'VIIRS_NPP'   : ['NPP_IMFTS_L1'],
+}
+
+def get_sat_wisdom(satellite_name):
+      return _satellite_wisdom[satellite_name]
+
+def get_sat_wisdom_variables():
+      return _satellite_wisdom.keys()
 
 
-def retr_all(ingest_dir, hdf, from_utc, to_utc, lonlat = []):
+def retr_sat(ingest_dir, satellite, from_utc, to_utc, lonlat = []):
       """
-      Downloads all implemented granules in a given time and lonlat (optional) range
+      Downloads all implemented granules of a satellite in a given time and lonlat (optional) range
       """
       ingest_dir = osp.abspath(osp.expanduser(ingest_dir))
-      hdf_wis = get_hdf_wisdom(hdf)
-
-      geo_wis = hdf_wis['GEO']
-      geo_source_wis = get_source_wisdom(geo_wis['source'])
+      sat_gran_names = get_sat_wisdom(satellite)
+      sat_gran_wis = map(lambda x: get_gran_wisdom(x), sat_gran_names)
 
       if lonlat != []:
-            if hdf == 'MODIS_TERRA':
+            for gran in sat_gran_wis:
+                if gran['type'] == 'geolocation':
+                    geo_gran = gran
+
+            geo_source_wis = get_source_wisdom(geo_gran['source'])
+
+            if geo_gran['name'] == 'MOD03':
                   geo_manifest = geo_source_wis['geo_from_geoMeta'](ingest_dir, 'TERRA', from_utc, to_utc, lonlat)
-            elif hdf == 'MODIS_AQUA':
+            elif geo_gran['name'] == 'MYD03':
                   geo_manifest = geo_source_wis['geo_from_geoMeta'](ingest_dir, 'AQUA', from_utc, to_utc, lonlat)
             else:
-                  geo_manifest = geo_source_wis['range_manifest'](geo_wis, from_utc, to_utc)
+                  geo_manifest = geo_source_wis['range_manifest'](geo_gran, from_utc, to_utc)
       else:
-            geo_manifest = geo_source_wis['range_manifest'](geo_wis, from_utc, to_utc)
+            geo_manifest = geo_source_wis['range_manifest'](geo_gran, from_utc, to_utc)
 
-      manifest = geo_source_wis['retr_manifest'](ingest_dir, geo_manifest)
+      geo_source_wis['retr_manifest'](ingest_dir, geo_manifest)
 
-      for gran in hdf_wis.keys():
-            if gran != 'GEO':
-                  source_wis = get_source_wisdom(hdf_wis[gran]['source'])
-                  logging.info('Downloading %s from source %s' % (gran, hdf_wis[gran]['source']))
-                  temp_manifest = source_wis['list_manifest'](hdf_wis[gran], geo_manifest)
-                  manifest.extend(source_wis['retr_manifest'](ingest_dir, temp_manifest))
+      # need copy here (shallow is fine), use list()
+      # this caused a lot of pain
+      manifest = list(geo_manifest)
+
+      for gran in sat_gran_wis:
+          if gran['name'] != geo_gran['name']:
+                  source_wis = get_source_wisdom(gran['source'])
+                  logging.info('Downloading %s from source %s' % (gran['name'], gran['source']))
+                  gran_manifest = source_wis['list_manifest'](gran, geo_manifest)
+                  source_wis['retr_manifest'](ingest_dir, gran_manifest)
+                  manifest.extend(gran_manifest)
 
       return manifest
 
@@ -277,7 +320,7 @@ def download_file(ingest_dir, url, rel_path, max_retries=3):
     :param rel_path: the relative path of the file
     :param max_retries: how many times we may retry to download the file
     """
-    logging.info("Downloading %s from %s" % (rel_path, url))
+    # logging.info("Downloading %s from %s" % (rel_path, url))
     path = osp.join(ingest_dir, rel_path)
     try:
         download_url(url, path, max_retries)
