@@ -106,7 +106,8 @@ def parallel_job_running(js):
     for line in ret.split('\n'):
         ls=line.split()
         if len(ls) >0 and ls[0] == js.job_num:
-             logging.debug('WRF job %s is running.' % js.job_num)
+             status = ls[4]
+             logging.debug('WRF job %s status is %s' % (js.job_num, status))
              return True
     logging.info('WRF job %s is not running.' % js.job_num)
     return False 
