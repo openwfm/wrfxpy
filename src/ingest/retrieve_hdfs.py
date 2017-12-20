@@ -18,7 +18,7 @@ if __name__ == '__main__':
         print('        supported HDF sources: MODIS_AQUA, MODIS_TERRA')
         print('        time of format YYYY.MM.DD-HH.MM.SS')
         print('        (lonlat parameters optional, CONUS = -124.7844079 -66.9513812 24.7433195 49.3457868)')
-        print('ex:     MODIS_AQUA 2017.06.20-10.00.00 2017.06.20-15.00.00 ~/hdf_test -124.7844079 -66.9513812 24.7433195 49.3457868')
+        print('example: ./retrieve_hdfs.sh MODIS_AQUA 2017.06.20-10.00.00 2017.06.20-15.00.00 ~/hdf_test -124.7844079 -66.9513812 24.7433195 49.3457868')
         sys.exit(-1)
 
     # configure basic logger

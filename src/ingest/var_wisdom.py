@@ -152,10 +152,9 @@ def laads_geo_from_geoMeta(ingest_dir, satellite, from_utc, to_utc, lonlat):
       # using these to determine if the particular file intersects the lonlat range
       # we select the file name (in position 0) using list comprehension method
       geo_manifest = [item[0] for item in filter(\
-                                                 lambda x:\
-                                                 lonlat_intersect(lonlat, [float(x[5]), float(x[8]), float(x[7]), float(x[6])])\
-                                                 and (x[1] > str(from_utc) and x[1] < str(to_utc)), geoMeta)]
-
+            lambda x:\
+            lonlat_intersect(lonlat, [float(x[5]), float(x[8]), float(x[7]), float(x[6])])\
+            and (x[1] > str(from_utc) and x[1] < str(to_utc)), geoMeta)]
       return geo_manifest
 
 def laads_range_manifest(gran, from_utc, to_utc):
