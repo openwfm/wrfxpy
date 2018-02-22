@@ -30,9 +30,13 @@ Install pre-requisites:
 ::
 
   conda install basemap netcdf4 pyproj paramiko
-  conda install --channel https://conda.anaconda.org/conda-forge simplekml
+  conda install -c conda-forge simplekml
+  conda install -c conda-forge pygrib
   pip install f90nml
   pip install MesoPy
+  pip install -U numpy
+
+At the moment this installation works with Anaconda2-4.3.0 but not the latest Anaconda2.
 
 Note that ``conda`` and ``pip`` are package managers available in the Anaconda Python distribution.
 
