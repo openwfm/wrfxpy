@@ -71,6 +71,7 @@ class SSHShuttle(object):
         self.ssh = ssh
         self.sftp = ssh.open_sftp()
         # change to the remote root immediately
+        logging.info('SHUTTLE changing to remote root %s' % self.root)
         self.sftp.chdir(self.root)
         self.connected = True
 
@@ -234,7 +235,9 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
     sent_files = s.send_directory(local_dir, remote_dir, exclude_files)
 
     # identify the start/end UTC time (all domains may not have the same simulation extent)
-    manifest_file = osp.join(local_dir,manifest_filename)
+    # if more than one manifest file match, take the first one
+    manifest_file = glob.glob(osp.join(local_dir,manifest_filename))[0] 
+    logging.info('SHUTTLE loading manifest filename given %s loading %s' % (manifest_filename, manifest_file))
     mf = json.load(open(manifest_file))
     #print 'manifest:', json.dumps(mf, indent=4, separators=(',', ': '))
     logging.debug('manifest %s' % mf)

@@ -59,6 +59,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
 
     # read in the longitudes and latitudes
     geo_path = osp.join(wksp_path, '%s-geo.nc' % region_cfg.code)
+    logging.info('CYCLER reading longitudes and latitudes from NetCDF file %s' % geo_path )
     d = netCDF4.Dataset(geo_path)
     lats = d.variables['XLAT'][:,:]
     lons = d.variables['XLONG'][:,:]
@@ -350,7 +351,7 @@ if __name__ == '__main__':
             pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
             if 'shuttle_remote_host' in sys_cfg:
                 sim_code = 'fmda-' + wrapped_cfg.code
-                send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, region_id + ' FM')
+                send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, '*.json', region_id + ' FM')
         else:
             logging.info('CYCLER the cycle %s for region %s is already complete, skipping ...' % (str(cycle), str(region_id)))
 
