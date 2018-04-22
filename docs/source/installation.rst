@@ -25,14 +25,17 @@ Python and packages
 -------------------
 Download and install the Python 2 `Anaconda Python <https://www.continuum.io/downloads>`_ distribution for your platform.  We recommend an installation into the users home directory.
 
+::
+  wget https://repo.continuum.io/archive/Anaconda2-4.3.0-Linux-x86_64.sh
+  chmod +x Anaconda2-4.3.0-Linux-x86_64.sh
+  ./Anaconda2-4.3.0-Linux-x86_64.sh
+
 Install pre-requisites: 
 
 ::
 
   conda install basemap netcdf4 pyproj paramiko
-  conda install -c conda-forge simplekml
-  conda install -c conda-forge pygrib
-  pip install f90nml
+  conda install -c conda-forge simplekml pygrib f90nml
   pip install MesoPy
   pip install -U numpy
 
