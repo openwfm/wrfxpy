@@ -131,7 +131,7 @@ If Anaconda python is not practical, a different python distribution can be used
 
 ::
 
-  git clone https://github.com/vejmelkam/wrfxpy.git
+  git clone https://github.com/openwfm/wrfxpy.git
 
 Configure *wrfxpy* by editing ``etc/conf.json`` as above and then continue with :doc:`quickstart`.
 
