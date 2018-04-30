@@ -15,10 +15,10 @@
     "qsub_script" : "etc/qsub/colibri.sub"
   },
   "kingspeak" : {
-    "qsub_cmd" : "qsub",
-    "qdel_cmd" : "qdel",
-    "qstat_cmd" : "qstat",
-    "qsub_job_num_index" : 2,
+    "qsub_cmd" : "sbatch",
+    "qdel_cmd" : "scancel",
+    "qstat_cmd" : "squeue",
+    "qsub_job_num_index" : 3,
     "qsub_script" : "etc/qsub/kingspeak.sub"
   }
 }
