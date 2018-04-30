@@ -19,7 +19,7 @@
     "qdel_cmd" : "qdel",
     "qstat_cmd" : "qstat",
     "qsub_job_num_index" : 2,
-    "qsub_script" : "etc/qsub/kingspeak.slm"
-  },
+    "qsub_script" : "etc/qsub/kingspeak.sub"
+  }
 }
 

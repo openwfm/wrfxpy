@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --time=2:00:00 # walltime, abbreviated by -t
+#SBATCH --nodes=1     # number of cluster nodes, abbreviated by -N
+#SBATCH -o slurm-%j.out-%N # name of the stdout, using the job number (%j) and the first node (%N)
+#SBATCH --ntasks=28   # number of MPI tasks, abbreviated by -n
+# additional information for allocated clusters
+#SBATCH --account=kochanski-kp     # account - abbreviated by -A
+##SBATCH --account=strong-kp
+#SBATCH --partition=strong-kp  # partition, abbreviated by -p
+#SBATCH --job-name=INV_WRF 
+# set data and working directories
+export WORKDIR=${PWD} 
+cd $WORKDIR
+#
+# load appropriate modules, in this case Intel compilers, MPICHa
+module purge
+module load chpc
+module load intel/18 
+module load impi
+module load netcdf-c
+module load netcdf-f
+# for MPICH2 over Ethernet, set communication method to TCP
+# see below for network interface selection options for different MPI distributions
+export MV2_ENABLE_AFFINITY=0
+#setenv MPICH_NEMESIS_NETMOD tcp
+# run the program
+# see below for ways to do this for different MPI distributions
+mpirun -np $SLURM_NTASKS ./wrf.exe
