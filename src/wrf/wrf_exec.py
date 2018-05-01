@@ -268,9 +268,13 @@ class Submitter(object):
         with open(script_path, 'w') as f:
             f.write(script_tmpl % args)
 
+        logging.info('submitting to batch queue system %s' % self.qsys_id)
+        logging.info('%s %s' % (qsub, script_path))
+
         ret = check_output([qsub, script_path], cwd=self.work_dir)
         logging.info(ret)
-        job_num = ret.split(' ')[qsys['qsub_job_num_index']]
+        job_num = ret.split(' ')[qsys['qsub_job_num_index']].rstrip()
+        logging.info('job number %s submitted' % job_num)
 	return job_num
        
  

@@ -457,13 +457,13 @@ def process_output(job_id):
                     logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                     try:
                         pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
+                        # in incremental mode, upload to server
+                        if js.postproc.get('shuttle', None) == 'incremental':
+                            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+                            already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
-                # in incremental mode, upload to server
-                if js.postproc.get('shuttle', None) == 'incremental':
-                    desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                    sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                    already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
 
         # if we are to send out the postprocessed files after completion, this is the time
         if js.postproc.get('shuttle', None) == 'on_completion':
@@ -500,7 +500,7 @@ def process_output(job_id):
             if not wait_lines:
                 logging.info('Waiting for more output lines')
             wait_lines = wait_lines + 1 
-            time.sleep(0.5)
+            time.sleep(5)
             continue
         wait_lines = 0
 

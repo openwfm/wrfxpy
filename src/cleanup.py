@@ -103,22 +103,29 @@ def parallel_job_running(js):
     if cluster is None:
         logging.warning('No cluster system, cannot check for WRF job')
         return False
+    qstat_cmd = cluster['qstat_cmd']
     qstat_arg = cluster['qstat_arg']
     if re.search('%s',qstat_arg):
         try:
-            ret = subprocess.check_output([cluster['qstat_cmd'],qstat_arg % js.job_num],stderr=subprocess.STDOUT)
+            ret = subprocess.check_output([qstat_cmd,qstat_arg % js.job_num],stderr=subprocess.STDOUT)
+            logging.info('Job %s exists in the queue system' % js.job_num)
         except subprocess.CalledProcessError as e:
-            print e
+            logging.info('%s %s returned status %s' % (qstat_cmd,qstat_arg,e.returncode))
             if e.returncode == 1:
                 logging.info('Job %s not found' % js.job_num)
                 return False
+            else:
+                logging.error(e.output)
     else:
-        ret = subprocess.check_output([cluster['qstat_cmd'],qstat_arg],stderr=subprocess.STDOUT)
-    print ret
+        ret = subprocess.check_output([qstat_cmd,qstat_arg],stderr=subprocess.STDOUT)
     for line in ret.split('\n'):
         ls=line.split()
         if len(ls) >0 and ls[0] == str(js.job_num):
-             status = ls[4]
+             if len(ls) >4:
+                 status = ls[4]
+             else:
+                 status = '??'
+                 print ret
              logging.info('WRF job %s status is %s' % (js.job_num, status))
              return True
     logging.info('WRF job %s is not running.' % js.job_num)
@@ -195,12 +202,12 @@ def update(name):
     if js is not None:
         logging.debug('Old state is: %s' % js.state)
         if not forecast_process_running(js):
-            logging.debug('Forecast process is not running')
-            js.pid = None
+            logging.debug('Forecast process %s is not running' % js.pid)
+            # js.pid = None
         if not parallel_job_running(js):    
             logging.debug('WRF is not running')
-            js.old_job_num = js.job_num
-            js.job_num = None
+            # js.old_job_num = js.job_num
+            # js.job_num = None
         if js.state == 'Completed' or js.state == 'Cancelled':
             if js.pid is not None:
                  js.state = 'Forecast runaway'
