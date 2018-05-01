@@ -27,6 +27,7 @@ import shutil
 import glob
 import signal
 import subprocess
+import re
 from utils import kill_process, Dict, process_create_time, load_sys_cfg
 
 cfg = load_sys_cfg()
@@ -97,17 +98,28 @@ def forecast_process_running(js):
         return None 
 
 def parallel_job_running(js):
-    logging.debug('Checking for WRF job %s' % js.job_num)
+    logging.info('Checking for WRF job %s' % js.job_num)
     cluster = load_cluster_file(js.qsys)
     if cluster is None:
         logging.warning('No cluster system, cannot check for WRF job')
         return False
-    ret = subprocess.check_output(cluster['qstat_cmd'],stderr=subprocess.STDOUT)
+    qstat_arg = cluster['qstat_arg']
+    if re.search('%s',qstat_arg):
+        try:
+            ret = subprocess.check_output([cluster['qstat_cmd'],qstat_arg % js.job_num],stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            print e
+            if e.returncode == 1:
+                logging.info('Job %s not found' % js.job_num)
+                return False
+    else:
+        ret = subprocess.check_output([cluster['qstat_cmd'],qstat_arg],stderr=subprocess.STDOUT)
+    print ret
     for line in ret.split('\n'):
         ls=line.split()
-        if len(ls) >0 and ls[0] == js.job_num:
+        if len(ls) >0 and ls[0] == str(js.job_num):
              status = ls[4]
-             logging.debug('WRF job %s status is %s' % (js.job_num, status))
+             logging.info('WRF job %s status is %s' % (js.job_num, status))
              return True
     logging.info('WRF job %s is not running.' % js.job_num)
     return False 
