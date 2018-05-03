@@ -193,7 +193,7 @@ class HRRR(GribSource):
         # check if GRIBs we don't are available remotely
         url_base = self.remote_url
         logging.info('Retrieving GRIBs from %s' % url_base)
-        unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
+        unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
         if len(unavailables) > 0:
             raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
 
@@ -220,6 +220,14 @@ class HRRR(GribSource):
     # remote_url = 'http://www.ftp.ncep.noaa.gov/data/nccf/nonoperational/com/hrrr/prod'
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/'
     period_hours = 1
+
+def readhead(url):
+    try:
+        ret=requests.head(url)
+        ret.raise_for_status()
+    except (requests.exceptions.Timeout, requests.exceptions.TooManyRedirects, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
+        logging.warning(e)
+    return ret
 
 
 class NAM218(GribSource):
@@ -306,7 +314,7 @@ class NAM218(GribSource):
             # check if GRIBs we don't are available remotely
             url_base = self.remote_url
             logging.info('Retrieving GRIBs from %s' % url_base)
-            unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
+            unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
             if len(unavailables) > 0:
                 logging.warning('NAM218: failed retrieving cycle data for cycle %s, unavailables %s' % (cycle_start, repr(unavailables)))
                 cycle_shift += 1
@@ -429,7 +437,7 @@ class NAM227(GribSource):
             # check if GRIBs we don't are available remotely
             url_base = self.remote_url
             logging.info('Attempting to retrieve GRIBs from %s' % url_base)
-            unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
+            unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
             if len(unavailables) > 0:
                 logging.warning('NAM227: failed retrieving cycle data for cycle %s, unavailables %s' % (cycle_start, repr(unavailables)))
                 cycle_shift += 1
@@ -543,7 +551,7 @@ class NARR(GribSource):
         # check if GRIBs we don't have are available remotely
         url_base = self.remote_url
         logging.info('Retrieving GRIBs from %s' % url_base)
-        unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
+        unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
         if len(unavailables) > 0:
             raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
 
