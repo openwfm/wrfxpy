@@ -221,12 +221,18 @@ class HRRR(GribSource):
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/'
     period_hours = 1
 
+class response_object(object):
+    status_code = 0
+    def __init__(self,status_code):
+        self.status_code = status_code
+
 def readhead(url):
     try:
         ret=requests.head(url)
         ret.raise_for_status()
-    except (requests.exceptions.Timeout, requests.exceptions.TooManyRedirects, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
+    except (requests.RequestException, requests.exceptions.Timeout, requests.exceptions.TooManyRedirects, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
         logging.warning(e)
+        ret = response_object(-1)
     return ret
 
 
@@ -349,6 +355,7 @@ class NAM218(GribSource):
         return map(lambda x: path_tmpl % (year, mon, day, hour, x), fc_list)
 
     # instance variables
+    #remote_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     period_hours = 3
 
