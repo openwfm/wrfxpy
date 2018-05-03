@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 import pytz
 import logging
 import os.path as osp
+from ingest_utils import readhead
 
 
 class RTMA(object):
@@ -112,7 +113,7 @@ class RTMA(object):
         """
         # find last-modified time of file in UTC timezone
         url = self._remote_var_url(cycle.hour, var)
-        r = requests.head(url)
+        r = readhead(url)
         if r.status_code != 200:
             raise ValueError('Cannot find variable %s for hour %d at url %s' % (var, cycle.hour, url))
         last_modif = self._parse_header_timestamp(r.headers['Last-Modified'])
