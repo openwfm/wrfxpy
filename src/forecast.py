@@ -30,7 +30,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
-from ingest.grib_source import HRRR, NAM218, NAM227, NARR
+from ingest.grib_source import HRRR, NAM218, NAM227, NARR, CFSR_P, CFSR_S
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
 from ssh_shuttle import send_product_to_server, ssh_command
@@ -98,6 +98,10 @@ class JobState(Dict):
             return NAM227('ingest')
         elif gs_name == 'NARR':
             return NARR('ingest')
+        elif gs_name == 'CFSR_P':
+            return CFSR_P('ingest')
+        elif gs_name == 'CFSR_S':
+            return CFSR_S('ingest')
         else:
             raise ValueError('Unrecognized grib_source %s' % gs_name)
 
@@ -607,8 +611,8 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
-    if args['grib_source'] not in ['HRRR', 'NAM','NAM227', 'NARR']:
-        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NAM227, NARR')
+    if args['grib_source'] not in ['HRRR', 'NAM','NAM227', 'NARR','CFSR_P','CFSR_S']:
+        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NAM227, NARR, CFSR_P, CFSR_S')
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:

@@ -19,7 +19,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-from ingest.grib_source import HRRR, NAM218, NAM227, NARR
+from ingest.grib_source import HRRR, NAM218, NAM227, CFSR_P, CFSR_S, NARR
 from utils import esmf_to_utc
 
 import logging
@@ -30,7 +30,7 @@ import os.path as osp
 if __name__ == '__main__':
     if len(sys.argv) != 5:
         print('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0])
-        print('       supported GRIB sources: HRRR, NAM, NARR')
+        print('       supported GRIB sources: HRRR, NAM, CFSR_P, CFSR_S, NARR')
         sys.exit(-1)
 
     # configure the basic logger
@@ -48,6 +48,10 @@ if __name__ == '__main__':
         grib_src = NAM218(ingest_dir)
     elif grib_src_name == 'NAM227':
         grib_src = NAM227(ingest_dir)
+    elif grib_src_name == 'CFSR_P':
+        grib_src = CFSR_P(ingest_dir)
+    elif grib_src_name == 'CFSR_S':
+        grib_src = CFSR_S(ingest_dir)
     elif grib_src_name == 'NARR':
         grib_src = NARR(ingest_dir)
     else:
