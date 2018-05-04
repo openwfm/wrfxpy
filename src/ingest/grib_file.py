@@ -19,6 +19,7 @@
 
 import pygrib
 import numpy as np
+import logging
 
 
 class GribFile(object):
@@ -33,6 +34,8 @@ class GribFile(object):
         :param path: path to the file
         :param def_msg: the default message to process
         """
+        self.path = path
+        logging.info('Reading grib file %s' % path)
         self.grbf = pygrib.open(path)
         
     
@@ -51,9 +54,11 @@ class GribFile(object):
             return GribMessage(msgs[0])
         elif type(msg_id) == int:
             try:
-                return GribMessage(self.grbf.message(msg_id))
+                msg=GribMessage(self.grbf.message(msg_id))
+                logging.info('Message %s: %s' % (msg_id, msg))
+                return msg
             except:
-                raise ValueError('GRIB file does not have message with index %d' % msg_id)
+                raise ValueError('GRIB file %s does not have message with index %d' % (self.path, msg_id))
         
     
     def __iter__(self):

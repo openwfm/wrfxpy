@@ -220,7 +220,11 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
         model = FuelMoistureModel.from_netcdf(prev_model_path)
         
     # retrieve the variables and make sure they are available (we should not be here if they are not)
-    dont_have_vars, have_vars = rtma.retrieve_rtma(cycle)
+    try:
+        dont_have_vars, have_vars = rtma.retrieve_rtma(cycle)
+    except ValueError as e:
+        logging.error(e)
+        sys.exit(1) 
     assert not dont_have_vars
     
     logging.info('CYCLER loading RTMA data for cycle %s.' % str(cycle))
