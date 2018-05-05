@@ -165,14 +165,14 @@ def retrieve_gribs_and_run_ungrib(js, q):
     try:
         logging.info("retrieving GRIB files.")
 
-        # step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps
+        logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
         manifest = js.grib_source.retrieve_gribs(js.start_utc, js.end_utc)
         js.grib_source.symlink_gribs(manifest, js.wps_dir)
 
         send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
-        logging.info("running UNGRIB")
 
-        # step 4: patch namelist for ungrib end execute ungrib
+        logging.info("step 4: patch namelist for ungrib end execute ungrib")
+        logging.info("Creating WPS namelist from js.wps_nml = %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': '))) 
         f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
         Ungrib(js.wps_dir).execute().check_output()
@@ -314,12 +314,12 @@ def execute(args,job_args):
     #check_obj(args,'args')
     #check_obj(js,'Initial job state')
 
-    # step 1: clone WPS and WRF directories
+    logging.info("step 1: clone WPS and WRF directories")
     logging.info("cloning WPS into %s" % js.wps_dir)
     cln = WRFCloner(js.args)
     cln.clone_wps(js.wps_dir, js.grib_source.vtables(), [])
 
-    # step 2: process domain information and patch namelist for geogrid
+    logging.info("step 2: process domain information and patch namelist for geogrid")
     js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
@@ -350,7 +350,7 @@ def execute(args,job_args):
 
     proc_q.close()
 
-    # step 5: execute metgrid after ensuring all grids will be processed
+    logging.info("step 5: execute metgrid after ensuring all grids will be processed")
     js.domain_conf.prepare_for_metgrid(js.wps_nml)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
@@ -360,7 +360,7 @@ def execute(args,job_args):
     send_email(js, 'metgrid', 'Job %s - metgrid complete.' % js.job_id)
     logging.info("cloning WRF into %s" % js.wrf_dir)
 
-    # step 6: clone wrf directory, symlink all met_em* files, make namelists
+    logging.info("step 6: clone wrf directory, symlink all met_em* files, make namelists")
     cln.clone_wrf(js.wrf_dir, [])
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
     time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
