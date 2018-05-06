@@ -1,0 +1,44 @@
+&share
+    wrf_core = 'ARW'
+    max_dom = 5
+    io_form_geogrid = 2
+    start_date = '2016-09-11_00:00:00', '2016-09-11_00:00:00', '2016-09-11_00:00:00',
+                 '2016-09-11_00:00:00', '2016-09-11_00:00:00'
+    end_date = '2016-09-13_00:00:00', '2016-09-13_00:00:00', '2016-09-13_00:00:00',
+               '2016-09-13_00:00:00', '2016-09-13_00:00:00'
+    interval_seconds = 3600
+    subgrid_ratio_x = 0, 0, 0, 0, 5
+    subgrid_ratio_y = 0, 0, 0, 0, 5
+    active_grid = .true., .true., .true., .true., .true.
+/
+
+&geogrid
+    parent_id = 1, 1, 2, 3, 4
+    parent_grid_ratio = 1, 3, 3, 3, 3
+    i_parent_start = 1, 33, 33, 33, 33
+    j_parent_start = 1, 33, 33, 33, 33
+    e_we = 97, 97, 97, 97, 97
+    e_sn = 97, 97, 97, 97, 97
+    geog_data_res = '30s', '30s', '.3s', '.3s', '.3s'
+    dx = 12000
+    dy = 12000
+    map_proj = 'lambert'
+    ref_lat = 38.437
+    ref_lon = -112.0824
+    truelat1 = 30
+    truelat2 = 34
+    stand_lon = -81.67
+    geog_data_path = '/share_home/mvejmelka/Packages/WPS-GEOG'
+    s_we = 1, 1, 1, 1, 1
+    s_sn = 1, 1, 1, 1, 1
+/
+
+&ungrib
+    out_format = 'WPS'
+    prefix = 'COLMET_S'
+/
+
+&metgrid
+    fg_name = 'COLMET_S','COLMET_P'
+    io_form_metgrid = 2
+/
