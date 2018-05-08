@@ -17,6 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import print_function
 import requests
 import os.path as osp
 import logging
@@ -56,10 +57,14 @@ def download_url(url, local_path, max_retries=3):
     open(ensure_dir(info_path), 'w').write(str(content_size))
 
     # stream the download to file
+    s = 0
     with open(ensure_dir(local_path), 'wb') as f:
         for chunk in r.iter_content(1024 * 1024):
+            s =  s + 1024 * 1024
+            print('Read %sB out of %sB' % (s,content_size), end='\r')
             f.write(chunk)
-    
+    print('')
+
     # does the server accept byte range queries? e.g. the NOMADs server does
     accepts_ranges = 'bytes' in r.headers.get('Accept-Ranges', '')
     
