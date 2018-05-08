@@ -149,7 +149,7 @@ class HRRR(GribSource):
         Returns the variable tables that must be linked in for use with the HRRR data source.
         :return:
         """
-        return {'geogrid_vtable': 'GEOGRID.TBL.HRRR',
+        return {'geogrid_vtable': 'GEOGRID.TBL',
                 'ungrib_vtable': 'Vtable.HRRR',
                 'metgrid_vtable': 'METGRID.TBL.HRRR'}
 
@@ -243,7 +243,7 @@ class NAM218(GribSource):
 
         :return: a dictionary of variable tables
         """
-        return {'geogrid_vtable': 'GEOGRID.TBL.NAM',
+        return {'geogrid_vtable': 'GEOGRID.TBL',
                 'ungrib_vtable':'Vtable.NAM',
                 'metgrid_vtable':'METGRID.TBL.NAM'}
 
@@ -367,7 +367,7 @@ class NAM227(GribSource):
 
         :return: a dictionary of variable tables
         """
-        return {'geogrid_vtable': 'GEOGRID.TBL.NAM',
+        return {'geogrid_vtable': 'GEOGRID.TBL',
                 'ungrib_vtable':'Vtable.NAM',
                 'metgrid_vtable':'METGRID.TBL.NAM'}
 
@@ -492,7 +492,7 @@ class CFSR_P(GribSource):
 
         :return: a dictionary of variable tables
         """
-        return {'geogrid_vtable': 'GEOGRID.TBL.CFSR',
+        return {'geogrid_vtable': 'GEOGRID.TBL',
                 'ungrib_vtable': 'Vtable.CFSR_press_pgbh06',
                 'metgrid_vtable': 'METGRID.TBL.CFSR'}
 
@@ -610,9 +610,10 @@ class CFSR_S(GribSource):
 
         :return: a dictionary of variable tables
         """
-        return {'geogrid_vtable': 'GEOGRID.TBL.CFSR',
+        return {'geogrid_vtable': 'GEOGRID.TBL',
                 'ungrib_vtable': 'Vtable.CFSR_sfc_flxf06',
                 'metgrid_vtable': 'METGRID.TBL.CFSR'}
+
     def namelist_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.input with CFSRv2.
@@ -712,7 +713,7 @@ class NARR(GribSource):
 
         :return: a dictionary of variable tables
         """
-        return {'geogrid_vtable': 'GEOGRID.TBL.NARR',
+        return {'geogrid_vtable': 'GEOGRID.TBL',
                 'ungrib_vtable': 'Vtable.NARR',
                 'metgrid_vtable': 'METGRID.TBL.NARR'}
 
