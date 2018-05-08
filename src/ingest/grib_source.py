@@ -502,7 +502,7 @@ class CFSR_P(GribSource):
         return: a dictionary of namelist entries
         """
         return { 'ungrib' : {'prefix': 'COLMET_P'},
-                 'metgrid': {'COLMET_S':'COLMET_P'} 
+                 'metgrid': {'fg_name': ['COLMET_S','COLMET_P']} 
                }
 
     def namelist_keys(self):
@@ -601,7 +601,7 @@ class CFSR_S(GribSource):
         return: a dictionary of namelist entries
         """
         return { 'ungrib' : {'prefix': 'COLMET_S'},
-                 'metgrid': {'COLMET_S':'COLMET_P'} 
+                 'metgrid': {'fg_name': ['COLMET_S','COLMET_P']} 
                }
 
     def vtables(self):

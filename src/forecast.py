@@ -68,10 +68,10 @@ class JobState(Dict):
         #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
         #self.grib_source = [self.resolve_grib_source(g) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source)
-        #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
-        #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
-        self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
-        self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
+        self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
+        self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
+        #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
+        #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
         self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
         if 'job_id' in args:
             logging.info('job_id given in the job description.')
@@ -97,17 +97,15 @@ class JobState(Dict):
         :param gs_name: the name of the grib source
         """
         if gs_name == 'HRRR':
-            return HRRR('ingest')
-        elif gs_name == 'NAM':
-            return NAM218('ingest')
+            return [HRRR('ingest')]
+        elif gs_name == 'NAM' or gs_name == 'NAM218' :
+            return [NAM218('ingest')]
         elif gs_name == 'NAM227':
-            return NAM227('ingest')
+            return [NAM227('ingest')]
         elif gs_name == 'NARR':
-            return NARR('ingest')
-        elif gs_name == 'CFSR_P':
-            return CFSR_P('ingest')
-        elif gs_name == 'CFSR_S':
-            return CFSR_S('ingest')
+            return [NARR('ingest')]
+        elif gs_name == 'CFSR':
+            return [CFSR_P('ingest'),CFSR_S('ingest')]
         else:
             raise ValueError('Unrecognized grib_source %s' % gs_name)
 
@@ -158,29 +156,36 @@ def send_email(js, event, body):
             mail_serv.sendmail(js.emails.origin, [js.emails.to], msg.as_string())
             mail_serv.quit()
 
+def retrieve_gribs_and_run_ungrib_all(js, q):
+    for grib_source in js.grib_source:
+        retrieve_gribs_and_run_ungrib(js, grib_source, q)
+        
 
-def retrieve_gribs_and_run_ungrib(js, q):
+def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     """
     This function retrieves required GRIB files and runs ungrib.
 
     It returns either 'SUCCESS' or 'FAILURE' on completion.
 
     :param js: the JobState object containing the forecast configuration
+    :param grib_source: the GribSource object containing ungrib configuration
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
     try:
         logging.info("retrieving GRIB files.")
 
         logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
-        manifest = js.grib_source.retrieve_gribs(js.start_utc, js.end_utc)
-        js.grib_source.symlink_gribs(manifest, js.wps_dir)
+        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc)
+        for f in glob.glob(osp.join(js.wps_dir,'GRIBFILE.???')):
+            os.remove(f)
+        grib_source.symlink_gribs(manifest, js.wps_dir)
 
         send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
 
         logging.info("step 4: patch namelist for ungrib end execute ungrib")
         wps_nml = js.wps_nml 
-        update_namelist(wps_nml, js.grib_source.namelist_wps_keys())
-        logging.info("Creating WPS namelist for UNGRIB from wps_nml = %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
+        update_namelist(wps_nml, grib_source.namelist_wps_keys())
+        logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
         f90nml.write(wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
         Ungrib(js.wps_dir).execute().check_output()
@@ -258,6 +263,10 @@ def make_job_file(js):
 def make_kmz(args):
     ssh_command('wrfxweb/make_kmz.sh ' + args)
 
+def read_namelist(path):
+    logging.info('Reading namelist %s' % path) 
+    return f90nml.read(path)
+
 def execute(args,job_args):
     """
     Executes a weather/fire simulation.
@@ -300,12 +309,12 @@ def execute(args,job_args):
     send_email(js, 'start', 'Job %s started.' % js.job_id)
 
     # read in all namelists
-    js.wps_nml = f90nml.read(js.args['wps_namelist_path'])
-    js.wrf_nml = f90nml.read(js.args['wrf_namelist_path'])
-    js.fire_nml = f90nml.read(js.args['fire_namelist_path'])
+    js.wps_nml = read_namelist(js.args['wps_namelist_path'])
+    js.wrf_nml = read_namelist(js.args['wrf_namelist_path'])
+    js.fire_nml = read_namelist(js.args['fire_namelist_path'])
     js.ems_nml = None
     if 'emissions_namelist_path' in js.args:
-        js.ems_nml = f90nml.read(js.args['emissions_namelist_path'])
+        js.ems_nml = read_namelist(js.args['emissions_namelist_path'])
     
     # Parse and setup the domain configuration
     js.domain_conf = WPSDomainConf(js.domains)
@@ -328,7 +337,7 @@ def execute(args,job_args):
     logging.info("cloning WPS into %s" % js.wps_dir)
     cln = WRFCloner(js.args)
     cln.clone_wps(js.wps_dir, [])
-    cln.clone_vtables(js.wps_dir, js.grib_source.vtables())
+    cln.clone_vtables(js.wps_dir, js.grib_source[0].vtables())
 
     logging.info("step 2: process domain information and patch namelist for geogrid")
     js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']
@@ -341,7 +350,7 @@ def execute(args,job_args):
 
     proc_q = Queue()
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
-    grib_proc = Process(target=retrieve_gribs_and_run_ungrib, args=(js, proc_q))
+    grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q))
 
 
     logging.info('starting GEOGRID and GRIB2/UNGRIB')
@@ -353,8 +362,9 @@ def execute(args,job_args):
     grib_proc.join()
     geogrid_proc.join()
 
-    if proc_q.get() != 'SUCCESS':
-        return
+    for g in js.grib_source:
+        if proc_q.get() != 'SUCCESS':
+            return
 
     if proc_q.get() != 'SUCCESS':
         return
@@ -362,7 +372,9 @@ def execute(args,job_args):
     proc_q.close()
 
     logging.info("step 5: execute metgrid after ensuring all grids will be processed")
+    update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
     js.domain_conf.prepare_for_metgrid(js.wps_nml)
+    logging.info("namelist.wps for METGRID: %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': '))) 
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
     logging.info("running METGRID")
@@ -376,7 +388,7 @@ def execute(args,job_args):
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
     time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
-    update_namelist(js.wrf_nml, js.grib_source.namelist_keys())
+    update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, num_doms))
 
@@ -622,8 +634,8 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
-    if args['grib_source'] not in ['HRRR', 'NAM','NAM227', 'NARR','CFSR_P','CFSR_S']:
-        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NAM227, NARR, CFSR_P, CFSR_S')
+    if args['grib_source'] not in ['HRRR', 'NAM','NAM227', 'NARR','CFSR']:
+        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NAM227, NARR, CFSR')
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
