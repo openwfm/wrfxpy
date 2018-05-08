@@ -66,7 +66,11 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
+        #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
+        #self.grib_source = [self.resolve_grib_source(g) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source)
+        #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
+        #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
         self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
@@ -83,6 +87,9 @@ class JobState(Dict):
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
         self.args = args
+        logging.debug('JobState initialized: ' + str(self))
+ 
+        
 
     def resolve_grib_source(self, gs_name):
         """
@@ -172,7 +179,7 @@ def retrieve_gribs_and_run_ungrib(js, q):
         send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
 
         logging.info("step 4: patch namelist for ungrib end execute ungrib")
-        logging.info("Creating WPS namelist from js.wps_nml = %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': '))) 
+        logging.debug("Creating WPS namelist from js.wps_nml = %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': '))) 
         f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
         Ungrib(js.wps_dir).execute().check_output()
@@ -275,8 +282,10 @@ def execute(args,job_args):
     
     """
 
-    # step 0 initialize the job state from the arguments
+    logging.info('step 0 initialize the job state from the arguments')
+    ## logging.info('args = %s' % json.dumps(jargs, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': ')))
     js = JobState(args)
+    ## logging.info('js = %s' % json.dumps(js, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': ')))
 
     jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
     make_clean_dir(jobdir)
@@ -317,7 +326,8 @@ def execute(args,job_args):
     logging.info("step 1: clone WPS and WRF directories")
     logging.info("cloning WPS into %s" % js.wps_dir)
     cln = WRFCloner(js.args)
-    cln.clone_wps(js.wps_dir, js.grib_source.vtables(), [])
+    cln.clone_wps(js.wps_dir, [])
+    cln.clone_vtables(js.wps_dir, js.grib_source.vtables())
 
     logging.info("step 2: process domain information and patch namelist for geogrid")
     js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']

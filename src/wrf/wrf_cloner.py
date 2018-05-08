@@ -44,19 +44,34 @@ class WRFCloner(object):
         self.wrf_idir = args['wrf_install_path']
         self.wps_idir = args['wps_install_path']
 
-    def clone_wps(self, tgt, vtables, with_files):
+    def clone_vtables(self, tgt, vtables):
+        """
+        Clone all vtables (build symlink name, ensure directories exist, create the symlink)
+        :param tgt: target directory into which WPS is cloned
+        :param vtables: a dictionary with keys from list ['geogrid_vtable', 'ungrib_vtable', 'metgrid_vtable'],
+                        which contain paths of the variable tables relative to 'etc/vtables'
+        """
+
+        vtable_locs = self.vtable_locations
+        for vtable_id, vtable_path in vtables.iteritems():
+            # build path to link location
+            symlink_path = osp.join(tgt, vtable_locs[vtable_id])
+
+            if not osp.exists(symlink_path):
+                symlink_tgt = osp.join(self.sys_idir, "etc/vtables", vtable_path)
+                symlink_unless_exists(symlink_tgt, ensure_dir(symlink_path))
+
+
+    def clone_wps(self, tgt, with_files):
         """
         Clone the WPS installation directory (self.wps_idir) together with the chosen table files vtables
         and additional files with_files.  The WPS clone is created in directory tgt.
 
         :param tgt: target directory into which WPS is cloned
-        :param vtables: a dictionary with keys from list ['geogrid_vtable', 'ungrib_vtable', 'metgrid_vtable'],
-                        which contain paths of the variable tables relative to 'etc/vtables'
         :param with_files: a list of files from the WPS source directory that should be symlinked
         :return:
         """
         src = self.wps_idir
-        vtable_locs = self.vtable_locations
 
         # build a list of all files that are simply symlinked
         symlinks = list(self.wps_exec_files)
@@ -67,15 +82,6 @@ class WRFCloner(object):
 
         # clone all WPS executables
         map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks)
-
-        # clone all vtables (build symlink name, ensure directories exist, create the symlink)
-        for vtable_id, vtable_path in vtables.iteritems():
-            # build path to link location
-            symlink_path = osp.join(tgt, vtable_locs[vtable_id])
-
-            if not osp.exists(symlink_path):
-                symlink_tgt = osp.join(self.sys_idir, "etc/vtables", vtable_path)
-                symlink_unless_exists(symlink_tgt, ensure_dir(symlink_path))
 
     def clone_wrf(self, tgt, with_files):
         """
