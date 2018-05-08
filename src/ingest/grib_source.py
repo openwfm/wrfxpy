@@ -54,6 +54,13 @@ class GribSource(object):
         """
         self.ingest_dir = osp.abspath(ingest_dir)
 
+    def namelist_wps_keys(self):
+        """
+        Returns the namelist keys that must be modified for this source
+        return: a dictionary of namelist entries
+        """
+        return {}
+
     def vtables(self):
         """
         Returns the vtables that must be used with this source as a table with keys:
@@ -488,6 +495,16 @@ class CFSR_P(GribSource):
         return {'geogrid_vtable': 'GEOGRID.TBL.CFSR',
                 'ungrib_vtable': 'Vtable.CFSR_press_pgbh06',
                 'metgrid_vtable': 'METGRID.TBL.CFSR'}
+
+    def namelist_wps_keys(self):
+        """
+        Returns the namelist keys that must be modified in namelist.wps with CFSR_P
+        return: a dictionary of namelist entries
+        """
+        return { 'ungrib' : {'prefix': 'COLMET_P'},
+                 'metgrid': {'COLMET_S':'COLMET_P'} 
+               }
+
     def namelist_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.input with CFSRv2.
@@ -577,6 +594,15 @@ class CFSR_S(GribSource):
 
     def __init__(self, ingest_dir):
         super(CFSR_S, self).__init__(ingest_dir)
+
+    def namelist_wps_keys(self):
+        """
+        Returns the namelist keys that must be modified in namelist.wps with CFSR_S
+        return: a dictionary of namelist entries
+        """
+        return { 'ungrib' : {'prefix': 'COLMET_S'},
+                 'metgrid': {'COLMET_S':'COLMET_P'} 
+               }
 
     def vtables(self):
         """

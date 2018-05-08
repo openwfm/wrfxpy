@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) 2013-2016 Martin Vejmelka, UC Denver
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -179,8 +178,10 @@ def retrieve_gribs_and_run_ungrib(js, q):
         send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
 
         logging.info("step 4: patch namelist for ungrib end execute ungrib")
-        logging.debug("Creating WPS namelist from js.wps_nml = %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': '))) 
-        f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+        wps_nml = js.wps_nml 
+        update_namelist(wps_nml, js.grib_source.namelist_wps_keys())
+        logging.info("Creating WPS namelist for UNGRIB from wps_nml = %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
+        f90nml.write(wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
         Ungrib(js.wps_dir).execute().check_output()
 
