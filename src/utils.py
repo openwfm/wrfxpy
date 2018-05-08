@@ -158,8 +158,15 @@ def symlink_unless_exists(link_tgt, link_loc):
     :param link_tgt: link target
     :param link_loc: link location
     """
-    if not osp.lexists(link_loc):
-        os.symlink(link_tgt, link_loc)
+
+    logging.info('Linking %s -> %s' % (link_loc, link_tgt))
+    if osp.isfile(link_tgt):
+        if not osp.lexists(link_loc):
+            os.symlink(link_tgt, link_loc)
+        else:
+            logging.warning('Link %s already exists' % link_loc)
+    else:
+        logging.error('Link target %s does not exist' % link_tgt)
 
 
 def esmf_to_utc(esmf):
