@@ -21,6 +21,7 @@ from __future__ import print_function
 import requests
 import os.path as osp
 import logging
+import time
 
 from utils import ensure_dir
 
@@ -58,11 +59,14 @@ def download_url(url, local_path, max_retries=3):
 
     # stream the download to file
     s = 0
+    MB = 1024.0*1024.0
+    chunk_size = 1024*1024
     with open(ensure_dir(local_path), 'wb') as f:
-        for chunk in r.iter_content(1024 * 1024):
-            s =  s + 1024 * 1024
-            print('Read %sB out of %sB' % (s,content_size), end='\r')
+        start_time = time.time()
+        for chunk in r.iter_content(chunk_size):
+            s =  s + chunk_size
             f.write(chunk)
+            print(' %s out of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
     print('')
 
     # does the server accept byte range queries? e.g. the NOMADs server does
