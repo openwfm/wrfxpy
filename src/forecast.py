@@ -43,6 +43,7 @@ import stat
 from multiprocessing import Process, Queue
 import glob
 import netCDF4 as nc4
+import shutil
 
 import smtplib
 from email.mime.text import MIMEText
@@ -74,7 +75,7 @@ class JobState(Dict):
         #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
         self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
         if 'job_id' in args:
-            logging.info('job_id given in the job description.')
+            logging.info('job_id %s given in the job description' % args['job_id'])
             self.job_id = args['job_id']
         else:
             logging.warning('job_id not given, creating.')
@@ -194,8 +195,12 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         Ungrib(grib_dir).execute().check_output()
 
         # move output
-        for f in glob.glob(osp.join(grib_dir,grib_source.prefix(),'.???')):
-            logging_info('moving %s' % f)
+        #search = osp.join(grib_dir,grib_source.prefix() + '*')
+        #logging.info('looking for ' + search)
+        #produced = glob.glob(search)
+        #logging.info('ungrib produced files ' + str(produced))        
+        for f in glob.glob(osp.join(grib_dir,grib_source.prefix() + '*')):
+            logging.info('moving %s' % f)
             shutil.move(f,wps_dir)
             
 
