@@ -44,24 +44,6 @@ class WRFCloner(object):
         self.wrf_idir = args['wrf_install_path']
         self.wps_idir = args['wps_install_path']
 
-    def clone_vtables(self, tgt, vtables):
-        """
-        Clone all vtables (build symlink name, ensure directories exist, create the symlink)
-        :param tgt: target directory into which WPS is cloned
-        :param vtables: a dictionary with keys from list ['geogrid_vtable', 'ungrib_vtable', 'metgrid_vtable'],
-                        which contain paths of the variable tables relative to 'etc/vtables'
-        """
-
-        vtable_locs = self.vtable_locations
-        for vtable_id, vtable_path in vtables.iteritems():
-            # build path to link location
-            symlink_path = osp.join(tgt, vtable_locs[vtable_id])
-
-            if not osp.exists(symlink_path):
-                symlink_tgt = osp.join(self.sys_idir, "etc/vtables", vtable_path)
-                symlink_unless_exists(symlink_tgt, ensure_dir(symlink_path))
-
-
     def clone_wps(self, tgt, with_files):
         """
         Clone the WPS installation directory (self.wps_idir) together with the chosen table files vtables
@@ -105,11 +87,6 @@ class WRFCloner(object):
 
     # list of executable file that must be symlinked in WPS directory
     wps_exec_files = ['geogrid.exe', 'metgrid.exe', 'ungrib.exe']
-
-    # where are the symlink locations for vtable files (name of symlink)
-    vtable_locations = {'geogrid_vtable': 'geogrid/GEOGRID.TBL',
-                        'ungrib_vtable': 'Vtable',
-                        'metgrid_vtable': 'metgrid/METGRID.TBL'}
 
     # list of files that must(?) be symlinked from the WRFV3 directory
     wrf_files = ["CAM_ABS_DATA", "CAM_AEROPT_DATA", "co2_trans", "ETAMPNEW_DATA", "ETAMPNEW_DATA_DBL",

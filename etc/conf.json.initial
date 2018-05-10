@@ -1,4 +1,5 @@
 {
+  "ingest_path": "ingest",
   "workspace_path": "wksp",
   "wps_install_path": "path/to/WPS",
   "wrf_install_path": "path/to/WRF",

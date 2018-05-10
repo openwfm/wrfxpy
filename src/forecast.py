@@ -66,8 +66,8 @@ class JobState(Dict):
         """
         super(JobState, self).__init__(args)
         #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
-        #self.grib_source = [self.resolve_grib_source(g) for g in self.grib_source]
-        self.grib_source = self.resolve_grib_source(self.grib_source)
+        #self.grib_source = [self.resolve_grib_source(g, args) for g in self.grib_source]
+        self.grib_source = self.resolve_grib_source(self.grib_source,args)
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
         #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
@@ -90,22 +90,22 @@ class JobState(Dict):
  
         
 
-    def resolve_grib_source(self, gs_name):
+    def resolve_grib_source(self, gs_name, js):
         """
         Creates the right GribSource object from the name.
         
         :param gs_name: the name of the grib source
         """
         if gs_name == 'HRRR':
-            return [HRRR('ingest')]
+            return [HRRR(js)]
         elif gs_name == 'NAM' or gs_name == 'NAM218' :
-            return [NAM218('ingest')]
+            return [NAM218(js)]
         elif gs_name == 'NAM227':
-            return [NAM227('ingest')]
+            return [NAM227(js)]
         elif gs_name == 'NARR':
-            return [NARR('ingest')]
+            return [NARR(js)]
         elif gs_name == 'CFSR':
-            return [CFSR_P('ingest'),CFSR_S('ingest')]
+            return [CFSR_P(js),CFSR_S(js)]
         else:
             raise ValueError('Unrecognized grib_source %s' % gs_name)
 
@@ -171,24 +171,33 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     :param grib_source: the GribSource object containing ungrib configuration
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
+    wps_dir = osp.abspath(js.wps_dir)
+    grib_dir = osp.join(wps_dir,grib_source.id())
+    make_clean_dir(grib_dir)
+    wps_nml = js.wps_nml 
     try:
-        logging.info("retrieving GRIB files.")
+        logging.info("retrieving %s GRIB files" % grib_source.id())
 
         logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
         manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc)
-        for f in glob.glob(osp.join(js.wps_dir,'GRIBFILE.???')):
-            os.remove(f)
-        grib_source.symlink_gribs(manifest, js.wps_dir)
+        grib_source.symlink_gribs(manifest, grib_dir)
 
         send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
 
-        logging.info("step 4: patch namelist for ungrib end execute ungrib")
-        wps_nml = js.wps_nml 
+        logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id())
+
         update_namelist(wps_nml, grib_source.namelist_wps_keys())
         logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
-        f90nml.write(wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+        f90nml.write(wps_nml, osp.join(grib_dir, 'namelist.wps'), force=True)
+        grib_source.clone_vtables(grib_dir)
+        symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
+        Ungrib(grib_dir).execute().check_output()
 
-        Ungrib(js.wps_dir).execute().check_output()
+        # move output
+        for f in glob.glob(osp.join(grib_dir,grib_source.prefix(),'.???')):
+            logging_info('moving %s' % f)
+            shutil.move(f,wps_dir)
+            
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
         logging.info('UNGRIB complete')
@@ -337,7 +346,7 @@ def execute(args,job_args):
     logging.info("cloning WPS into %s" % js.wps_dir)
     cln = WRFCloner(js.args)
     cln.clone_wps(js.wps_dir, [])
-    cln.clone_vtables(js.wps_dir, js.grib_source[0].vtables())
+    js.grib_source[0].clone_vtables(js.wps_dir)
 
     logging.info("step 2: process domain information and patch namelist for geogrid")
     js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']

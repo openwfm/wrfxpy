@@ -46,13 +46,14 @@ class GribSource(object):
     - symlinking GRIB2 files for ungrib
     """
 
-    def __init__(self, ingest_dir):
+    def __init__(self, js):
         """
         Initialize grib source with ingest directory (where GRIB files are stored).
 
-        :param ingest_dir: root of GRIB storage
+        :param js: job structure with at least ingest_path root of GRIB storage and sys_install_path 
         """
-        self.ingest_dir = osp.abspath(ingest_dir)
+        self.ingest_dir = osp.abspath(js['ingest_path'])
+        self.sys_dir = osp.abspath(js['sys_install_path'])
 
     def prefix(self):
         """
@@ -99,6 +100,29 @@ class GribSource(object):
         :return: a dictionary mapping section names to keys that must be modified.
         """
         return {}
+
+    def clone_vtables(self, tgt):
+        """
+        Clone all vtables (build symlink name, ensure directories exist, create the symlink)
+        :param tgt: target directory into which WPS is cloned
+        """
+
+        # where are the symlink locations for vtable files (name of symlink)
+        vtable_locs = {'geogrid_vtable': 'geogrid/GEOGRID.TBL',
+                        'ungrib_vtable': 'Vtable',
+                       'metgrid_vtable': 'metgrid/METGRID.TBL'}
+        vtables = self.vtables()
+        # vtables: a dictionary with keys from list ['geogrid_vtable', 'ungrib_vtable', 'metgrid_vtable'],
+        #               which contain paths of the variable tables relative to 'etc/vtables'
+
+        for vtable_id, vtable_path in vtables.iteritems():
+            # build path to link location
+            symlink_path = osp.join(tgt, vtable_locs[vtable_id])
+
+            if not osp.exists(symlink_path):
+                symlink_tgt = osp.join(self.sys_dir, "etc/vtables", vtable_path)
+                symlink_unless_exists(symlink_tgt, ensure_dir(symlink_path))
+
 
     def retrieve_gribs(self, from_utc, to_utc, ref_utc = None):
         """
@@ -180,6 +204,7 @@ class HRRR(GribSource):
         return {'geogrid_vtable': 'GEOGRID.TBL',
                 'ungrib_vtable': 'Vtable.HRRR',
                 'metgrid_vtable': 'METGRID.TBL.HRRR'}
+
 
     def namelist_keys(self):
         """
