@@ -696,6 +696,9 @@ if __name__ == '__main__':
 
     # load configuration JSON
     sys_cfg = load_sys_cfg()
+    # configuration defaults
+    sys_cfg['ingest_path'] = sys_cfg.get('ingest_path','ingest')
+    sys_cfg['workspace_path'] = sys_cfg.get('workspace_path','wksp')
     # note: the execution flow allows us to override anything in the etc/conf.json file
     # dump(sys_cfg,'sys_cfg')
     job_args = json.load(open(sys.argv[1]), 'ascii')
