@@ -54,12 +54,33 @@ class GribSource(object):
         """
         self.ingest_dir = osp.abspath(ingest_dir)
 
+    def prefix(self):
+        """
+        Return the prefix of ungribbed files 
+        return: string  
+        """
+        return "COLMET"
+
+    def id(self):
+        """
+        Return the name of the GRIB source.
+        return: string  
+        """
+        return "not specified"
+  
+
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified for this source
         return: a dictionary of namelist entries
         """
         return {}
+
+    def name(self):
+        """
+        return: string 
+        """
+        return "unnknown"
 
     def vtables(self):
         """
@@ -144,6 +165,13 @@ class HRRR(GribSource):
     def __init__(self, ingest_dir):
         super(HRRR, self).__init__(ingest_dir)
 
+    def id(self):
+        """
+        Return the name of the GRIB source.
+        return: string 
+        """
+        return "HRRR"
+  
     def vtables(self):
         """
         Returns the variable tables that must be linked in for use with the HRRR data source.
@@ -236,6 +264,14 @@ class NAM218(GribSource):
 
     def __init__(self, ingest_dir):
         super(NAM218, self).__init__(ingest_dir)
+
+    def id(self):
+        """
+        Return the name of the GRIB source.
+        return: string 
+        """
+        return "NAM218"
+  
 
     def vtables(self):
         """
@@ -371,6 +407,13 @@ class NAM227(GribSource):
                 'ungrib_vtable':'Vtable.NAM',
                 'metgrid_vtable':'METGRID.TBL.NAM'}
 
+    def id(self):
+        """
+        Return the name of the GRIB source.
+        return: string 
+        """
+        return "NAM227"
+  
 
     def namelist_keys(self):
         """
@@ -486,6 +529,14 @@ class CFSR_P(GribSource):
     def __init__(self, ingest_dir):
         super(CFSR_P, self).__init__(ingest_dir)
 
+    def id(self):
+        """
+        Return the name of the GRIB source.
+        return: string 
+        """
+        return "CFSR_P"
+  
+
     def vtables(self):
         """
         Returns the variable tables that must be linked in for use with the CFSRv2 data source.
@@ -595,6 +646,13 @@ class CFSR_S(GribSource):
     def __init__(self, ingest_dir):
         super(CFSR_S, self).__init__(ingest_dir)
 
+    def id(self):
+        """
+        Return the name of the GRIB source.
+        return: string 
+        """
+        return "CFSR_S"
+  
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.wps with CFSR_S
@@ -706,6 +764,14 @@ class NARR(GribSource):
 
     def __init__(self, ingest_dir):
         super(NARR, self).__init__(ingest_dir)
+
+    def id(self):
+        """
+        Return the name of the GRIB source.
+        return: string 
+        """
+        return "NARR"
+  
 
     def vtables(self):
         """
