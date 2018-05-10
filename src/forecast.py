@@ -205,7 +205,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
-        logging.info('UNGRIB complete')
+        logging.info('UNGRIB %s complete' % grib_source.id())
         q.put('SUCCESS')
 
     except Exception as e:
@@ -364,19 +364,23 @@ def execute(args,job_args):
 
     proc_q = Queue()
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
-    grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q))
-
+    # grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q))
+    grib_proc = {}
+    for grib_source in js.grib_source:
+        grib_proc[grib_source.id()] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
     logging.info('starting GEOGRID and GRIB2/UNGRIB')
     geogrid_proc.start()
-    grib_proc.start()
+    for grib_source in js.grib_source:
+        grib_proc[grib_source.id()].start()
 
-    # wait until both tasks are done
+    # wait until all tasks are done
     logging.info('waiting until both tasks are done')
-    grib_proc.join()
+    for grib_source in js.grib_source:
+        grib_proc[grib_source.id()].join()
     geogrid_proc.join()
 
-    for g in js.grib_source:
+    for grib_source in js.grib_source:
         if proc_q.get() != 'SUCCESS':
             return
 
