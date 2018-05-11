@@ -177,13 +177,14 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     make_clean_dir(grib_dir)
     wps_nml = js.wps_nml 
     try:
-        logging.info("retrieving %s GRIB files" % grib_source.id())
+        logging.info("retrieving GRIB files from %s" % grib_source.id())
 
-        logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
+        # logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
         manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc)
         grib_source.symlink_gribs(manifest, grib_dir)
 
         send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
+        logging.info("running UNGRIB for %s" % grib_source.id())
 
         logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id())
 
@@ -205,7 +206,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
-        logging.info('UNGRIB %s complete' % grib_source.id())
+        logging.info('UNGRIB complete for %s' % grib_source.id())
         q.put('SUCCESS')
 
     except Exception as e:
@@ -399,6 +400,8 @@ def execute(args,job_args):
     Metgrid(js.wps_dir).execute().check_output()
 
     send_email(js, 'metgrid', 'Job %s - metgrid complete.' % js.job_id)
+    logging.info("METGRID complete")
+
     logging.info("cloning WRF into %s" % js.wrf_dir)
 
     logging.info("step 6: clone wrf directory, symlink all met_em* files, make namelists")
