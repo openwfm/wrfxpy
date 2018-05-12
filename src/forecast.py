@@ -25,7 +25,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time, load_sys_cfg
+                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -196,10 +196,6 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         Ungrib(grib_dir).execute().check_output()
 
         # move output
-        #search = osp.join(grib_dir,grib_source.prefix() + '*')
-        #logging.info('looking for ' + search)
-        #produced = glob.glob(search)
-        #logging.info('ungrib produced files ' + str(produced))        
         for f in glob.glob(osp.join(grib_dir,grib_source.prefix() + '*')):
             logging.info('moving %s' % f)
             shutil.move(f,wps_dir)
@@ -337,7 +333,7 @@ def execute(args,job_args):
     num_doms = len(js.domain_conf)
     js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * num_doms
     js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * num_doms
-    js.wps_nml['share']['interval_seconds'] = 3600
+    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds() 
 
     logging.info("number of domains defined is %d." % num_doms)
 
@@ -409,6 +405,7 @@ def execute(args,job_args):
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
     time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
+    js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds() 
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, num_doms))
@@ -703,9 +700,7 @@ if __name__ == '__main__':
 
     # load configuration JSON
     sys_cfg = load_sys_cfg()
-    # configuration defaults
-    sys_cfg['ingest_path'] = sys_cfg.get('ingest_path','ingest')
-    sys_cfg['workspace_path'] = sys_cfg.get('workspace_path','wksp')
+
     # note: the execution flow allows us to override anything in the etc/conf.json file
     # dump(sys_cfg,'sys_cfg')
     job_args = json.load(open(sys.argv[1]), 'ascii')

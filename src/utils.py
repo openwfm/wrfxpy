@@ -122,7 +122,7 @@ def process_create_time(pid):
 
 def ensure_dir(path):
     """
-    Ensure all directories in path exist, for convenience return path itself.
+    Ensure all directories in path if a file exist, for convenience return path itself.
 
     :param path: the path whose directories should exist
     :return: the path back for convenience
@@ -144,11 +144,14 @@ def make_clean_dir(dir):
 def make_dir(dir):
     """
     Create a directory if it does not exist. Creates any intermediate dirs as necessary.
+    For convenience return the director path itself
 
     :param dir: the directory to be created
+    :retun: same as input
     """
     if not osp.exists(dir):
         os.makedirs(dir)
+    return dir
 
 
 def symlink_unless_exists(link_tgt, link_loc):
@@ -378,8 +381,6 @@ def great_circle_distance(lon1, lat1, lon2, lat2):
     c = 2 * math.atan2(a**0.5, (1-a)**0.5)
     return 6371.0 * c
 
-
-
 def find_closest_grid_point(slon, slat, glon, glat):
     """
     Finds the closest grid point to the given station longitude/lattitude.
@@ -396,8 +397,12 @@ def load_sys_cfg():
     except IOError:
         logging.critical('Cannot find system configuration, have you created etc/conf.json?')
         sys.exit(2)
+    
     # set defaults
     sys = sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
-    sys_cfg.workspace_path = sys_cfg.get('workspace_path',osp.join(sys,'wksp'))
+    # configuration defaults + make directories if they do not exist
+    sys_cfg.workspace_path = make_dir(osp.abspath(sys_cfg.get('workspace_path','wksp')))
+    sys_cfg.ingest_path = make_dir(osp.abspath(sys_cfg.get('ingest_path','ingest')))
+    sys_cfg.cache_path = make_dir(osp.abspath(sys_cfg.get('cache_path','cache')))
     return sys_cfg
 
