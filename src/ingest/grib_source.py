@@ -62,18 +62,19 @@ class GribSource(object):
         """
         return "COLMET"
 
+    def interval_seconds(self):
+        """
+        :return: string with key value  
+        """
+        return None
+
+
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified for this source
         return: a dictionary of namelist entries
         """
         return {}
-
-    def name(self):
-        """
-        return: string 
-        """
-        return "unnknown"
 
     def vtables(self):
         """
@@ -183,6 +184,12 @@ class HRRR(GribSource):
     def __init__(self, ingest_dir):
         super(HRRR, self).__init__(ingest_dir)
 
+    def interval_seconds(self):
+        """
+        :return: string with key value  
+        """
+        return 3600 
+
   
     def vtables(self):
         """
@@ -279,7 +286,13 @@ class NAM218(GribSource):
     def __init__(self, ingest_dir):
         super(NAM218, self).__init__(ingest_dir)
 
-  
+
+    def interval_seconds(self):
+        """
+        :return: string with key value  
+        """
+        return 3*3600 
+
 
     def vtables(self):
         """
@@ -406,6 +419,12 @@ class NAM227(GribSource):
     def __init__(self, ingest_dir):
         super(NAM227, self).__init__(ingest_dir)
 
+    def interval_seconds(self):
+        """
+        :return: string with key value  
+        """
+        return 3600 
+
     def vtables(self):
         """
         Returns the variable tables that must be linked in for use with the NAM data source.
@@ -531,6 +550,12 @@ class CFSR_P(GribSource):
     def __init__(self, ingest_dir):
         super(CFSR_P, self).__init__(ingest_dir)
 
+    def interval_seconds(self):
+        """
+        :return: string with key value  
+        """
+        return 6*3600
+
     def vtables(self):
         """
         Returns the variable tables that must be linked in for use with the CFSRv2 data source.
@@ -641,6 +666,13 @@ class CFSR_S(GribSource):
     def __init__(self, ingest_dir):
         super(CFSR_S, self).__init__(ingest_dir)
 
+    def interval_seconds(self):
+        """
+        :return: string with key value  
+        """
+        return 6*3600
+
+
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.wps with CFSR_S
@@ -742,6 +774,7 @@ class CFSR_S(GribSource):
 
 
 #end CFSR
+
 class NARR(GribSource):
     """
     The NARR (North American Regional Reanalysis) grib source as provided by NOMADS.
@@ -753,6 +786,13 @@ class NARR(GribSource):
 
     def __init__(self, ingest_dir):
         super(NARR, self).__init__(ingest_dir)
+
+    def interval_seconds(self):
+        """
+        :return: string with key value  
+        """
+        return 3*3600
+
 
     def vtables(self):
         """
