@@ -62,14 +62,6 @@ class GribSource(object):
         """
         return "COLMET"
 
-    def id(self):
-        """
-        Return the name of the GRIB source.
-        return: string  
-        """
-        return "not specified"
-  
-
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified for this source
@@ -180,6 +172,8 @@ class GribSource(object):
             logging.info('Linking %s -> %s' % ( osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, grib_name)) )
             symlink_unless_exists(osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, grib_name))
 
+    # instance variables  
+    # id = "not specified"
 
 class HRRR(GribSource):
     """
@@ -189,12 +183,6 @@ class HRRR(GribSource):
     def __init__(self, ingest_dir):
         super(HRRR, self).__init__(ingest_dir)
 
-    def id(self):
-        """
-        Return the name of the GRIB source.
-        return: string 
-        """
-        return "HRRR"
   
     def vtables(self):
         """
@@ -279,6 +267,7 @@ class HRRR(GribSource):
 
     # instance variables
     # remote_url = 'http://www.ftp.ncep.noaa.gov/data/nccf/nonoperational/com/hrrr/prod'
+    id = "HRRR"
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/'
     period_hours = 1
 
@@ -290,12 +279,6 @@ class NAM218(GribSource):
     def __init__(self, ingest_dir):
         super(NAM218, self).__init__(ingest_dir)
 
-    def id(self):
-        """
-        Return the name of the GRIB source.
-        return: string 
-        """
-        return "NAM218"
   
 
     def vtables(self):
@@ -409,6 +392,7 @@ class NAM218(GribSource):
         return map(lambda x: path_tmpl % (year, mon, day, hour, x), fc_list)
 
     # instance variables
+    id = "NAM218"
     #remote_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     period_hours = 3
@@ -431,14 +415,6 @@ class NAM227(GribSource):
         return {'geogrid_vtable': 'GEOGRID.TBL',
                 'ungrib_vtable':'Vtable.NAM',
                 'metgrid_vtable':'METGRID.TBL.NAM'}
-
-    def id(self):
-        """
-        Return the name of the GRIB source.
-        return: string 
-        """
-        return "NAM227"
-  
 
     def namelist_keys(self):
         """
@@ -541,6 +517,7 @@ class NAM227(GribSource):
 
     # instance variables
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
+    id = "NAM227"
     period_hours = 3
 # CFSR
 class CFSR_P(GribSource):
@@ -553,14 +530,6 @@ class CFSR_P(GribSource):
 
     def __init__(self, ingest_dir):
         super(CFSR_P, self).__init__(ingest_dir)
-
-    def id(self):
-        """
-        Return the name of the GRIB source.
-        return: string 
-        """
-        return "CFSR_P"
-  
 
     def vtables(self):
         """
@@ -659,6 +628,7 @@ class CFSR_P(GribSource):
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_pgbh'
     period_hours = 6
+    id = "CFSR_P"
 
 class CFSR_S(GribSource):
     """
@@ -671,13 +641,6 @@ class CFSR_S(GribSource):
     def __init__(self, ingest_dir):
         super(CFSR_S, self).__init__(ingest_dir)
 
-    def id(self):
-        """
-        Return the name of the GRIB source.
-        return: string 
-        """
-        return "CFSR_S"
-  
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.wps with CFSR_S
@@ -775,6 +738,7 @@ class CFSR_S(GribSource):
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_flxf'
     period_hours = 6
+    id = "CFSR_S"
 
 
 #end CFSR
@@ -789,14 +753,6 @@ class NARR(GribSource):
 
     def __init__(self, ingest_dir):
         super(NARR, self).__init__(ingest_dir)
-
-    def id(self):
-        """
-        Return the name of the GRIB source.
-        return: string 
-        """
-        return "NARR"
-  
 
     def vtables(self):
         """
@@ -886,6 +842,7 @@ class NARR(GribSource):
     # instance variables
     remote_url = 'http://nomads.ncdc.noaa.gov/data/narr'
     period_hours = 3
+    id = "NARR"
 
 ## Utility functions
 

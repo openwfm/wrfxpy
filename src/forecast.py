@@ -173,20 +173,20 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
     wps_dir = osp.abspath(js.wps_dir)
-    grib_dir = osp.join(wps_dir,grib_source.id())
+    grib_dir = osp.join(wps_dir,grib_source.id)
     make_clean_dir(grib_dir)
     wps_nml = js.wps_nml 
     try:
-        logging.info("retrieving GRIB files from %s" % grib_source.id())
+        logging.info("retrieving GRIB files from %s" % grib_source.id)
 
         # logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
         manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc)
         grib_source.symlink_gribs(manifest, grib_dir)
 
         send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
-        logging.info("running UNGRIB for %s" % grib_source.id())
+        logging.info("running UNGRIB for %s" % grib_source.id)
 
-        logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id())
+        logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id)
 
         update_namelist(wps_nml, grib_source.namelist_wps_keys())
         logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
@@ -206,7 +206,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
-        logging.info('UNGRIB complete for %s' % grib_source.id())
+        logging.info('UNGRIB complete for %s' % grib_source.id)
         q.put('SUCCESS')
 
     except Exception as e:
@@ -368,17 +368,17 @@ def execute(args,job_args):
     # grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q))
     grib_proc = {}
     for grib_source in js.grib_source:
-        grib_proc[grib_source.id()] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
+        grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
     logging.info('starting GEOGRID and GRIB2/UNGRIB')
     geogrid_proc.start()
     for grib_source in js.grib_source:
-        grib_proc[grib_source.id()].start()
+        grib_proc[grib_source.id].start()
 
     # wait until all tasks are done
     logging.info('waiting until both tasks are done')
     for grib_source in js.grib_source:
-        grib_proc[grib_source.id()].join()
+        grib_proc[grib_source.id].join()
     geogrid_proc.join()
 
     for grib_source in js.grib_source:
