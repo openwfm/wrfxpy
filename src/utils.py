@@ -182,18 +182,18 @@ def cache_file(path, cache_dir):
     :param cache_dir: source directory, must be absolute path 
     """
     if not osp.isdir(cache_dir):
-        logging.error('%s is not directory' % str(cache_dir)
-        raise Exception
+        logging.error('%s is not directory' % str(cache_dir))
+        raise Exception('%s is not directory' % str(cache_dir))
     if not osp.isfile(path):
-        logging.error('%s is not file' % str(path)
-        raise Exception
+        logging.error('%s is not file' % str(path))
+        raise Exception('%s is not directory' % str(cache_dir))
     dst = osp.join(cache_dir,osp.basename(path))
     if osp.islink(path):
         if osp.dirname(osp.realpath(path)) is osp.realpath(cache_dir):
             logging.debug('%s is link to %s already' % (path, cache_dir))
             if osp.basename(osp.realpath(path)) is not osp.basename(path):
                 logging.error('link %s -> %s does not match' % (path,osp.realpath(path)))
-                raise Exception
+                raise Exception('link %s -> %s does not match' % (path,osp.realpath(path)))
         else:
             src = osp.realpath(path)
             logging.info('Copying %s to %s' % (src, dst))
