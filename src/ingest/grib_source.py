@@ -645,11 +645,9 @@ class CFSR_P(GribSource):
         :return: the relative URL
         """
         path_tmpl = '%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.pgrbh00.grib2'
-        print "path_tmpl=",path_tmpl
         
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
         return path_tmpl % (year, year, mon, year, mon, day, hour)
-        print "path_tmpl",path_tmpl
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_pgbh'
     period_hours = 6
@@ -762,11 +760,9 @@ class CFSR_S(GribSource):
         :return: the relative URL
         """
         path_tmpl = '%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.sfluxgrbf00.grib2'
-        print "path_tmpl=",path_tmpl
 
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
         return path_tmpl % (year, year, mon, year, mon, day, hour)
-        print "path_tmpl",path_tmpl
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_flxf'
     period_hours = 6
