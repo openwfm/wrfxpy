@@ -172,6 +172,37 @@ def symlink_unless_exists(link_tgt, link_loc):
         logging.error('Link target %s does not exist' % link_tgt)
 
 
+def cache_file(path, cache_dir):
+    """
+    Move file at the path to cache directory and replace by symlink
+    except when it is symlink to the cache direcory already
+    except if the file is symlink to elsewhere, copy the file to cache directory and replace by symlink
+
+    :path: file name 
+    :param cache_dir: source directory, must be absolute path 
+    """
+    if not osp.isdir(cache_dir):
+        logging.error('%s is not directory' % str(cache_dir)
+        raise Exception
+    if not osp.isfile(path):
+        logging.error('%s is not file' % str(path)
+        raise Exception
+    dst = osp.join(cache_dir,osp.basename(path))
+    if osp.islink(path):
+        if osp.dirname(osp.realpath(path)) is osp.realpath(cache_dir):
+            logging.debug('%s is link to %s already' % (path, cache_dir))
+            if osp.basename(osp.realpath(path)) is not osp.basename(path):
+                logging.error('link %s -> %s does not match' % (path,osp.realpath(path)))
+                raise Exception
+        else:
+            src = osp.realpath(path)
+            logging.info('Copying %s to %s' % (src, dst))
+            shutil.copyfile(src,dst)           
+    else:
+        logging.info('Moving %s to %s' % (path, dst))
+        shutil.move(path,dst)
+    symlink_unless_exists(dst, path)
+
 def esmf_to_utc(esmf):
     """
     Converts an ESMF datetime into a UTC datetime.
