@@ -64,9 +64,11 @@ class GribSource(object):
 
     def interval_seconds(self):
         """
-        :return: string with key value  
+        :return: namelist key value  
         """
-        return None
+        ret = 3600 * self.period_hours
+        logging.info('Grib source %s  interval_seconds=%s' % (self.id,  ret))
+        return ret
 
 
     def namelist_wps_keys(self):
@@ -175,6 +177,8 @@ class GribSource(object):
 
     # instance variables  
     # id = "not specified"
+    id = None
+    period_hours = None
 
 class HRRR(GribSource):
     """
@@ -184,13 +188,6 @@ class HRRR(GribSource):
     def __init__(self, ingest_dir):
         super(HRRR, self).__init__(ingest_dir)
 
-    def interval_seconds(self):
-        """
-        :return: string with key value  
-        """
-        return 3600 
-
-  
     def vtables(self):
         """
         Returns the variable tables that must be linked in for use with the HRRR data source.
@@ -285,13 +282,6 @@ class NAM218(GribSource):
 
     def __init__(self, ingest_dir):
         super(NAM218, self).__init__(ingest_dir)
-
-
-    def interval_seconds(self):
-        """
-        :return: string with key value  
-        """
-        return 3*3600 
 
 
     def vtables(self):
@@ -418,12 +408,6 @@ class NAM227(GribSource):
 
     def __init__(self, ingest_dir):
         super(NAM227, self).__init__(ingest_dir)
-
-    def interval_seconds(self):
-        """
-        :return: string with key value  
-        """
-        return 3600 
 
     def vtables(self):
         """
@@ -553,12 +537,6 @@ class CFSR(GribSource):
     def __init__(self, ingest_dir):
         super(CFSR, self).__init__(ingest_dir)
 
-    def interval_seconds(self):
-        """
-        :return: string with key value  
-        """
-        return 6*3600
-
     def vtables(self):
         return None
 
@@ -686,12 +664,6 @@ class CFSR_S(CFSR):
     def __init__(self, ingest_dir):
         super(CFSR_S, self).__init__(ingest_dir)
 
-    def interval_seconds(self):
-        """
-        :return: string with key value  
-        """
-        return 6*3600
-
 
     def namelist_wps_keys(self):
         """
@@ -741,12 +713,6 @@ class NARR(GribSource):
 
     def __init__(self, ingest_dir):
         super(NARR, self).__init__(ingest_dir)
-
-    def interval_seconds(self):
-        """
-        :return: string with key value  
-        """
-        return 3*3600
 
 
     def vtables(self):
