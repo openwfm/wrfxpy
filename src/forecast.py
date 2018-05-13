@@ -700,11 +700,12 @@ if __name__ == '__main__':
 
     # load configuration JSON
     sys_cfg = load_sys_cfg()
+    # logging.info('sys_cfg = %s' % json.dumps(sys_cfg, indent=4, separators=(',', ': ')))
 
     # note: the execution flow allows us to override anything in the etc/conf.json file
     # dump(sys_cfg,'sys_cfg')
     job_args = json.load(open(sys.argv[1]), 'ascii')
-    # dump(job_args,'job_args')
+    # logging.info('job_args = %s' % json.dumps(job_args, indent=4, separators=(',', ': ')))
     args = sys_cfg
     keys = job_args.keys()
     for key in keys:
@@ -712,12 +713,17 @@ if __name__ == '__main__':
             logging.warning('Job argument %s=None, ignoring' % key) 
             del job_args[key]
     args.update(job_args)
+    # logging.info('updated args = %s' % json.dumps(args, indent=4, separators=(',', ': ')))
+
     process_arguments(args)
+    # logging.info('processed args = %s' % str(args))
 
     # sanity check, also that nothing in etc/conf got overrident
     verify_inputs(args,sys_cfg)
+    # logging.info('verified args = %s' % str(args))
 
     # execute the job
+    logging.info('calling execute')
     execute(args,job_args)
     
     logging.info('forecast.py done')
