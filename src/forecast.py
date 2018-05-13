@@ -558,6 +558,7 @@ def process_output(job_id):
             break
 
         if "Timing for Writing wrfout" in line:
+            wait_wrfout = 0
             esmf_time,domain_str = re.match(r'.*wrfout_d.._([0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             wrfout_path,domain_str = re.match(r'.*(wrfout_d.._[0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             dom_id = int(domain_str)
@@ -570,13 +571,12 @@ def process_output(job_id):
                     pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
                 except Exception as e:
                     logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
-
-            # in incremental mode, upload to server
-            if js.postproc.get('shuttle', None) == 'incremental':
-                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
-            wait_wrfout = 0
+                else:
+                    # in incremental mode, upload to server
+                    if js.postproc.get('shuttle', None) == 'incremental':
+                        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                        sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+                        already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
         else: 
             if not wait_wrfout:
                 logging.info('Waiting for wrfout')
