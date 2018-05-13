@@ -333,7 +333,7 @@ def execute(args,job_args):
     num_doms = len(js.domain_conf)
     js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * num_doms
     js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * num_doms
-    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds() 
+    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds 
 
     logging.info("number of domains defined is %d." % num_doms)
 
@@ -405,7 +405,7 @@ def execute(args,job_args):
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
     time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
-    js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds() 
+    js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds 
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, num_doms))

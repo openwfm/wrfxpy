@@ -54,6 +54,7 @@ class GribSource(object):
         """
         self.ingest_dir = osp.abspath(js['ingest_path'])
         self.sys_dir = osp.abspath(js['sys_install_path'])
+        self.interval_seconds = 3600 * self.period_hours
 
     def prefix(self):
         """
@@ -61,15 +62,6 @@ class GribSource(object):
         return: string  
         """
         return "COLMET"
-
-    def interval_seconds(self):
-        """
-        :return: namelist key value  
-        """
-        ret = 3600 * self.period_hours
-        logging.info('Grib source %s  interval_seconds=%s' % (self.id,  ret))
-        return ret
-
 
     def namelist_wps_keys(self):
         """
