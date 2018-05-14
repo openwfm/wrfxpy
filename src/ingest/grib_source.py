@@ -52,8 +52,10 @@ class GribSource(object):
 
         :param js: job structure with at least ingest_path root of GRIB storage and sys_install_path 
         """
-        self.ingest_dir = osp.abspath(js['ingest_path'])
-        self.sys_dir = osp.abspath(js['sys_install_path'])
+        self.ingest_dir = osp.abspath(js.get('ingest_path','ingest'))
+        self.cache_dir = osp.abspath(js.get('cache_path','cache'))
+        self.sys_dir = osp.abspath(js.get('sys_install_path',None))
+
         self.interval_seconds = 3600 * self.period_hours
 
     def prefix(self):

@@ -20,7 +20,7 @@
 
 
 from ingest.grib_source import HRRR, NAM218, NAM227, CFSR_P, CFSR_S, NARR
-from utils import esmf_to_utc
+from utils import esmf_to_utc, load_sys_cfg 
 
 import logging
 import sys
@@ -32,28 +32,31 @@ if __name__ == '__main__':
         print('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0])
         print('       supported GRIB sources: HRRR, NAM, CFSR_P, CFSR_S, NARR')
         sys.exit(-1)
+    
 
     # configure the basic logger
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+    js = load_sys_cfg()
     grib_src_name = sys.argv[1]
     from_utc = esmf_to_utc(sys.argv[2])
     to_utc = esmf_to_utc(sys.argv[3])
     ingest_dir = sys.argv[4]
+    js.ingest_dir = ingest_dir 
 
     grib_src = None
     if grib_src_name == 'HRRR':
-        grib_src = HRRR(ingest_dir)
+        grib_src = HRRR(js)
     elif grib_src_name == 'NAM':
-        grib_src = NAM218(ingest_dir)
+        grib_src = NAM218(js)
     elif grib_src_name == 'NAM227':
-        grib_src = NAM227(ingest_dir)
+        grib_src = NAM227(js)
     elif grib_src_name == 'CFSR_P':
-        grib_src = CFSR_P(ingest_dir)
+        grib_src = CFSR_P(js)
     elif grib_src_name == 'CFSR_S':
-        grib_src = CFSR_S(ingest_dir)
+        grib_src = CFSR_S(js)
     elif grib_src_name == 'NARR':
-        grib_src = NARR(ingest_dir)
+        grib_src = NARR(js)
     else:
         raise ValueError('Invalid GRIB source %s' % grib_src_name)
 
