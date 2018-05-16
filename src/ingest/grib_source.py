@@ -56,7 +56,9 @@ class GribSource(object):
         self.cache_dir = osp.abspath(js.get('cache_path','cache'))
         self.sys_dir = osp.abspath(js.get('sys_install_path',None))
 
-        self.interval_seconds = 3600 * self.period_hours
+    def interval_seconds(self)
+        # metgrid_period_hours must be defined for each grib source
+        return 3600 * self.metgrid_period_hours
 
     def prefix(self):
         """
@@ -170,8 +172,9 @@ class GribSource(object):
             symlink_unless_exists(osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, grib_name))
 
     # instance variables  
-    # id = "not specified"
     id = None
+  
+    # for intermediate files
     period_hours = None
 
 class HRRR(GribSource):
@@ -599,8 +602,8 @@ class CFSR(GribSource):
         # return manifest
         return manifest
 
-    period_hours = 6
     id = "CFSR"
+    period_hours = 6
 
 class CFSR_P(CFSR):
     """

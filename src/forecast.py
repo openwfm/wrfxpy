@@ -66,13 +66,9 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
-        #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
-        #self.grib_source = [self.resolve_grib_source(g, args) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
-        self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
-        self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
-        #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
-        #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
+        self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].start_period_hours);
+        self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].end_period_hours);
         self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
         if 'job_id' in args:
             logging.info('job_id %s given in the job description' % args['job_id'])
@@ -333,7 +329,7 @@ def execute(args,job_args):
     num_doms = len(js.domain_conf)
     js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * num_doms
     js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * num_doms
-    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds 
+    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds()
 
     logging.info("number of domains defined is %d." % num_doms)
 
@@ -405,7 +401,7 @@ def execute(args,job_args):
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
     time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
-    js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds 
+    js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds()
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, num_doms))
