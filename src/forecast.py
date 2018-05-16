@@ -25,7 +25,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time, load_sys_cfg
+                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -173,19 +173,20 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
     wps_dir = osp.abspath(js.wps_dir)
-    grib_dir = osp.join(wps_dir,grib_source.id())
+    grib_dir = osp.join(wps_dir,grib_source.id)
     make_clean_dir(grib_dir)
     wps_nml = js.wps_nml 
     try:
-        logging.info("retrieving %s GRIB files" % grib_source.id())
+        logging.info("retrieving GRIB files from %s" % grib_source.id)
 
-        logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
+        # logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
         manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc)
         grib_source.symlink_gribs(manifest, grib_dir)
 
         send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
+        logging.info("running UNGRIB for %s" % grib_source.id)
 
-        logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id())
+        logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id)
 
         update_namelist(wps_nml, grib_source.namelist_wps_keys())
         logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
@@ -195,17 +196,13 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         Ungrib(grib_dir).execute().check_output()
 
         # move output
-        #search = osp.join(grib_dir,grib_source.prefix() + '*')
-        #logging.info('looking for ' + search)
-        #produced = glob.glob(search)
-        #logging.info('ungrib produced files ' + str(produced))        
         for f in glob.glob(osp.join(grib_dir,grib_source.prefix() + '*')):
             logging.info('moving %s' % f)
             shutil.move(f,wps_dir)
             
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
-        logging.info('UNGRIB %s complete' % grib_source.id())
+        logging.info('UNGRIB complete for %s' % grib_source.id)
         q.put('SUCCESS')
 
     except Exception as e:
@@ -336,7 +333,7 @@ def execute(args,job_args):
     num_doms = len(js.domain_conf)
     js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * num_doms
     js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * num_doms
-    js.wps_nml['share']['interval_seconds'] = 3600
+    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds 
 
     logging.info("number of domains defined is %d." % num_doms)
 
@@ -367,17 +364,17 @@ def execute(args,job_args):
     # grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q))
     grib_proc = {}
     for grib_source in js.grib_source:
-        grib_proc[grib_source.id()] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
+        grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
     logging.info('starting GEOGRID and GRIB2/UNGRIB')
     geogrid_proc.start()
     for grib_source in js.grib_source:
-        grib_proc[grib_source.id()].start()
+        grib_proc[grib_source.id].start()
 
     # wait until all tasks are done
     logging.info('waiting until both tasks are done')
     for grib_source in js.grib_source:
-        grib_proc[grib_source.id()].join()
+        grib_proc[grib_source.id].join()
     geogrid_proc.join()
 
     for grib_source in js.grib_source:
@@ -399,6 +396,8 @@ def execute(args,job_args):
     Metgrid(js.wps_dir).execute().check_output()
 
     send_email(js, 'metgrid', 'Job %s - metgrid complete.' % js.job_id)
+    logging.info("METGRID complete")
+
     logging.info("cloning WRF into %s" % js.wrf_dir)
 
     logging.info("step 6: clone wrf directory, symlink all met_em* files, make namelists")
@@ -406,6 +405,7 @@ def execute(args,job_args):
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
     time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
+    js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds 
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, num_doms))
@@ -558,6 +558,7 @@ def process_output(job_id):
             break
 
         if "Timing for Writing wrfout" in line:
+            wait_wrfout = 0
             esmf_time,domain_str = re.match(r'.*wrfout_d.._([0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             wrfout_path,domain_str = re.match(r'.*(wrfout_d.._[0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             dom_id = int(domain_str)
@@ -570,13 +571,12 @@ def process_output(job_id):
                     pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
                 except Exception as e:
                     logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
-
-            # in incremental mode, upload to server
-            if js.postproc.get('shuttle', None) == 'incremental':
-                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
-            wait_wrfout = 0
+                else:
+                    # in incremental mode, upload to server
+                    if js.postproc.get('shuttle', None) == 'incremental':
+                        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                        sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+                        already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
         else: 
             if not wait_wrfout:
                 logging.info('Waiting for wrfout')
@@ -700,13 +700,12 @@ if __name__ == '__main__':
 
     # load configuration JSON
     sys_cfg = load_sys_cfg()
-    # configuration defaults
-    sys_cfg['ingest_path'] = sys_cfg.get('ingest_path','ingest')
-    sys_cfg['workspace_path'] = sys_cfg.get('workspace_path','wksp')
+    # logging.info('sys_cfg = %s' % json.dumps(sys_cfg, indent=4, separators=(',', ': ')))
+
     # note: the execution flow allows us to override anything in the etc/conf.json file
     # dump(sys_cfg,'sys_cfg')
     job_args = json.load(open(sys.argv[1]), 'ascii')
-    # dump(job_args,'job_args')
+    # logging.info('job_args = %s' % json.dumps(job_args, indent=4, separators=(',', ': ')))
     args = sys_cfg
     keys = job_args.keys()
     for key in keys:
@@ -714,12 +713,17 @@ if __name__ == '__main__':
             logging.warning('Job argument %s=None, ignoring' % key) 
             del job_args[key]
     args.update(job_args)
+    # logging.info('updated args = %s' % json.dumps(args, indent=4, separators=(',', ': ')))
+
     process_arguments(args)
+    # logging.info('processed args = %s' % str(args))
 
     # sanity check, also that nothing in etc/conf got overrident
     verify_inputs(args,sys_cfg)
+    # logging.info('verified args = %s' % str(args))
 
     # execute the job
+    logging.info('calling execute')
     execute(args,job_args)
     
     logging.info('forecast.py done')

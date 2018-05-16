@@ -122,7 +122,7 @@ def process_create_time(pid):
 
 def ensure_dir(path):
     """
-    Ensure all directories in path exist, for convenience return path itself.
+    Ensure all directories in path if a file exist, for convenience return path itself.
 
     :param path: the path whose directories should exist
     :return: the path back for convenience
@@ -144,11 +144,14 @@ def make_clean_dir(dir):
 def make_dir(dir):
     """
     Create a directory if it does not exist. Creates any intermediate dirs as necessary.
+    For convenience return the director path itself
 
     :param dir: the directory to be created
+    :retun: same as input
     """
     if not osp.exists(dir):
         os.makedirs(dir)
+    return dir
 
 
 def symlink_unless_exists(link_tgt, link_loc):
@@ -168,6 +171,37 @@ def symlink_unless_exists(link_tgt, link_loc):
     else:
         logging.error('Link target %s does not exist' % link_tgt)
 
+
+def cache_file(path, cache_dir):
+    """
+    Move file at the path to cache directory and replace by symlink
+    except when it is symlink to the cache direcory already
+    except if the file is symlink to elsewhere, copy the file to cache directory and replace by symlink
+
+    :path: file name 
+    :param cache_dir: source directory, must be absolute path 
+    """
+    if not osp.isdir(cache_dir):
+        logging.error('%s is not directory' % str(cache_dir))
+        raise Exception('%s is not directory' % str(cache_dir))
+    if not osp.isfile(path):
+        logging.error('%s is not file' % str(path))
+        raise Exception('%s is not directory' % str(cache_dir))
+    dst = osp.join(cache_dir,osp.basename(path))
+    if osp.islink(path):
+        if osp.dirname(osp.realpath(path)) is osp.realpath(cache_dir):
+            logging.debug('%s is link to %s already' % (path, cache_dir))
+            if osp.basename(osp.realpath(path)) is not osp.basename(path):
+                logging.error('link %s -> %s does not match' % (path,osp.realpath(path)))
+                raise Exception('link %s -> %s does not match' % (path,osp.realpath(path)))
+        else:
+            src = osp.realpath(path)
+            logging.info('Copying %s to %s' % (src, dst))
+            shutil.copyfile(src,dst)           
+    else:
+        logging.info('Moving %s to %s' % (path, dst))
+        shutil.move(path,dst)
+    symlink_unless_exists(dst, path)
 
 def esmf_to_utc(esmf):
     """
@@ -378,8 +412,6 @@ def great_circle_distance(lon1, lat1, lon2, lat2):
     c = 2 * math.atan2(a**0.5, (1-a)**0.5)
     return 6371.0 * c
 
-
-
 def find_closest_grid_point(slon, slat, glon, glat):
     """
     Finds the closest grid point to the given station longitude/lattitude.
@@ -396,8 +428,12 @@ def load_sys_cfg():
     except IOError:
         logging.critical('Cannot find system configuration, have you created etc/conf.json?')
         sys.exit(2)
+    
     # set defaults
     sys = sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
-    sys_cfg.workspace_path = sys_cfg.get('workspace_path',osp.join(sys,'wksp'))
+    # configuration defaults + make directories if they do not exist
+    sys_cfg.workspace_path = make_dir(osp.abspath(sys_cfg.get('workspace_path','wksp')))
+    sys_cfg.ingest_path = make_dir(osp.abspath(sys_cfg.get('ingest_path','ingest')))
+    sys_cfg.cache_path = make_dir(osp.abspath(sys_cfg.get('cache_path','cache')))
     return sys_cfg
 
