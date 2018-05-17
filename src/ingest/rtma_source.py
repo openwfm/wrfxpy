@@ -117,8 +117,10 @@ class RTMA(object):
         if r.status_code != 200:
             raise ValueError('Cannot find variable %s for hour %d at url %s' % (var, cycle.hour, url))
         last_modif = self._parse_header_timestamp(r.headers['Last-Modified'])
+        content_size = int(r.headers['Content-Length'])
+        logging.info('%s file size %s' % (url, content_size))
 
-        return last_modif > cycle
+        return last_modif > cycle and content_size > 10000
 
 
     @staticmethod
