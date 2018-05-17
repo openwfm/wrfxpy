@@ -21,6 +21,21 @@ import pygrib
 import numpy as np
 import logging
 
+def grib_messages(path):
+    """
+    Compute the number of messages in grib file 
+    :param path: path to the file
+    :return: numeb of messages
+    """
+    grbf = pygrib.open(path)
+    grbf.seek(0)
+    i=0
+    for grb in self.grbf:
+        i=i+1
+        logging.debug('%s: %s' % (i, str(grb)))
+    self.grbf.seek(0)
+    return i
+    
 
 class GribFile(object):
     """
@@ -55,7 +70,6 @@ class GribFile(object):
         elif type(msg_id) == int:
             try:
                 msg=GribMessage(self.grbf.message(msg_id))
-                logging.info('Message %s: %s' % (msg_id, msg))
                 return msg
             except:
                 raise ValueError('GRIB file %s does not have message with index %d' % (self.path, msg_id))
