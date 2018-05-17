@@ -26,7 +26,10 @@ import pytz
 import logging
 import os.path as osp
 from ingest_utils import readhead
+from grib_file import grib_messages
 
+# global parameter
+min_content_size = 10000
 
 class RTMA(object):
     """
@@ -74,6 +77,8 @@ class RTMA(object):
         for var, local_path in nonlocals:
             if self._is_var_ready(ts, var):
                 download_url(self._remote_var_url(cycle.hour, var), local_path)
+                num=grib_messages(local_path,print_messages=True,max_messages=9999)
+                logging.info('file %s contains %s message(s)' % (local_path, num))
                 ready[var] = local_path
             else:
                 not_ready.append(var)
@@ -119,8 +124,10 @@ class RTMA(object):
         last_modif = self._parse_header_timestamp(r.headers['Last-Modified'])
         content_size = int(r.headers['Content-Length'])
         logging.info('%s file size %s' % (url, content_size))
+        if content_size < min_content_size:
+            logging.warning('file size less than minimum %s, considered invalid' % min_content_size)
 
-        return last_modif > cycle and content_size > 10000
+        return last_modif > cycle and content_size >= min_content_size
 
 
     @staticmethod
@@ -149,7 +156,11 @@ class RTMA(object):
         info_path = path + '.size'
         if osp.exists(path) and osp.exists(info_path):
             content_size = int(open(info_path).read())
-            return osp.getsize(path) == content_size
+            if content_size < min_content_size:
+                logging.info('cached file %s size %s' % ( path, content_size))
+                logging.warning('file size less than minimum %s, considered invalid' % min_content_size)
+
+            return osp.getsize(path) == content_size and content_size >= min_content_size
         else:
             return False
 

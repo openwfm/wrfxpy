@@ -21,7 +21,7 @@ import pygrib
 import numpy as np
 import logging
 
-def grib_messages(path):
+def grib_messages(path,print_messages=False,max_messages=9999):
     """
     Compute the number of messages in grib file 
     :param path: path to the file
@@ -30,10 +30,13 @@ def grib_messages(path):
     grbf = pygrib.open(path)
     grbf.seek(0)
     i=0
-    for grb in self.grbf:
+    for grb in grbf:
         i=i+1
-        logging.debug('%s: %s' % (i, str(grb)))
-    self.grbf.seek(0)
+        if print_messages:
+            logging.info('%s: %s' % (i, str(grb)))
+        if i > max_messages:
+            break
+    grbf.seek(0)
     return i
     
 
