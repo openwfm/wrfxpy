@@ -20,6 +20,7 @@
 from __future__ import print_function
 import requests
 import os.path as osp
+import os
 import logging
 import time
 
@@ -74,7 +75,13 @@ def download_url(url, local_path, max_retries=3):
     
     retries_available = max_retries
     file_size = osp.getsize(local_path)
+
+    # content size may have changed during download
+    r = requests.get(url, stream=True)
+    content_size = int(r.headers['Content-Length'])
+
     while file_size < content_size:
+        logging.warning('downloaded file size %s is less than http header concent size %s' % (file_size, content_size))
         if retries_available > 0:
             logging.info('download_url trying again, retries available %d' % retries_available)
             if accepts_ranges:
@@ -89,7 +96,7 @@ def download_url(url, local_path, max_retries=3):
             else:
                 # call the entire function recursively, this will attempt to redownload the entire file
                 # and overwrite previously downloaded data
-                self.download_grib(url, local_path, max_retries-1)
+                download_url(url, local_path, max_retries-1)
         else:
             os.remove(local_path)
             os.remove(info_path)
