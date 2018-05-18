@@ -51,8 +51,10 @@ def download_url(url, local_path, max_retries=5, sleep_seconds=5):
 
     try:    
         r = requests.get(url, stream=True)
-    except Exeception as e:
-        logging.error(str(e))
+    except Exception as e:
+        # logging.error(str(e))
+        logging.info('not found, download_url trying again, retries available %d' % max_retries)
+        logging.info('download_url sleeping %s seconds' % sleep_seconds)
         time.sleep(sleep_seconds)
         download_url(url, local_path, max_retries-1)
 
@@ -88,7 +90,7 @@ def download_url(url, local_path, max_retries=5, sleep_seconds=5):
     while file_size < content_size:
         logging.warning('downloaded file size %s is less than http header concent size %s' % (file_size, content_size))
         if max_retries > 0:
-            logging.info('download_url trying again, retries available %d' % max_retries)
+            logging.info('wrong file size, download_url trying again, retries available %d' % max_retries)
             if accepts_ranges:
                 # if range queries are supported, try to download only the missing portion of the file
                 headers = { 'Range' : 'bytes=%d-%d' % (file_size, content_size) }
@@ -101,6 +103,7 @@ def download_url(url, local_path, max_retries=5, sleep_seconds=5):
             else:
                 # call the entire function recursively, this will attempt to redownload the entire file
                 # and overwrite previously downloaded data
+                logging.info('download_url sleeping %s seconds' % sleep_seconds)
                 time.sleep(sleep_seconds)
                 download_url(url, local_path, max_retries-1)
         else:
