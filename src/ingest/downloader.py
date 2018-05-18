@@ -20,6 +20,7 @@
 from __future__ import print_function
 import requests
 import os.path as osp
+import os
 import logging
 import time
 
@@ -33,7 +34,7 @@ class DownloadError(Exception):
     pass
 
 
-def download_url(url, local_path, max_retries=3):
+def download_url(url, local_path, max_retries=5, sleep_seconds=60):
     """
     Download a remote URL to the location local_path with retries.
     
@@ -48,7 +49,15 @@ def download_url(url, local_path, max_retries=3):
 
     logging.info('download_url %s as %s' % (url,local_path))
 
-    r = requests.get(url, stream=True)
+    try:    
+        r = requests.get(url, stream=True)
+    except Exception as e:
+        # logging.error(str(e))
+        logging.info('not found, download_url trying again, retries available %d' % max_retries)
+        logging.info('download_url sleeping %s seconds' % sleep_seconds)
+        time.sleep(sleep_seconds)
+        download_url(url, local_path, max_retries-1)
+
     content_size = int(r.headers['Content-Length'])
 
     # dump the correct file size to an info file next to the grib file
@@ -64,7 +73,7 @@ def download_url(url, local_path, max_retries=3):
     with open(ensure_dir(local_path), 'wb') as f:
         start_time = time.time()
         for chunk in r.iter_content(chunk_size):
-            s =  s + chunk_size
+            s =  s + len(chunk)
             f.write(chunk)
             print(' %s out of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
     print('')
@@ -72,11 +81,16 @@ def download_url(url, local_path, max_retries=3):
     # does the server accept byte range queries? e.g. the NOMADs server does
     accepts_ranges = 'bytes' in r.headers.get('Accept-Ranges', '')
     
-    retries_available = max_retries
     file_size = osp.getsize(local_path)
+
+    # content size may have changed during download
+    r = requests.get(url, stream=True)
+    content_size = int(r.headers['Content-Length'])
+
     while file_size < content_size:
-        if retries_available > 0:
-            logging.info('download_url trying again, retries available %d' % retries_available)
+        logging.warning('downloaded file size %s is less than http header concent size %s' % (file_size, content_size))
+        if max_retries > 0:
+            logging.info('wrong file size, download_url trying again, retries available %d' % max_retries)
             if accepts_ranges:
                 # if range queries are supported, try to download only the missing portion of the file
                 headers = { 'Range' : 'bytes=%d-%d' % (file_size, content_size) }
@@ -89,7 +103,9 @@ def download_url(url, local_path, max_retries=3):
             else:
                 # call the entire function recursively, this will attempt to redownload the entire file
                 # and overwrite previously downloaded data
-                self.download_grib(url, local_path, max_retries-1)
+                logging.info('download_url sleeping %s seconds' % sleep_seconds)
+                time.sleep(sleep_seconds)
+                download_url(url, local_path, max_retries-1)
         else:
             os.remove(local_path)
             os.remove(info_path)

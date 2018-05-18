@@ -347,6 +347,8 @@ class NAM218(GribSource):
 
             # computes the relative paths of the desired files (the manifest)
             manifest = self.compute_manifest(cycle_start, fc_start, fc_hours)
+            for f in manifest:
+               logging.info('NAM218 will retrive ' + f) 
 
             # check what's available locally
             nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), manifest)
