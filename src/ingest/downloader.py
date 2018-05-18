@@ -34,7 +34,7 @@ class DownloadError(Exception):
     pass
 
 
-def download_url(url, local_path, max_retries=5, sleep_seconds=5):
+def download_url(url, local_path, max_retries=5, sleep_seconds=60):
     """
     Download a remote URL to the location local_path with retries.
     
