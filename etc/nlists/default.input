@@ -153,6 +153,7 @@ fire_ignition_radius5               =   0,      0
 fire_ignition_start_time5           =   0,      0
 fire_ignition_end_time5             =   0,      0
 fire_viscosity                      =   0
+fire_boundary_guard                 =   0,      0
 /
 
   &bdy_control
