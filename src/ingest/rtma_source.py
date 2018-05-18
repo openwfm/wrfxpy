@@ -18,7 +18,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from downloader import download_url, DownloadError
-from utils import esmf_to_utc
+from utils import esmf_to_utc, load_sys_cfg
 
 import requests
 from datetime import datetime, timedelta
@@ -26,10 +26,16 @@ import pytz
 import logging
 import os.path as osp
 from utils import readhead
+import time
 from grib_file import grib_messages
 
 # global parameter
 min_content_size = 10000
+
+cfg = load_sys_cfg()
+sleep_seconds = cfg.get('sleep_seconds', 20)
+max_retries = cfg.get('max_retries', 3)
+
 
 class RTMA(object):
     """
@@ -75,10 +81,21 @@ class RTMA(object):
 
         not_ready = []
         for var, local_path in nonlocals:
-            if self._is_var_ready(ts, var):
-                download_url(self._remote_var_url(cycle.hour, var), local_path)
-                num=grib_messages(local_path,print_messages=True,max_messages=9999)
-                logging.info('file %s contains %s message(s)' % (local_path, num))
+            var_ready = False
+            for i in range(0, max_retries):
+                try:
+                    if self._is_var_ready(ts, var):
+                        download_url(self._remote_var_url(cycle.hour, var), local_path)
+                        num=grib_messages(local_path,print_messages=True,max_messages=9999)
+                        logging.info('file %s contains %s message(s)' % (local_path, num))
+                        if num == 0:
+                            raise ValueError
+                        var_ready = True
+                        break
+                except Exception as e:
+                    logging.error(str(e))
+                time.sleep(sleep_seconds)
+            if var_ready:
                 ready[var] = local_path
             else:
                 not_ready.append(var)
@@ -120,7 +137,8 @@ class RTMA(object):
         url = self._remote_var_url(cycle.hour, var)
         r = readhead(url)
         if r.status_code != 200:
-            raise ValueError('Cannot find variable %s for hour %d at url %s' % (var, cycle.hour, url))
+            logging.error('Cannot find variable %s for hour %d at url %s' % (var, cycle.hour, url))
+            return False
         last_modif = self._parse_header_timestamp(r.headers['Last-Modified'])
         content_size = int(r.headers['Content-Length'])
         logging.info('%s file size %s' % (url, content_size))

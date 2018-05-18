@@ -27,9 +27,8 @@ import time
 from utils import ensure_dir, load_sys_cfg
  
 cfg = load_sys_cfg()
-sleep_seconds = cfg.get('sleep_seconds', 20)
-max_retries = cfg.get('max_retries', 3)
-
+sleep_seconds_def = cfg.get('sleep_seconds', 20)
+max_retries_def = cfg.get('max_retries', 3)
 
 class DownloadError(Exception):
     """
@@ -38,7 +37,7 @@ class DownloadError(Exception):
     pass
 
 
-def download_url(url, local_path, max_retries=max_retries, sleep_seconds=sleep_seconds):
+def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def):
     """
     Download a remote URL to the location local_path with retries.
     
@@ -61,7 +60,7 @@ def download_url(url, local_path, max_retries=max_retries, sleep_seconds=sleep_s
         logging.info('not found, download_url trying again, retries available %d' % max_retries)
         logging.info('download_url sleeping %s seconds' % sleep_seconds)
         time.sleep(sleep_seconds)
-        download_url(url, local_path, max_retries-1)
+        download_url(url, local_path, max_retries = max_retries-1)
 
     content_size = int(r.headers['Content-Length'])
 
@@ -96,7 +95,7 @@ def download_url(url, local_path, max_retries=max_retries, sleep_seconds=sleep_s
 
     logging.info('local file size %d downloaded %d remote content size %d' % (file_size, s, content_size))
 
-    while file_size < content_size or s != file_size:
+    if int(file_size) != int(content_size) or int(s) != int(file_size):
         logging.warning('wrong file size, download_url trying again, retries available %d' % max_retries)
         if max_retries > 0:
             if accepts_ranges:
@@ -113,7 +112,7 @@ def download_url(url, local_path, max_retries=max_retries, sleep_seconds=sleep_s
                 # and overwrite previously downloaded data
                 logging.info('download_url sleeping %s seconds' % sleep_seconds)
                 time.sleep(sleep_seconds)
-                download_url(url, local_path, max_retries-1)
+                download_url(url, local_path, max_retries = max_retries-1)
         else:
             os.remove(local_path)
             os.remove(info_path)
