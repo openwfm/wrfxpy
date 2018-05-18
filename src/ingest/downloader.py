@@ -24,7 +24,11 @@ import os
 import logging
 import time
 
-from utils import ensure_dir
+from utils import ensure_dir, load_sys_cfg
+ 
+cfg = load_sys_cfg()
+sleep_seconds = cfg.get('sleep_seconds', 20)
+max_retries = cfg.get('max_retries', 3)
 
 
 class DownloadError(Exception):
@@ -34,7 +38,7 @@ class DownloadError(Exception):
     pass
 
 
-def download_url(url, local_path, max_retries=5, sleep_seconds=5):
+def download_url(url, local_path, max_retries=max_retries, sleep_seconds=sleep_seconds):
     """
     Download a remote URL to the location local_path with retries.
     
@@ -48,6 +52,7 @@ def download_url(url, local_path, max_retries=5, sleep_seconds=5):
     """
 
     logging.info('download_url %s as %s' % (url,local_path))
+    logging.info('If download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
 
     try:    
         r = requests.get(url, stream=True)
