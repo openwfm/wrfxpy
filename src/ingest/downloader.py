@@ -52,7 +52,7 @@ def download_url(url, local_path, max_retries=max_retries, sleep_seconds=sleep_s
     """
 
     logging.info('download_url %s as %s' % (url,local_path))
-    logging.info('If download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
+    logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
 
     try:    
         r = requests.get(url, stream=True)
@@ -85,6 +85,8 @@ def download_url(url, local_path, max_retries=max_retries, sleep_seconds=sleep_s
 
     # does the server accept byte range queries? e.g. the NOMADs server does
     accepts_ranges = 'bytes' in r.headers.get('Accept-Ranges', '')
+    logging.info('accepts_ranges = %s setting to False' % accepts_ranges)
+    accepts_ranges = False
     
     file_size = osp.getsize(local_path)
 
@@ -92,12 +94,13 @@ def download_url(url, local_path, max_retries=max_retries, sleep_seconds=sleep_s
     r = requests.get(url, stream=True)
     content_size = int(r.headers['Content-Length'])
 
-    while file_size < content_size:
-        logging.warning('downloaded file size %s is less than http header concent size %s' % (file_size, content_size))
+    logging.info('local file size %d downloaded %d remote content size %d' % (file_size, s, content_size))
+
+    while file_size < content_size or s != file_size:
+        logging.warning('wrong file size, download_url trying again, retries available %d' % max_retries)
         if max_retries > 0:
-            logging.info('wrong file size, download_url trying again, retries available %d' % max_retries)
             if accepts_ranges:
-                # if range queries are supported, try to download only the missing portion of the file
+                logging.info('range queries are supported, try to download only the missing portion of the file')
                 headers = { 'Range' : 'bytes=%d-%d' % (file_size, content_size) }
                 r = requests.get(url, headers=headers, stream=True)
                 with open(local_path, 'ab') as f:

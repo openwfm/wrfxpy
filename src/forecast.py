@@ -157,11 +157,6 @@ def send_email(js, event, body):
             mail_serv.sendmail(js.emails.origin, [js.emails.to], msg.as_string())
             mail_serv.quit()
 
-def retrieve_gribs_and_run_ungrib_all(js, q):
-    for grib_source in js.grib_source:
-        retrieve_gribs_and_run_ungrib(js, grib_source, q)
-        
-
 def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     """
     This function retrieves required GRIB files and runs ungrib.

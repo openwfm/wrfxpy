@@ -127,7 +127,7 @@ class GribSource(object):
         """
         pass
 
-    def download_grib(self, url_base, rel_path, max_retries=3):
+    def download_grib(self, url_base, rel_path):
         """
         Download a GRIB file from a GRIB service and stream to <rel_path> in ingest_dir.
 
@@ -136,9 +136,10 @@ class GribSource(object):
         :param max_retries: how many times we may retry to download the file
         """
         url = url_base + '/' + rel_path
+        logging.info('downloading %s grib from %s' % (self.id, url))
         grib_path = osp.join(self.ingest_dir, rel_path)
         try:
-            download_url(url, grib_path, max_retries)
+            download_url(url, grib_path)
         except DownloadError as e:
             raise GribError('GribSource: failed to download file %s' % url)
 
@@ -239,7 +240,7 @@ class HRRR(GribSource):
 
         # check if GRIBs we don't are available remotely
         url_base = self.remote_url
-        logging.info('Retrieving GRIBs from %s' % url_base)
+        logging.info('Retrieving HRRR GRIBs from %s' % url_base)
         unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
         if len(unavailables) > 0:
             raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
@@ -355,7 +356,7 @@ class NAM218(GribSource):
 
             # check if GRIBs we don't are available remotely
             url_base = self.remote_url
-            logging.info('Retrieving GRIBs from %s' % url_base)
+            logging.info('Retrieving NAM218 GRIBs from %s' % url_base)
             unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
             if len(unavailables) > 0:
                 logging.warning('NAM218: failed retrieving cycle data for cycle %s, unavailables %s' % (cycle_start, repr(unavailables)))
@@ -563,6 +564,7 @@ class CFSR(GribSource):
         :param to_utc: forecast end time
         :return: a list of paths to local GRIB files
         """
+
         # ensure minutes and seconds are zero, simplifies arithmetic later
         from_utc = from_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
         to_utc = to_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
@@ -585,12 +587,14 @@ class CFSR(GribSource):
             logging.info('Adding to manifest input file %s' % self.make_relative_url(at_time))
             at_time += timedelta(hours=6)
 
+        print 'manifest = ' + str(manifest)
         # check what's available locally
         nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), manifest)
+        print 'nonlocals = ' + str(nonlocals)
 
         # check if GRIBs we don't have are available remotely
         url_base = self.remote_url
-        logging.info('Retrieving GRIBs from %s' % url_base)
+        logging.info('Retrieving CFSR GRIBs from %s' % url_base)
         unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
         if len(unavailables) > 0:
             raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
@@ -774,7 +778,7 @@ class NARR(GribSource):
 
         # check if GRIBs we don't have are available remotely
         url_base = self.remote_url
-        logging.info('Retrieving GRIBs from %s' % url_base)
+        logging.info('Retrieving NARR GRIBs from %s' % url_base)
         unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
         if len(unavailables) > 0:
             raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))

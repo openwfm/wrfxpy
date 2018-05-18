@@ -125,7 +125,7 @@ class RTMA(object):
         content_size = int(r.headers['Content-Length'])
         logging.info('%s file size %s' % (url, content_size))
         if content_size < min_content_size:
-            logging.warning('file size less than minimum %s, considered invalid' % min_content_size)
+            logging.warning('remote file size less than minimum %s, considered invalid' % min_content_size)
 
         return last_modif > cycle and content_size >= min_content_size
 
@@ -158,7 +158,7 @@ class RTMA(object):
             content_size = int(open(info_path).read())
             if content_size < min_content_size:
                 logging.info('cached file %s size %s' % ( path, content_size))
-                logging.warning('file size less than minimum %s, considered invalid' % min_content_size)
+                logging.warning('cached file size less than minimum %s, considered invalid' % min_content_size)
 
             return osp.getsize(path) == content_size and content_size >= min_content_size
         else:
