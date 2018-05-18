@@ -20,7 +20,7 @@
 
 
 from ingest.grib_source import HRRR, NAM218, NAM227, CFSR_P, CFSR_S, NARR
-from utils import esmf_to_utc, load_sys_cfg 
+from utils import esmf_to_utc, load_sys_cfg
 
 import logging
 import sys

@@ -33,6 +33,7 @@ import pickle
 import inspect
 import shutil
 import psutil
+import requests
 
 
 class Dict(dict):
@@ -437,3 +438,19 @@ def load_sys_cfg():
     sys_cfg.cache_path = make_dir(osp.abspath(sys_cfg.get('cache_path','cache')))
     return sys_cfg
 
+class response_object(object):
+    status_code = 0 
+    def __init__(self,status_code):
+        self.status_code = status_code
+
+
+def readhead(url):
+    logging.info('reading http head of %s ' % url)
+    try:
+        ret=requests.head(url)
+        ret.raise_for_status()
+    #except (requests.RequestException, requests.exceptions.Timeout, requests.exceptions.TooManyRedirects, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
+    except Exception as e:
+        logging.error(e)
+        ret = response_object(-1)
+    return ret 

@@ -27,7 +27,7 @@ import os
 import os.path as osp
 import sys
 import logging
-from ingest_utils import readhead
+from utils import readhead
 
 
 class GribError(Exception):
@@ -595,7 +595,7 @@ class CFSR(GribSource):
         # check if GRIBs we don't have are available remotely
         url_base = self.remote_url
         logging.info('Retrieving CFSR GRIBs from %s' % url_base)
-        unavailables = filter(lambda x: requests.head(url_base + '/' + x).status_code != 200, nonlocals)
+        unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
         if len(unavailables) > 0:
             raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
 
