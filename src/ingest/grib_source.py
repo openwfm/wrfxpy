@@ -17,7 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from utils import ensure_dir, symlink_unless_exists
+from utils import ensure_dir, symlink_unless_exists, timedelta_hours
 from downloader import download_url, DownloadError
 
 from datetime import datetime, timedelta
@@ -332,19 +332,8 @@ class NAM218(GribSource):
             cycle_start = min(from_utc, ref_utc_2)
             cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
             cycle_start -= timedelta(hours=6*cycle_shift)
-
-            # check if the request is even satisfiable
-            delta_end = to_utc - cycle_start
-            fc_hours = delta_end.days * 24 + int(delta_end.seconds / 3600)
-
-            if fc_hours > 84:
-                raise GribError('Unsatisfiable: NAM 218 initial and boundary conditions are only available for 84 hours.')
-
-            delta_start = from_utc - cycle_start
-            fc_start = delta_start.days * 24 + int(delta_start.seconds / 3600)
-
-            logging.info('NAM218: from_utc=%s to_utc=%s attempting retrieval for fc [%d,%d] of cycle %s' %
-                          (str(from_utc), str(to_utc), fc_start, fc_hours, str(cycle_start)))
+ 
+            fc_start, fc_hours = self.forecast_times(cycle_start, from_utc, to_utc)
 
             # computes the relative paths of the desired files (the manifest)
             manifest = self.compute_manifest(cycle_start, fc_start, fc_hours)
@@ -370,10 +359,38 @@ class NAM218(GribSource):
             return manifest
 
         raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
+
+    def forecast_times(self,cycle_start, from_utc, to_utc):  
+        """
+        :param cycle_start: UTC time of cycle start
+        :param from_utc: forecast start time
+        :param to_utc: forecast end time
+        """
+
+        logging.info('%s cycle %s forecast from %s to %s UTC' % (self.id, str( cycle_start), str( from_utc), str( to_utc)))
+
+        # check if the request is even satisfiable
+        if (from_utc - cycle_start).total_seconds() < 0:
+            raise GribError('cycle start %s is larger than forecast start %s' % (str(cycle_start), str(from_utc)))
+        if (to_utc - from_utc).total_seconds() < 3600:
+            raise GribError('forecast from %s to %s is less than one hour' % (str(from_utc), str(to_utc)))
+
+        fc_hours = timedelta_hours(to_utc - cycle_start)
+
+        if fc_hours > self.max_forecast_hours :
+            logging.error('cycle start %s to forecast end %s is more than %s hours' % (str(cycle_start), str(to_utc),self.max_forecast_hours))
+            raise GribError('Unsatisfiable: %s forecast is only available for %s hours.' % (self.id, self.max_forecast_hours))
+
+        fc_start = timedelta_hours(from_utc - cycle_start, False) # rounding down
+
+        logging.info('%s using cycle %s hours %d to %d' % (self.id, str(cycle_start), fc_start, fc_hours))
+  
+        return fc_start, fc_hours
+
     
     def compute_manifest(self, cycle_start, fc_start, fc_hours):
         """
-        Computes the relative paths of required GRIB files.
+        Computes the relative paths of required GRIB and COLMET files.
 
         NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
         every 3 hours, starting with 39 and ending with 84.
@@ -382,7 +399,17 @@ class NAM218(GribSource):
         :param fc_start: index of first file we need
         :param fc_hours: final forecast hour 
         """
+        # grib path: nam.YYYYMMDD/nam.tccz.awphysfh.tm00.grib2 
+        #cc is the model cycle runtime (i.e. 00, 06, 12, 18) 
+        #YYYYMMDD is the Year Month Day Hour of model runtime
+        #fh is the forecast hour (i.e. 00, 03, 06, ..., 84) 
         path_tmpl = 'nam.%04d%02d%02d/nam.t%02dz.awphys%02d.tm00.grib2'
+
+        # met path: nam.YYYYMMDDtcc/COLMET:YYYY-MM-DD_hh
+        # YYYYMMDD is the Year Month Day Hour of the cycle
+        # YYYY-MM-DD_hh the Year Month Day Hour of the forecast
+        colmet_tmpl ='nam.%04d%02d%02dt%02d/COLMET:%04d-%02d-%02d_%02d'
+
         fc_seq = range(fc_start, 36) + range(max(fc_start, 39), 85, 3)
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
@@ -393,9 +420,12 @@ class NAM218(GribSource):
 
     # instance variables
     id = "NAM218"
-    #remote_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
+    max_forecast_hours = 84
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     period_hours = 3
+    info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
+    info_url = "http://www.nco.ncep.noaa.gov/pmb/products/nam/"
+ 
 
 
 class NAM227(GribSource):
@@ -469,10 +499,10 @@ class NAM227(GribSource):
             delta_start = from_utc - cycle_start
             fc_start = delta_start.days * 24 + int(delta_start.seconds / 3600)
 
-            logging.info('NAM227: from_utc=%s to_utc=%s attempting retrieval for fc [%d,%d] of cycle %s' %
-                          (str(from_utc), str(to_utc), fc_start, fc_hours, str(cycle_start)))
+            logging.info('err %s %s' % (fc_start - fc_start_orig, fc_hours - fc_hours_orig))
 
             # computes the relative paths of the desired files (the manifest)
+            
             manifest = self.compute_manifest(cycle_start, fc_start, fc_hours)
 
             # check what's available locally
@@ -519,6 +549,8 @@ class NAM227(GribSource):
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     id = "NAM227"
     period_hours = 3
+    info_url="http://www.nco.ncep.noaa.gov/pmb/products/nam"
+    info_text="NAM NEST over CONUS (5 km Resolution - Grid 227)"
 
 # CFSR
 class CFSR(GribSource):

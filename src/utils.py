@@ -243,16 +243,15 @@ def round_time_to_hour(utc, up=False, period_hours=1):
     return tm 
 
 
-def compute_fc_hours(start_utc, end_utc):
+def timedelta_hours(timedelta_utc, up = True):
     """
-    Compute the number of forecast hours.  Rounds up in case of incomplete hours.
+    Compute difference of times in hours, rounds up in case of incomplete hours.
 
-    :param start_utc: start time of forecast
-    :param end_utc: end time of forecast
-    :return: number of forecast hours (rounded up to nearest hour)
+    :param delta_utc: difference of two datetime objects
+    :param up: round up if True, down in False
+    :return: number of hours rounded to whole hour
     """
-    delta = end_utc - start_utc
-    return delta.days * 24 + int(delta.seconds + 3600 - 1) / 3600
+    return int(timedelta_utc.total_seconds() + ((3600 - 0.001)if up else 0 ))/ 3600
 
 
 def symlink_matching_files(tgt_dir, src_dir, glob_pattern):

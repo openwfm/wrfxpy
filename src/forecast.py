@@ -23,7 +23,7 @@ from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
 from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
-                  update_namelist, compute_fc_hours, esmf_to_utc, render_ignitions, make_dir, \
+                  update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
                   make_clean_dir, process_create_time, load_sys_cfg, ensure_dir
 from vis.postprocessor import Postprocessor
@@ -69,11 +69,13 @@ class JobState(Dict):
         #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
         #self.grib_source = [self.resolve_grib_source(g, args) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
+        logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
+        logging.info('Simulation times rounded  %s to %s' % (str(self.start_utc), str(self.end_utc)))
         #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
         #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
-        self.fc_hrs = compute_fc_hours(self.start_utc, self.end_utc)
+        self.fc_hrs = timedelta_hours(self.end_utc - self.start_utc)
         if 'job_id' in args:
             logging.info('job_id %s given in the job description' % args['job_id'])
             self.job_id = args['job_id']
