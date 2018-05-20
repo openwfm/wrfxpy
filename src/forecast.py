@@ -181,7 +181,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         # manifest[1] = optional directory path for colmet files
         # manifest[2] = optional list of colmet file names
         
-        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc)
+        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc)
 
         cache_colmet = len(manifest) > 1
         have_all_colmet = False
@@ -384,7 +384,7 @@ def execute(args,job_args):
 
     proc_q = Queue()
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
-    # grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q))
+    # grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q, ref_utc))
     grib_proc = {}
     for grib_source in js.grib_source:
         grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))

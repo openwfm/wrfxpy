@@ -221,6 +221,8 @@ def esmf_to_utc(esmf):
     :param esmf: date & time from YYYY-MM-DD_hh:mm:ss (ESMF) format
     :return: a python datetime with UTC timezone
     """
+    if esmf is None:
+        return None
     # ESMF date: YYYY-MM-DD_hh:mm:ss
     year, mon, day = int(esmf[0:4]), int(esmf[5:7]), int(esmf[8:10])
     hour, min, sec = int(esmf[11:13]), int(esmf[14:16]), int(esmf[17:19])
@@ -445,6 +447,7 @@ def load_sys_cfg():
     sys_cfg.workspace_path = make_dir(osp.abspath(sys_cfg.get('workspace_path','wksp')))
     sys_cfg.ingest_path = make_dir(osp.abspath(sys_cfg.get('ingest_path','ingest')))
     sys_cfg.cache_path = make_dir(osp.abspath(sys_cfg.get('cache_path','cache')))
+    sys_cfg.ref_utc = esmf_to_utc(sys_cfg.get('ref_esmf',None))
     return sys_cfg
 
 class response_object(object):

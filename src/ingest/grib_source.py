@@ -319,6 +319,8 @@ class NAM218(GribSource):
 
         if ref_utc is None:
             ref_utc = datetime.now(pytz.UTC)
+        
+        logging.info('retrieve_gribs reference time is ' + str(ref_utc))
 
         # it is possible that a cycle output is delayed and unavailable when we expect it (3 hours after cycle time)
         # in this case, the NAM grib source supports using previous cycles (up to 2)
