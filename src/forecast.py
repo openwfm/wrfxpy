@@ -710,7 +710,8 @@ def verify_inputs(args,sys_cfg):
 
 def process_arguments(args):
     """
-    Convert arguments passed into program via the JSON configuration file.
+    Convert arguments passed into program via the JSON configuration file and job json argument.
+    This is processed after the configuration is updated by the job json file.
 
     Transforms unicode strings into standard strings.
 
@@ -721,7 +722,10 @@ def process_arguments(args):
     args['orig_start_utc'] = start_utc
     args['start_utc'] = round_time_to_hour(start_utc)
     args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
-    args['ref_utc'] = timespec_to_utc(args.get('ref_utc',None))
+
+    # defaults
+    if args['ref_utc'] is not None:
+        args['ref_utc'] = timespec_to_utc(args['ref_utc'], args['start_utc'])
 
     for k, v in args.iteritems():
         if type(v) == unicode:

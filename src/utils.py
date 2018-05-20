@@ -454,7 +454,7 @@ def load_sys_cfg():
     sys_cfg.workspace_path = make_dir(osp.abspath(sys_cfg.get('workspace_path','wksp')))
     sys_cfg.ingest_path = make_dir(osp.abspath(sys_cfg.get('ingest_path','ingest')))
     sys_cfg.cache_path = make_dir(osp.abspath(sys_cfg.get('cache_path','cache')))
-    sys_cfg.ref_utc = esmf_to_utc(sys_cfg.get('ref_utc',None))
+    sys_cfg.ref_utc = sys_cfg.get('ref_utc',None)
     sys_cfg.ungrib_only = sys_cfg.get('ungrib_only',False)
     return sys_cfg
 
