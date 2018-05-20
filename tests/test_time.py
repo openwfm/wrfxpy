@@ -13,7 +13,7 @@ def test_time():
     cycle_start_esmf = "2005-01-05_00:00:00"
     cycle_start =  esmf_to_utc(cycle_start_esmf)
     from_utc = esmf_to_utc("2005-01-05_00:00:00")
-    to_utc = esmf_to_utc("2005-01-06_00:00:01")
+    to_utc = esmf_to_utc("2005-01-06_22:00:0")
 
 
 
@@ -29,7 +29,19 @@ def test_time():
     print timedelta_hours(to_utc - cycle_start)
     print timedelta_hours(to_utc - cycle_start, False)
 
-    g.forecast_times(cycle_start, from_utc, to_utc)
+    fc_start, fc_hours = g.forecast_times(cycle_start, from_utc, to_utc)
+    print 'fc_start = ', fc_start
+    print 'fc_hours = ',fc_hours
+    fc_list, colmet_list_utc, grib_files, colmet_files = g.compute_manifest(cycle_start, fc_start, fc_hours)
+    print 'fc_list = ',fc_list
+    print 'colmet_list_utc = '
+    for x in colmet_list_utc:
+        print x   
+    for x in grib_files:
+        print x   
+    for x in colmet_files:
+        print x   
+    
 
      
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

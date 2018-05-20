@@ -336,7 +336,9 @@ class NAM218(GribSource):
             fc_start, fc_hours = self.forecast_times(cycle_start, from_utc, to_utc)
 
             # computes the relative paths of the desired files (the manifest)
-            manifest = self.compute_manifest(cycle_start, fc_start, fc_hours)
+            fc_list, colmet_list_utc, grib_files, colmet_files = self.compute_manifest(cycle_start, fc_start, fc_hours)
+            manifest = grib_files
+
             for f in manifest:
                logging.info('NAM218 will retrive ' + f) 
 
@@ -384,10 +386,9 @@ class NAM218(GribSource):
         fc_start = timedelta_hours(from_utc - cycle_start, False) # rounding down
 
         logging.info('%s using cycle %s hours %d to %d' % (self.id, str(cycle_start), fc_start, fc_hours))
-  
+
         return fc_start, fc_hours
 
-    
     def compute_manifest(self, cycle_start, fc_start, fc_hours):
         """
         Computes the relative paths of required GRIB and COLMET files.
@@ -399,6 +400,12 @@ class NAM218(GribSource):
         :param fc_start: index of first file we need
         :param fc_hours: final forecast hour 
         """
+
+        fc_seq = range(fc_start, 37) + range(max(fc_start, 39), 85, 3)
+        # get all time points up to fc_hours plus one (we must cover entire timespan)
+        fc_list = [x for x in fc_seq if x < fc_hours]
+        fc_list.append(fc_seq[len(fc_list)])
+        
         # grib path: nam.YYYYMMDD/nam.tccz.awphysfh.tm00.grib2 
         #cc is the model cycle runtime (i.e. 00, 06, 12, 18) 
         #YYYYMMDD is the Year Month Day Hour of model runtime
@@ -408,15 +415,23 @@ class NAM218(GribSource):
         # met path: nam.YYYYMMDDtcc/COLMET:YYYY-MM-DD_hh
         # YYYYMMDD is the Year Month Day Hour of the cycle
         # YYYY-MM-DD_hh the Year Month Day Hour of the forecast
-        colmet_tmpl ='nam.%04d%02d%02dt%02d/COLMET:%04d-%02d-%02d_%02d'
+        colmet_tmpl ='%s.%04d%02d%02dt%02d/COLMET:%04d-%02d-%02d_%02d'
 
-        fc_seq = range(fc_start, 36) + range(max(fc_start, 39), 85, 3)
+        fc_seq = range(fc_start, 37) + range(max(fc_start, 39), 85, 3)
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
         fc_list.append(fc_seq[len(fc_list)])
         
+        colmet_list_utc = [cycle_start + timedelta(hours = x) for x in range(fc_start, fc_list[-1] +1)]
+ 
         year, mon, day, hour = cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
-        return map(lambda x: path_tmpl % (year, mon, day, hour, x), fc_list)
+        # grib_files = map(lambda x: path_tmpl % (year, mon, day, hour, x), fc_list)
+        grib_files = [path_tmpl % (year, mon, day, hour, x) for x in fc_list]
+
+        colmet_files = [colmet_tmpl % (self.id, year, mon, day, hour, x.year, x.month, x.day, x.hour) for x in colmet_list_utc]
+        
+        return fc_list, colmet_list_utc, grib_files, colmet_files 
+        
 
     # instance variables
     id = "NAM218"
