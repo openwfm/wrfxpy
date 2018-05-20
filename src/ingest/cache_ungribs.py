@@ -26,11 +26,11 @@ import logging
 import sys
 import os.path as osp
 
-## Standalone script that can be used to simply download files
+## Standalone script that can be used to download gribs and cache ungribs
 if __name__ == '__main__':
     if len(sys.argv) != 5:
-        print('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0])
-        print('       supported GRIB sources: HRRR, NAM, CFSR_P, CFSR_S, NARR')
+        print('Usage: %s <grib_source_name> <esmf_ref_utc> [<esmf_from_utc> <esmf_to_utc> <target_directory>]' % sys.argv[0])
+        print('       supported GRIB sources: NAM218')
         sys.exit(-1)
     
 
@@ -39,10 +39,12 @@ if __name__ == '__main__':
 
     js = load_sys_cfg()
     grib_src_name = sys.argv[1]
-    from_utc = esmf_to_utc(sys.argv[2])
-    to_utc = esmf_to_utc(sys.argv[3])
-    ingest_dir = sys.argv[4]
+    ref_utc = esmf_to_utc(sys.argv[2])
+    from_utc = esmf_to_utc(sys.argv[3])
+    to_utc = esmf_to_utc(sys.argv[4])
+    ingest_dir = sys.argv[5]
     js.ingest_dir = ingest_dir 
+    js.job_id = 'download_tmp'
 
     grib_src = None
     if grib_src_name == 'HRRR':
