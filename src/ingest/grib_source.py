@@ -311,7 +311,7 @@ class NAM218(GribSource):
 
         :param from_utc: forecast start time
         :param to_utc: forecast end time
-        :return: a list of paths to local GRIB files
+        :return: a list of paths to local GRIB files and hopefully cached COLMET files
         """
         # ensure minutes and seconds are zero, simplifies arithmetic later
         from_utc = from_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)
@@ -333,14 +333,16 @@ class NAM218(GribSource):
             cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
             cycle_start -= timedelta(hours=6*cycle_shift)
  
-            fc_start, fc_hours = self.forecast_times(cycle_start, from_utc, to_utc)
-
             # computes the relative paths of the desired files (the manifest)
-            fc_list, colmet_list_utc, grib_files, colmet_files = self.compute_manifest(cycle_start, fc_start, fc_hours)
-            manifest = grib_files
+            fc_start, fc_hours = self.forecast_times(cycle_start, from_utc, to_utc)
+            fc_list, colmet_list_utc = self.file_times(cycle_start,fc_start, fc_hours)
+            grib_files, colmet_prefix, colmet_files = self.file_names(cycle_start, fc_list, colmet_list_utc)
 
-            for f in manifest:
+            manifest = grib_files
+            for f in grib_files:
                logging.info('NAM218 will retrive ' + f) 
+            for f in colmet_files:
+               logging.info('UNGRIB will create  ' + colmet_prefix + '/' +f) 
 
             # check what's available locally
             nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), manifest)
@@ -358,15 +360,19 @@ class NAM218(GribSource):
             map(lambda x: self.download_grib(url_base, x), nonlocals)
 
             # return manifest
-            return manifest
+            return [manifest, colmet_prefix, colmet_files]
 
         raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
 
     def forecast_times(self,cycle_start, from_utc, to_utc):  
         """
+        Compute the span of hours to be used in a forecast cycle
+        This should be common to all forecast data sources
+
         :param cycle_start: UTC time of cycle start
         :param from_utc: forecast start time
         :param to_utc: forecast end time
+        :return fc_start, fc_hours: first and last hour in the forecast to be used
         """
 
         logging.info('%s cycle %s forecast from %s to %s UTC' % (self.id, str( cycle_start), str( from_utc), str( to_utc)))
@@ -389,49 +395,64 @@ class NAM218(GribSource):
 
         return fc_start, fc_hours
 
-    def compute_manifest(self, cycle_start, fc_start, fc_hours):
-        """
-        Computes the relative paths of required GRIB and COLMET files.
 
+    def file_times(self, cycle_start, fc_start, fc_hours):
+        """
+        Computes the file times of required GRIB and COLMET files from start and end forecast hour
+        This may depend on the forecast source
+         
         NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
         every 3 hours, starting with 39 and ending with 84.
 
         :param cycle_start: UTC time of cycle start
         :param fc_start: index of first file we need
         :param fc_hours: final forecast hour 
+        :return fc_list: hours from cycle_start for which is forecast required
+        :return colmet_list_utc: utc time of files after ungrib
         """
 
         fc_seq = range(fc_start, 37) + range(max(fc_start, 39), 85, 3)
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
         fc_list.append(fc_seq[len(fc_list)])
-        
+
+        colmet_list_utc = [cycle_start + timedelta(hours = x) for x in range(fc_start, fc_list[-1] +1)]
+  
+        return fc_list, colmet_list_utc
+
+
+    def file_names(self, cycle_start, fc_list, colmet_list_utc):
+        """
+        Computes the relative paths of required GRIB and COLMET files.
+        Defintely dependent on the grib source.
+
+        NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
+        every 3 hours, starting with 39 and ending with 84.
+
+        :param cycle_start: UTC time of cycle start
+        :param fc_list: list of hours in the cycle when forecast will be donwloaded
+        :param colmet_list_utc: 
+        """
+
         # grib path: nam.YYYYMMDD/nam.tccz.awphysfh.tm00.grib2 
         #cc is the model cycle runtime (i.e. 00, 06, 12, 18) 
         #YYYYMMDD is the Year Month Day Hour of model runtime
         #fh is the forecast hour (i.e. 00, 03, 06, ..., 84) 
+
         path_tmpl = 'nam.%04d%02d%02d/nam.t%02dz.awphys%02d.tm00.grib2'
+        grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, x) for x in fc_list]
 
         # met path: nam.YYYYMMDDtcc/COLMET:YYYY-MM-DD_hh
         # YYYYMMDD is the Year Month Day Hour of the cycle
         # YYYY-MM-DD_hh the Year Month Day Hour of the forecast
-        colmet_tmpl ='%s.%04d%02d%02dt%02d/COLMET:%04d-%02d-%02d_%02d'
 
-        fc_seq = range(fc_start, 37) + range(max(fc_start, 39), 85, 3)
-        # get all time points up to fc_hours plus one (we must cover entire timespan)
-        fc_list = [x for x in fc_seq if x < fc_hours]
-        fc_list.append(fc_seq[len(fc_list)])
-        
-        colmet_list_utc = [cycle_start + timedelta(hours = x) for x in range(fc_start, fc_list[-1] +1)]
- 
-        year, mon, day, hour = cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
-        # grib_files = map(lambda x: path_tmpl % (year, mon, day, hour, x), fc_list)
-        grib_files = [path_tmpl % (year, mon, day, hour, x) for x in fc_list]
+        colmet_prefix_tmpl = '%s.%04d%02d%02dt%02d'
+        colmet_files_tmpl ='COLMET:%04d-%02d-%02d_%02d'
 
-        colmet_files = [colmet_tmpl % (self.id, year, mon, day, hour, x.year, x.month, x.day, x.hour) for x in colmet_list_utc]
+        colmet_prefix = colmet_prefix_tmpl % (self.id, cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour)
+        colmet_files = [colmet_files_tmpl % (x.year, x.month, x.day, x.hour) for x in colmet_list_utc]
         
-        return fc_list, colmet_list_utc, grib_files, colmet_files 
-        
+        return grib_files, colmet_prefix, colmet_files 
 
     # instance variables
     id = "NAM218"

@@ -177,8 +177,11 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         logging.info("retrieving GRIB files from %s" % grib_source.id)
 
         # logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
+        # manifest[0] = list of grib files
+        # manifest[1] = optional directory path for colmet files
+        # manifest[2] = optional list of colmet file names
         manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc)
-        grib_source.symlink_gribs(manifest, grib_dir)
+        grib_source.symlink_gribs(manifest[0], grib_dir)
 
         send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
         logging.info("running UNGRIB for %s" % grib_source.id)

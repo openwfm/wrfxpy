@@ -32,15 +32,18 @@ def test_time():
     fc_start, fc_hours = g.forecast_times(cycle_start, from_utc, to_utc)
     print 'fc_start = ', fc_start
     print 'fc_hours = ',fc_hours
-    fc_list, colmet_list_utc, grib_files, colmet_files = g.compute_manifest(cycle_start, fc_start, fc_hours)
+    fc_list, colmet_list_utc = g.file_times(cycle_start, fc_start, fc_hours)
+    grib_files, colmet_prefix, colmet_files = g.file_names(cycle_start, fc_list, colmet_list_utc)
     print 'fc_list = ',fc_list
     print 'colmet_list_utc = '
     for x in colmet_list_utc:
         print x   
+    print 'grib_files = '
     for x in grib_files:
         print x   
+    print 'colmet_files = '
     for x in colmet_files:
-        print x   
+        print colmet_prefix + '/' + x   
     
 
      
