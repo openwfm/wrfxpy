@@ -139,8 +139,13 @@ def make_clean_dir(dir):
     """
     if osp.exists(dir):
         logging.info('Deleting existing directory %s to make a clean one' % dir)
-        shutil.rmtree(dir)
-    os.makedirs(dir)
+        try:
+            shutil.rmtree(dir)
+        except Exception as e:
+            logging.warning(str(e))
+            logging.warning('This is often caused by hidden files on NSF mounted volumes, which is harmless.') 
+    if not osp.exists(dir):
+        os.makedirs(dir)
 
 def make_dir(dir):
     """
