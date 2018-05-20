@@ -383,6 +383,7 @@ def execute(args,job_args):
     #  -> GRIB2 download ->  UNGRIB ->
 
     proc_q = Queue()
+
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
     # grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q, ref_utc))
     grib_proc = {}
@@ -390,15 +391,25 @@ def execute(args,job_args):
         grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
     logging.info('starting GEOGRID and GRIB2/UNGRIB')
-    geogrid_proc.start()
+
+    if js.ungrib_only:
+        logging.info('ungrib_only set, skipping GEOGRID, will exit after UNGRIB')
+    else:
+        geogrid_proc.start()
+
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].start()
-
+ 
     # wait until all tasks are done
-    logging.info('waiting until both tasks are done')
+    logging.info('waiting until all tasks are done')
+
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
-    geogrid_proc.join()
+    
+    if js.ungrib_only:
+        return
+    else:
+        geogrid_proc.join()
 
     for grib_source in js.grib_source:
         if proc_q.get() != 'SUCCESS':
@@ -710,6 +721,7 @@ def process_arguments(args):
     args['orig_start_utc'] = start_utc
     args['start_utc'] = round_time_to_hour(start_utc)
     args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
+    args['ref_utc'] = timespec_to_utc(args.get('ref_utc',None))
 
     for k, v in args.iteritems():
         if type(v) == unicode:
