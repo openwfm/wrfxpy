@@ -236,31 +236,35 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
 
     # identify the start/end UTC time (all domains may not have the same simulation extent)
     # if more than one manifest file match, take the first one
-    manifest_file = glob.glob(osp.join(local_dir,manifest_filename))[0] 
-    logging.info('SHUTTLE loading manifest filename given %s loading %s' % (manifest_filename, manifest_file))
-    mf = json.load(open(manifest_file))
-    #print 'manifest:', json.dumps(mf, indent=4, separators=(',', ': '))
-    logging.debug('manifest %s' % mf)
-    k=[]
-    for i in mf.keys():
-        dom = mf[i]
-        k = k + dom.keys()
-    times = sorted(k)
-    logging.info('SHUTTLE detected local start/end UTC times as %s - %s' % (times[0], times[-1]))
-
-    # retrieve the catalog & update it
-    logging.info('SHUTTLE updating local catalog file on remote host')
-    local_cat = { sim_name : { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
-                      'description' : description if description is not None else sim_name,
-                      'from_utc' : times[0],
-                      'to_utc' : times[-1] }
-                }
-    local_cat_path = osp.join(local_dir,'catalog.json')
-    json.dump(local_cat, open(local_cat_path, 'w'), indent=1, separators=(',',':'))
-    remote_cat_path = remote_dir + '/catalog.json'
-    s.put(local_cat_path, remote_cat_path)
-    # s.simple_command('ls -l %s' % osp.join(s.root,remote_cat_path))
-    s.simple_command('wrfxweb/join_catalog.sh')
+    manifest_file = glob.glob(osp.join(local_dir,manifest_filename)) 
+    if len(manifest_file) == 0:
+        logging.warning('SHUTTLE did not find manifest file %s, catalog update postponed' % manifest_filename)
+    else:
+        manifest_file = manifest_file[0]
+        logging.info('SHUTTLE loading manifest filename given %s loading %s' % (manifest_filename, manifest_file))
+        mf = json.load(open(manifest_file))
+        #print 'manifest:', json.dumps(mf, indent=4, separators=(',', ': '))
+        logging.debug('manifest %s' % mf)
+        k=[]
+        for i in mf.keys():
+            dom = mf[i]
+            k = k + dom.keys()
+        times = sorted(k)
+        logging.info('SHUTTLE detected local start/end UTC times as %s - %s' % (times[0], times[-1]))
+    
+        # retrieve the catalog & update it
+        logging.info('SHUTTLE updating local catalog file on remote host')
+        local_cat = { sim_name : { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
+                          'description' : description if description is not None else sim_name,
+                          'from_utc' : times[0],
+                          'to_utc' : times[-1] }
+                    }
+        local_cat_path = osp.join(local_dir,'catalog.json')
+        json.dump(local_cat, open(local_cat_path, 'w'), indent=1, separators=(',',':'))
+        remote_cat_path = remote_dir + '/catalog.json'
+        s.put(local_cat_path, remote_cat_path)
+        # s.simple_command('ls -l %s' % osp.join(s.root,remote_cat_path))
+        s.simple_command('wrfxweb/join_catalog.sh')
 
     s.disconnect()
 
