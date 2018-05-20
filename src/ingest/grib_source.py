@@ -344,6 +344,15 @@ class NAM218(GribSource):
             for f in colmet_files:
                logging.info('UNGRIB will create  ' + colmet_prefix + '/' +f) 
 
+            # check what colmet files are available locally
+            colmet_missing = [f for f in colmet_files if not osp.isfile(osp.join(self.cache_dir, colmet_prefix, f))] 
+            logging.info('%d COLMET intermediate files not in cache' % len(colmet_missing) )
+            for f in  colmet_missing:
+                logging.info('Missing in cache    ' +f) 
+            if len(colmet_missing) == 0:
+                # no need to download
+                return [manifest, colmet_prefix, colmet_files, colmet_missing]
+
             # check what's available locally
             nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), manifest)
 
@@ -360,7 +369,7 @@ class NAM218(GribSource):
             map(lambda x: self.download_grib(url_base, x), nonlocals)
 
             # return manifest
-            return [manifest, colmet_prefix, colmet_files]
+            return [manifest, colmet_prefix, colmet_files, colmet_missing]
 
         raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
 
@@ -458,7 +467,7 @@ class NAM218(GribSource):
     id = "NAM218"
     max_forecast_hours = 84
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
-    period_hours = 3
+    period_hours = 1
     info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
     info_url = "http://www.nco.ncep.noaa.gov/pmb/products/nam/"
  

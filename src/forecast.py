@@ -25,7 +25,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir
+                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -180,25 +180,48 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         # manifest[0] = list of grib files
         # manifest[1] = optional directory path for colmet files
         # manifest[2] = optional list of colmet file names
+        
         manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc)
-        grib_source.symlink_gribs(manifest[0], grib_dir)
 
-        send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
-        logging.info("running UNGRIB for %s" % grib_source.id)
+        cache_colmet = len(manifest) > 1
+        have_all_colmet = False
+        if cache_colmet:  
+            grib_files, colmet_prefix, colmet_files, colmet_missing = manifest
+            have_all_colmet = len(colmet_missing) == 0
+            colmet_dir = osp.join(grib_source.cache_dir, colmet_prefix)
 
-        logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id)
+        logging.info('cache colmet %s, have all colmet %s' % (cache_colmet, have_all_colmet))
+ 
+        if not have_all_colmet:
+            # this is also if we do not cache
+            grib_source.symlink_gribs(manifest[0], grib_dir)
+    
+            send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
+            logging.info("running UNGRIB for %s" % grib_source.id)
+    
+            logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id)
+    
+            update_namelist(wps_nml, grib_source.namelist_wps_keys())
+            logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
+            f90nml.write(wps_nml, osp.join(grib_dir, 'namelist.wps'), force=True)
+            grib_source.clone_vtables(grib_dir)
+            symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
+            Ungrib(grib_dir).execute().check_output()
 
-        update_namelist(wps_nml, grib_source.namelist_wps_keys())
-        logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
-        f90nml.write(wps_nml, osp.join(grib_dir, 'namelist.wps'), force=True)
-        grib_source.clone_vtables(grib_dir)
-        symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
-        Ungrib(grib_dir).execute().check_output()
+            if cache_colmet:
+                # move output to cache directory
+                make_dir(colmet_dir)
+                for f in colmet_files:
+                    move(osp.join(grib_dir,f),osp.join(colmet_dir,f))
+                # now all colmet files should be in the cache
 
-        # move output
-        for f in glob.glob(osp.join(grib_dir,grib_source.prefix() + '*')):
-            logging.info('moving %s' % f)
-            shutil.move(f,wps_dir)
+        if cache_colmet:
+            for f in colmet_files:
+                symlink_unless_exists(osp.join(colmet_dir,f),osp.join(wps_dir,f))
+        else:
+            # move output
+            for f in glob.glob(osp.join(grib_dir,grib_source.prefix() + '*')):
+                move(f,osp.join(wps_dir,f))
             
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
