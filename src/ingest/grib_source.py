@@ -551,8 +551,6 @@ class NAM227(GribSource):
             delta_start = from_utc - cycle_start
             fc_start = delta_start.days * 24 + int(delta_start.seconds / 3600)
 
-            logging.info('err %s %s' % (fc_start - fc_start_orig, fc_hours - fc_hours_orig))
-
             # computes the relative paths of the desired files (the manifest)
             
             manifest = self.compute_manifest(cycle_start, fc_start, fc_hours)
