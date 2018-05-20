@@ -420,12 +420,16 @@ class NAM218(GribSource):
         :return colmet_list_utc: utc time of files after ungrib
         """
 
-        fc_seq = range(fc_start, 37) + range(max(fc_start, 39), 85, 3)
+        logging.info('period_hours = %d' % self.period_hours)
+        if self.period_hours not in [1, 3]:
+            raise GribError('period_hours = %d must be 1 or 3' % self.period_hours) 
+
+        fc_seq = range(fc_start, 37, self.period_hours) + range(max(fc_start, 39), 85, 3)
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
         fc_list.append(fc_seq[len(fc_list)])
 
-        colmet_list_utc = [cycle_start + timedelta(hours = x) for x in range(fc_start, fc_list[-1] +1)]
+        colmet_list_utc = [cycle_start + timedelta(hours = x) for x in range(fc_start, fc_list[-1] +1, self.period_hours)]
   
         return fc_list, colmet_list_utc
 
@@ -467,7 +471,8 @@ class NAM218(GribSource):
     id = "NAM218"
     max_forecast_hours = 84
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
-    period_hours = 1
+    #period_hours = 1
+    period_hours = 3
     info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
     info_url = "http://www.nco.ncep.noaa.gov/pmb/products/nam/"
  
