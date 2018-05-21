@@ -207,7 +207,14 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             f90nml.write(wps_nml, osp.join(grib_dir, 'namelist.wps'), force=True)
             grib_source.clone_vtables(grib_dir)
             symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
+
+            print(grib_dir + ':')
+            os.system('ls -l %s' % grib_dir)
+
             Ungrib(grib_dir).execute().check_output()
+
+            print(grib_dir + ':')
+            os.system('ls -l %s' % grib_dir)
 
             if cache_colmet:
                 # move output to cache directory
