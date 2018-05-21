@@ -249,7 +249,7 @@ class HRRR(GribSource):
         map(lambda x: self.download_grib(url_base, x), nonlocals)
 
         # return manifest
-        return manifest
+        return [manifest]
 
     def compute_manifest(self, cycle_start, fc_hours):
         """
@@ -571,7 +571,7 @@ class NAM227(GribSource):
             map(lambda x: self.download_grib(url_base, x), nonlocals)
 
             # return manifest
-            return manifest
+            return [manifest]
 
         raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
 
@@ -685,7 +685,7 @@ class CFSR(GribSource):
         map(lambda x: self.download_grib(url_base, x), nonlocals)
 
         # return manifest
-        return manifest
+        return [manifest]
 
     period_hours = 6
     id = "CFSR"
@@ -869,7 +869,7 @@ class NARR(GribSource):
         map(lambda x: self.download_grib(url_base, x), nonlocals)
 
         # return manifest
-        return manifest
+        return [manifest]
 
     def make_relative_url(self, utc_time):
         """
