@@ -221,7 +221,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         else:
             # move output
             for f in glob.glob(osp.join(grib_dir,grib_source.prefix() + '*')):
-                move(f,osp.join(wps_dir,f))
+                move(f,wps_dir)
             
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
