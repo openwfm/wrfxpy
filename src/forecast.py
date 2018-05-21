@@ -182,6 +182,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         # manifest[2] = optional list of colmet file names
         
         manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc)
+        logging.info('manifest: ' + str(manifest))
 
         cache_colmet = len(manifest) > 1
         have_all_colmet = False
@@ -202,7 +203,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id)
     
             update_namelist(wps_nml, grib_source.namelist_wps_keys())
-            logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
+            # logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
             f90nml.write(wps_nml, osp.join(grib_dir, 'namelist.wps'), force=True)
             grib_source.clone_vtables(grib_dir)
             symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
