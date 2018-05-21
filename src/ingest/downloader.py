@@ -61,7 +61,8 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
         logging.info('download_url sleeping %s seconds' % sleep_seconds)
         time.sleep(sleep_seconds)
         download_url(url, local_path, max_retries = max_retries-1)
-
+        return
+         
     content_size = int(r.headers['Content-Length'])
 
     # dump the correct file size to an info file next to the grib file
