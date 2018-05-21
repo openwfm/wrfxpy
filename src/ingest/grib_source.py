@@ -29,7 +29,6 @@ import sys
 import logging
 from utils import readhead
 
-
 class GribError(Exception):
     """
     Raised when a GribSource cannot retrieve GRIBs.
@@ -299,7 +298,7 @@ class NAM218(GribSource):
         return { 'domains' : { 'num_metgrid_levels': 40, 'num_metgrid_soil_levels' : 4 }}
 
     
-    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None):
+    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None, download_whole_cycle=False):
         """
         Attempts to retrieve the files to satisfy the simulation request from_utc - to_utc.
 
@@ -327,16 +326,21 @@ class NAM218(GribSource):
         cycle_shift = 0
         while cycle_shift < 3:
     
-            # select cycle (at least two hours behind real-time), out of the four NAM 218 cycles per day
-            # which occurr at [0, 6, 12, 18] hours
-            ref_utc_2 = ref_utc - timedelta(hours=3)
-            ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
-            cycle_start = min(from_utc, ref_utc_2)
-            cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
-            cycle_start -= timedelta(hours=6*cycle_shift)
- 
+            if download_whole_cycle:
+                cycle_start = from_utc
+                fc_start, fc_hours = 0, 84
+                logging.info('%s downloading whole cycle at %s hours %d to %d' % (self.id, from_utc, fc_start, fc_hours))
+            else:
+                # select cycle (at least two hours behind real-time), out of the four NAM 218 cycles per day
+                # which occurr at [0, 6, 12, 18] hours
+                ref_utc_2 = ref_utc - timedelta(hours=3)
+                ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
+                cycle_start = min(from_utc, ref_utc_2)
+                cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
+                cycle_start -= timedelta(hours=6*cycle_shift)
+                fc_start, fc_hours = self.forecast_times(cycle_start, from_utc, to_utc)
+
             # computes the relative paths of the desired files (the manifest)
-            fc_start, fc_hours = self.forecast_times(cycle_start, from_utc, to_utc)
             fc_list, colmet_list_utc = self.file_times(cycle_start,fc_start, fc_hours)
             grib_files, colmet_prefix, colmet_files = self.file_names(cycle_start, fc_list, colmet_list_utc)
 

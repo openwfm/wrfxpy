@@ -181,7 +181,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         # manifest[1] = optional directory path for colmet files
         # manifest[2] = optional list of colmet file names
         
-        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc)
+        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc, js.get('download_whole_cycle',False))
         logging.info('manifest: ' + str(manifest))
 
         cache_colmet = len(manifest) > 1
