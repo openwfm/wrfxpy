@@ -253,6 +253,8 @@ def round_time_to_hour(utc, up=False, period_hours=1):
     :param hours: round to multiple of this from the start of day
     :return: a new datetime rounded as specified
     """
+    if utc is None:
+        return None
     tm = utc + timedelta(hours=1, seconds=-1) if up else utc
     tm = tm.replace(minute=0, second=0)
     h = period_hours * ((tm.hour + period_hours - 1 if up else tm.hour) / period_hours)

@@ -72,6 +72,7 @@ class JobState(Dict):
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
+        self.cycle_start_utc = round_time_to_hour(self.get('cycle_start_utc',None), period_hours=self.grib_source[0].forecast_cycle_hours);
         logging.info('Simulation times rounded  %s to %s' % (str(self.start_utc), str(self.end_utc)))
         #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
         #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
@@ -176,33 +177,31 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     try:
         logging.info("retrieving GRIB files from %s" % grib_source.id)
 
-        # logging.info('step 3: retrieve required GRIB files from the grib_source, symlink into GRIBFILE.XYZ links into wps')
-        # manifest[0] = list of grib files
-        # manifest[1] = optional directory path for colmet files
-        # manifest[2] = optional list of colmet file names
-        
-        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc, js.get('download_whole_cycle',False))
-        logging.info('manifest: ' + str(manifest))
+        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc, js.cycle_start_utc, js.get('download_whole_cycle',False))
+        # logging.info('manifest: ' + str(manifest))
 
         cache_colmet = len(manifest) > 1
         have_all_colmet = False
         if cache_colmet:  
-            grib_files, colmet_prefix, colmet_files, colmet_missing = manifest
-            have_all_colmet = len(colmet_missing) == 0
-            colmet_dir = osp.join(grib_source.cache_dir, colmet_prefix)
+            have_all_colmet = len(manifest.colmet_missing) == 0
+            colmet_dir = osp.join(grib_source.cache_dir, manifest.colmet_prefix)
 
         logging.info('cache colmet %s, have all colmet %s' % (cache_colmet, have_all_colmet))
  
         if not have_all_colmet:
             # this is also if we do not cache
-            grib_source.symlink_gribs(manifest[0], grib_dir)
-    
+            grib_source.symlink_gribs(manifest.grib_files, grib_dir)
+
             send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
             logging.info("running UNGRIB for %s" % grib_source.id)
     
             logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id)
     
             update_namelist(wps_nml, grib_source.namelist_wps_keys())
+            if cache_colmet:
+                wps_nml['share']['start_date'] = [utc_to_esmf(manifest.colmet_files_utc[0])] * js.num_doms
+                wps_nml['share']['end_date'] = [utc_to_esmf(manifest.colmet_files_utc[-1])] * js.num_doms
+    
             # logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
             f90nml.write(wps_nml, osp.join(grib_dir, 'namelist.wps'), force=True)
             grib_source.clone_vtables(grib_dir)
@@ -219,12 +218,12 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             if cache_colmet:
                 # move output to cache directory
                 make_dir(colmet_dir)
-                for f in colmet_files:
+                for f in manifest.colmet_files:
                     move(osp.join(grib_dir,f),osp.join(colmet_dir,f))
                 # now all colmet files should be in the cache
 
         if cache_colmet:
-            for f in colmet_files:
+            for f in manifest.colmet_files:
                 symlink_unless_exists(osp.join(colmet_dir,f),osp.join(wps_dir,f))
         else:
             # move output
@@ -361,12 +360,10 @@ def execute(args,job_args):
     # Parse and setup the domain configuration
     js.domain_conf = WPSDomainConf(js.domains)
 
-    num_doms = len(js.domain_conf)
-    js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * num_doms
-    js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * num_doms
+    js.num_doms = len(js.domain_conf)
     js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds 
 
-    logging.info("number of domains defined is %d." % num_doms)
+    logging.info("number of domains defined is %d." % js.num_doms)
 
     # build directories in workspace
     js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
@@ -382,6 +379,8 @@ def execute(args,job_args):
     js.grib_source[0].clone_vtables(js.wps_dir)
 
     logging.info("step 2: process domain information and patch namelist for geogrid")
+    js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * js.num_doms
+    js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * js.num_doms
     js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
@@ -445,18 +444,18 @@ def execute(args,job_args):
     logging.info("step 6: clone wrf directory, symlink all met_em* files, make namelists")
     cln.clone_wrf(js.wrf_dir, [])
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
-    time_ctrl = update_time_control(js.start_utc, js.end_utc, num_doms)
+    time_ctrl = update_time_control(js.start_utc, js.end_utc, js.num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
     js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds 
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
-        update_namelist(js.wrf_nml, render_ignitions(js, num_doms))
+        update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
 
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
         logging.debug('namelist.fire_emissions given, turning on tracers')
         f90nml.write(js.ems_nml, osp.join(js.wrf_dir, 'namelist.fire_emissions'), force=True)
-        js.wrf_nml['dynamics']['tracer_opt'] = [2] * num_doms
+        js.wrf_nml['dynamics']['tracer_opt'] = [2] * js.num_doms
 
     f90nml.write(js.wrf_nml, osp.join(js.wrf_dir, 'namelist.input'), force=True)
 
@@ -730,6 +729,7 @@ def process_arguments(args):
     args['orig_start_utc'] = start_utc
     args['start_utc'] = round_time_to_hour(start_utc)
     args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
+    args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
 
     # defaults
     if args['ref_utc'] is not None:
