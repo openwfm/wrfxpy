@@ -112,7 +112,7 @@ class GribSource(object):
                 symlink_unless_exists(symlink_tgt, ensure_dir(symlink_path))
 
 
-    def retrieve_gribs(self, from_utc, to_utc, ref_utc = None):
+    def retrieve_gribs(self, from_utc, to_utc, ref_utc = None, cycle_start_utc = None, download_all_gribs = False):
         """
         Attempts to retrieve the GRIB files for the forecast time range.
         It should be first verified whether the GRIB2 files are available locally.
@@ -201,7 +201,7 @@ class HRRR(GribSource):
         """
         return {}
 
-    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None):
+    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None, cycle_start_utc = None, download_all_gribs = False):
         """
         Attempts to retrieve the files to satisfy the simulation request from_utc - to_utc.
 
@@ -522,7 +522,7 @@ class NAM227(GribSource):
         return { 'domains' : { 'num_metgrid_levels': 43, 'num_metgrid_soil_levels' : 4 }}
 
     
-    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None):
+    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None, cycle_start_utc = None, download_all_gribs = False):
         """
         Attempts to retrieve the files to satisfy the simulation request from_utc - to_utc.
 
@@ -647,7 +647,7 @@ class CFSR(GribSource):
                                'num_metgrid_soil_levels' : 4,
                                'p_top_requested' : 10000 }}
 
-    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None):
+    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None, cycle_start_utc = None, download_all_gribs = False):
         """
         Attempts to retrieve the files to satisfy the simulation request from_utc - to_utc.
 
@@ -833,7 +833,7 @@ class NARR(GribSource):
                                'num_metgrid_soil_levels' : 4,
                                'p_top_requested' : 10000 }}
 
-    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None):
+    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None, cycle_start_utc = None, download_all_gribs = False):
         """
         Attempts to retrieve the files to satisfy the simulation request from_utc - to_utc.
 
