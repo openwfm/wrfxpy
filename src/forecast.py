@@ -177,7 +177,8 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     try:
         logging.info("retrieving GRIB files from %s" % grib_source.id)
 
-        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc, js.cycle_start_utc, js.get('download_whole_cycle',False))
+        download_whole_cycle = js.get('download_whole_cycle',False)
+        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc, js.cycle_start_utc, download_whole_cycle)
         # logging.info('manifest: ' + str(manifest))
 
         cache_colmet = len(manifest) > 1

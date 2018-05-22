@@ -1,0 +1,101 @@
+{
+    "profile": {
+        "info": "A two-domain configuration with 60x60km fire domain at 1km resolution and a 25m fire grid.",
+        "identifier": "2d-1km-NAM218",
+        "template": "profiles/2d_1km_NAM218.json",
+        "title": "Two domains, 3km/1km resolution with 25m fire grid, NAM218 12km forcing"
+    },
+    "wall_time_hrs": 3,
+    "end_utc": "2018-05-22_16:00:00",
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "postproc": {
+        "1": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "SMOKE_INT"
+        ],
+        "shuttle": "incremental",
+        "2": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "FIRE_AREA",
+            "FGRNHFX",
+            "SMOKE_INT"
+        ],
+        "description": "new NAM test"
+    },
+    "ppn": 28,
+    "template": "/uufs/chpc.utah.edu/common/home/u6015690/Projects/wrfxctrl/profiles/2d_1km_NAM218.json",
+    "grid_code": "from-web-2018-05-22_07-33-23",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "domains": {
+        "1": {
+            "cell_size": [
+                3000,
+                3000
+            ],
+            "truelats": [
+                40.0699,
+                40.0699
+            ],
+            "stand_lon": -106.5981,
+            "center_latlon": [
+                40.0699,
+                -106.5981
+            ],
+            "history_interval": 30,
+            "geog_res": "30s",
+            "domain_size": [
+                61,
+                61
+            ],
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "time_step": 15
+        },
+        "2": {
+            "parent_time_step_ratio": 3,
+            "parent_start": [
+                20,
+                20
+            ],
+            "history_interval": 15,
+            "geog_res": ".3s",
+            "parent_id": 1,
+            "subgrid_ratio": [
+                30,
+                30
+            ],
+            "parent_end": [
+                41,
+                41
+            ],
+            "parent_cell_size_ratio": 3
+        }
+    },
+    "ignitions": {
+        "2": [
+            {
+                "latlon": [
+                    40.0699,
+                    -106.5981
+                ],
+                "time_utc": "2018-05-22_07:32:00",
+                "duration_s": 240,
+                "start_delay_s": 600
+            }
+        ]
+    },
+    "num_nodes": 6,
+    "grib_source": "NAM",
+    "start_utc": "2018-05-22_07:00:00",
+    "job_id": "wfc-from-web-2018-05-22_07-33-23-2018-05-22_07:00:00-09"
+}

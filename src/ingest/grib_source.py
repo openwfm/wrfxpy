@@ -319,8 +319,9 @@ class NAM218(GribSource):
 
         if ref_utc is None:
             ref_utc = datetime.now(pytz.UTC)
-        
-        logging.info('retrieve_gribs reference time is ' + str(ref_utc))
+ 
+        logging.info('retrieve_gribs %s from_utc=%s to_utc=%s ref_utc=%s cycle_start=%s download_whole_cycle=%s' %
+            (self.id, from_utc, to_utc, ref_utc, cycle_start, download_whole_cycle ))
 
         # it is possible that a cycle output is delayed and unavailable when we expect it (3 hours after cycle time)
         # in this case, the NAM grib source supports using previous cycles (up to 2)
@@ -337,11 +338,13 @@ class NAM218(GribSource):
                 cycle_start = min(from_utc, ref_utc_2)
                 cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
                 cycle_start -= timedelta(hours=6*cycle_shift)
+                logging.info('forecast cycle start selected as %s' % cycle_start)
 
             if download_whole_cycle:
                 logging.info('%s downloading whole cycle' % self.id)
                 fc_start, fc_hours = 0, 84
             else:
+                logging.info('%s downloading from %s to %s' % (self.id, from_utc, to_utc))
                 fc_start, fc_hours = self.forecast_times(cycle_start, from_utc, to_utc)
 
             logging.info('%s downloading cycle %s forecast hours %d to %d' % (self.id, cycle_start, fc_start, fc_hours))
