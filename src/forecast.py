@@ -29,7 +29,12 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
-from ingest.grib_source import HRRR, NAM218, NAM227, NARR, CFSR_P, CFSR_S
+from ingest.NAM218 import NAM218
+from ingest.HRRR import HRRR
+from ingest.NAM227 import NAM227
+from ingest.CFSR import CFSR_P, CFSR_S
+from ingest.NARR import NARR
+
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
 from ssh_shuttle import send_product_to_server, ssh_command
