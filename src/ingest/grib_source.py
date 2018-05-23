@@ -172,6 +172,16 @@ class GribSource(object):
     id = None
     period_hours = None
     forecast_cycle_hours = 6
+    
+    
+class GribForecast(GribSource):
+    """
+    Common part for all grib forecasts.
+    """
+
+    def __init__(self, arg):
+        super(GribForecast, self).__init__(arg)
+
 
 ## Utility functions
 

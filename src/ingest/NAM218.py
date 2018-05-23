@@ -1,4 +1,4 @@
-from ingest.grib_source import GribSource, GribError
+from ingest.grib_source import GribForecast, GribError
 from datetime import datetime, timedelta
 import pytz
 import logging
@@ -6,7 +6,7 @@ import os.path as osp
 from utils import Dict, timedelta_hours, readhead
 
 
-class NAM218(GribSource):
+class NAM218(GribForecast):
     """
     The NAM (North American Mesoscale) 218 grib source as provided by NOMADS.
     """
