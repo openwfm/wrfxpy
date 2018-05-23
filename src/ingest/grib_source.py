@@ -233,7 +233,8 @@ class GribForecast(GribSource):
 
             # computes the relative paths of the desired files (the manifest)
             fc_list, colmet_files_utc = self.file_times(cycle_start,fc_start, fc_hours)
-            grib_files, colmet_prefix, colmet_files = self.file_names(cycle_start, fc_list, colmet_files_utc)
+            grib_files = self.file_names(cycle_start, fc_list)
+            colmet_prefix, colmet_files = self.colmet_names(cycle_start, colmet_files_utc)
 
             for f in grib_files:
                logging.info('%s will retrive %s' % (self.id, f)) 
@@ -341,6 +342,28 @@ class GribForecast(GribSource):
         colmet_files_utc = [cycle_start + timedelta(hours = x) for x in range(fc_start, fc_list[-1] +1, self.period_hours)]
   
         return fc_list, colmet_files_utc
+
+
+
+    def colmet_names(self, cycle_start, colmet_files_utc):
+        """
+        Computes the relative paths of cached COLMET files.
+    
+        :param cycle_start: UTC time of cycle start
+        :param colmet_files_utc: 
+        """
+
+        # met path: nam.YYYYMMDDtcc/COLMET:YYYY-MM-DD_hh
+        # YYYYMMDD is the Year Month Day Hour of the cycle
+        # YYYY-MM-DD_hh the Year Month Day Hour of the forecast
+
+        colmet_prefix_tmpl = '%s.%04d%02d%02dt%02d'
+        colmet_files_tmpl ='COLMET:%04d-%02d-%02d_%02d'
+
+        colmet_prefix = colmet_prefix_tmpl % (self.id, cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour)
+        colmet_files = [colmet_files_tmpl % (x.year, x.month, x.day, x.hour) for x in colmet_files_utc]
+        
+        return colmet_prefix, colmet_files 
 
 
 ## Utility functions

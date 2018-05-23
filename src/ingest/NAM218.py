@@ -36,14 +36,12 @@ class NAM218(GribForecast):
 
     
 
-    def file_names(self, cycle_start, fc_list, colmet_files_utc):
+    def file_names(self, cycle_start, fc_list):
         """
-        Computes the relative paths of required GRIB and COLMET files.
-        Defintely dependent on the grib source.
+        Computes the relative paths of required GRIB files.
+        Dependent on the grib source.
 
-        NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
-        every 3 hours, starting with 39 and ending with 84.
-
+ 
         :param cycle_start: UTC time of cycle start
         :param fc_list: list of hours in the cycle when forecast will be donwloaded
         :param colmet_files_utc: 
@@ -57,20 +55,13 @@ class NAM218(GribForecast):
         path_tmpl = 'nam.%04d%02d%02d/nam.t%02dz.awphys%02d.tm00.grib2'
         grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, x) for x in fc_list]
 
-        # met path: nam.YYYYMMDDtcc/COLMET:YYYY-MM-DD_hh
-        # YYYYMMDD is the Year Month Day Hour of the cycle
-        # YYYY-MM-DD_hh the Year Month Day Hour of the forecast
-
-        colmet_prefix_tmpl = '%s.%04d%02d%02dt%02d'
-        colmet_files_tmpl ='COLMET:%04d-%02d-%02d_%02d'
-
-        colmet_prefix = colmet_prefix_tmpl % (self.id, cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour)
-        colmet_files = [colmet_files_tmpl % (x.year, x.month, x.day, x.hour) for x in colmet_files_utc]
         
-        return grib_files, colmet_prefix, colmet_files 
+        return grib_files
 
     # instance variables
     id = "NAM218"
+    #    NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
+    #    every 3 hours, starting with 39 and ending with 84.
     # grib_forecast_hours_periods = [{'hours':36,'period':3} , {'hours':84,'period':3}]
     grib_forecast_hours_periods = [{'hours':84,'period':3}]
     cycle_hours = 6
