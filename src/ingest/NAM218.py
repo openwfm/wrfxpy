@@ -35,66 +35,6 @@ class NAM218(GribForecast):
         return { 'domains' : { 'num_metgrid_levels': 40, 'num_metgrid_soil_levels' : 4 }}
 
     
-    def forecast_times(self,cycle_start, from_utc, to_utc):  
-        """
-        Compute the span of hours to be used in a forecast cycle
-        This should be common to all forecast data sources
-
-        :param cycle_start: UTC time of cycle start
-        :param from_utc: forecast start time
-        :param to_utc: forecast end time
-        :return fc_start, fc_hours: first and last hour in the forecast to be used
-        """
-
-        logging.info('%s cycle %s forecast from %s to %s UTC' % (self.id, str( cycle_start), str( from_utc), str( to_utc)))
-
-        # check if the request is even satisfiable
-        if (from_utc - cycle_start).total_seconds() < 0:
-            raise GribError('cycle start %s is larger than forecast start %s' % (str(cycle_start), str(from_utc)))
-        if (to_utc - from_utc).total_seconds() < 3600:
-            raise GribError('forecast from %s to %s is less than one hour' % (str(from_utc), str(to_utc)))
-
-        fc_hours = timedelta_hours(to_utc - cycle_start)
-
-        if fc_hours > self.max_forecast_hours :
-            logging.error('cycle start %s to forecast end %s is more than %s hours' % (str(cycle_start), str(to_utc),self.max_forecast_hours))
-            raise GribError('Unsatisfiable: %s forecast is only available for %s hours.' % (self.id, self.max_forecast_hours))
-
-        fc_start = timedelta_hours(from_utc - cycle_start, False) # rounding down
-
-        logging.info('%s using cycle %s hours %d to %d' % (self.id, str(cycle_start), fc_start, fc_hours))
-
-        return fc_start, fc_hours
-
-
-    def file_times(self, cycle_start, fc_start, fc_hours):
-        """
-        Computes the file times of required GRIB and COLMET files from start and end forecast hour
-        This may depend on the forecast source
-         
-        NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
-        every 3 hours, starting with 39 and ending with 84.
-
-        :param cycle_start: UTC time of cycle start
-        :param fc_start: index of first file we need
-        :param fc_hours: final forecast hour 
-        :return fc_list: hours from cycle_start for which is forecast required
-        :return colmet_files_utc: utc time of files after ungrib
-        """
-
-        logging.info('period_hours = %d' % self.period_hours)
-        if self.period_hours not in [1, 3]:
-            raise GribError('period_hours = %d must be 1 or 3' % self.period_hours) 
-
-        fc_seq = range(fc_start, 37, self.period_hours) + range(max(fc_start, 39), 85, 3)
-        # get all time points up to fc_hours plus one (we must cover entire timespan)
-        fc_list = [x for x in fc_seq if x < fc_hours]
-        fc_list.append(fc_seq[len(fc_list)])
-
-        colmet_files_utc = [cycle_start + timedelta(hours = x) for x in range(fc_start, fc_list[-1] +1, self.period_hours)]
-  
-        return fc_list, colmet_files_utc
-
 
     def file_names(self, cycle_start, fc_list, colmet_files_utc):
         """
@@ -131,10 +71,11 @@ class NAM218(GribForecast):
 
     # instance variables
     id = "NAM218"
-    max_forecast_hours = 84
+    grib_forecast_hours_periods = [{'hours':36,'period':3} , {'hours':84,'period':3}]
+    cycle_hours = 6
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     #period_hours = 1
-    period_hours = 3
+    period_hours = 3    # for METGRID and WRF
     info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
     info_url = "http://www.nco.ncep.noaa.gov/pmb/products/nam/"
  
