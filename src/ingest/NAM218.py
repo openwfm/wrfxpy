@@ -71,7 +71,8 @@ class NAM218(GribForecast):
 
     # instance variables
     id = "NAM218"
-    grib_forecast_hours_periods = [{'hours':36,'period':3} , {'hours':84,'period':3}]
+    # grib_forecast_hours_periods = [{'hours':36,'period':3} , {'hours':84,'period':3}]
+    grib_forecast_hours_periods = [{'hours':84,'period':3}]
     cycle_hours = 6
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     #period_hours = 1
