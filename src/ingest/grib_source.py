@@ -175,6 +175,19 @@ class GribSource(object):
     period_hours = None
     forecast_cycle_hours = 6
 
+## Utility functions
+
+def generate_grib_names():
+    """
+    Keeps generating gribfile names from GRIBFILE.AAA to ZZZ.
+    """
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    for c1 in alphabet:
+        for c2 in alphabet:
+            for c3 in alphabet:
+                yield "GRIBFILE." + c1 + c2 + c3
+
+
 class HRRR(GribSource):
     """
     The HRRR (High Resolution Rapid Refresh) grib source as provided by NOMADS.
@@ -901,17 +914,5 @@ class NARR(GribSource):
     remote_url = 'http://nomads.ncdc.noaa.gov/data/narr'
     period_hours = 3
     id = "NARR"
-
-## Utility functions
-
-def generate_grib_names():
-    """
-    Keeps generating gribfile names from GRIBFILE.AAA to ZZZ.
-    """
-    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    for c1 in alphabet:
-        for c2 in alphabet:
-            for c3 in alphabet:
-                yield "GRIBFILE." + c1 + c2 + c3
 
 
