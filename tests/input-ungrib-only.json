@@ -10,7 +10,7 @@
     "grib_source": "NAM",
     "start_utc": "2018-05-21_00:00:00",
     "end_utc": "2018-05-23_00:00:00",
-    "cycle_start_utc": "2018-05-21_09:00:00",
+    "cycle_start_utc": "2018-05-22_12:00:00",
     "download_whole_cycle": true,
     "ungrib_only": true, 
     "wps_namelist_path": "etc/nlists/default.wps",

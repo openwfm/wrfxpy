@@ -181,6 +181,98 @@ class GribForecast(GribSource):
 
     def __init__(self, arg):
         super(GribForecast, self).__init__(arg)
+        
+    def retrieve_gribs(self, from_utc, to_utc, ref_utc=None, cycle_start = None, download_whole_cycle=False):
+        """
+        Attempts to retrieve the files to satisfy the simulation request from_utc - to_utc.
+
+        Starts with the most recent cycle available an hour ago, then moves further
+        into the past.  For each candidate cycle, the filenames are computed, the local cache is
+        checked for files that are already there.  The presence of remaining files is checked
+        on server, if not available, we try an older cycle, if yes, download is attempted.
+        Once all files are downloaded, the manifest is returned, or if retrieval fails, an error is raised.
+
+        :param from_utc: forecast start time
+        :param to_utc: forecast end time
+        :return: a list of paths to local GRIB files and hopefully cached COLMET files
+        """
+        # ensure minutes and seconds are zero, simplifies arithmetic later
+        from_utc = from_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)
+        to_utc = to_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)
+
+        if ref_utc is None:
+            ref_utc = datetime.now(pytz.UTC)
+ 
+        logging.info('retrieve_gribs %s from_utc=%s to_utc=%s ref_utc=%s cycle_start=%s download_whole_cycle=%s' %
+            (self.id, from_utc, to_utc, ref_utc, cycle_start, download_whole_cycle ))
+
+        # it is possible that a cycle output is delayed and unavailable when we expect it (3 hours after cycle time)
+        # in this case, the NAM grib source supports using previous cycles (up to 2)
+        cycle_shift = 0
+        while cycle_shift < 3:
+    
+            if cycle_start is not None:
+                logging.info('forecast cycle start given as %s' % cycle_start)
+            else:
+                # select cycle (at least two hours behind real-time), out of the four NAM 218 cycles per day
+                # which occurr at [0, 6, 12, 18] hours
+                ref_utc_2 = ref_utc - timedelta(hours=3)
+                ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
+                cycle_start = min(from_utc, ref_utc_2)
+                cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
+                cycle_start -= timedelta(hours=6*cycle_shift)
+                logging.info('forecast cycle start selected as %s' % cycle_start)
+
+            if download_whole_cycle:
+                logging.info('%s downloading whole cycle' % self.id)
+                fc_start, fc_hours = 0, 84
+            else:
+                logging.info('%s downloading from %s to %s' % (self.id, from_utc, to_utc))
+                fc_start, fc_hours = self.forecast_times(cycle_start, from_utc, to_utc)
+
+            logging.info('%s downloading cycle %s forecast hours %d to %d' % (self.id, cycle_start, fc_start, fc_hours))
+
+            # computes the relative paths of the desired files (the manifest)
+            fc_list, colmet_files_utc = self.file_times(cycle_start,fc_start, fc_hours)
+            grib_files, colmet_prefix, colmet_files = self.file_names(cycle_start, fc_list, colmet_files_utc)
+
+            for f in grib_files:
+               logging.info('NAM218 will retrive ' + f) 
+            for f in colmet_files:
+               logging.info('UNGRIB will create  ' + colmet_prefix + '/' +f) 
+
+            # check what colmet files are available locally
+            colmet_missing = [f for f in colmet_files if not osp.isfile(osp.join(self.cache_dir, colmet_prefix, f))] 
+            logging.info('%d COLMET intermediate files not in cache' % len(colmet_missing) )
+            for f in  colmet_missing:
+                logging.info('Missing in cache    ' +f) 
+            if len(colmet_missing) > 0:
+
+                # check what's available locally
+                nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), grib_files)
+    
+                # check if GRIBs we don't are available remotely
+                url_base = self.remote_url
+                logging.info('Retrieving NAM218 GRIBs from %s' % url_base)
+                unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
+                if len(unavailables) > 0:
+                    logging.warning('NAM218: failed retrieving cycle data for cycle %s, unavailables %s' % (cycle_start, repr(unavailables)))
+                    cycle_shift += 1
+                    continue
+    
+                # download all gribs we need
+                map(lambda x: self.download_grib(url_base, x), nonlocals)
+
+            # return manifest
+
+            return Dict({'grib_files': grib_files, 
+                'colmet_files_utc': colmet_files_utc, 
+                'colmet_prefix': colmet_prefix, 
+                'colmet_files': colmet_files, 
+                'colmet_missing': colmet_missing})
+
+        raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
+
 
 
 ## Utility functions
