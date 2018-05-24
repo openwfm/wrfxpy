@@ -31,11 +31,11 @@ class GribForecast(GribSource):
         :param from_utc: forecast start time
         :param to_utc: forecast end time
         :return: dictionary with
-        		'grib_files': list of grib files available, 
-                'colmet_files_utc': list of datetimes for the colmet files, 
-                'colmet_prefix': string as colmet file prefix, 
-                'colmet_files': list of all colmet files, 
-                'colmet_missing': list of colmet files that need to be created
+       	    'grib_files': list of grib files available, 
+            'colmet_files_utc': list of datetimes for the colmet files, 
+            'colmet_prefix': string as colmet file prefix, 
+            'colmet_files': list of all colmet files, 
+     s      'colmet_missing': list of colmet files that need to be created
         """
         # ensure minutes and seconds are zero, simplifies arithmetic later
         from_utc = from_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)
@@ -80,14 +80,8 @@ class GribForecast(GribSource):
 
             for f in grib_files:
                logging.info('%s will retrive %s' % (self.id, f)) 
-            for f in colmet_files:
-               logging.info('%s will create %s' % (self.id, osp.join(colmet_prefix,f))) 
 
-            # check what colmet files are available locally
-            colmet_missing = [f for f in colmet_files if not osp.isfile(osp.join(self.cache_dir, colmet_prefix, f))] 
-            logging.info('%d COLMET intermediate files not in cache' % len(colmet_missing) )
-            for f in  colmet_missing:
-                logging.info('Missing in cache    ' +f) 
+            colmet_missing = self.colmet_missing(colmet_prefix,colmet_files)
             if len(colmet_missing) > 0:
 
                 # check what's available locally

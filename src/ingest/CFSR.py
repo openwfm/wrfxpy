@@ -1,4 +1,5 @@
-from ingest.grib_source import GribReanalysis, GribError
+from ingest.grib_source import GribError
+from grib_reanalysis import GribReanalysis
 from datetime import datetime, timedelta
 import pytz
 import logging
@@ -15,8 +16,8 @@ class CFSR(GribReanalysis):
     Methods return value if common, otherwise None and must be specified in contained classes
     """
 
-    def __init__(self, ingest_dir):
-        super(CFSR, self).__init__(ingest_dir)
+    def __init__(self, js):
+        super(CFSR, self).__init__(js)
 
     def vtables(self):
         return None
@@ -40,8 +41,8 @@ class CFSR(GribReanalysis):
     info_text = "The CFSRv2 (Climate Forecast System Reanalysis v2)"
     cycle_hours = 6
     info_url = "https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/climate-forecast-system-version2-cfsv2"
-    available_from_utc = datetime.now(pytz.UTC)
-    available_to_utc = datetime(2011,4,1,tzinfo=pytz.UTC)
+    available_to_utc = datetime.now(pytz.UTC)
+    available_from_utc = datetime(2011,4,1,tzinfo=pytz.UTC)
 
 
 class CFSR_P(CFSR):
@@ -52,8 +53,8 @@ class CFSR_P(CFSR):
     It's a reanalysis product and the conditions are encoded every 6 hours [0, 6, 12, 18] every day.
     """
 
-    def __init__(self, ingest_dir):
-        super(CFSR_P, self).__init__(ingest_dir)
+    def __init__(self, js):
+        super(CFSR_P, self).__init__(js)
 
     def vtables(self):
         """
@@ -85,10 +86,11 @@ class CFSR_P(CFSR):
         
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
         return path_tmpl % (year, year, mon, year, mon, day, hour)
+
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_pgbh'
     id = "CFSR_P"
-    self_prefix = 'COLMET_P'
+    prefix = 'COLMET_P'
 
 class CFSR_S(CFSR):
     """
@@ -98,9 +100,8 @@ class CFSR_S(CFSR):
     It's a reanalysis product and the conditions are encoded every 6 hours [0, 6, 12, 18] every day.
     """
 
-    def __init__(self, ingest_dir):
-        super(CFSR_S, self).__init__(ingest_dir)
-
+    def __init__(self, js):
+        super(CFSR_S, self).__init__(js)
 
     def namelist_wps_keys(self):
         """
@@ -135,6 +136,6 @@ class CFSR_S(CFSR):
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_flxf'
     id = "CFSR_S"
-    self_prefix = 'COLMET_S'
+    prefix = 'COLMET_S'
 
 	

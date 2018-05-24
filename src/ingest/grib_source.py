@@ -56,7 +56,12 @@ class GribSource(object):
         self.interval_seconds = 3600 * self.period_hours
 
 
-    def colmet_files(colmet_files_utc)       
+    def colmet_files(self, colmet_files_utc):
+        """
+        Compute the names of list of colment files from their datetime_utc.
+        :param colmet_files_utc: list of datetime uct times
+        :return: file names
+        """
         return ['%s:%04d-%02d-%02d_%02d' % (self.prefix, x.year, x.month, x.day, x.hour) for x in colmet_files_utc]
 
     def namelist_wps_keys(self):
@@ -163,6 +168,25 @@ class GribSource(object):
         for rel_path, grib_name in zip(manifest, generate_grib_names()):
             logging.info('Linking %s -> %s' % ( osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, grib_name)) )
             symlink_unless_exists(osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, grib_name))
+
+    def colmet_missing(self,colmet_prefix,colmet_files):
+        """
+        Make list of files missing in the cache
+        :param colmet prefix: the cache subdirectory the files should be in
+        :param colmet_files: List of all files needed
+        :return: list of all files not in cache
+        """
+
+        logging.info('%s: %d COLMET intermediate files needed' % (self.id,len(colmet_files)) )
+        for f in  colmet_files:
+            logging.info('Will need file   ' +f)
+        # check what colmet files are available locally
+        colmet_missing = [f for f in colmet_files if not osp.isfile(osp.join(self.cache_dir, colmet_prefix, f))]
+        logging.info('%s: %d COLMET intermediate files not in cache' % (self.id,len(colmet_missing)) )
+        for f in  colmet_missing:
+            logging.info('Missing in cache ' +f)
+        return colmet_missing
+
 
     # instance variables  
     prefix = 'COLMET'
