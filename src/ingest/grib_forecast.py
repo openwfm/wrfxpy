@@ -200,9 +200,7 @@ class GribForecast(GribSource):
         # YYYY-MM-DD_hh the Year Month Day Hour of the forecast
 
         colmet_prefix_tmpl = '%s.%04d%02d%02dt%02d'
-        colmet_files_tmpl ='COLMET:%04d-%02d-%02d_%02d'
-
         colmet_prefix = colmet_prefix_tmpl % (self.id, cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour)
-        colmet_files = [colmet_files_tmpl % (x.year, x.month, x.day, x.hour) for x in colmet_files_utc]
+        colmet_files = self.colmet_files(colmet_files_utc)
         
         return colmet_prefix, colmet_files 

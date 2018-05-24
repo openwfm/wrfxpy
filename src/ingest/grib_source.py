@@ -55,12 +55,9 @@ class GribSource(object):
 
         self.interval_seconds = 3600 * self.period_hours
 
-    def prefix(self):
-        """
-        Return the prefix of ungribbed files 
-        return: string  
-        """
-        return "COLMET"
+
+    def colmet_files(colmet_files_utc)       
+        return ['%s:%04d-%02d-%02d_%02d' % (self.prefix, x.year, x.month, x.day, x.hour) for x in colmet_files_utc]
 
     def namelist_wps_keys(self):
         """
@@ -168,7 +165,7 @@ class GribSource(object):
             symlink_unless_exists(osp.join(self.ingest_dir, rel_path), osp.join(wps_dir, grib_name))
 
     # instance variables  
-    # id = "not specified"
+    prefix = 'COLMET'
     id = None
     period_hours = None    
     
