@@ -1,4 +1,5 @@
-from ingest.grib_source import GribForecast, GribError
+from ingest.grib_source import GribError
+from ingest.grib_forecast import GribForecast
 from datetime import datetime, timedelta
 import pytz
 import logging
