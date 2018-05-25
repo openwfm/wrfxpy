@@ -56,8 +56,9 @@ class NAM227(GribForecast):
     #    NAM227 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
     #    every 3 hours, starting with 39 and ending with 60.
     # grib_forecast_hours_periods = [{'hours':36,'period':1},{'hours':60,'period':3}]
-    grib_forecast_hours_periods = [{'hours':60,'period':3}]
+    # grib_forecast_hours_periods = [{'hours':60,'period':3}]
+    grib_forecast_hours_periods = [{'hours':60,'period':1}]
+    period_hours = 3    # for METGRID and WRF
     cycle_hours = 6
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
-    period_hours = 3    # for METGRID and WRF
  

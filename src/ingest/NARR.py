@@ -57,7 +57,6 @@ class NARR(GribReanalysis):
     info = "North American Regional Reanalysis (NARR)"
     remote_url = 'https://nomads.ncdc.noaa.gov/data/narr'
     period_hours = 3
-    cycle_hours = 3
     id = "NARR"
     available_from_utc = datetime(1979,1,1,tzinfo=pytz.UTC)
     available_to_utc = datetime(2014,10,2,tzinfo=pytz.UTC)

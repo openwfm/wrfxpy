@@ -1,0 +1,127 @@
+{
+    "profile": {
+        "info": "A three-domain configuration with 66x66km fire domain at 555m resolution and a 28m fire grid.",
+        "identifier": "3d-555m_NAM227",
+        "template": "profiles/3d_555m_NAM227.json",
+        "title": "Three domains, 5km/1.6km/0.55km cell size, 28m fire grid., NAM218 5km forcing"
+    },
+    "job_id": "testing-CFSR-ungrib-only",
+    "wall_time_hrs": 3,
+    "grib_source": "CFSR",
+    "start_utc": "2015-05-19_22:00:00",
+    "end_utc": "2015-05-20_22:00:00",
+    "ungrib_only": true,
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "postproc": {
+        "1": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "SMOKE_INT"
+        ],
+        "shuttle": "incremental",
+        "3": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "FIRE_AREA",
+            "FGRNHFX",
+            "SMOKE_INT"
+        ],
+        "2": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "SMOKE_INT"
+        ],
+        "description": "new3"
+    },
+    "ppn": 28,
+    "grid_code": "from-web-2018-05-05_19-48-08",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "template": "/uufs/chpc.utah.edu/common/home/u6015690/Projects/wrfxctrl/profiles/3d_555m_NAM227.json",
+    "domains": {
+        "1": {
+            "cell_size": [
+                5000,
+                5000
+            ],
+            "truelats": [
+                40.0699,
+                40.0699
+            ],
+            "stand_lon": -108.2909,
+            "center_latlon": [
+                40.0699,
+                -108.2909
+            ],
+            "history_interval": 120,
+            "geog_res": "30s",
+            "domain_size": [
+                101,
+                101
+            ],
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "time_step": 25
+        },
+        "3": {
+            "parent_time_step_ratio": 3,
+            "parent_start": [
+                41,
+                41
+            ],
+            "history_interval": 15,
+            "geog_res": ".3s",
+            "parent_id": 2,
+            "subgrid_ratio": [
+                20,
+                20
+            ],
+            "parent_end": [
+                81,
+                81
+            ],
+            "parent_cell_size_ratio": 3
+        },
+        "2": {
+            "parent_time_step_ratio": 3,
+            "parent_start": [
+                31,
+                31
+            ],
+            "history_interval": 60,
+            "geog_res": ".3s",
+            "parent_id": 1,
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "parent_end": [
+                71,
+                71
+            ],
+            "parent_cell_size_ratio": 3
+        }
+    },
+    "ignitions": {
+        "3": [
+            {
+                "time_utc": "2018-05-05_19:47:00",
+                "latlon": [
+                    40.0699,
+                    -108.2909
+                ],
+                "duration_s": 240
+            }
+        ]
+    },
+    "num_nodes": 6 
+}

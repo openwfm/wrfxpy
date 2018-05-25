@@ -39,7 +39,6 @@ class CFSR(GribReanalysis):
     period_hours = 6
     id = "CFSR"
     info_text = "The CFSRv2 (Climate Forecast System Reanalysis v2)"
-    cycle_hours = 6
     info_url = "https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/climate-forecast-system-version2-cfsv2"
     available_to_utc = datetime.now(pytz.UTC)
     available_from_utc = datetime(2011,4,1,tzinfo=pytz.UTC)

@@ -36,10 +36,10 @@ class GribReanalysis(GribSource):
         from_utc = from_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
         to_utc = to_utc.replace(minute=0, second=0, tzinfo=pytz.UTC)
 
-        # round start_utc down and end_utc up
-        start_utc = from_utc.replace(hour = from_utc.hour - from_utc.hour % self.cycle_hours)
-        end_utc = to_utc + timedelta(hours=self.cycle_hours)-timedelta(seconds=1)
-        end_utc = end_utc.replace(hour=end_utc.hour - end_utc.hour % self.cycle_hours)
+        # round start_utc down and end_utc up to period - reanalysis has no forecast cycles
+        start_utc = from_utc.replace(hour = from_utc.hour - from_utc.hour % self.period_hours)
+        end_utc = to_utc + timedelta(hours=self.period_hours)-timedelta(seconds=1)
+        end_utc = end_utc.replace(hour=end_utc.hour - end_utc.hour % self.period_hours)
 
         if (start_utc < self.available_from_utc) | (end_utc > self.available_to_utc):
             logging.error('%s is available from %s to %s only' % (self.id, self.available_from_utc, sef.available_to_utc))
@@ -86,6 +86,7 @@ class GribReanalysis(GribSource):
     info = None
     remote_url = None
     period_hours = None
+    cycle_hours = None
     info_url = None
     available_from_utc = None
     available_to_utc = None
