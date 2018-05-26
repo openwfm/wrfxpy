@@ -1,4 +1,4 @@
-# Copyright (C) 2013-2016 Martin Vejmelka, UC Denver
+# Copyright (C) 2013-2016 Martin Vejmelka, CU Denver
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -18,7 +18,10 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from __future__ import print_function
+
 import requests
+import urllib2
+
 import os.path as osp
 import os
 import logging
@@ -36,11 +39,17 @@ class DownloadError(Exception):
     """
     pass
 
+def get_dList(url):
+    dList = urllib2.urlopen(url).read().splitlines()
+    listing = []
+    for l in dList:
+        listing.append(l.split()[-1])
+    return listing
 
 def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def):
     """
     Download a remote URL to the location local_path with retries.
-    
+
     On download, the file size is first obtained and stored.  When the download completes,
     the file size is compared to the stored file.  This prevents broken downloads from
     contaminating the processing chain.
@@ -53,8 +62,10 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     logging.info('download_url %s as %s' % (url,local_path))
     logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
 
+    use_urllib2 = url[:6] == 'ftp://'
+    
     try:    
-        r = requests.get(url, stream=True)
+        r = urllib2.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
     except Exception as e:
         # logging.error(str(e))
         logging.info('not found, download_url trying again, retries available %d' % max_retries)
@@ -77,21 +88,25 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     chunk_size = 1024*1024
     with open(ensure_dir(local_path), 'wb') as f:
         start_time = time.time()
-        for chunk in r.iter_content(chunk_size):
-            s =  s + len(chunk)
-            f.write(chunk)
-            print(' %s out of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
+        if use_urllib2:
+            while True:
+                chunk = r.read(chunk_size)
+                s =  s + len(chunk)
+                if not chunk:
+                    break
+                f.write(chunk)
+                print(' %s of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
+        else:
+            for chunk in r.iter_content(chunk_size):
+                s =  s + len(chunk)
+                f.write(chunk)
+                print(' %s  of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
     print('')
 
-    # does the server accept byte range queries? e.g. the NOMADs server does
-    accepts_ranges = 'bytes' in r.headers.get('Accept-Ranges', '')
-    logging.info('accepts_ranges = %s setting to False' % accepts_ranges)
-    accepts_ranges = False
-    
     file_size = osp.getsize(local_path)
 
     # content size may have changed during download
-    r = requests.get(url, stream=True)
+    r = urllib2.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
     content_size = int(r.headers['Content-Length'])
 
     logging.info('local file size %d downloaded %d remote content size %d' % (file_size, s, content_size))
@@ -99,23 +114,12 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     if int(file_size) != int(content_size) or int(s) != int(file_size):
         logging.warning('wrong file size, download_url trying again, retries available %d' % max_retries)
         if max_retries > 0:
-            if accepts_ranges:
-                logging.info('range queries are supported, try to download only the missing portion of the file')
-                headers = { 'Range' : 'bytes=%d-%d' % (file_size, content_size) }
-                r = requests.get(url, headers=headers, stream=True)
-                with open(local_path, 'ab') as f:
-                    for chunk in r.iter_content(1024 * 1024):
-                        f.write(chunk)
-                retries_available -= 1
-                file_size = osp.getsize(local_path)
-            else:
-                # call the entire function recursively, this will attempt to redownload the entire file
-                # and overwrite previously downloaded data
-                logging.info('download_url sleeping %s seconds' % sleep_seconds)
-                time.sleep(sleep_seconds)
-                download_url(url, local_path, max_retries = max_retries-1)
+            # call the entire function recursively, this will attempt to redownload the entire file
+            # and overwrite previously downloaded data
+            logging.info('download_url sleeping %s seconds' % sleep_seconds)
+            time.sleep(sleep_seconds)
+            download_url(url, local_path, max_retries = max_retries-1)
         else:
             os.remove(local_path)
             os.remove(info_path)
             raise DownloadError('failed to download file %s' % url)
-

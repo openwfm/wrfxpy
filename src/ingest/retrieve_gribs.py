@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (C) 2013-2016 Martin Vejmelka, UC Denver
+# Copyright (C) 2013-2016 Martin Vejmelka, CU Denver
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
