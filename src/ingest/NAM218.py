@@ -31,7 +31,7 @@ class NAM218(GribForecast):
         """
         Returns the namelist keys that must be modified in namelist.input with NAM.
 
-        NAM 218 requires that ''num_metgrid_soil_levels'' is set to 8.
+        NAM 218 requires that ''num_metgrid_soil_levels'' is set to 4.
         """
         return { 'domains' : { 'num_metgrid_levels': 40, 'num_metgrid_soil_levels' : 4 }}
 
@@ -67,7 +67,6 @@ class NAM218(GribForecast):
     grib_forecast_hours_periods = [{'hours':84,'period':3}]
     cycle_hours = 6
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
-    #period_hours = 1
     period_hours = 3    # for METGRID and WRF
     info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
     info_url = "http://www.nco.ncep.noaa.gov/pmb/products/nam/"

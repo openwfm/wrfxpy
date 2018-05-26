@@ -60,3 +60,9 @@ class NARR(GribReanalysis):
     id = "NARR"
     available_from_utc = datetime(1979,1,1,tzinfo=pytz.UTC)
     available_to_utc = datetime(2014,10,2,tzinfo=pytz.UTC)
+
+    # see also
+    # https://rda.ucar.edu/datasets/ds608.0/
+    # https://rda.ucar.edu/datasets/ds608.0/index.html#!docs
+    # http://www2.mmm.ucar.edu/wrf/OnLineTutorial/DATA/NARR/index.html
+    # http://lundquistgroup.blogspot.com/2014/04/using-input-datasets-in-real-wrf-runs.html

@@ -29,9 +29,9 @@ class HRRR(GribForecast):
         """
         Returns the namelist keys that must be modified in namelist.input with HRRR.
 
-        HRRR requires that ''num_metgrid_soil_levels'' is set to 8.
+        HRRR requires that ''num_metgrid_soil_levels'' is set to 9.
         """
-        return {}
+        return { 'domains' : { 'num_metgrid_levels': 41, 'num_metgrid_soil_levels' : 9 }}
 
     def file_names(self, cycle_start, fc_list):
         """
@@ -48,12 +48,16 @@ class HRRR(GribForecast):
         return grib_files
 
     # instance variables
-    # remote_url = 'http://www.ftp.ncep.noaa.gov/data/nccf/nonoperational/com/hrrr/prod'
     id = "HRRR"
     remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/'
-    period_hours = 1
     grib_forecast_hours_periods = [{'hours':15,'period':1}]
     cycle_hours = 1
+    period_hours = 1
     hours_behind_real_time = 1     # choose forecast cycle at least one hour behind
+    info_url="https://rapidrefresh.noaa.gov/hrrr"
+    info="The High-Resolution Rapid Refresh (HRRR)"
     
+    # General info: https://rapidrefresh.noaa.gov/internal/pdfs/RAPX_HRRRX_NWS-13sep2016-pub.pdf
+    # File Content: http://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfprsf00.grib2.shtml
 
+ 

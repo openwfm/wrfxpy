@@ -10,7 +10,7 @@
     "grib_source": "HRRR",
     "start_utc": "2018-05-23_00:00:00",
     "end_utc": "2018-05-23_00:00:00",
-    "cycle_start_utc": "2018-05-23_21:00:00",
+    "cycle_start_utc": "2018-05-25_21:00:00",
     "download_whole_cycle": true,
     "ungrib_only": true, 
     "wps_namelist_path": "etc/nlists/default.wps",

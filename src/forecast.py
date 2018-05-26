@@ -699,7 +699,7 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
-    if args['grib_source'] not in ['HRRR', 'NAM','NAM227', 'NARR','CFSR']:
+    if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR']:
         raise ValueError('Invalid grib source, must be one of HRRR, NAM, NAM227, NARR, CFSR')
 
     # if precomputed key is present, check files linked in

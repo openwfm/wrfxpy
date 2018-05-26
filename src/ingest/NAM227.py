@@ -28,7 +28,7 @@ class NAM227(GribForecast):
         """
         Returns the namelist keys that must be modified in namelist.input with NAM.
 
-        NAM 227 requires that ''num_metgrid_soil_levels'' is set to 8.
+        NAM 227 requires that ''num_metgrid_soil_levels'' is set to 4.
         """
         return { 'domains' : { 'num_metgrid_levels': 43, 'num_metgrid_soil_levels' : 4 }}
 
