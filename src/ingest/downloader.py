@@ -67,11 +67,12 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     try:    
         r = urllib2.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
     except Exception as e:
-        # logging.error(str(e))
-        logging.info('not found, download_url trying again, retries available %d' % max_retries)
-        logging.info('download_url sleeping %s seconds' % sleep_seconds)
-        time.sleep(sleep_seconds)
-        download_url(url, local_path, max_retries = max_retries-1)
+        if max_retries > 0:
+            # logging.error(str(e))
+            logging.info('not found, download_url trying again, retries available %d' % max_retries)
+            logging.info('download_url sleeping %s seconds' % sleep_seconds)
+            time.sleep(sleep_seconds)
+            download_url(url, local_path, max_retries = max_retries-1)
         return
          
     content_size = int(r.headers['Content-Length'])
