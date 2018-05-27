@@ -95,12 +95,12 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
                 if not chunk:
                     break
                 f.write(chunk)
-                print(' %s of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
+                print('read %s of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
         else:
             for chunk in r.iter_content(chunk_size):
                 s =  s + len(chunk)
                 f.write(chunk)
-                print(' %s  of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
+                print('streamed %s  of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
     print('')
 
     file_size = osp.getsize(local_path)

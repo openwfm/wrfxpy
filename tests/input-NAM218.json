@@ -10,7 +10,7 @@
     "grib_source": "NAM",
     "start_utc": "2018-05-19_22:00:00",
     "end_utc": "2018-05-20_22:00:00",
-    "cycle_start_utc": "2018-05-19_18:00:00",
+    "cycle_start_utc": "2018-05-24_18:00:00",
     "download_whole_cycle": true,
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
