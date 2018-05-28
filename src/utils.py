@@ -476,3 +476,12 @@ def readhead(url):
         logging.error(e)
         ret = response_object(-1)
     return ret 
+
+def json2xml(d):
+    if isinstance(d,dict):
+        s = ''
+        for key in d:
+            s += '<%s>%s</%s>' % (key, json2xml(d[key]),key)
+        return s
+    else:
+        return str(d)
