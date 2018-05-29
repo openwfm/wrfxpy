@@ -5,13 +5,13 @@ import xmltodict
 import logging
 
 # global
-headers = {'Content-Type': 'application/xml'}
 
 class earthdata(object):
 
     def __init__(self):
         self.token = None
         self.base_url = 'https://cmr.earthdata.nasa.gov'
+        self.headers = {'Content-Type': 'application/xml', 'Client-Id': 'WRFXPY'}
 
     def login(self,username, password):
         # see https://wiki.earthdata.nasa.gov/display/CMR/CMR+Client+Partner+User+Guide#CMRClientPartnerUserGuide-CreatingaToken
@@ -48,8 +48,8 @@ class earthdata(object):
             try:
                 r = requests.delete(url, headers=headers)
                 if r.status_code == 204:
-                    logging.info('Successfully logged out of %s' % self.base_url)
                     self.token = None
+                    logging.info('Successfully logged out of %s' % self.base_url)
                     return
             except Exception as e:
                 logging.error(e)
