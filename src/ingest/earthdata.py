@@ -4,9 +4,11 @@ import json
 import xmltodict
 import logging
 
+#
+
 # global
 
-class earthdata(object):
+class Earthdata(object):
 
     def __init__(self):
         self.token = None
@@ -54,5 +56,32 @@ class earthdata(object):
             except Exception as e:
                 logging.error(e)
             logging.warning('Failed to log out of %s' % self.base_url)
-     
-    
+
+    # tentative stubs 
+
+class MODIS(Earthdata):
+    # special things for the MODIS instrument
+
+class TERRA(MODIS):
+    # anythnig special for the TERRA satellite
+
+class AQUA(MODIS): 
+    # anything special for the AQUA satellite
+
+class VIIRS(Earthdata):
+    # anything special for the VIIRS instrument
+
+class SUOMI_NPP(VIIRS):
+    # anything special for the SUOMI_NPP satellite
+
+def search(): 
+    # find all granules within a given box and time interval
+
+def download_granules():
+    # do thins
+
+def extract_maps():
+    # return list of rectangular arrays of pixel values with geolocation 
+    # for each pixel: active fires detection status, confidence level, fire radiative power, longitude, latitude
+
+
