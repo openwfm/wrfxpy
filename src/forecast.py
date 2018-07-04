@@ -484,7 +484,8 @@ def execute(args,job_args):
     if js.fmda is not None:
         logging.info('running fuel moisture data assimilation')
         for dom in js.fmda.domains:
-            assimilate_fm10_observations(osp.join(wrf_dir, 'wrfinput_d%02d' % dom), None, js.fmda.token)
+            logging.info('assimilate_fm10_observations for domain %s' % dom)
+            assimilate_fm10_observations(osp.join(js.wrf_dir, 'wrfinput_d%02d' % int(dom)), None, js.fmda.token)
 
     # step 8: execute wrf.exe on parallel backend
     logging.info('submitting WRF job')

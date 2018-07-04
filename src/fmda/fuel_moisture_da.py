@@ -220,6 +220,7 @@ def run_data_assimilation(wrf_model, fm10, wrf_model_prev = None):
 def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
   
   # load the wrfinput file
+  logging.info('assimilate_fm10_observations: loading %s' % path_wrf)
   wrfin = WRFModelData(path_wrf, ['T2', 'Q2', 'PSFC', 'HGT', 'FMC_GC', 'FMEP'])
   lat, lon = wrfin.get_lats(), wrfin.get_lons()
   tss = wrfin.get_gmt_times()
