@@ -127,9 +127,9 @@ class JobState(Dict):
         """
         if 'fuel_moisture_da' in args:
             fmda = args['fuel_moisture_da']
-            self.fmda = Dict({'token' : fmda['mesowest_token'], 'domains' : fmda['domains']})
+            return Dict({'token' : fmda['mesowest_token'], 'domains' : fmda['domains']})
         else:
-            self.fmda = None
+            return None
 
 
     def parse_emails(self, args):
@@ -479,7 +479,8 @@ def execute(args,job_args):
         Real(js.wrf_dir).execute().check_output()
     
 
-    # step 7b: if requested, do fuel moisture DA
+    logging.info('step 7b: if requested, do fuel moisture DA')
+    logging.info('fmda = %s' % js.fmda)
     if js.fmda is not None:
         logging.info('running fuel moisture data assimilation')
         for dom in js.fmda.domains:
