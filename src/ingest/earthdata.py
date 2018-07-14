@@ -1,8 +1,9 @@
 import requests
-from utils import json2xml, checkip
+from utils import json2xml, checkip, get_ip_address, load_sys_cfg
 import json
 import xmltodict
 import logging
+import sys
 
 #
 
@@ -21,12 +22,13 @@ class Earthdata(object):
             logging.warning('Already logged into %s' % self.base_url)
             return True
         url = self.base_url +'/legacy-services/rest/tokens'
-        self.ip = checkip()
+        # self.ip = checkip()
+        self.ip = get_ip_address()
         data ={'token': {'username': username, 
             'password': password, 
             'user_ip_address': self.ip, 'client_id': 'WRFXPY'}}
         try:
-            r = requests.post(url, data=json2xml(data), headers=headers)
+            r = requests.post(url, data=json2xml(data), headers=self.headers)
         except Exception as e:
             logging.error(e)
             return False
@@ -48,7 +50,7 @@ class Earthdata(object):
         else:
             url = self.base_url +'/legacy-services/rest/tokens/' + self.token
             try:
-                r = requests.delete(url, headers=headers)
+                r = requests.delete(url, headers=self.headers)
                 if r.status_code == 204:
                     self.token = None
                     logging.info('Successfully logged out of %s' % self.base_url)
@@ -57,31 +59,58 @@ class Earthdata(object):
                 logging.error(e)
             logging.warning('Failed to log out of %s' % self.base_url)
 
-    # tentative stubs 
+# tentative stubs 
 
 class MODIS(Earthdata):
     # special things for the MODIS instrument
+    pass
 
 class TERRA(MODIS):
-    # anythnig special for the TERRA satellite
+    # anything special for the TERRA satellite
+    pass
 
 class AQUA(MODIS): 
     # anything special for the AQUA satellite
+    pass
 
 class VIIRS(Earthdata):
     # anything special for the VIIRS instrument
+    pass
 
 class SUOMI_NPP(VIIRS):
     # anything special for the SUOMI_NPP satellite
+    pass
 
 def search(): 
     # find all granules within a given box and time interval
+    pass
 
 def download_granules():
     # do thins
+    pass
 
 def extract_maps():
     # return list of rectangular arrays of pixel values with geolocation 
     # for each pixel: active fires detection status, confidence level, fire radiative power, longitude, latitude
+    pass
+
+
+if __name__ == '__main__':
+
+    # configure the basic logger
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    # logging.basicConfig(level=logging.DEBUG)
+
+    # load configuration JSON
+    sys_cfg = load_sys_cfg()
+
+    if len(sys.argv) != 3: 
+         print 'Usage: ./earthdata.sh username password'
+         sys.exit(1)
+
+    e = Earthdata()
+    e.login(sys.argv[1],sys.argv[2])
+    e.logout()
+
 
 
