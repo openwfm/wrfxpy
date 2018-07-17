@@ -34,6 +34,7 @@ import inspect
 import shutil
 import psutil
 import requests
+import socket
 
 
 class Dict(dict):
@@ -485,3 +486,27 @@ def json2xml(d):
         return s
     else:
         return str(d)
+
+def checkip():
+    try:
+        r = requests.get('http://checkip.dyndns.org')
+    except Exception as e:
+        logging.error(e)
+        logging.error('Cannot get the public IP address, are you connected to the internet?')
+        return None
+    if r.status_code != requests.codes.ok:
+        logging.error('checkip: Bad request')
+        return None
+    s = 'Current IP Address: '
+    i = r.text.find(s) + len(s)
+    j = r.text.find('</body>')
+    ip = r.text[i:j]
+    logging.info('Your public IP address is %s' % ip)
+    return ip
+   #
+
+def get_ip_address():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    return s.getsockname()[0]
+    
