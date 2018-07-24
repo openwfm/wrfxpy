@@ -50,8 +50,7 @@ def check_overlap(wrf_path,ts_now):
 def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
     """
     Retrieve observation data from Mesowest and repackage them as a time-indexed
-    dictionary of lists of observations.
-
+    dictionary of lists of observations.  
     :param meso_token: the mesowest API access token
     :param tm_start: the start of the observation window
     :param tm_end: the end of the observation window
@@ -72,11 +71,16 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
 
     # retrieve data from Mesowest API (http://mesowest.org/api/)
     m = Meso(meso_token)
+    logging.info("Retrieving fuel moisture from %s to %s" % (meso_time(tm_start - timedelta(minutes=30)),
+                          meso_time(tm_end + timedelta(minutes=30))))
+    logging.info("bbox=' %g,%g,%g,%g'" % (min_lon, min_lat, max_lon, max_lat))
     meso_obss = m.timeseries(meso_time(tm_start - timedelta(minutes=30)),
                           meso_time(tm_end + timedelta(minutes=30)),
                           showemptystations = '0', bbox='%g,%g,%g,%g' % (min_lon, min_lat, max_lon, max_lat),
                           vars='fuel_moisture')
-
+    if meso_obss is None:
+        logging.info('retrieve_mesowest_observations: Meso.timeseries returned None')
+        return {}
 
     # repackage all the observations into a time-indexed structure which groups
     # observations at the same time together
