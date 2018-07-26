@@ -387,7 +387,9 @@ def render_ignitions(js, max_dom):
             start = int((start_time - js.start_utc).total_seconds())
             dur = ign['duration_s']
             lat, lon = ign['latlon']
-            vals = [ lat, lat, lon, lon, start, start+dur, 200, 1 ]
+            radius = ign.get('radius',200)
+            ros = ign.get('ros',1)
+            vals = [ lat, lat, lon, lon, start, start+dur, radius, ros]
             kv = dict(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals]))
             nml_fire.update(kv)
 
