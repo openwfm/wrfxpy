@@ -1,16 +1,16 @@
 {
     "profile": {
         "info": "A three-domain configuration with 66x66km fire domain at 555m resolution and a 28m fire grid.",
-        "identifier": "3d-555m_NAM218",
-        "template": "profiles/3d_555m_NAM218.json",
+        "identifier": "3d-555m_NAM227",
+        "template": "profiles/3d_555m_NAM227.json",
         "title": "Three domains, 5km/1.6km/0.55km cell size, 28m fire grid., NAM218 5km forcing"
     },
-    "job_id": "testing-ungrib-only",
+    "job_id": "testing-NAM227-ungrib-only",
     "wall_time_hrs": 3,
-    "grib_source": "NAM218",
-    "start_utc": "T-30",
-    "end_utc": "T+120",
-    "cycle_start_utc": "T-120",
+    "grib_source": "NAM227",
+    "start_utc": "T+00",
+    "end_utc": "T+99",
+    "cycle_start_utc": "T+30",
     "download_whole_cycle": true,
     "ungrib_only": true, 
     "wps_namelist_path": "etc/nlists/default.wps",
