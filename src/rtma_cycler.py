@@ -21,7 +21,7 @@ from fmda.fuel_moisture_da import execute_da_step, retrieve_mesowest_observation
 from fmda.fuel_moisture_model import FuelMoistureModel
 from ingest.grib_file import GribFile, GribMessage
 from ingest.rtma_source import RTMA
-from utils import Dict, ensure_dir, utc_to_esmf
+from utils import Dict, ensure_dir, utc_to_esmf, delete
 from vis.postprocessor import scalar_field_to_raster
 from ssh_shuttle import send_product_to_server
 
@@ -318,6 +318,24 @@ if __name__ == '__main__':
     # setup environment
     sys_cfg = Dict(json.load(open('etc/conf.json')))
     cfg = Dict(json.load(open('etc/rtma_cycler.json')))
+ 
+    if len(sys.argv) == 1:
+	print 'Usage: ./rtma_cycler.sh GACC'
+        print '       ./rtma_cycler.sh lat1 lon1 lat2 lon2'
+        print 'Example: ./rtma_cycler.sh 43 -126 48 -110'
+        exit(1) 
+
+    if len(sys.argv) == 5:
+        code = 'FIRE'
+        cfg.regions = {
+             "Fire domain" : {
+                  "code" : code,
+                  "bbox" : [42, -124.6, 49, -116.4]
+             }
+        }
+        os.remove(osp.join(cfg.workspace_path,code+'-geo.nc'))
+        delete(osp.join(cfg.workspace_path,code))
+
     meso_token = json.load(open('etc/tokens.json'))['mesowest']
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 

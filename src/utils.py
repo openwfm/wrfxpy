@@ -134,17 +134,20 @@ def ensure_dir(path):
         os.makedirs(path_dir)
     return path
 
-def make_clean_dir(dir):
-    """
-    Create a clean directory; delete first if it exists.
-    """
+def delete(dir):
     if osp.exists(dir):
-        logging.info('Deleting existing directory %s to make a clean one' % dir)
         try:
             shutil.rmtree(dir)
         except Exception as e:
             logging.warning(str(e))
-            logging.warning('This is often caused by hidden files on NSF mounted volumes, which is harmless.') 
+            #logging.warning('This is often caused by hidden files on NSF mounted volumes, which is harmless.') 
+
+def make_clean_dir(dir):
+    """
+    Create a clean directory; delete first if it exists.
+    """
+    logging.info('Deleting existing directory %s to make a clean one' % dir)
+    delete(dir)
     if not osp.exists(dir):
         os.makedirs(dir)
 
