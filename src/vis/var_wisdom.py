@@ -1,51 +1,10 @@
 import numpy as np
 import logging
 
-from vis.vis_utils import interpolate2height, index8height
+from vis.vis_utils import interpolate2height, index8height, height8p
 
 smoke_threshold_int = 50
 smoke_threshold = 10
-
-def p_height(d,t):
-      """
-      Compute pressure height of mesh centers
-      :param d: open NetCDF4 dataset
-      :param t: number of timestep
-      """
-      p = d.variables['P'][t,:,:,:]  
-      p_hyd = d.variables['P_HYD'][t,:,:,:]
-      return p + p_hyd
-
-def p_height8w(d,t):
-      """
-      Compute pressure height at mesh cell bottoms a.k.a. w-points 
-      :param d: open NetCDF4 dataset
-      :param t: number of timestep
-      """
-      ph = p_height(d,t)
-      ph8w = ph[0:ph.shape[0]-1,:,:]  
-      # average from 2nd layer up 
-      ph8w[1:,:,:] = 0.5*(ph[1:,:,:] + ph[0:ph.shape[0]-1,:,:])
-      return ph8w 
-
-def height8w(d,t):
-      """
-      Compute height at mesh bottom a.k.a. w-points 
-      :param d: open NetCDF4 dataset
-      :param t: number of timestep
-      """
-      ph = d.variables['PH'][t,:,:,:]  
-      phb = d.variables['PHB'][t,:,:,:]
-      return (phb + ph)/9.81 # geopotential height at W points
-
-def height(d,t):
-      """
-      Compute height of mesh centers
-      :param d: open NetCDF4 dataset
-      :param t: number of timestep
-      """
-      z8w = height8w(d,t)
-      return 0.5*(z8w[0:z8w.shape[0]-1,:,:]+z8w[1:,:,:])
 
 def plume_center(d,t):
       """
@@ -55,7 +14,7 @@ def plume_center(d,t):
       """
       tr = d.variables['tr17_1'][t,:,:,:]
       smoke_int = np.sum(tr, axis = 0)
-      z = height(d,t) 
+      z = height8p(d,t) 
       h = np.sum(z * tr, axis = 0)
       h[smoke_int <= smoke_threshold_int] = 0
       smoke_int[smoke_int <= smoke_threshold_int] = 1
@@ -78,7 +37,7 @@ def plume_height(d,t):
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
-      z =  height(d,t)
+      z =  height8p(d,t)
       tr = d.variables['tr17_1'][t,:,:,:]
       h = np.zeros(tr.shape[1:])
       for i in range(0, tr.shape[2]):

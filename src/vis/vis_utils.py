@@ -67,3 +67,44 @@ def index8height(height,level):
              tx[i,j]= (level - height[k-1,i,j])/(height[k,i,j] - height[k-1,i,j])
       return ix,tx 
 
+def p_height(d,t):
+      """
+      Compute pressure height of mesh centers
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      p = d.variables['P'][t,:,:,:]  
+      p_hyd = d.variables['P_HYD'][t,:,:,:]
+      return p + p_hyd
+
+def p_height8w(d,t):
+      """
+      Compute pressure height at mesh cell bottoms a.k.a. w-points 
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      ph = p_height(d,t)
+      ph8w = ph[0:ph.shape[0]-1,:,:]  
+      # average from 2nd layer up 
+      ph8w[1:,:,:] = 0.5*(ph[1:,:,:] + ph[0:ph.shape[0]-1,:,:])
+      return ph8w 
+
+def height8w(d,t):
+      """
+      Compute height at mesh bottom a.k.a. w-points 
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      ph = d.variables['PH'][t,:,:,:]  
+      phb = d.variables['PHB'][t,:,:,:]
+      return (phb + ph)/9.81 # geopotential height at W points
+
+def height8p(d,t):
+      """
+      Compute height of mesh centers (pressure points)
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      z8w = height8w(d,t)
+      return 0.5*(z8w[0:z8w.shape[0]-1,:,:]+z8w[1:,:,:])
+
