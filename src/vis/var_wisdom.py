@@ -26,6 +26,27 @@ def interpolate2height(var,height,level):
              r[i,j]=var[k-1,i,j]+(var[k,i,j]-var[k-1,i,j]) \
                      * (level - height[k-1,i,j])/(height[k,i,j] - height[k-1,i,j])
       return r
+
+
+def p_height(d,t):
+      """
+      Compute pressure height of mesh centers
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      p = d.variables['P'][t,:,:,:]  
+      p_hyd = d.variables['P_HYD'][t,:,:,:]
+      return (p + p_hyd)
+
+def p_height8w(d,t):
+      """
+      Compute pressure height at mesh bottom a.k.a. w-points 
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      ph = p_height(d,t)
+      return 0.5*(ph[0:ph.shape[0]-1,:,:]+ph[1:,:,:])
+
                 
 
 def height8w(d,t):
