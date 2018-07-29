@@ -1,7 +1,32 @@
 import numpy as np
+import logging
 
 smoke_threshold_int = 50
 smoke_threshold = 10
+
+def interpolate2height(var,height,level):
+      """
+      Interpolate 3d variable to a given height
+      :param var: the 3d array to be interpolated, 1st axis is vertical
+      :param height: the 3d array of heights of the nodes on which v is defined
+      :param level: the target height to interpolate to
+      :return: interpolated value, or
+      """
+      maxlayer = var.shape[0]-1
+      z = np.zeros([var.shape[1],var.shape[2]])
+      r = z
+      for i in range(0, var.shape[1]):
+          for j in range(0, var.shape[2]):
+             k = np.searchsorted(height[:,i,j],level)
+             if k==0 or k>maxlayer:
+                 logging.error("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s" \
+                    % (i,j,height[0,i,j],level,maxlayer,i,j,height[maxlayer,i,j]))
+                 return z
+             # interpolate in the interval height[k-1,i,j] to height[k,i,j]
+             r[i,j]=var[k-1,i,j]+(var[k,i,j]-var[k-1,i,j]) \
+                     * (level - height[k-1,i,j])/(height[k,i,j] - height[k-1,i,j])
+      return r
+                
 
 def height8w(d,t):
       """
