@@ -16,11 +16,13 @@ def interpolate2height_old(var,height,level):
           for j in range(0, var.shape[2]):
              k = np.searchsorted(height[:,i,j],level)
              if k==0 or k>maxlayer:
-                 logging.error("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s" \
-                    % (i,j,height[0,i,j],level,maxlayer,i,j,height[maxlayer,i,j]))
-                 return z
-             # interpolate in the interval height[k-1,i,j] to height[k,i,j]
-             r[i,j]=var[k-1,i,j]+(var[k,i,j]-var[k-1,i,j]) \
+                 r[i,j] = np.nan
+                 #logging.error("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s" \
+                 #   % (i,j,height[0,i,j],level,maxlayer,i,j,height[maxlayer,i,j]))
+                 #return z
+             else:
+                 # interpolate in the interval height[k-1,i,j] to height[k,i,j]
+                 r[i,j]=var[k-1,i,j]+(var[k,i,j]-var[k-1,i,j]) \
                      * (level - height[k-1,i,j])/(height[k,i,j] - height[k-1,i,j])
       return r
 
@@ -34,12 +36,17 @@ def interpolate2height(var,height,level):
       """
       ix, tx = index8height(height,level)
       r = np.zeros([var.shape[1],var.shape[2]])
+      maxlayer = var.shape[0]-1
       for i in range(0, var.shape[1]):
           for j in range(0, var.shape[2]):
              k = ix[i,j]
              t = tx[i,j]
-             #r[i,j]=var[k,i,j]+(var[k+1,i,j]-var[k,i,j])*tx[i,j] 
-             r[i,j] = var[k,i,j]*(1.0-t) + var[k+1,i,j]*t 
+             if k==0 or k>maxlayer:
+                 #r[i,j] = np.nan
+                 r[i,j] = 0
+             else:
+                 #r[i,j]=var[k,i,j]+(var[k+1,i,j]-var[k,i,j])*tx[i,j] 
+                 r[i,j] = var[k,i,j]*(1.0-t) + var[k+1,i,j]*t 
       return r
 
 def index8height(height,level):
@@ -89,6 +96,8 @@ def p_height8w(d,t):
       ph8w[1:,:,:] = 0.5*(ph[1:,:,:] + ph[0:ph.shape[0]-1,:,:])
       return ph8w 
 
+
+
 def height8w(d,t):
       """
       Compute height at mesh bottom a.k.a. w-points 
@@ -101,10 +110,22 @@ def height8w(d,t):
 
 def height8p(d,t):
       """
-      Compute height of mesh centers (pressure points)
+      Compute height of mesh centers (p-points)
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
       z8w = height8w(d,t)
       return 0.5*(z8w[0:z8w.shape[0]-1,:,:]+z8w[1:,:,:])
 
+def height8p_terrain(d,t):
+      """
+      Compute height of mesh centers (p-points) above terrain
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      z8w = height8w(d,t)
+      h =  0.5*(z8w[0:z8w.shape[0]-1,:,:]+z8w[1:,:,:])
+      for i in range(0, h.shape[2]):
+          for j in range(0, h.shape[1]):
+              h[:,i,j] -= z8w[0,i,j]
+      return h

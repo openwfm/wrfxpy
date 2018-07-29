@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 
-from vis.vis_utils import interpolate2height, index8height, height8p
+from vis.vis_utils import interpolate2height, index8height, height8p, height8p_terrain
 
 smoke_threshold_int = 50
 smoke_threshold = 10
@@ -18,17 +18,6 @@ def plume_center(d,t):
       h = np.sum(z * tr, axis = 0)
       h[smoke_int <= smoke_threshold_int] = 0
       smoke_int[smoke_int <= smoke_threshold_int] = 1
-      #c = np.zeros(tr.shape[1:])
-      #for i in range(0, tr.shape[2]):
-      #    for j in range(0, tr.shape[1]):
-      #        ss=0
-      #        zs=0
-      #        for k in range(tr.shape[0]-1, -1, -1):
-      #                  ss = ss + tr[k,j,i]
-      #                  zs = zs + tr[k,j,i]* z[k,j,i]
-      #        if ss >= smoke_threshold_int:
-      #            c[j,i] = zs/ss
-      # return c
       return h/smoke_int
 
 def plume_height(d,t):
@@ -48,7 +37,24 @@ def plume_height(d,t):
                         break
       return h
 
+def smoke_at_height_terrain(d,t,level):
+      return interpolate2height(d.variables['tr17_1'][t,:,:,:],height8p_terrain(d,t),level)
+      
+def smoke_at_height_terrain_ft(d,t,level_ft):
+      return smoke_at_height_terrain(d,t,convert_value('ft','m',level_ft))
+      
+
 _var_wisdom = {
+     'SMOKE1000FT' : {
+        'name' : 'Smoke concentration at 1000ft above terrain',
+        'native_unit' : 'g/kg',
+        'colorbar' : 'g/kg',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : [0,100],
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,1000),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
      'PLUME_HEIGHT' : {
         'name' : 'plume height',
         'native_unit' : 'm',
