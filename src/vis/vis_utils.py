@@ -74,23 +74,21 @@ def index8height(height,level):
              tx[i,j]= (level - height[k-1,i,j])/(height[k,i,j] - height[k-1,i,j])
       return ix,tx 
 
-def p_height(d,t):
+def pressure(d,t):
       """
       Compute pressure height of mesh centers
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
-      p = d.variables['P'][t,:,:,:]  
-      p_hyd = d.variables['P_HYD'][t,:,:,:]
-      return p + p_hyd
+      return d.variables['P'][t,:,:,:] + d.variables['PB'][t,:,:,:]
 
-def p_height8w(d,t):
+def pressure8w(d,t):
       """
       Compute pressure height at mesh cell bottoms a.k.a. w-points 
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
-      ph = p_height(d,t)
+      ph = pressure(d,t)
       ph8w = ph[0:ph.shape[0]-1,:,:]  
       # average from 2nd layer up 
       ph8w[1:,:,:] = 0.5*(ph[1:,:,:] + ph[0:ph.shape[0]-1,:,:])
