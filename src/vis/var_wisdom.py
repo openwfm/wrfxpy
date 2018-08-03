@@ -37,11 +37,17 @@ def plume_height(d,t):
                         break
       return h
 
+def interpolate2height_terrain(d,t,var,level):
+      return interpolate2height(var,height8p_terrain(d,t),level)
+
 def smoke_at_height_terrain(d,t,level):
-      return interpolate2height(d.variables['tr17_1'][t,:,:,:],height8p_terrain(d,t),level)
+      return interpolate2height_terrain(d,t,d.variables['tr17_1'][t,:,:,:],level)
       
 def smoke_at_height_terrain_ft(d,t,level_ft):
       return smoke_at_height_terrain(d,t,convert_value('ft','m',level_ft))
+      
+#def smoke_at_height_terrain(d,t,level):
+#      return interpolate2height(d.variables['tr17_1'][t,:,:,:],height8p_terrain(d,t),level)
       
 
 _var_wisdom = {
@@ -75,6 +81,22 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
+     'WINDSPD1000FT' : {
+        'name' : 'wind speed',
+        'native_unit' : 'm/s',
+        'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
+    'WINDVEC1000FT' : {
+        'name' : 'wind speed',
+        'components' : [ 'U10', 'V10' ],
+        'native_unit' : 'm/s',
+        'scale' : 'original',
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
      'PLUME_HEIGHT' : {
         'name' : 'plume height',
         'native_unit' : 'm',
