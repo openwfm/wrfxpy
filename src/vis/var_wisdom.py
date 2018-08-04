@@ -62,7 +62,7 @@ def v8p_ft(d,t,level_ft):
        return v8p_m(d,t,convert_value('ft','m',level_ft))
 
 def is_windvec(name):
-       return name in ['WINDVEC1000FT','WINDVEC']
+       return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC']
 
 _var_wisdom = {
      'SMOKE1000FT' : {
@@ -96,7 +96,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'WINDSPD1000FT' : {
-        'name' : 'wind speed',
+        'name' : 'wind speed at 1000ft',
         'native_unit' : 'm/s',
         'colorbar' : 'm/s',
         'colormap' : 'jet',
@@ -118,6 +118,54 @@ _var_wisdom = {
     'V1000FT' : {
         'name' : 'latitudinal wind component 1000ft',
         'retrieve_as' : lambda d, t: v8p_ft(d,t,1000),
+    },
+     'WINDSPD4000FT' : {
+        'name' : 'wind speed at 4000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
+    'WINDVEC4000FT' : {
+        'name' : 'wind speed at 4000ft',
+        'components' : [ 'U4000FT', 'V4000FT' ],
+        'native_unit' : 'm/s',
+        'scale' : 'original',
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'U4000FT' : {
+        'name' : 'longitudinal wind component 4000ft',
+        'retrieve_as' : lambda d, t: u8p_ft(d,t,4000),
+    },
+    'V4000FT' : {
+        'name' : 'latitudinal wind component 4000ft',
+        'retrieve_as' : lambda d, t: v8p_ft(d,t,4000),
+    },
+     'WINDSPD6000FT' : {
+        'name' : 'wind speed at 6000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
+    'WINDVEC6000FT' : {
+        'name' : 'wind speed at 6000ft',
+        'components' : [ 'U6000FT', 'V6000FT' ],
+        'native_unit' : 'm/s',
+        'scale' : 'original',
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'U6000FT' : {
+        'name' : 'longitudinal wind component 6000ft',
+        'retrieve_as' : lambda d, t: u8p_ft(d,t,6000),
+    },
+    'V6000FT' : {
+        'name' : 'latitudinal wind component 6000ft',
+        'retrieve_as' : lambda d, t: v8p_ft(d,t,6000),
     },
      'PLUME_HEIGHT' : {
         'name' : 'plume height',
