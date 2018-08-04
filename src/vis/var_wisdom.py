@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 
-from vis.vis_utils import interpolate2height, index8height, height8p, height8p_terrain
+from vis.vis_utils import interpolate2height, index8height, height8p, height8p_terrain, u8p, v8p
 
 smoke_threshold_int = 50
 smoke_threshold = 10
@@ -48,7 +48,21 @@ def smoke_at_height_terrain_ft(d,t,level_ft):
       
 #def smoke_at_height_terrain(d,t,level):
 #      return interpolate2height(d.variables['tr17_1'][t,:,:,:],height8p_terrain(d,t),level)
-      
+
+def u8p_m(d,t,level):
+       return interpolate2height(u8p(d,t),height8p_terrain(d,t),level)
+ 
+def v8p_m(d,t,level):
+       return interpolate2height(v8p(d,t),height8p_terrain(d,t),level)
+ 
+def u8p_ft(d,t,level_ft):
+       return u8p_m(d,t,convert_value('ft','m',level_ft))
+ 
+def v8p_ft(d,t,level_ft):
+       return v8p_m(d,t,convert_value('ft','m',level_ft))
+
+def is_windvec(name):
+       return name in ['WINDVEC1000FT','WINDVEC']
 
 _var_wisdom = {
      'SMOKE1000FT' : {
@@ -87,15 +101,23 @@ _var_wisdom = {
         'colorbar' : 'm/s',
         'colormap' : 'jet',
         'scale' : 'original',
-        'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
     'WINDVEC1000FT' : {
-        'name' : 'wind speed',
-        'components' : [ 'U10', 'V10' ],
+        'name' : 'wind speed at 1000ft',
+        'components' : [ 'U1000FT', 'V1000FT' ],
         'native_unit' : 'm/s',
         'scale' : 'original',
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'U1000FT' : {
+        'name' : 'longitudinal wind component 1000ft',
+        'retrieve_as' : lambda d, t: u8p_ft(d,t,1000),
+    },
+    'V1000FT' : {
+        'name' : 'latitudinal wind component 1000ft',
+        'retrieve_as' : lambda d, t: v8p_ft(d,t,1000),
     },
      'PLUME_HEIGHT' : {
         'name' : 'plume height',

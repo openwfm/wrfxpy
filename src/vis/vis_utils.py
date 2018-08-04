@@ -94,7 +94,32 @@ def pressure8w(d,t):
       ph8w[1:,:,:] = 0.5*(ph[1:,:,:] + ph[0:ph.shape[0]-1,:,:])
       return ph8w 
 
+def u8p(d,t):
+      """
+      Compute horizontal wind u at mesh cell centers a.k.a. p-points
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      u = d.variables['U'][t,:,:,:]
+      return 0.5*(u[:,:,0:u.shape[2]-1]+u[:,:,1:])
 
+def v8p(d,t):
+      """
+      Compute horizontal wind v at mesh cell centers a.k.a. p-points
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      v = d.variables['V'][t,:,:,:]
+      return 0.5*(v[:,0:v.shape[1]-1,:]+v[:,1:,:])
+
+def w8p(d,t):
+      """
+      Compute vertical wind w at mesh cell centers a.k.a. p-points
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      w = d.variables['W'][t,:,:,:]
+      return 0.5*(w[0:w.shape[0]-1,:,:]+w[1:,:,:])
 
 def height8w(d,t):
       """
