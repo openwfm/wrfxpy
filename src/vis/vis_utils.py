@@ -152,3 +152,22 @@ def height8p_terrain(d,t):
           for j in range(0, h.shape[1]):
               h[:,i,j] -= z8w[0,i,j]
       return h
+
+def wcloud(d,t):
+      """
+      Compute the cloud water mass intensity in mesh cells (kg/m^2)
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      :return: cloud water mass in mesh cells per surface area (kg/m^2)
+      """
+      P = d.variables['P'][t,:,:,:]   # dry air pressure (Pa )
+      T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
+      r_d = 287                       # specific gas constant (J/kg/K)
+      rho = P/(r_d * T)               # dry air density  (kg/m^3)
+      z8w = height8w(d,t)             # height of mesh bottom (m)
+      dz = z8w[1:,:,:]-z8w[0:z8w.shape[0]-1,:,:] # mesh cell heights (m)
+      qcloud = d.variables['QCLOUD'][t,:,:,:] # cloud water mixing ratio (kg water/kg dry air)
+      return rho * qcloud * dz        # cloud water mass intensity kg/m^2
+      
+ 
+
