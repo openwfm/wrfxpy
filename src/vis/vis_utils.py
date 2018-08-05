@@ -45,8 +45,32 @@ def interpolate2height(var,height,level):
                  #r[i,j] = np.nan
                  r[i,j] = 0
              else:
-                 #r[i,j]=var[k,i,j]+(var[k+1,i,j]-var[k,i,j])*tx[i,j] 
+                 #r[i,j]=var[k,i,j]+(var[::k+1,i,j]-var[k,i,j])*tx[i,j] 
                  r[i,j] = var[k,i,j]*(1.0-t) + var[k+1,i,j]*t 
+      return r
+
+def integrate2height(var,height,level):
+      """
+      Interpolate 3d variable to a given height
+      :param var: the 3d array to be interpolated, 1st axis is vertical
+      :param height: the 3d array of heights of the nodes on which v is defined
+      :param level: the target height to interpolate to
+      :return: interpolated value, or
+      """
+      ix, tx = index8height(height,level)
+      r = np.zeros([var.shape[1],var.shape[2]])
+      maxlayer = var.shape[0]-1
+      for i in range(0, var.shape[1]):
+          for j in range(0, var.shape[2]):
+             k = ix[i,j]
+             t = tx[i,j]
+             if k==0 or k>maxlayer:
+                 r[i,j] = var[k,i,j]*t 
+             elif k>maxlayer:
+                 r[i,j] = np.sum(var[:,i,j],axis=0)
+             else:
+                 #r[i,j]=var[k,i,j]+(var[k+1,i,j]-var[k,i,j])*tx[i,j] 
+                 r[i,j] = np.sum(var[0:k-1,i,j],axis=0)+var[k,i,j]*t 
       return r
 
 def index8height(height,level):
@@ -65,10 +89,17 @@ def index8height(height,level):
       for i in range(0, height.shape[1]):
           for j in range(0, height.shape[2]):
              k = np.searchsorted(height[:,i,j],level)
-             if k==0 or k>maxlayer:
-                 logging.error("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s" \
+             if k==0:
+                 ix[i,j]=0
+                 tx[i,j]=0
+                 logging.warning("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s" \
                     % (i,j,height[0,i,j],level,maxlayer,i,j,height[maxlayer,i,j]))
-                 return iz, tz
+             elif k>maxlayer:
+                 ix[i,j]=maxlayer
+                 tx[i,j]=0
+                 logging.warning("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s" \
+                    % (i,j,height[0,i,j],level,maxlayer,i,j,height[maxlayer,i,j]))
+                 # return iz, tz
              ix[i,j]=k-1    # integer part
              # interpolation in the interval height[k-1,i,j] to height[k,i,j]
              tx[i,j]= (level - height[k-1,i,j])/(height[k,i,j] - height[k-1,i,j])
@@ -76,7 +107,7 @@ def index8height(height,level):
 
 def pressure(d,t):
       """
-      Compute pressure height of mesh centers
+      Compute pressure at mesh centers
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
@@ -89,7 +120,7 @@ def pressure8w(d,t):
       :param t: number of timestep
       """
       ph = pressure(d,t)
-      ph8w = ph[0:ph.shape[0]-1,:,:]  
+      ph8w = ph 
       # average from 2nd layer up 
       ph8w[1:,:,:] = 0.5*(ph[1:,:,:] + ph[0:ph.shape[0]-1,:,:])
       return ph8w 
@@ -153,21 +184,36 @@ def height8p_terrain(d,t):
               h[:,i,j] -= z8w[0,i,j]
       return h
 
+def dz8w(d,t):
+      z8w = height8w(d,t)             # height of mesh bottom (m)
+      return z8w[1:,:,:]-z8w[0:z8w.shape[0]-1,:,:] # mesh cell heights (m)
+
 def wcloud(d,t):
       """
-      Compute the cloud water mass intensity in mesh cells (kg/m^2)
+      Compute the cloud water density (kg/m^3)
       :param d: open NetCDF4 dataset
       :param t: number of timestep
-      :return: cloud water mass in mesh cells per surface area (kg/m^2)
+      :return: cloud water density (kg/m^3)
       """
-      P = d.variables['P'][t,:,:,:]   # dry air pressure (Pa )
+      P = pressure(d,t)   # dry air pressure (Pa )
       T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
       r_d = 287                       # specific gas constant (J/kg/K)
       rho = P/(r_d * T)               # dry air density  (kg/m^3)
-      z8w = height8w(d,t)             # height of mesh bottom (m)
-      dz = z8w[1:,:,:]-z8w[0:z8w.shape[0]-1,:,:] # mesh cell heights (m)
       qcloud = d.variables['QCLOUD'][t,:,:,:] # cloud water mixing ratio (kg water/kg dry air)
-      return rho * qcloud * dz        # cloud water mass intensity kg/m^2
+      return rho * qcloud             # cloud water density kg/m^3
       
- 
+def cloud_to_level_hPa(d,t,level_hPa):
+      """
+      Integrate cloud water density from the ground to given pressure height
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      :param level_hPa: pressure height
+      :return: cloud water intensity to given pressure level (kg/m^2)
+      """
+      w =  wcloud(d,t)    # cloud water density kg/m^3
+      dz = dz8w(d,t)      # vertical mesh steps
+      p8w = pressure8w(d,t) # pressure at cell bottoms (Pa)
+      return integrate2height(w*dz,-p8w,-level_hPa*100)
+      
+      
 

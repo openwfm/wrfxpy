@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 
-from vis.vis_utils import interpolate2height, index8height, height8p, height8p_terrain, u8p, v8p
+from vis.vis_utils import interpolate2height, index8height, height8p, height8p_terrain, u8p, v8p, cloud_to_level_hPa
 
 smoke_threshold_int = 50
 smoke_threshold = 10
@@ -65,6 +65,36 @@ def is_windvec(name):
        return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC']
 
 _var_wisdom = {
+     'CLOUDTO700HPA' : {
+        'name' : 'Cloud up to 700hPa',
+        'native_unit' : 'kg/m^2',
+        'colorbar' : 'kg/m^2',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,700),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'CLOUD700TO400HPA' : {
+        'name' : 'Cloud 700hPa to 400hPa',
+        'native_unit' : 'kg/m^2',
+        'colorbar' : 'kg/m^2',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,700) - cloud_to_level_hPa(d,t,700),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'CLOUDABOVE400HPA' : {
+        'name' : 'Cloud above 400hPa',
+        'native_unit' : 'kg/m^2',
+        'colorbar' : 'kg/m^2',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,0) - cloud_to_level_hPa(d,t,400),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
      'SMOKE1000FT' : {
         'name' : 'Smoke concentration at 1000ft above terrain',
         'native_unit' : 'g/kg',
