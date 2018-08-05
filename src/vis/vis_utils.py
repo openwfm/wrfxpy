@@ -201,6 +201,17 @@ def wcloud(d,t):
       rho = P/(r_d * T)               # dry air density  (kg/m^3)
       qcloud = d.variables['QCLOUD'][t,:,:,:] # cloud water mixing ratio (kg water/kg dry air)
       return rho * qcloud             # cloud water density kg/m^3
+
+def hPa_to_m(p):
+      """
+      Compute pressure altitude
+      :param p: pressure (hPa)
+      :return: altitude (ft) 
+      """
+      # https://www.weather.gov/media/epz/wxcalc/pressureAltitude.pdf
+      return (0.3048*145366.45)*(1 - (p/1013.25)**0.190284)
+ 
+
       
 def cloud_to_level_hPa(d,t,level_hPa):
       """
@@ -213,7 +224,9 @@ def cloud_to_level_hPa(d,t,level_hPa):
       w =  wcloud(d,t)    # cloud water density kg/m^3
       dz = dz8w(d,t)      # vertical mesh steps
       p8w = pressure8w(d,t) # pressure at cell bottoms (Pa)
-      return integrate2height(w*dz,-p8w,-level_hPa*100)
+      h8w_m = hPa_to_m(p8w*0.01)
+      level_m = hPa_to_m(level_hPa)
+      return integrate2height(w*dz,h8w_m,level_m)
       
       
 
