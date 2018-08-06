@@ -230,7 +230,7 @@ _var_wisdom = {
       },
      'SMOKE_INT' : {
         'name' : 'vertically integrated smoke',
-        'native_unit' : '-',
+        'native_unit' : 'g/m^2',
         'colorbar' : None,
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_threshold_int],

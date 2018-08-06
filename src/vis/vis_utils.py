@@ -239,8 +239,8 @@ def smoke_to_height_terrain(d,t,level):
       dz = dz8w(d,t)      # vertical mesh steps
       h_terrain = height8w_terrain(d,t)  # height above the terrain
       htw = h_terrain[0:h_terrain.shape[0]-1,:,:] # get rid of extra end stagger points
-      smoke_int = integrate2height(smoke_d*dz,htw,level)
-      logging.info('integrated smoke to %sm max %s mg/m^2' % (level,np.max(smoke_int)))
+      smoke_int = 1e-3* integrate2height(smoke_d*dz,htw,level)
+      logging.info('integrated smoke to %sm max %s g/m^2' % (level,np.max(smoke_int)))
       return smoke_int
       
 
