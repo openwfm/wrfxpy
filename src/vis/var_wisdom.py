@@ -1,7 +1,8 @@
 import numpy as np
 import logging
 
-from vis.vis_utils import interpolate2height, index8height, height8p, height8p_terrain, u8p, v8p, cloud_to_level_hPa
+from vis.vis_utils import interpolate2height, index8height, height8p, height8p_terrain, \
+      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain
 
 smoke_threshold_int = 50
 smoke_threshold = 10
@@ -234,7 +235,7 @@ _var_wisdom = {
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_threshold_int],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: np.sum(d.variables['tr17_1'][t,:,:,:], axis=0),
+        'retrieve_as' : lambda d,t: smoke_to_height_terrain(d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
     'T2' : {

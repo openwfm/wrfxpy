@@ -82,27 +82,19 @@ def index8height(height,level):
       If level is <= smallest height or > largest g=height, return all zeros
       """
       maxlayer = height.shape[0]-1
-      iz = np.zeros([height.shape[1],height.shape[2]],dtype=np.int_)
-      tz = np.zeros([height.shape[1],height.shape[2]])
-      ix = np.copy(iz)
-      tx = np.copy(tz)
+      ix = np.zeros([height.shape[1],height.shape[2]],dtype=np.int_)
+      tx = np.zeros([height.shape[1],height.shape[2]])
       for i in range(0, height.shape[1]):
           for j in range(0, height.shape[2]):
              k = np.searchsorted(height[:,i,j],level)
-             if k==0:
-                 ix[i,j]=0
-                 tx[i,j]=0
-                 logging.warning("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s" \
-                    % (i,j,height[0,i,j],level,maxlayer,i,j,height[maxlayer,i,j]))
-             elif k>maxlayer:
-                 ix[i,j]=maxlayer
-                 tx[i,j]=0
-                 logging.warning("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s" \
-                    % (i,j,height[0,i,j],level,maxlayer,i,j,height[maxlayer,i,j]))
-                 # return iz, tz
-             ix[i,j]=k-1    # integer part
-             # interpolation in the interval height[k-1,i,j] to height[k,i,j]
-             tx[i,j]= (level - height[k-1,i,j])/(height[k,i,j] - height[k-1,i,j])
+             if k> 0 and k < height.shape[0]:
+                 ix[i,j]=k-1    # integer part
+                 # interpolation in the interval height[k-1,i,j] to height[k,i,j]
+                 tx[i,j]= (level - height[k-1,i,j])/(height[k,i,j] - height[k-1,i,j])
+             else:
+                 ix[i,j]=min(k,height.shape[0]-1) # zero, or max. leaving tx[i,j]=0
+                 #logging.warning("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s, got index k=%s" \
+                 #   % (i,j,height[0,i,j],level,maxlayer,i,j,height[maxlayer,i,j],k))
       return ix,tx 
 
 def pressure(d,t):
@@ -162,6 +154,19 @@ def height8w(d,t):
       phb = d.variables['PHB'][t,:,:,:]
       return (phb + ph)/9.81 # geopotential height at W points
 
+def height8w_terrain(d,t):
+      """
+      Compute height of mesh centers (p-points) above terrain
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      """
+      h = height8w(d,t)
+      terrain_height = h[0,:,:] 
+      for i in range(0, h.shape[2]):
+          for j in range(0, h.shape[1]):
+              h[:,i,j] -= terrain_height[i,j]
+      return h
+
 def height8p(d,t):
       """
       Compute height of mesh centers (p-points)
@@ -188,20 +193,6 @@ def dz8w(d,t):
       z8w = height8w(d,t)             # height of mesh bottom (m)
       return z8w[1:,:,:]-z8w[0:z8w.shape[0]-1,:,:] # mesh cell heights (m)
 
-def wcloud(d,t):
-      """
-      Compute the cloud water density (kg/m^3)
-      :param d: open NetCDF4 dataset
-      :param t: number of timestep
-      :return: cloud water density (kg/m^3)
-      """
-      P = pressure(d,t)   # dry air pressure (Pa )
-      T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
-      r_d = 287                       # specific gas constant (J/kg/K)
-      rho = P/(r_d * T)               # dry air density  (kg/m^3)
-      qcloud = d.variables['QCLOUD'][t,:,:,:] # cloud water mixing ratio (kg water/kg dry air)
-      return rho * qcloud             # cloud water density kg/m^3
-
 def hPa_to_m(p):
       """
       Compute pressure altitude
@@ -211,8 +202,6 @@ def hPa_to_m(p):
       # https://www.weather.gov/media/epz/wxcalc/pressureAltitude.pdf
       return (0.3048*145366.45)*(1 - (p/1013.25)**0.190284)
  
-
-      
 def cloud_to_level_hPa(d,t,level_hPa):
       """
       Integrate cloud water density from the ground to given pressure height
@@ -221,12 +210,35 @@ def cloud_to_level_hPa(d,t,level_hPa):
       :param level_hPa: pressure height
       :return: cloud water intensity to given pressure level (kg/m^2)
       """
-      w =  wcloud(d,t)    # cloud water density kg/m^3
+      P = pressure(d,t)   # dry air pressure (Pa )
+      T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
+      r_d = 287                       # specific gas constant (J/kg/K)
+      rho = P/(r_d * T)               # dry air density  (kg/m^3)
+      qcloud = d.variables['QCLOUD'][t,:,:,:] # cloud water mixing ratio (kg water/kg dry air)
+      cloud_d = rho * qcloud             # cloud water density kg/m^3
       dz = dz8w(d,t)      # vertical mesh steps
       p8w = pressure8w(d,t) # pressure at cell bottoms (Pa)
       h8w_m = hPa_to_m(p8w*0.01)
       level_m = hPa_to_m(level_hPa)
-      return integrate2height(w*dz,h8w_m,level_m)
+      return integrate2height(cloud_d*dz,h8w_m,level_m)
       
+def smoke_to_height_terrain(d,t,level):
+      """
+      Integrate smoke from the ground to given height above terrain
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      :param level: height above terrain (m)
+      :return: smoke integrated to given level (mg/m^2)
+      """
+      P = pressure(d,t)   # dry air pressure (Pa )
+      T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
+      r_d = 287                       # specific gas constant (J/kg/K)
+      rho = P/(r_d * T)               # dry air density  (kg/m^3)
+      qsmoke= d.variables['tr17_1'][t,:,:,:] # smoke mixing ratio (mg/kg dry air)
+      smoke_d = rho * qsmoke          # smoke density kg/m^3
+      dz = dz8w(d,t)      # vertical mesh steps
+      h_terrain = height8w_terrain(d,t)  # height above the terrain
+      htw = h_terrain[0:h_terrain.shape[0]-1,:,:] # get rid of extra end stagger points
+      return integrate2height(smoke_d*dz,htw,level)
       
 
