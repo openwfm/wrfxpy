@@ -1,26 +1,11 @@
 import numpy as np
+import logging
+
+from vis.vis_utils import interpolate2height, index8height, height8p, height8p_terrain, \
+      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain
 
 smoke_threshold_int = 50
 smoke_threshold = 10
-
-def height8w(d,t):
-      """
-      Compute height at mesh bottom a.k.a. w-points 
-      :param d: open NetCDF4 dataset
-      :param t: number of timestep
-      """
-      ph = d.variables['PH'][t,:,:,:]  
-      phb = d.variables['PHB'][t,:,:,:]
-      return (phb + ph)/9.81 # geopotential height at W points
-
-def height(d,t):
-      """
-      Compute height of mesh centers
-      :param d: open NetCDF4 dataset
-      :param t: number of timestep
-      """
-      z8w = height8w(d,t)
-      return 0.5*(z8w[0:z8w.shape[0]-1,:,:]+z8w[1:,:,:])
 
 def plume_center(d,t):
       """
@@ -30,21 +15,10 @@ def plume_center(d,t):
       """
       tr = d.variables['tr17_1'][t,:,:,:]
       smoke_int = np.sum(tr, axis = 0)
-      z = height(d,t) 
+      z = height8p(d,t) 
       h = np.sum(z * tr, axis = 0)
       h[smoke_int <= smoke_threshold_int] = 0
       smoke_int[smoke_int <= smoke_threshold_int] = 1
-      #c = np.zeros(tr.shape[1:])
-      #for i in range(0, tr.shape[2]):
-      #    for j in range(0, tr.shape[1]):
-      #        ss=0
-      #        zs=0
-      #        for k in range(tr.shape[0]-1, -1, -1):
-      #                  ss = ss + tr[k,j,i]
-      #                  zs = zs + tr[k,j,i]* z[k,j,i]
-      #        if ss >= smoke_threshold_int:
-      #            c[j,i] = zs/ss
-      # return c
       return h/smoke_int
 
 def plume_height(d,t):
@@ -53,7 +27,7 @@ def plume_height(d,t):
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
-      z =  height(d,t)
+      z =  height8p(d,t)
       tr = d.variables['tr17_1'][t,:,:,:]
       h = np.zeros(tr.shape[1:])
       for i in range(0, tr.shape[2]):
@@ -64,7 +38,166 @@ def plume_height(d,t):
                         break
       return h
 
+def interpolate2height_terrain(d,t,var,level):
+      return interpolate2height(var,height8p_terrain(d,t),level)
+
+def smoke_at_height_terrain(d,t,level):
+      return interpolate2height_terrain(d,t,d.variables['tr17_1'][t,:,:,:],level)
+      
+def smoke_at_height_terrain_ft(d,t,level_ft):
+      return smoke_at_height_terrain(d,t,convert_value('ft','m',level_ft))
+      
+#def smoke_at_height_terrain(d,t,level):
+#      return interpolate2height(d.variables['tr17_1'][t,:,:,:],height8p_terrain(d,t),level)
+
+def u8p_m(d,t,level):
+       return interpolate2height(u8p(d,t),height8p_terrain(d,t),level)
+ 
+def v8p_m(d,t,level):
+       return interpolate2height(v8p(d,t),height8p_terrain(d,t),level)
+ 
+def u8p_ft(d,t,level_ft):
+       return u8p_m(d,t,convert_value('ft','m',level_ft))
+ 
+def v8p_ft(d,t,level_ft):
+       return v8p_m(d,t,convert_value('ft','m',level_ft))
+
+def is_windvec(name):
+       return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC']
+
 _var_wisdom = {
+     'CLOUDTO700HPA' : {
+        'name' : 'Cloud up to 700hPa',
+        'native_unit' : 'kg/m^2',
+        'colorbar' : 'kg/m^2',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,700),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'CLOUD700TO400HPA' : {
+        'name' : 'Cloud 700hPa to 400hPa',
+        'native_unit' : 'kg/m^2',
+        'colorbar' : 'kg/m^2',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,700) - cloud_to_level_hPa(d,t,700),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'CLOUDABOVE400HPA' : {
+        'name' : 'Cloud above 400hPa',
+        'native_unit' : 'kg/m^2',
+        'colorbar' : 'kg/m^2',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,0) - cloud_to_level_hPa(d,t,400),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'SMOKE1000FT' : {
+        'name' : 'Smoke concentration at 1000ft above terrain',
+        'native_unit' : 'g/kg',
+        'colorbar' : 'g/kg',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : [0,100],
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,1000),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'SMOKE4000FT' : {
+        'name' : 'Smoke concentration at 4000ft above terrain',
+        'native_unit' : 'g/kg',
+        'colorbar' : 'g/kg',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : [0,100],
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,4000),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'SMOKE6000FT' : {
+        'name' : 'Smoke concentration at 4000ft above terrain',
+        'native_unit' : 'g/kg',
+        'colorbar' : 'g/kg',
+        'colormap' : 'jet',
+        'transparent_values' : [0,0],
+        'scale' : [0,100],
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,6000),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'WINDSPD1000FT' : {
+        'name' : 'wind speed at 1000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
+    'WINDVEC1000FT' : {
+        'name' : 'wind speed at 1000ft',
+        'components' : [ 'U1000FT', 'V1000FT' ],
+        'native_unit' : 'm/s',
+        'scale' : 'original',
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'U1000FT' : {
+        'name' : 'longitudinal wind component 1000ft',
+        'retrieve_as' : lambda d, t: u8p_ft(d,t,1000),
+    },
+    'V1000FT' : {
+        'name' : 'latitudinal wind component 1000ft',
+        'retrieve_as' : lambda d, t: v8p_ft(d,t,1000),
+    },
+     'WINDSPD4000FT' : {
+        'name' : 'wind speed at 4000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
+    'WINDVEC4000FT' : {
+        'name' : 'wind speed at 4000ft',
+        'components' : [ 'U4000FT', 'V4000FT' ],
+        'native_unit' : 'm/s',
+        'scale' : 'original',
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'U4000FT' : {
+        'name' : 'longitudinal wind component 4000ft',
+        'retrieve_as' : lambda d, t: u8p_ft(d,t,4000),
+    },
+    'V4000FT' : {
+        'name' : 'latitudinal wind component 4000ft',
+        'retrieve_as' : lambda d, t: v8p_ft(d,t,4000),
+    },
+     'WINDSPD6000FT' : {
+        'name' : 'wind speed at 6000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
+    'WINDVEC6000FT' : {
+        'name' : 'wind speed at 6000ft',
+        'components' : [ 'U6000FT', 'V6000FT' ],
+        'native_unit' : 'm/s',
+        'scale' : 'original',
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'U6000FT' : {
+        'name' : 'longitudinal wind component 6000ft',
+        'retrieve_as' : lambda d, t: u8p_ft(d,t,6000),
+    },
+    'V6000FT' : {
+        'name' : 'latitudinal wind component 6000ft',
+        'retrieve_as' : lambda d, t: v8p_ft(d,t,6000),
+    },
      'PLUME_HEIGHT' : {
         'name' : 'plume height',
         'native_unit' : 'm',
@@ -97,12 +230,12 @@ _var_wisdom = {
       },
      'SMOKE_INT' : {
         'name' : 'vertically integrated smoke',
-        'native_unit' : '-',
+        'native_unit' : 'g/m^2',
         'colorbar' : None,
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_threshold_int],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: np.sum(d.variables['tr17_1'][t,:,:,:], axis=0),
+        'retrieve_as' : lambda d,t: smoke_to_height_terrain(d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
     'T2' : {

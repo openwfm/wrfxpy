@@ -14,7 +14,7 @@ import traceback
 from utils import dump, traceargs
 
 from vis.rasterizer import make_colorbar, basemap_raster_mercator, basemap_barbs_mercator
-from vis.var_wisdom import convert_value, get_wisdom
+from vis.var_wisdom import convert_value, get_wisdom, is_windvec
 
 
 class PostprocError(Exception):
@@ -413,7 +413,7 @@ class Postprocessor(object):
             try:
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
                 kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
-                if var in ['WINDVEC']:
+                if is_windvec(var):
                     kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False)
                 else:
                     kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False)
@@ -454,7 +454,7 @@ class Postprocessor(object):
             try:
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
                 kmz_path = None
-                if var in ['WINDVEC']:
+                if is_windvec(var):
                     kmz_path,_,_ = self._vector2kmz(d, var, tndx, ts_esmf, outpath_base)
                 else:
                     kmz_path,_,_,_ = self._scalar2kmz(d, var, tndx, ts_esmf, outpath_base)
@@ -489,7 +489,7 @@ class Postprocessor(object):
         for var in vars:
             try:
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var) 
-                if var in ['WINDVEC']:
+                if is_windvec(var):
                     raster_path, coords = self._vector2png(d, var, tndx, outpath_base)
                     raster_name = osp.basename(raster_path)
                     self._update_manifest(dom_id, ts_esmf, var, { 'raster' : raster_name, 'coords' : coords})
@@ -526,7 +526,7 @@ class Postprocessor(object):
             for var in var_list:
                 try:
                     outpath_base = os.path.join(self.output_path, self.product_name + '-' + ts_esmf + '-' + var) 
-                    if var in ['WINDVEC']:
+                    if is_windvec(var):
                         kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, ts_esmf, outpath_base, cleanup=False)
                         raster_name = osp.basename(raster_path)
                         kmz_name = osp.basename(kmz_path)

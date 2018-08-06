@@ -134,17 +134,20 @@ def ensure_dir(path):
         os.makedirs(path_dir)
     return path
 
-def make_clean_dir(dir):
-    """
-    Create a clean directory; delete first if it exists.
-    """
+def delete(dir):
     if osp.exists(dir):
-        logging.info('Deleting existing directory %s to make a clean one' % dir)
         try:
             shutil.rmtree(dir)
         except Exception as e:
             logging.warning(str(e))
-            logging.warning('This is often caused by hidden files on NSF mounted volumes, which is harmless.') 
+            #logging.warning('This is often caused by hidden files on NSF mounted volumes, which is harmless.') 
+
+def make_clean_dir(dir):
+    """
+    Create a clean directory; delete first if it exists.
+    """
+    logging.info('Deleting existing directory %s to make a clean one' % dir)
+    delete(dir)
     if not osp.exists(dir):
         os.makedirs(dir)
 
@@ -387,7 +390,9 @@ def render_ignitions(js, max_dom):
             start = int((start_time - js.start_utc).total_seconds())
             dur = ign['duration_s']
             lat, lon = ign['latlon']
-            vals = [ lat, lat, lon, lon, start, start+dur, 200, 1 ]
+            radius = ign.get('radius',200)
+            ros = ign.get('ros',1)
+            vals = [ lat, lat, lon, lon, start, start+dur, radius, ros]
             kv = dict(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals]))
             nml_fire.update(kv)
 

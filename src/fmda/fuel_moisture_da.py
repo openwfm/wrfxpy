@@ -50,8 +50,7 @@ def check_overlap(wrf_path,ts_now):
 def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
     """
     Retrieve observation data from Mesowest and repackage them as a time-indexed
-    dictionary of lists of observations.
-
+    dictionary of lists of observations.  
     :param meso_token: the mesowest API access token
     :param tm_start: the start of the observation window
     :param tm_end: the end of the observation window
@@ -72,11 +71,16 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
 
     # retrieve data from Mesowest API (http://mesowest.org/api/)
     m = Meso(meso_token)
+    logging.info("Retrieving fuel moisture from %s to %s" % (meso_time(tm_start - timedelta(minutes=30)),
+                          meso_time(tm_end + timedelta(minutes=30))))
+    logging.info("bbox=' %g,%g,%g,%g'" % (min_lon, min_lat, max_lon, max_lat))
     meso_obss = m.timeseries(meso_time(tm_start - timedelta(minutes=30)),
                           meso_time(tm_end + timedelta(minutes=30)),
                           showemptystations = '0', bbox='%g,%g,%g,%g' % (min_lon, min_lat, max_lon, max_lat),
                           vars='fuel_moisture')
-
+    if meso_obss is None:
+        logging.info('retrieve_mesowest_observations: Meso.timeseries returned None')
+        return {}
 
     # repackage all the observations into a time-indexed structure which groups
     # observations at the same time together
@@ -220,6 +224,7 @@ def run_data_assimilation(wrf_model, fm10, wrf_model_prev = None):
 def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
   
   # load the wrfinput file
+  logging.info('assimilate_fm10_observations: loading %s' % path_wrf)
   wrfin = WRFModelData(path_wrf, ['T2', 'Q2', 'PSFC', 'HGT', 'FMC_GC', 'FMEP'])
   lat, lon = wrfin.get_lats(), wrfin.get_lons()
   tss = wrfin.get_gmt_times()

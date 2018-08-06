@@ -21,7 +21,7 @@ from fmda.fuel_moisture_da import execute_da_step, retrieve_mesowest_observation
 from fmda.fuel_moisture_model import FuelMoistureModel
 from ingest.grib_file import GribFile, GribMessage
 from ingest.rtma_source import RTMA
-from utils import Dict, ensure_dir, utc_to_esmf
+from utils import Dict, ensure_dir, utc_to_esmf, delete
 from vis.postprocessor import scalar_field_to_raster
 from ssh_shuttle import send_product_to_server
 
@@ -315,11 +315,41 @@ def is_cycle_computed(cycle, cfg, wksp_path):
     
 if __name__ == '__main__':
     
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
     # setup environment
     sys_cfg = Dict(json.load(open('etc/conf.json')))
     cfg = Dict(json.load(open('etc/rtma_cycler.json')))
+ 
+    if len(sys.argv) == 2:
+        pass
+    elif len(sys.argv) == 5:
+        code = 'FIRE'
+        cfg.regions = {
+             "Fire domain" : {
+                  "code" : code,
+                  "bbox" : sys.argv[1:5]
+             }
+        }
+        try:
+            os.remove(osp.join(cfg.workspace_path,code+'-geo.nc'))
+        except Exception as e:
+            logging.warning(e)
+        try:
+            delete(osp.join(cfg.workspace_path,code))
+        except Exception as e:
+            logging.warning(e)
+    else:
+	print 'Usage: to use domains configured in etc/rtma_cycler.json:'
+        print './rtma_cycler.sh anything'
+        print 'To use a custom domain named FIRE by giving a bounding box:'
+        print './rtma_cycler.sh lat1 lon1 lat2 lon2'
+        print 'Example: ./rtma_cycler.sh 42, -124.6, 49, -116.4'
+        exit(1) 
+
+    logging.info('regions: %s' % cfg.regions)
+
     meso_token = json.load(open('etc/tokens.json'))['mesowest']
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # current time
     now = datetime.now(pytz.UTC)
