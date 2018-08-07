@@ -234,13 +234,13 @@ def smoke_to_height_terrain(d,t,level):
       T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
       r_d = 287                       # specific gas constant (J/kg/K)
       rho = P/(r_d * T)               # dry air density  (kg/m^3)
-      qsmoke= d.variables['tr17_1'][t,:,:,:] # smoke mixing ratio (mg/kg dry air)
-      smoke_d = rho * qsmoke          # smoke density kg/m^3
+      qsmoke= d.variables['tr17_1'][t,:,:,:] # smoke mixing ratio (ug/kg dry air)
+      smoke_d = rho * qsmoke          # smoke density ug/m^3
       dz = dz8w(d,t)      # vertical mesh steps
       h_terrain = height8w_terrain(d,t)  # height above the terrain
       htw = h_terrain[0:h_terrain.shape[0]-1,:,:] # get rid of extra end stagger points
-      smoke_int = 1e-3* integrate2height(smoke_d*dz,htw,level)
-      logging.info('integrated smoke to %sm max %s g/m^2' % (level,np.max(smoke_int)))
+      smoke_int = integrate2height(smoke_d*dz,htw,level)
+      logging.info('integrated smoke to %sm max %s ug/m^2' % (level,np.max(smoke_int)))
       return smoke_int
       
 
