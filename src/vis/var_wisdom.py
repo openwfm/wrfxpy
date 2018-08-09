@@ -244,7 +244,7 @@ _var_wisdom = {
      'PM25_INT' : {
         'name' : 'vertically integrated PM2.5',
         'native_unit' : 'g/m^2',
-        'colorbar' : 'g/m^2',
+        'colorbar' : None,
         'colormap' : 'jet',
         'transparent_values' : [-np.inf, smoke_threshold_int],
         'scale' : 'original',
