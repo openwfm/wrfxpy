@@ -59,10 +59,13 @@ def integrate_ratio_to_level(d,t,ratio,height,level):
       :param level: the target height to interpolate to (m)
       :return: vertically integrated mass, (x/m^2)
       """
+      logging.info('mixing ratio min %s max %s X/m^2' % (np.min(ratio),np.max(ratio)))
       rho = density(d,t)      # air density (kg/m^3)
       dz = dz8w(d,t)      # vertical mesh steps (m)
       var = ratio * rho * dz
-      return sum_to_level(var,height,level)
+      ratio_int = sum_to_level(var,height,level)
+      logging.info('integrated to %s: min %s max %s X/m^2' % (level,np.min(ratio_int),np.max(ratio_int)))
+      return ratio_int
 
 def sum_to_level(var,height,level):
       """
@@ -242,7 +245,9 @@ def cloud_to_level_hPa(d,t,level_hPa):
       p8w = pressure8w(d,t) # pressure at cell bottoms (Pa)
       h8w_m = hPa_to_m(p8w*0.01)  # pressure height at cell bottoms (m)
       level_m = hPa_to_m(level_hPa) # desired pressure level (m)
-      return integrate_ratio_to_level(d,t,qcloud,h8w_m,level_m)
+      cloud_int = integrate_ratio_to_level(d,t,qcloud,h8w_m,level_m)
+      # logging.info('integrated cloud water to pressure height %sm min %s max %s kg/m^2' % (level_m,np.min(cloud_int),np.max(cloud_int)))
+      return cloud_int
       
 def smoke_to_height_terrain(d,t,level):
       """
@@ -252,14 +257,11 @@ def smoke_to_height_terrain(d,t,level):
       :param level: height above terrain (m)
       :return: smoke integrated to given level (mg/m^2)
       """
-      rho = density(d,t)  
-      qsmoke= d.variables['tr17_1'][t,:,:,:] # smoke mixing ratio (ug/kg dry air)
-      smoke_d = rho * qsmoke          # smoke density ug/m^3
-      dz = dz8w(d,t)      # vertical mesh steps
+      smoke= d.variables['tr17_1'][t,:,:,:] # smoke mixing ratio (g/kg dry air)
       h_terrain = height8w_terrain(d,t)  # height above the terrain
-      htw = h_terrain[0:h_terrain.shape[0]-1,:,:] # get rid of extra end stagger points
-      smoke_int = sum_to_level(smoke_d*dz,htw,level)
-      logging.info('integrated smoke to %sm max %s ug/m^2' % (level,np.max(smoke_int)))
+      htw = h_terrain[0:h_terrain.shape[0]-1,:,:] # get rid of extra end stagger points at the top
+      smoke_int = integrate_ratio_to_level(d,t,smoke,htw,level)
+      # logging.info('integrated smoke to %sm min %s max %s g/m^2' % (level,np.min(smoke_int),np.max(smoke_int)))
       return smoke_int
       
 
