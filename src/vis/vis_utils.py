@@ -49,10 +49,25 @@ def interpolate2height(var,height,level):
                  r[i,j] = var[k,i,j]*(1.0-t) + var[k+1,i,j]*t 
       return r
 
-def integrate2height(var,height,level):
+def integrate_ratio_to_level(d,t,ratio,height,level):
+      """
+      Interpolate 3d mixing ratio to a given level
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      :param ratio: the 3d array to be integrated, 1st asix is is vertical (X/kg)
+      :param height: the 3d array of heights of the nodes on which v is defined
+      :param level: the target height to interpolate to (m)
+      :return: vertically integrated mass, (x/m^2)
+      """
+      rho = density(d,t)      # air density (kg/m^3)
+      dz = dz8w(d,t)      # vertical mesh steps (m)
+      var = ratio * rho * dz
+      return sum_to_level(var,height,level)
+
+def sum_to_level(var,height,level):
       """
       Interpolate 3d variable to a given height
-      :param var: the 3d array to be interpolated, 1st axis is vertical
+      :param var: the 3d array to be integrated, 1st axis is vertical
       :param height: the 3d array of heights of the nodes on which v is defined
       :param level: the target height to interpolate to
       :return: interpolated value, or
@@ -220,17 +235,14 @@ def cloud_to_level_hPa(d,t,level_hPa):
       Integrate cloud water density from the ground to given pressure height
       :param d: open NetCDF4 dataset
       :param t: number of timestep
-      :param level_hPa: pressure height
+      :param level_hPa: pressure level
       :return: cloud water intensity to given pressure level (kg/m^2)
       """
-      rho = density(d,t)  
       qcloud = d.variables['QCLOUD'][t,:,:,:] # cloud water mixing ratio (kg water/kg dry air)
-      cloud_d = rho * qcloud             # cloud water density kg/m^3
-      dz = dz8w(d,t)      # vertical mesh steps
       p8w = pressure8w(d,t) # pressure at cell bottoms (Pa)
-      h8w_m = hPa_to_m(p8w*0.01)
-      level_m = hPa_to_m(level_hPa)
-      return integrate2height(cloud_d*dz,h8w_m,level_m)
+      h8w_m = hPa_to_m(p8w*0.01)  # pressure height at cell bottoms (m)
+      level_m = hPa_to_m(level_hPa) # desired pressure level (m)
+      return integrate_ratio_to_level(d,t,qcloud,h8w_m,level_m)
       
 def smoke_to_height_terrain(d,t,level):
       """
@@ -246,7 +258,7 @@ def smoke_to_height_terrain(d,t,level):
       dz = dz8w(d,t)      # vertical mesh steps
       h_terrain = height8w_terrain(d,t)  # height above the terrain
       htw = h_terrain[0:h_terrain.shape[0]-1,:,:] # get rid of extra end stagger points
-      smoke_int = integrate2height(smoke_d*dz,htw,level)
+      smoke_int = sum_to_level(smoke_d*dz,htw,level)
       logging.info('integrated smoke to %sm max %s ug/m^2' % (level,np.max(smoke_int)))
       return smoke_int
       
