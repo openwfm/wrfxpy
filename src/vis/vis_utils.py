@@ -201,6 +201,19 @@ def hPa_to_m(p):
       """
       # https://www.weather.gov/media/epz/wxcalc/pressureAltitude.pdf
       return (0.3048*145366.45)*(1 - (p/1013.25)**0.190284)
+
+def density(d,t):
+      """
+      Get air density 
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      :return: air density (kg/m^3)
+      """
+      P = pressure(d,t)   # dry air pressure (Pa )
+      T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
+      r_d = 287                       # specific gas constant (J/kg/K)
+      rho = P/(r_d * T)               # dry air density  (kg/m^3)
+      return rho
  
 def cloud_to_level_hPa(d,t,level_hPa):
       """
@@ -210,10 +223,7 @@ def cloud_to_level_hPa(d,t,level_hPa):
       :param level_hPa: pressure height
       :return: cloud water intensity to given pressure level (kg/m^2)
       """
-      P = pressure(d,t)   # dry air pressure (Pa )
-      T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
-      r_d = 287                       # specific gas constant (J/kg/K)
-      rho = P/(r_d * T)               # dry air density  (kg/m^3)
+      rho = density(d,t)  
       qcloud = d.variables['QCLOUD'][t,:,:,:] # cloud water mixing ratio (kg water/kg dry air)
       cloud_d = rho * qcloud             # cloud water density kg/m^3
       dz = dz8w(d,t)      # vertical mesh steps
@@ -230,10 +240,7 @@ def smoke_to_height_terrain(d,t,level):
       :param level: height above terrain (m)
       :return: smoke integrated to given level (mg/m^2)
       """
-      P = pressure(d,t)   # dry air pressure (Pa )
-      T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
-      r_d = 287                       # specific gas constant (J/kg/K)
-      rho = P/(r_d * T)               # dry air density  (kg/m^3)
+      rho = density(d,t)  
       qsmoke= d.variables['tr17_1'][t,:,:,:] # smoke mixing ratio (ug/kg dry air)
       smoke_d = rho * qsmoke          # smoke density ug/m^3
       dz = dz8w(d,t)      # vertical mesh steps
