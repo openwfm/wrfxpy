@@ -83,7 +83,7 @@ _var_wisdom = {
         'colormap' : 'jet',
         'transparent_values' : [0,0],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,700) - cloud_to_level_hPa(d,t,700),
+        'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,400) - cloud_to_level_hPa(d,t,700),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'CLOUDABOVE400HPA' : {
