@@ -2,7 +2,7 @@
 fire_wind_height = 6.096,          ! height to take wind from (m), 6.096 Behave, 0 to use fwh
 cmbcnst  = 17.433e+06,             ! J/kg combustion heat dry fuel
 hfgl     = 17.e4 ,                 ! W/m^2 heat flux to ignite canopy
-fuelmc_g = 0.30,                   ! ground fuel moisture, set = 0 for dry
+fuelmc_g = 0.25,                   ! ground fuel moisture, set = 0 for dry
 !jc fuelmc_g = 0.09,                   ! ground fuel moisture, set = 0 for dry
 fuelmc_c = 1.00,                   ! canopy fuel moisture, set = 0 for dry
 nfuelcats = 13,                    ! number of fuel categories used
@@ -62,6 +62,7 @@ no_fuel_cat = 14                   ! extra category for no fuel
   adjrs = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
           1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
   ! proportions of moisture classes in the fuel categories
+  ! must add up to  1 in each category
   fmc_gw01 = 1.00000, 0.15385, 1.00000, 0.31253, 0.28571, 0.25000, 0.23203,
              0.30000, 0.06625, 0.25042, 0.13021, 0.11600, 0.12065, 0.00000,
   fmc_gw02 = 0.00000, 0.07692, 0.00000, 0.25016, 0.14286, 0.41667, 0.38398,
@@ -71,8 +72,8 @@ no_fuel_cat = 14                   ! extra category for no fuel
   fmc_gw04 = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
   fmc_gw05 = 0.00000, 0.38462, 0.00000, 0.31254, 0.57143, 0.00000, 0.07598,
-             0.00000, 0.00000, 0.16639, 0.00000, 0.00000, 0.00000, 0.00000,
- /
+             0.00000, 0.00000, 0.16639, 0.00000, 0.00000, 0.00000, 0.00000, 
+/
 
 &moisture
 moisture_class_name =
