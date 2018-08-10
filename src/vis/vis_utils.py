@@ -47,6 +47,7 @@ def interpolate2height(var,height,level):
              else:
                  #r[i,j]=var[k,i,j]+(var[::k+1,i,j]-var[k,i,j])*tx[i,j] 
                  r[i,j] = var[k,i,j]*(1.0-t) + var[k+1,i,j]*t 
+      logging.info('interpolated to %s: min %s max %s' % (level,np.min(r),np.max(r)))
       return r
 
 def integrate_ratio_to_level(d,t,ratio,height,level):
@@ -59,12 +60,12 @@ def integrate_ratio_to_level(d,t,ratio,height,level):
       :param level: the target height to interpolate to (m)
       :return: vertically integrated mass, (x/m^2)
       """
-      logging.info('mixing ratio min %s max %s X/m^2' % (np.min(ratio),np.max(ratio)))
+      logging.info('mixing ratio min %s max %s /m^2' % (np.min(ratio),np.max(ratio)))
       rho = density(d,t)      # air density (kg/m^3)
       dz = dz8w(d,t)      # vertical mesh steps (m)
       var = ratio * rho * dz
       ratio_int = sum_to_level(var,height,level)
-      logging.info('integrated to %s: min %s max %s X/m^2' % (level,np.min(ratio_int),np.max(ratio_int)))
+      logging.info('integrated to %s: min %s max %s /m^2' % (level,np.min(ratio_int),np.max(ratio_int)))
       return ratio_int
 
 def sum_to_level(var,height,level):

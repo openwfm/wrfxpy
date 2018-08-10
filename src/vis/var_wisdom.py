@@ -1,8 +1,8 @@
 import numpy as np
 import logging
 
-from vis.vis_utils import interpolate2height, index8height, height8p, height8p_terrain, \
-      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain
+from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
+      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density
 
 smoke_threshold_int = 50
 smoke_threshold = 20
@@ -38,18 +38,15 @@ def plume_height(d,t):
                         break
       return h
 
+def smoke_at_height_terrain_ft(d,t,level_ft):
+      return smoke_at_height_terrain(d,t,convert_value('ft','m',level_ft))
+
 def interpolate2height_terrain(d,t,var,level):
       return interpolate2height(var,height8p_terrain(d,t),level)
 
 def smoke_at_height_terrain(d,t,level):
-      return interpolate2height_terrain(d,t,d.variables['tr17_1'][t,:,:,:],level)
+      return interpolate2height_terrain(d,t,d.variables['tr17_1'][t,:,:,:]*density(d,t),level)
       
-def smoke_at_height_terrain_ft(d,t,level_ft):
-      return smoke_at_height_terrain(d,t,convert_value('ft','m',level_ft))
-      
-#def smoke_at_height_terrain(d,t,level):
-#      return interpolate2height(d.variables['tr17_1'][t,:,:,:],height8p_terrain(d,t),level)
-
 def u8p_m(d,t,level):
        return interpolate2height(u8p(d,t),height8p_terrain(d,t),level)
  
