@@ -238,6 +238,16 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: smoke_to_height_terrain(d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
+     'SMOKETO10M' : {
+        'name' : 'vertically integrated smoke to 10m',
+        'native_unit' : 'g/m^2',
+        'colorbar' : None,
+        'colormap' : 'gray_r',
+        'transparent_values' : [-np.inf, smoke_threshold_int],
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: smoke_to_height_terrain(d,t,10),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+     },
      'PM25_INT' : {
         'name' : 'vertically integrated PM2.5',
         'native_unit' : 'g/m^2',

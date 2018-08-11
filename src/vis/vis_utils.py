@@ -83,7 +83,7 @@ def sum_to_level(var,height,level):
           for j in range(0, var.shape[2]):
              k = ix[i,j]
              t = tx[i,j]
-             if k==0 or k>maxlayer:
+             if k<=0 :
                  r[i,j] = var[k,i,j]*t 
              elif k>maxlayer:
                  r[i,j] = np.sum(var[:,i,j],axis=0)
@@ -106,14 +106,17 @@ def index8height(height,level):
       for i in range(0, height.shape[1]):
           for j in range(0, height.shape[2]):
              k = np.searchsorted(height[:,i,j],level)
-             if k> 0 and k < height.shape[0]:
-                 ix[i,j]=k-1    # integer part
+             if k == 0:
+                 ix[i,j] = -1 if level < height[0,i,j] else 0 # leaving tx[i,j]=0
+             elif k < height.shape[0]:
+                 ix[i,j]=k-1    # integer partheight[:,i,j]
                  # interpolation in the interval height[k-1,i,j] to height[k,i,j]
                  tx[i,j]= (level - height[k-1,i,j])/(height[k,i,j] - height[k-1,i,j])
              else:
-                 ix[i,j]=min(k,height.shape[0]-1) # zero, or max. leaving tx[i,j]=0
+                 ix[i,j]=height.shape[0]-1 #  max, leaving tx[i,j]=0
                  #logging.warning("Need height[0,%s,%s]=%s < level=%s <= height[%s,%s,%s]=%s, got index k=%s" \
                  #   % (i,j,height[0,i,j],level,maxlayer,i,j,height[maxlayer,i,j],k))
+      logging.info('grid layer min %s max %s'  % ( np.min(ix), np.max(ix)))
       return ix,tx 
 
 def pressure(d,t):
