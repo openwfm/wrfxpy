@@ -40,8 +40,17 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
     if lats.shape != fa.shape:
         raise PostprocError("Variable size %s does not correspond to grid size %s." % (fa.shape, lats.shape))
 
-    # look at mins and maxes
-    fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
+    # mask 'transparent' color value
+    if 'transparent_values' in wisdom:
+        rng = wisdom['transparent_values']
+        fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
+        logging.info('scalar_field_to_raster: array elements %s not masked %s' % (fa.size , fa.count())
+        
+    # look at mins and maxes, transparent don't count
+    if fa.count():
+        fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
+    else:
+        fa_min, fa_max = 0.0, 0.0
 
     # determine if we will use the range in the variable or a fixed range
     scale = wisdom['scale']
@@ -57,11 +66,6 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
         #  colorbar + add it to the KMZ as a screen overlay
         cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
-
-    # check for 'transparent' color value and replace with nans
-    if 'transparent_values' in wisdom:
-        rng = wisdom['transparent_values']
-        fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
 
     # create the raster & get coordinate bounds
     raster_png_data,corner_coords = basemap_raster_mercator(lons,lats,fa,fa_min,fa_max,cmap)
