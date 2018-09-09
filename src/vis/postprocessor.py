@@ -40,11 +40,14 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
     if lats.shape != fa.shape:
         raise PostprocError("Variable size %s does not correspond to grid size %s." % (fa.shape, lats.shape))
 
+    logging.info('scalar_field_to_raster: variable %s min %s max %s' % (var, np.nanmin(fa),np.nanmax(fa)))
+
     # mask 'transparent' color value
     if 'transparent_values' in wisdom:
         rng = wisdom['transparent_values']
         fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
-        logging.info('scalar_field_to_raster: array elements %s not masked %s' % (fa.size , fa.count()))
+        logging.info('scalar_field_to_raster: transparent from %s to %, elements %s not masked %s' % (rng[0], rng[1], fa.size , fa.count()))
+        logging.info('scalar_field_to_raster: masked variable %s min %s max %s' % (var, np.nanmin(fa),np.nanmax(fa)))
         
     # look at mins and maxes, transparent don't count
     if fa.count():
@@ -59,13 +62,12 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         fa[fa < fa_min] = fa_min
         fa[fa > fa_max] = fa_max
 
-    if scale == 'original' and  wisdom['colorbar'] is not None:
-        logging.warning('postprocessor: %s: Colorbar specified with scaling = original' % wisdom['name'])
-        logging.warning('postprocessor: Colorbar is not updated by the online visualization system correctly, do not use withough explicit scaling')
-
     # only create the colorbar if requested
     cb_png_data = None
-    if wisdom['colorbar'] is not None and fa.count():
+    if wisdom['colorbar'] is not None:
+        if scale == 'original':
+            logging.warning('postprocessor: Colorbar %s %s specified with scaling original' % (wisdom['name'],wisdom['colorbar']))
+            logging.warning('postprocessor: Colorbar is not updated by the online visualization system correctly, use only with explicit scaling')
         cb_unit = wisdom['colorbar']
         cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
         #  colorbar + add it to the KMZ as a screen overlay
@@ -197,9 +199,9 @@ class Postprocessor(object):
             fa[fa < fa_min] = fa_min
             fa[fa > fa_max] = fa_max
 
-        # only create the colorbar if requested and if there is any not masked data
+        # only create the colorbar if requested
         cb_png_data = None
-        if wisdom['colorbar'] is not None and fa.count():
+        if wisdom['colorbar'] is not None:
             cb_unit = wisdom['colorbar']
             cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
             #  colorbar + add it to the KMZ as a screen overlay

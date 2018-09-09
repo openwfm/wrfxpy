@@ -7,7 +7,7 @@ from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
 smoke_threshold_int = 300
 smoke_threshold = 100
 smoke_int_unit = 'g/m^2'
-smoke_int_transparent = 1e-4 
+smoke_int_transparent = 1e-2 
 
 def smoke_to_height_terrain_u(d,t,h):
       return convert_value('ug/m^2', smoke_int_unit,smoke_to_height_terrain(d,t,h))
@@ -254,12 +254,12 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
      },
      'PM25_INT' : {
-        'name' : 'vertically integrated PM2.5',
+        'name' : 'vert integrated PM2.5',
         'native_unit' : smoke_int_unit,
         'colorbar' : smoke_int_unit,
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf, smoke_int_transparent],
-        'scale' : [0, 30],
+        'scale' : [0, 50],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u(d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
