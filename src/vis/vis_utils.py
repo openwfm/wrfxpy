@@ -261,12 +261,12 @@ def smoke_to_height_terrain(d,t,level):
       :param level: height above terrain (m)
       :return: smoke integrated to given level (mg/m^2)
       """
-      smoke= d.variables['tr17_1'][t,:,:,:] # smoke mixing ratio (g/kg dry air)
-      logging.info('smoke tr17_1 min %s max %s g/m^3' % (np.min(smoke),np.max(smoke)))
+      smoke= d.variables['tr17_1'][t,:,:,:] # smoke mixing ratio (ug/kg dry air)
+      logging.info('smoke tr17_1 min %s max %s ug/kg' % (np.min(smoke),np.max(smoke)))
       h_terrain = height8w_terrain(d,t)  # height above the terrain
       htw = h_terrain[0:h_terrain.shape[0]-1,:,:] # get rid of extra end stagger points at the top
-      smoke_int = integrate_ratio_to_level(d,t,smoke,htw,level)
-      logging.info('integrated smoke to %sm min %s max %s g/m^2' % (level,np.min(smoke_int),np.max(smoke_int)))
+      smoke_int = integrate_ratio_to_level(d,t,smoke,htw,level) 
+      logging.info('integrated smoke to %sm min %s max %s ug/m^2' % (level,np.min(smoke_int),np.max(smoke_int)))
       return smoke_int
       
 

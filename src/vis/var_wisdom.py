@@ -6,6 +6,11 @@ from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
 
 smoke_threshold_int = 300
 smoke_threshold = 100
+smoke_int_unit = 'g/m^2'
+smoke_int_transparent = 1e-4 
+
+def smoke_to_height_terrain_u(d,t,h):
+      return convert_value('ug/m^2', smoke_int_unit,smoke_to_height_terrain(d,t,h))
 
 def plume_center(d,t):
       """
@@ -230,32 +235,32 @@ _var_wisdom = {
       },
      'SMOKE_INT' : {
         'name' : 'vertically integrated smoke',
-        'native_unit' : 'g/m^2',
+        'native_unit' : smoke_int_unit,
         'colorbar' : None,
         'colormap' : 'gray_r',
-        'transparent_values' : [-np.inf, smoke_threshold_int],
+        'transparent_values' : [-np.inf, smoke_int_transparent],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_to_height_terrain(d,t,100000),
+        'retrieve_as' : lambda d,t: smoke_to_height_terrain_u(d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKETO10M' : {
         'name' : 'vertically integrated smoke to 10m',
-        'native_unit' : 'g/m^2',
+        'native_unit' : smoke_int_unit,
         'colorbar' : None,
         'colormap' : 'gray_r',
-        'transparent_values' : [-np.inf, smoke_threshold],
+        'transparent_values' : [-np.inf, smoke_int_transparent],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_to_height_terrain(d,t,10),
+        'retrieve_as' : lambda d,t: smoke_to_height_terrain_u(d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
      },
      'PM25_INT' : {
         'name' : 'vertically integrated PM2.5',
-        'native_unit' : 'g/m^2',
-        'colorbar' : 'g/m^2',
+        'native_unit' : smoke_int_unit,
+        'colorbar' : smoke_int_unit,
         'colormap' : 'rainbow',
-        'transparent_values' : [-np.inf, smoke_threshold_int],
+        'transparent_values' : [-np.inf, smoke_int_transparent],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_to_height_terrain(d,t,100000),
+        'retrieve_as' : lambda d,t: smoke_to_height_terrain_u(d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
 
@@ -433,7 +438,7 @@ _units_wisdom = {
     ('m',   'ft') : lambda x: 3.2808399 * x,
     ('ft/s','m/s') : lambda x: x / 3.2808399,
     ('ft',  'm') : lambda x: x / 3.2808399,
-    ('ug/m^2', 'g/m^2') : lambda x: 1000 * x
+    ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x
 }
 
 
