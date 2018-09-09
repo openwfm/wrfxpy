@@ -175,10 +175,12 @@ class SSHShuttle(object):
         :param remote_dir: the directory to remove
         """
         abs_path = osp.join(self.root, remote_dir)
-        files = self.sftp.listdir(abs_path)
-        for f in files:
-            self.sftp.remove(osp.join(abs_path, f))
-        self.sftp.rmdir(abs_path)
+        logging.info('SHUTTLE removing directory ' + abs_path)
+        self.simple_command('/bin/rm -rf ' + abs_path)
+        #files = self.sftp.listdir(abs_path) # was taking too long
+        #for f in files:
+        #    self.sftp.remove(osp.join(abs_path, f))
+        #self.sftp.rmdir(abs_path)
 
     def simple_command(self, command):
         """
