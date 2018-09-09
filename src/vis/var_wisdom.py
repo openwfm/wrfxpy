@@ -259,7 +259,7 @@ _var_wisdom = {
         'colorbar' : smoke_int_unit,
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf, smoke_int_transparent],
-        'scale' : 'original',
+        'scale' : [0, 30],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u(d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },

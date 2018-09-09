@@ -59,9 +59,13 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         fa[fa < fa_min] = fa_min
         fa[fa > fa_max] = fa_max
 
+    if scale == 'original' and  wisdom['colorbar'] is not None:
+        logging.warning('postprocessor: %s: Colorbar specified with scaling = original' % wisdom['name'])
+        logging.warning('postprocessor: Colorbar is not updated by the online visualization system correctly, do not use withough explicit scaling')
+
     # only create the colorbar if requested
     cb_png_data = None
-    if wisdom['colorbar'] is not None:
+    if wisdom['colorbar'] is not None and fa.count():
         cb_unit = wisdom['colorbar']
         cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
         #  colorbar + add it to the KMZ as a screen overlay
@@ -180,10 +184,7 @@ class Postprocessor(object):
         # look at mins and maxes
         # fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
         # look at mins and maxes, transparent don't count
-        if fa.count():
-            fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
-        else:
-            fa_min, fa_max = 0.0, 0.0
+        fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
 
         logging.info('_scalar_to_raster: variable %s elements %s not masked %s min %s max %s' 
             % (var, fa.size , fa.count(), fa_min, fa_max))
@@ -196,9 +197,9 @@ class Postprocessor(object):
             fa[fa < fa_min] = fa_min
             fa[fa > fa_max] = fa_max
 
-        # only create the colorbar if requested
+        # only create the colorbar if requested and if there is any not masked data
         cb_png_data = None
-        if wisdom['colorbar'] is not None:
+        if wisdom['colorbar'] is not None and fa.count():
             cb_unit = wisdom['colorbar']
             cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
             #  colorbar + add it to the KMZ as a screen overlay
