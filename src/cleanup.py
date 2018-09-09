@@ -33,13 +33,13 @@ from utils import kill_process, Dict, process_create_time, load_sys_cfg
 cfg = load_sys_cfg()
 
 def remote_rmdir(s,dirname):
-    logging.info('SHUTTLE removing remote directory %s' % dirname)
+    logging.info('Deleting remote directory %s' % dirname)
     try:
         s.rmdir(dirname)
-        logging.info('SHUTTLE delete successful.')
+        logging.info('Delete successful.')
         return 0
-    except:
-        logging.error('SHUTTLE cannot delete directory %s' % dirname)
+    except Exception as e:
+        logging.error('%s: cannot delete directory %s' % (e,dirname))
         return 'Error'
 
 def local_rmdir(dirname):
@@ -188,6 +188,16 @@ def cancel(name):
         js.state = "Cancelled"
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
+def delete_visualization(name):
+    local_rmdir(osp.join(name,'products'))
+    s = SSHShuttle(cfg)
+    s.connect()
+    logging.info('Trying to delete all remote files of job %s' % name)
+    s.rmdir(name)
+    s.simple_command('wrfxweb/join_catalog.sh')
+    s.disconnect()
+
+
 def delete(s,name):
     s.connect()
     logging.info('Trying to delete all files of job %s' % name)
@@ -247,7 +257,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     cmd = sys.argv[1]
-    if cmd in ['delete' , 'cancel', 'output', 'update']: 
+    if cmd in ['delete' , 'cancel', 'output', 'update', 'visualization']: 
         if len(sys.argv) == 3 and not sys.argv[2] == "" :
             job_id = sys.argv[2]
         else:
@@ -273,6 +283,9 @@ if __name__ == '__main__':
     if cmd == 'delete':
         cancel(job_id)
         delete(s,job_id)
+
+    if cmd == 'visualization':
+        delete_visualization(job_id)
 
     if cmd == 'workspace':
         workspace(s)

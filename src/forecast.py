@@ -55,7 +55,7 @@ from email.mime.text import MIMEText
 
 import traceback
 import pprint
-from cleanup import parallel_job_running
+from cleanup import parallel_job_running, delete_visualization
 
 
 
@@ -526,6 +526,7 @@ def process_output(job_id):
         return
 
     # set up postprocessing
+    delete_visualization(js.job_id)
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
     make_clean_dir(js.pp_dir)
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
