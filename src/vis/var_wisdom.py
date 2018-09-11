@@ -7,7 +7,7 @@ from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
 smoke_threshold_int = 300
 smoke_threshold = 100
 smoke_int_unit = 'g/m^2'
-smoke_int_transparent = 1e-1 
+smoke_int_transparent = 1e-2 
 
 def smoke_to_height_terrain_u(d,t,h):
       return convert_value('ug/m^2', smoke_int_unit,smoke_to_height_terrain(d,t,h))

@@ -46,7 +46,7 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
     if 'transparent_values' in wisdom:
         rng = wisdom['transparent_values']
         fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
-        logging.info('scalar_field_to_raster: transparent from %s to %, elements %s not masked %s' % (rng[0], rng[1], fa.size , fa.count()))
+        logging.info('scalar_field_to_raster: transparent from %s to %, elements %s n))ot masked %s' % (rng[0], rng[1], fa.size , fa.count()))
         logging.info('scalar_field_to_raster: masked variable %s min %s max %s' % (var, np.nanmin(fa),np.nanmax(fa)))
         
     # look at mins and maxes, transparent don't count
@@ -175,7 +175,7 @@ class Postprocessor(object):
         # check for 'transparent' color value and mask 
         if 'transparent_values' in wisdom:
             rng = wisdom['transparent_values']
-            logging.info('_scalar2raster: variable %s min %s max %s masking from %s to %s' 
+            logging.info('_scalar2raster: variable %s min %s max %s masking transparent from %s to %s' 
                 % (var, np.nanmin(fa),np.nanmax(fa), rng[0], rng[1])) 
             fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
         else:
@@ -188,16 +188,14 @@ class Postprocessor(object):
         # look at mins and maxes, transparent don't count
         fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
 
-        logging.info('_scalar2raster: variable %s elements %s not masked %s min %s max %s' 
-            % (var, fa.size , fa.count(), fa_min, fa_max))
-
-
         # determine if we will use the range in the variable or a fixed range
         scale = wisdom['scale']
         if scale != 'original':
+            m = fa.mask.copy()             # save mask, resetting values below will destroy the mask
             fa_min, fa_max = scale[0], scale[1]
             fa[fa < fa_min] = fa_min
             fa[fa > fa_max] = fa_max
+            fa.mask = m                    # restore the mask
 
         # only create the colorbar if requested
         cb_png_data = None
@@ -208,6 +206,13 @@ class Postprocessor(object):
             legend = wisdom['name'] + ' ' + cb_unit
             logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (var, cbu_min,cbu_max, legend))
             cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend)
+
+        # replace masked values by nans just in case
+        fa.data[fa.mask]=np.nan
+        fa.fill_value=np.nan
+
+        logging.info('_scalar2raster: variable %s elements %s count %s not masked %s min %s max %s' 
+            % (var, fa.size , fa.count(), np.count_nonzero(fa.mask == False), np.nanmin(fa),np.nanmax(fa) ))
 
         raster_png_data,corner_coords = basemap_raster_mercator(lon,lat,fa,fa_min,fa_max,cmap)
 
@@ -277,6 +282,7 @@ class Postprocessor(object):
 
         # write raster file
         raster_path = out_path + "-raster.png"
+        logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
         with open(raster_path, 'w') as f:
             f.write(raster_png_data)
 
