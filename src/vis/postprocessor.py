@@ -175,9 +175,9 @@ class Postprocessor(object):
         # check for 'transparent' color value and mask 
         if 'transparent_values' in wisdom:
             rng = wisdom['transparent_values']
-            logging.info('_scalar_to_raster: variable %s min %s max %s' % (var, np.nanmin(fa),np.nanmax(fa)))
+            logging.info('_scalar2raster: variable %s min %s max %s masking from %s to %s' 
+                % (var, np.nanmin(fa),np.nanmax(fa), rng[0], rng[1])) 
             fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
-            logging.info('_scalar_to_raster: variable %s transparent from %s to %s' % (var, rng[0], rng[1])) 
         else:
             fa=np.ma.masked_array(fa)
 
@@ -188,7 +188,7 @@ class Postprocessor(object):
         # look at mins and maxes, transparent don't count
         fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
 
-        logging.info('_scalar_to_raster: variable %s elements %s not masked %s min %s max %s' 
+        logging.info('_scalar2raster: variable %s elements %s not masked %s min %s max %s' 
             % (var, fa.size , fa.count(), fa_min, fa_max))
 
 
@@ -206,7 +206,7 @@ class Postprocessor(object):
             cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
             #  colorbar + add it to the KMZ as a screen overlay
             legend = wisdom['name'] + ' ' + cb_unit
-            logging.info('_scalar_to_raster: variable %s colorbar from %s to %s %s' % (var, cbu_min,cbu_max, legend))
+            logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (var, cbu_min,cbu_max, legend))
             cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend)
 
         raster_png_data,corner_coords = basemap_raster_mercator(lon,lat,fa,fa_min,fa_max,cmap)
