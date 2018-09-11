@@ -27,6 +27,7 @@ import netCDF4 as nc4
 import sys
 import os
 import StringIO
+import logging
 
 
 def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
@@ -85,6 +86,7 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
 
     #vmin,vmax = np.nanmin(grid),np.nanmax(grid)
     masked_grid = np.ma.array(grid,mask=np.isnan(grid))
+    # logging.info('basemap_raster_mercator: not masked %s %s' % (grid.count(),masked_grid.count()))
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72)
     plt.axis('off')
     cmap = mpl.cm.get_cmap(cmap_name)

@@ -2,15 +2,17 @@ import numpy as np
 import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
-      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density
+      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats
 
 smoke_threshold_int = 300
 smoke_threshold = 100
 smoke_int_unit = 'g/m^2'
-smoke_int_transparent = 1e-1 
+smoke_int_transparent = 1e-2 
 
-def smoke_to_height_terrain_u(d,t,h):
-      return convert_value('ug/m^2', smoke_int_unit,smoke_to_height_terrain(d,t,h))
+def smoke_to_height_terrain_u(var,d,t,h):
+      v=convert_value('ug/m^2', smoke_int_unit,smoke_to_height_terrain(d,t,h))
+      print_stats(var,v,smoke_int_unit)
+      return v
 
 def plume_center(d,t):
       """
@@ -240,7 +242,7 @@ _var_wisdom = {
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_int_transparent],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_to_height_terrain_u(d,t,100000),
+        'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKE_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKETO10M' : {
@@ -250,7 +252,7 @@ _var_wisdom = {
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_int_transparent],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_to_height_terrain_u(d,t,10),
+        'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKETO10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
      },
      'PM25_INT' : {
@@ -259,8 +261,8 @@ _var_wisdom = {
         'colorbar' : smoke_int_unit,
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf, smoke_int_transparent],
-        'scale' : [0, 50],
-        'retrieve_as' : lambda d,t: smoke_to_height_terrain_u(d,t,100000),
+        'scale' : [0, 5],
+        'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
 
