@@ -12,6 +12,7 @@ import logging
 import os.path as osp
 import traceback
 from utils import dump, traceargs
+from vis_utils import print_stats
 
 from vis.rasterizer import make_colorbar, basemap_raster_mercator, basemap_barbs_mercator
 from vis.var_wisdom import convert_value, get_wisdom, is_windvec
