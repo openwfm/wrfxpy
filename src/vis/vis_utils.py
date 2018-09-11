@@ -1,6 +1,19 @@
 import numpy as np
 import logging
 
+def print_stats(varname,v,unit):
+      """
+      print some statistics on a variable
+      :param varname: string with variable name
+      :param v: array with values
+      """
+      logging.info('%s %s shape %s nans %s  min %s max %s mean %s %s' 
+          %(varname,repr(type(v)),repr(v.shape),np.sum(np.isnan(np.ma.compressed(v))),
+          np.nanmin(v),np.nanmax(v),np.nanmean(v),unit))
+      h = np.histogram(v)
+      logging.info("n: %s %s" % (h[0],unit))
+      logging.info("bins: %s" % (h[1],))
+
 def interpolate2height_old(var,height,level):
       """
       Interpolate 3d variable to a given height
@@ -262,7 +275,8 @@ def smoke_to_height_terrain(d,t,level):
       :return: smoke integrated to given level (mg/m^2)
       """
       smoke= d.variables['tr17_1'][t,:,:,:] # smoke mixing ratio (ug/kg dry air)
-      logging.info('smoke tr17_1 min %s max %s ug/kg' % (np.min(smoke),np.max(smoke)))
+      print_stats('tr17_1',smoke,'ug/kg')
+      # logging.info('smoke tr17_1 min %s max %s ug/kg' % (np.min(smoke),np.max(smoke)))
       h_terrain = height8w_terrain(d,t)  # height above the terrain
       htw = h_terrain[0:h_terrain.shape[0]-1,:,:] # get rid of extra end stagger points at the top
       smoke_int = integrate_ratio_to_level(d,t,smoke,htw,level) 
