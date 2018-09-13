@@ -138,7 +138,19 @@ def pressure(d,t):
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
-      return d.variables['P'][t,:,:,:] + d.variables['PB'][t,:,:,:]
+      P = d.variables['P'][t,:,:,:] + d.variables['PB'][t,:,:,:]
+      print_stats('pressure',P,'Pa')
+      return P
+
+def smoke_density(d,t):
+      """
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      :returns smoke ug/m^3
+      """
+      S=d.variables['tr17_1'][t,:,:,:]*density(d,t)
+      print_stats('smoke density',s,'ug/m^3')
+      return S
 
 def pressure8w(d,t):
       """
@@ -248,6 +260,8 @@ def density(d,t):
       T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
       r_d = 287                       # specific gas constant (J/kg/K)
       rho = P/(r_d * T)               # dry air density  (kg/m^3)
+      print_stats('temperature',T,'K')
+      print_stats('density',rho,'kg/m^3')
       return rho
  
 def cloud_to_level_hPa(d,t,level_hPa):

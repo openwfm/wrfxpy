@@ -2,7 +2,8 @@ import numpy as np
 import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
-      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats
+      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
+      smoke_density
 
 smoke_threshold_int = 300
 smoke_threshold = 100
@@ -45,14 +46,16 @@ def plume_height(d,t):
                         break
       return h
 
-def smoke_at_height_terrain_ft(d,t,level_ft):
-      return smoke_at_height_terrain(d,t,convert_value('ft','m',level_ft))
+def smoke_at_height_terrain_ft(varname,d,t,level_ft):
+      return smoke_at_height_terrain(varname,d,t,convert_value('ft','m',level_ft))
 
 def interpolate2height_terrain(d,t,var,level):
       return interpolate2height(var,height8p_terrain(d,t),level)
 
-def smoke_at_height_terrain(d,t,level):
-      return interpolate2height_terrain(d,t,d.variables['tr17_1'][t,:,:,:]*density(d,t),level)
+def smoke_at_height_terrain(varname,d,t,level):
+      s = interpolate2height_terrain(d,t,smoke_density(d,t),level)
+      print_stats(varname,s,'ug/m^3')
+      return s
       
 def u8p_m(d,t,level):
        return interpolate2height(u8p(d,t),height8p_terrain(d,t),level)
@@ -110,7 +113,7 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf,10],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,1000),
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE1000FT',d,t,1000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE4000FT' : {
@@ -120,7 +123,7 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf,10],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,4000),
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE4000FT',d,t,4000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE6000FT' : {
@@ -130,7 +133,7 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf,10],
         'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,6000),
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE6000FT',d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'WINDSPD1000FT' : {
