@@ -109,7 +109,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE1000FT' : {
-        'name' : 'Smoke concentration at 1000ft above terrain',
+        'name' : 'Smoke 1000ft above terrain',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -119,7 +119,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE4000FT' : {
-        'name' : 'Smoke concentration at 4000ft above terrain',
+        'name' : 'Smoke 4000ft above terrain',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -129,7 +129,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE6000FT' : {
-        'name' : 'Smoke concentration at 4000ft above terrain',
+        'name' : 'Smoke 6000ft above terrain',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
