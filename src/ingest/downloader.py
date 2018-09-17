@@ -26,6 +26,7 @@ import os.path as osp
 import os
 import logging
 import time
+import subprocess
 
 from utils import ensure_dir, load_sys_cfg
  
@@ -60,6 +61,10 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     """
 
     logging.info('download_url %s as %s' % (url,local_path))
+    subprocess.call(['/usr/bin/wget','-O',local_path,url])
+    return
+
+
     logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
 
     use_urllib2 = url[:6] == 'ftp://'

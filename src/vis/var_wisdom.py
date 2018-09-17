@@ -2,16 +2,19 @@ import numpy as np
 import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
-      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats
+      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
+      smoke_concentration
 
 smoke_threshold_int = 300
 smoke_threshold = 100
-smoke_int_unit = 'g/m^2'
-smoke_int_transparent = 1e-2 
+smoke_integrated_unit = 'g/m^2'
+smoke_integrated_transparent = 1e-2 
+smoke_concentration_scale = 400
+smoke_concentration_transparent=10
 
 def smoke_to_height_terrain_u(var,d,t,h):
-      v=convert_value('ug/m^2', smoke_int_unit,smoke_to_height_terrain(d,t,h))
-      print_stats(var,v,smoke_int_unit)
+      v=convert_value('ug/m^2', smoke_integrated_unit,smoke_to_height_terrain(d,t,h))
+      print_stats(var,v,smoke_integrated_unit)
       return v
 
 def plume_center(d,t):
@@ -45,14 +48,16 @@ def plume_height(d,t):
                         break
       return h
 
-def smoke_at_height_terrain_ft(d,t,level_ft):
-      return smoke_at_height_terrain(d,t,convert_value('ft','m',level_ft))
+def smoke_at_height_terrain_ft(varname,d,t,level_ft):
+      return smoke_at_height_terrain(varname,d,t,convert_value('ft','m',level_ft))
 
 def interpolate2height_terrain(d,t,var,level):
       return interpolate2height(var,height8p_terrain(d,t),level)
 
-def smoke_at_height_terrain(d,t,level):
-      return interpolate2height_terrain(d,t,d.variables['tr17_1'][t,:,:,:]*density(d,t),level)
+def smoke_at_height_terrain(varname,d,t,level):
+      s = interpolate2height_terrain(d,t,smoke_concentration(d,t),level)
+      print_stats(varname,s,'ug/m^3')
+      return s
       
 def u8p_m(d,t,level):
        return interpolate2height(u8p(d,t),height8p_terrain(d,t),level)
@@ -104,33 +109,33 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE1000FT' : {
-        'name' : 'Smoke concentration at 1000ft above terrain',
-        'native_unit' : 'g/kg',
-        'colorbar' : 'g/kg',
+        'name' : 'Smoke 1000ft above terrain',
+        'native_unit' : 'ug/m^3',
+        'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf,10],
-        'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,1000),
+        'scale' : [0, 500],
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE1000FT',d,t,1000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE4000FT' : {
-        'name' : 'Smoke concentration at 4000ft above terrain',
-        'native_unit' : 'g/kg',
-        'colorbar' : 'g/kg',
+        'name' : 'Smoke 4000ft above terrain',
+        'native_unit' : 'ug/m^3',
+        'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf,10],
-        'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,4000),
+        'scale' : [0, 500],
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE4000FT',d,t,4000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE6000FT' : {
-        'name' : 'Smoke concentration at 4000ft above terrain',
-        'native_unit' : 'g/kg',
-        'colorbar' : 'g/kg',
+        'name' : 'Smoke 6000ft above terrain',
+        'native_unit' : 'ug/m^3',
+        'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf,10],
-        'scale' : 'original',
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft(d,t,6000),
+        'scale' : [0, 500],
+        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE6000FT',d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'WINDSPD1000FT' : {
@@ -237,30 +242,30 @@ _var_wisdom = {
       },
      'SMOKE_INT' : {
         'name' : 'vertically integrated smoke',
-        'native_unit' : smoke_int_unit,
+        'native_unit' : smoke_integrated_unit,
         'colorbar' : None,
         'colormap' : 'gray_r',
-        'transparent_values' : [-np.inf, smoke_int_transparent],
+        'transparent_values' : [-np.inf, smoke_integrated_transparent],
         'scale' : 'original',
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKE_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKETO10M' : {
         'name' : 'vertically integrated smoke to 10m',
-        'native_unit' : smoke_int_unit,
+        'native_unit' : smoke_integrated_unit,
         'colorbar' : None,
         'colormap' : 'gray_r',
-        'transparent_values' : [-np.inf, smoke_int_transparent],
+        'transparent_values' : [-np.inf, smoke_integrated_transparent],
         'scale' : 'original',
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKETO10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
      },
      'PM25_INT' : {
         'name' : 'vert integrated PM2.5',
-        'native_unit' : smoke_int_unit,
-        'colorbar' : smoke_int_unit,
+        'native_unit' : smoke_integrated_unit,
+        'colorbar' : smoke_integrated_unit,
         'colormap' : 'rainbow',
-        'transparent_values' : [-np.inf, smoke_int_transparent],
+        'transparent_values' : [-np.inf, smoke_integrated_transparent],
         'scale' : [0, 5],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),

@@ -11,8 +11,8 @@ def print_stats(varname,v,unit):
           %(varname,repr(type(v)),repr(v.shape),np.sum(np.isnan(np.ma.compressed(v))),
           np.nanmin(v),np.nanmax(v),np.nanmean(v),unit))
       h = np.histogram(v)
-      logging.info("n: %s %s" % (h[0],unit))
-      logging.info("bins: %s" % (h[1],))
+      logging.info("%s n: %s %s" % (varname,h[0],unit))
+      logging.info("%s bins: %s" % (varname,h[1],))
 
 def interpolate2height_old(var,height,level):
       """
@@ -73,7 +73,7 @@ def integrate_ratio_to_level(d,t,ratio,height,level):
       :param level: the target height to interpolate to (m)
       :return: vertically integrated mass, (x/m^2)
       """
-      logging.info('mixing ratio min %s max %s /m^2' % (np.min(ratio),np.max(ratio)))
+      # logging.info('mixing ratio min %s max %s /m^2' % (np.min(ratio),np.max(ratio)))
       rho = density(d,t)      # air density (kg/m^3)
       dz = dz8w(d,t)      # vertical mesh steps (m)
       var = ratio * rho * dz
@@ -138,7 +138,19 @@ def pressure(d,t):
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
-      return d.variables['P'][t,:,:,:] + d.variables['PB'][t,:,:,:]
+      P = d.variables['P'][t,:,:,:] + d.variables['PB'][t,:,:,:]
+      print_stats('pressure',P,'Pa')
+      return P
+
+def smoke_concentration(d,t):
+      """
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      :returns smoke ug/m^3
+      """
+      s=d.variables['tr17_1'][t,:,:,:]*density(d,t)
+      print_stats('smoke concentration',s,'ug/m^3')
+      return s
 
 def pressure8w(d,t):
       """
@@ -248,6 +260,8 @@ def density(d,t):
       T = d.variables['T'][t,:,:,:] + d.variables['T00'][t]  # temperature (K)
       r_d = 287                       # specific gas constant (J/kg/K)
       rho = P/(r_d * T)               # dry air density  (kg/m^3)
+      print_stats('temperature',T,'K')
+      print_stats('density',rho,'kg/m^3')
       return rho
  
 def cloud_to_level_hPa(d,t,level_hPa):
