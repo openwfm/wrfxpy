@@ -62,7 +62,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     """
 
     logging.info('download_url %s as %s' % (url,local_path))
-    subprocess.call([wget,'-O',local_path(local_path),url])
+    subprocess.call([wget,'-O',ensure_dir(local_path),url])
     return
 
 
