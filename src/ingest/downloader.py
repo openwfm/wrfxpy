@@ -33,6 +33,7 @@ from utils import ensure_dir, load_sys_cfg
 cfg = load_sys_cfg()
 sleep_seconds_def = cfg.get('sleep_seconds', 20)
 max_retries_def = cfg.get('max_retries', 3)
+wget = cfg.get('wget','/usr/bin/wget')
 
 class DownloadError(Exception):
     """
@@ -61,7 +62,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     """
 
     logging.info('download_url %s as %s' % (url,local_path))
-    subprocess.call(['/usr/bin/wget','-O',local_path,url])
+    subprocess.call([wget,'-O',ensure_dir(local_path),url])
     return
 
 
