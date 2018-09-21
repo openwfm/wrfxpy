@@ -181,14 +181,20 @@ def symlink_unless_exists(link_tgt, link_loc):
     else:
         logging.error('Link target %s does not exist' % link_tgt)
 
+def remove(tgt):
+    """
+    os.remove wrapper
+    """
+    if osp.isfile(tgt):
+        logging.warning('remove: file %s exists, removing' % tgt)
+        os.remove(tgt)
+
 def move(src,tgt):
     """
     shutil.move wrapper
     """
     logging.info('moving %s to %s' % (src, tgt))
-    if osp.isfile(tgt):
-        logging.warning('file %s already exists' % tgt)
-        os.remove(tgt)
+    remove(tgt)
     shutil.move(src,tgt)
     
 

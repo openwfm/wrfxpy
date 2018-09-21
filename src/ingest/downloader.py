@@ -28,12 +28,13 @@ import logging
 import time
 import subprocess
 
-from utils import ensure_dir, load_sys_cfg
+from utils import ensure_dir, load_sys_cfg, remove
  
 cfg = load_sys_cfg()
 sleep_seconds_def = cfg.get('sleep_seconds', 20)
 max_retries_def = cfg.get('max_retries', 3)
 wget = cfg.get('wget','/usr/bin/wget')
+wget_options=cfg.get('wget_options',["--read-timeout=1"])
 
 class DownloadError(Exception):
     """
@@ -61,11 +62,6 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     :param max_retries: how many times we may retry to download the file
     """
 
-    logging.info('download_url %s as %s' % (url,local_path))
-    subprocess.call([wget,'--read-timeout=0.3','-O',ensure_dir(local_path),url])
-    return
-
-
     logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
 
     use_urllib2 = url[:6] == 'ftp://'
@@ -81,34 +77,13 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             download_url(url, local_path, max_retries = max_retries-1)
         return
          
-    content_size = int(r.headers['Content-Length'])
-
-    # dump the correct file size to an info file next to the grib file
-    # when re-using the GRIB2 file, we check its file size against this record
-    # to avoid using partial files
-    info_path = local_path + '.size'
-    open(ensure_dir(info_path), 'w').write(str(content_size))
-
-    # stream the download to file
-    s = 0
-    MB = 1024.0*1024.0
-    chunk_size = 1024*1024
-    with open(ensure_dir(local_path), 'wb') as f:
-        start_time = time.time()
-        if use_urllib2:
-            while True:
-                chunk = r.read(chunk_size)
-                s =  s + len(chunk)
-                if not chunk:
-                    break
-                f.write(chunk)
-                print('read %s of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
-        else:
-            for chunk in r.iter_content(chunk_size):
-                s =  s + len(chunk)
-                f.write(chunk)
-                print('streamed %s  of %s %s MB/s' % (s, content_size, s/(time.time()-start_time)/MB), end='\r')
-    print('')
+    logging.info('down load_url %s as %s' % (url,local_path))
+    remove(local_path)
+    command=[wget,'-O',ensure_dir(local_path),url]
+    for opt in wget_options:
+        command.insert(1,opt)
+    logging.info(' '.join(command))
+    subprocess.call(command)
 
     file_size = osp.getsize(local_path)
 
@@ -116,9 +91,9 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     r = urllib2.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
     content_size = int(r.headers['Content-Length'])
 
-    logging.info('local file size %d downloaded %d remote content size %d' % (file_size, s, content_size))
+    logging.info('local file size %d remote content size %d' % (file_size, content_size))
 
-    if int(file_size) != int(content_size) or int(s) != int(file_size):
+    if int(file_size) != int(content_size):
         logging.warning('wrong file size, download_url trying again, retries available %d' % max_retries)
         if max_retries > 0:
             # call the entire function recursively, this will attempt to redownload the entire file
@@ -126,7 +101,15 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             logging.info('download_url sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
             download_url(url, local_path, max_retries = max_retries-1)
+            return  # success
         else:
             os.remove(local_path)
             os.remove(info_path)
             raise DownloadError('failed to download file %s' % url)
+
+    # dump the correct file size to an info file next to the grib file
+    # when re-using the GRIB2 file, we check its file size against this record
+    # to avoid using partial files
+    info_path = local_path + '.size'
+    open(ensure_dir(info_path), 'w').write(str(content_size))
+
