@@ -1,5 +1,6 @@
 {
   "sleep_seconds": 30,
+  "download_sleep_seconds": 8,
   "max_retries": 7,
   "ingest_path": "ingest",
   "cache_path": "cache",

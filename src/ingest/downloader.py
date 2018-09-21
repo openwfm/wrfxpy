@@ -35,6 +35,7 @@ sleep_seconds_def = cfg.get('sleep_seconds', 20)
 max_retries_def = cfg.get('max_retries', 3)
 wget = cfg.get('wget','/usr/bin/wget')
 wget_options=cfg.get('wget_options',["--read-timeout=1"])
+download_sleep_seconds=cfg.get('download_sleep_seconds', 5)
 
 class DownloadError(Exception):
     """
@@ -63,6 +64,8 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     """
 
     logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
+    logging.info('download_url sleeping %s seconds' % download_sleep_seconds)
+    time.sleep(download_sleep_seconds)
 
     use_urllib2 = url[:6] == 'ftp://'
     
