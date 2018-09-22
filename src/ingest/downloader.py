@@ -27,6 +27,7 @@ import os
 import logging
 import time
 import subprocess
+import random
 
 from utils import ensure_dir, load_sys_cfg, remove
  
@@ -64,8 +65,9 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     """
 
     logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
-    logging.info('download_url sleeping %s seconds' % download_sleep_seconds)
-    time.sleep(download_sleep_seconds)
+    sec = random.random() * download_sleep_seconds
+    logging.info('download_url sleeping %s seconds' % sec)
+    time.sleep(sec)
 
     use_urllib2 = url[:6] == 'ftp://'
     
