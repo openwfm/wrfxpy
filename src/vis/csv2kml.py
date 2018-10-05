@@ -71,7 +71,7 @@ def json2kml(s,kml_path):
                 longitude=float(longitude)
                 confidence=float(confidence)
                 frp=float(frp)
-                timestamp=acq_date + 'T' + acq_time[0:2] + ':' + acq_time[2:4] + 'Z'
+                timestamp=acq_date + 'T' + acq_time[0:2] + ':' + acq_time[2:4] + '-06:00'
                 timedescr=acq_date + ' ' + acq_time[0:2] + ':' + acq_time[2:4] + ' UTC'
     
                 print([longitude,latitude,acq_date,acq_time,satellite,instrument,confidence,frp])
@@ -100,8 +100,20 @@ def json2kml(s,kml_path):
                 kml.write('<Polygon>\n<outerBoundaryIs>\n<LinearRing>\n<coordinates>\n')
     
     	        km_lon=km_lat/math.cos(latitude*math.pi/180)  # 1 km in longitude
-                sq2_lat=km_lat * sq_size_km/2;
-                sq2_lon=km_lon * sq_size_km/2;
+                print km_lat
+
+                if 'track' in s[p].keys():
+                    sq_track_size_km=float(s[p]['track'])
+                    sq2_lat=km_lat * sq_track_size_km/2
+                else:
+                    sq2_lat=km_lat * sq_size_km/2
+
+                if 'scan' in s[p].keys():
+                    sq_scan_size_km=float(s[p]['scan'])
+                    sq2_lon=km_lon * sq_scan_size_km/2
+                else:
+                    sq2_lon=km_lon * sq_size_km/2
+
                 kml.write('%s,%s,0\n' % (longitude - sq2_lon, latitude-sq2_lat))
                 kml.write('%s,%s,0\n' % (longitude - sq2_lon, latitude+sq2_lat))
                 kml.write('%s,%s,0\n' % (longitude + sq2_lon, latitude+sq2_lat))
