@@ -71,7 +71,7 @@ def json2kml(s,kml_path):
                 longitude=float(longitude)
                 confidence=float(confidence)
                 frp=float(frp)
-                timestamp=acq_date + 'T' + acq_time[0:2] + ':' + acq_time[2:4] + '-06:00'
+                timestamp=acq_date + 'T' + acq_time[0:2] + ':' + acq_time[2:4] + 'Z'
                 timedescr=acq_date + ' ' + acq_time[0:2] + ':' + acq_time[2:4] + ' UTC'
     
                 print([longitude,latitude,acq_date,acq_time,satellite,instrument,confidence,frp])
