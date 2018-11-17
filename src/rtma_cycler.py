@@ -282,8 +282,10 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     logging.info('CYCLER retrieved %d valid observations, min/mean/max [%g/%g/%g].' %
                  (len(fm10),np.amin(fm10v),np.mean(fm10v),np.amax(fm10v)))
     
-    # remove rain that is too small to make any difference
+    # remove rain that is too small to make any difference 
     rain[rain < 0.01] = 0
+    # remove bogus rain that is too large 
+    rain[rain > 1e10] = 0
     
     # run the data assimilation step
     covs = [np.ones(dom_shape), hgt / 2000.0]
@@ -294,7 +296,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path)
     logging.info('CYCLER writing model variables to:  %s.' % model_path)
-    model.to_netcdf(ensure_dir(path),{'TD':TD,'T2':T2,'RH':RH,'RAIN':rain})
+    model.to_netcdf(ensure_dir(model_path),{'TD':TD,'T2':T2,'RH':RH,'RAIN':rain})
     
     return model
     
