@@ -354,12 +354,13 @@ class FuelMoistureModel:
         cPickle.dump(self, path)
                 
 
-    def to_netcdf(self, path):
+    def to_netcdf(self, path, data_vars):
         """
         Store the model in a netCDF file that attempts to be displayable
         using standard tools and loosely follows the WRF 'standard'.
         
         :param path: the path where to store the model
+        :param data_vars: dictionary of additional variables to store
         """
         import netCDF4
         
@@ -374,6 +375,9 @@ class FuelMoistureModel:
         ncfmc[:,:,:] = self.m_ext
         ncfmc_cov = d.createVariable('FMC_COV', 'f4', ('south_north', 'west_east','fuel_moisture_classes_stag', 'fuel_moisture_classes_stag'))
         ncfmc_cov[:,:,:,:] = self.P
+        for v in data_vars:
+            d.createVariable(v, 'f4', ('south_north', 'west_east'))[:,:]=data_vars[v]
+       
         
         d.close()
         

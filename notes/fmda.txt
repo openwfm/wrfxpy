@@ -1,0 +1,16 @@
+src/rtma_cycler.py: create RTMA object 
+downloading RTMA variables 'precipa', 'wspd', 'wdir', 'td', 'temp' to ingest/rtma/2018mmdd/hh/variable_name.grib
+rtma home page is http://www.nco.ncep.noaa.gov/pmb/products/rtma/
+apparently using Grid 184 - CONUS - 2.5 km resolution
+documentation link goes to http://nomads.ncep.noaa.gov/txt_descriptions/RTMA_doc.shtml but there is no documentation there
+explanation of RTMA variables names e.g., https://www.unidata.ucar.edu/mailing_lists/archives/nws-changes/2010/msg00381.html
+but units are unknown
+variables used:
+precipa  Accumulated Precipitation rtma_cycler.py:165 loaded as rain
+wspd     Wind Speed not used
+wdir     Wind Direction not used
+td       Dewpoint Temperature      rtma_cycler.py:164 loaded as td
+temp     Temperature               rtma_cycler.py:163 loaded as t2
+
+
+

@@ -63,6 +63,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     :param local_path: the path to the local file
     :param max_retries: how many times we may retry to download the file
     """
+    logging.info('download_url %s as %s' % (url, local_path))
 
     logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
     sec = random.random() * download_sleep_seconds

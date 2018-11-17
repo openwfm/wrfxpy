@@ -41,14 +41,14 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
     if lats.shape != fa.shape:
         raise PostprocError("Variable size %s does not correspond to grid size %s." % (fa.shape, lats.shape))
 
-    logging.info('scalar_field_to_raster: variable %s min %s max %s' % (var, np.nanmin(fa),np.nanmax(fa)))
+    logging.info('scalar_field_to_raster: variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa),np.nanmax(fa)))
 
     # mask 'transparent' color value
     if 'transparent_values' in wisdom:
         rng = wisdom['transparent_values']
         fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
         logging.info('scalar_field_to_raster: transparent from %s to %, elements %s n))ot masked %s' % (rng[0], rng[1], fa.size , fa.count()))
-        logging.info('scalar_field_to_raster: masked variable %s min %s max %s' % (var, np.nanmin(fa),np.nanmax(fa)))
+        logging.info('scalar_field_to_raster: masked variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa),np.nanmax(fa)))
         
     # look at mins and maxes, transparent don't count
     if fa.count():
