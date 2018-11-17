@@ -168,7 +168,7 @@ def load_rtma_data(rtma_data, bbox):
     # compute relative humidity
     rh = 100*np.exp(17.625*243.04*(td - t2) / (243.04 + t2 - 273.15) / (243.0 + td - 273.15))
     
-    return t2, rh, rain, hgt, lats[i1:i2,j1:j2], lons[i1:i2,j1:j2]
+    return td, t2, rh, rain, hgt, lats[i1:i2,j1:j2], lons[i1:i2,j1:j2]
 
 
 def compute_equilibria(T, H):
@@ -228,7 +228,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     assert not dont_have_vars
     
     logging.info('CYCLER loading RTMA data for cycle %s.' % str(cycle))
-    T2, RH, rain, hgt, lats, lons = load_rtma_data(have_vars, cfg.bbox)
+    TD, T2, RH, rain, hgt, lats, lons = load_rtma_data(have_vars, cfg.bbox)
     Ed, Ew = compute_equilibria(T2, RH)
 
     dom_shape = T2.shape
@@ -294,7 +294,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # store the new model  
     path = compute_model_path(cycle, cfg.code, wksp_path)
     logging.info('CYCLER writing model variables to:  %s.' % path)
-    model.to_netcdf(ensure_dir(path))
+    model.to_netcdf(ensure_dir(path),{'TD':TD,'T2':T2,'RH':RH,'RAIN':rain})
     
     return model
     
