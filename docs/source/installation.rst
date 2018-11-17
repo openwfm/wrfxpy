@@ -34,12 +34,17 @@ Install pre-requisites:
 
 ::
 
-  conda install basemap netcdf4 pyproj paramiko
+  conda install basemap netcdf4 pyproj paramiko dill
   conda install -c conda-forge simplekml pygrib f90nml
+  conda install -c anaconda numpy
   pip install MesoPy
-  pip install -U numpy
+  pip install python-cmr
 
-At the moment this installation works with Anaconda2-4.3.0 but not the latest Anaconda2.
+Add to your .profile or .bashrc 
+
+::
+  setenv PROJ_LIB "$HOME/anaconda2/share/proj"
+
 
 Note that ``conda`` and ``pip`` are package managers available in the Anaconda Python distribution.
 
