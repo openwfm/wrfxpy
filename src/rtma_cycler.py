@@ -47,13 +47,13 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     :param wksp_path: the workspace path
     :return: the postprocessing path
     """
-    data_path = compute_model_path(cycle, region_cfg.code, wksp_path)
+    model_path = compute_model_path(cycle, region_cfg.code, wksp_path)
     year_month = '%04d%02d' % (cycle.year, cycle.month)
     cycle_dir = 'fmda-%s-%04d%02d%02d-%02d' %  (region_cfg.code, cycle.year, cycle.month, cycle.day, cycle.hour)
     postproc_path = osp.join(wksp_path, year_month, cycle_dir)
 
     # open and read in the fuel moisture values
-    d = netCDF4.Dataset(data_path)
+    d = netCDF4.Dataset(model_path)
     fmc_gc = d.variables['FMC_GC'][:,:,:]
     d.close()
 
@@ -292,8 +292,8 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     execute_da_step(model, cycle, covs, fm10)
     
     # store the new model  
-    path = compute_model_path(cycle, cfg.code, wksp_path)
-    logging.info('CYCLER writing model variables to:  %s.' % path)
+    model_path = compute_model_path(cycle, cfg.code, wksp_path)
+    logging.info('CYCLER writing model variables to:  %s.' % model_path)
     model.to_netcdf(ensure_dir(path),{'TD':TD,'T2':T2,'RH':RH,'RAIN':rain})
     
     return model
