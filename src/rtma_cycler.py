@@ -231,6 +231,11 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     TD, T2, RH, rain, hgt, lats, lons = load_rtma_data(have_vars, cfg.bbox)
     Ed, Ew = compute_equilibria(T2, RH)
 
+    # remove rain that is too small to make any difference 
+    rain[rain < 0.01] = 0
+    # remove bogus rain that is too large 
+    rain[rain > 1e10] = 0
+
     dom_shape = T2.shape
 
     # store the lons/lats for this domain
@@ -267,6 +272,11 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
         logging.info('CYCLER advancing model one hour to cycle %s.' % (str(cycle)))
         dt = 3600 # always 1 hr step in RTMA
         model.advance_model(Ed, Ew, rain, dt, Q)
+
+    ## store the  model  before DA
+    #model_path = compute_model_path(cycle, cfg.code, wksp_path) + '_before_da'
+    #logging.info('CYCLER writing model variables before DA to:  %s.' % model_path)
+    #model.to_netcdf(ensure_dir(model_path),{'EW':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'RAIN':rain,'HGT':hgt})
     
     logging.info('CYCLER retrieving fm-10 observations for cycle %s.' % (str(cycle)))
     
@@ -282,11 +292,6 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     logging.info('CYCLER retrieved %d valid observations, min/mean/max [%g/%g/%g].' %
                  (len(fm10),np.amin(fm10v),np.mean(fm10v),np.amax(fm10v)))
     
-    # remove rain that is too small to make any difference 
-    rain[rain < 0.01] = 0
-    # remove bogus rain that is too large 
-    rain[rain > 1e10] = 0
-    
     # run the data assimilation step
     covs = [np.ones(dom_shape), hgt / 2000.0]
     if np.any(rain > 0.01):
@@ -296,7 +301,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path)
     logging.info('CYCLER writing model variables to:  %s.' % model_path)
-    model.to_netcdf(ensure_dir(model_path),{'TD':TD,'T2':T2,'RH':RH,'RAIN':rain})
+    model.to_netcdf(ensure_dir(model_path),{'EW':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'RAIN':rain,'HGT':hgt})
     
     return model
     
