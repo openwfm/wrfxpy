@@ -66,32 +66,65 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             'colorbar' : '-',
             'colormap' : 'jet_r',
             'scale' : [0.0, 0.4]
-        }
+        },
+        'TD' : {
+            'name' : 'Dew point temperature at 2m',
+            'native_unit' : 'K',
+            'colorbar' : '-',
+            'colormap' : 'jet_r',
+            'scale' : [270.0, 320.0]
+        },
+        'T2' : {
+            'name' : 'Temperature at 2m',
+            'native_unit' : 'K',
+            'colorbar' : '-',
+            'colormap' : 'jet_r',
+            'scale' : [270.0, 320.0]
+        },
+        'PRECIPA' : {
+            'name' : 'Accumulated precipitation',
+            'native_unit' : 'kg/m^2/h',
+            'colorbar' : '-',
+            'colormap' : 'jet_r',
+            'scale' : [0.0, 50.0]
+        },
+        'HGT' : {
+            'name' : 'Terrain height',
+            'native_unit' : 'm',
+            'colorbar' : '-',
+            'colormap' : 'jet_r',
+            'scale' : [0.0, 5000.0]
+        },
+    
     }
-
-    # open and read in the fuel moisture values
-    d = netCDF4.Dataset(model_path)
-
 
     esmf_cycle = utc_to_esmf(cycle) 
     mf = { "1" : {esmf_cycle : {}}}
     manifest_name = 'fmda-%s-%04d%02d%02d-%02d.json' %  (region_cfg.code, cycle.year, cycle.month, cycle.day, cycle.hour)
     ensure_dir(osp.join(postproc_path, manifest_name))
-
-    for i,name in [(0, '1-hr'), (1, '10-hr'), (2, '100-hr')]:
-        fm_wisdom = var_wisdom['fm']
-        fm_wisdom['name'] = '%s fuel moisture' % name
-        raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
-        raster_name = 'fmda-%s-raster.png' % name
-        cb_name = 'fmda-%s-raster-cb.png' % name
-        with open(osp.join(postproc_path, raster_name), 'w') as f:
-            f.write(raster_png)
-        with open(osp.join(postproc_path, cb_name), 'w') as f:
-            f.write(cb_png) 
-        mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
-
-    # for name in ['TD','PRECIPA','T2','HGT']:
-    d.close()
+    
+    # read and process model variables
+    with netCDF4.Dataset(model_path) as d:
+        for i,name in [(0, '1-hr FM'), (1, '10-hr FM'), (2, '100-hr FM')]:
+            fm_wisdom = var_wisdom['fm']
+            fm_wisdom['name'] = '%s fuel moisture' % name
+            raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
+            raster_name = 'fmda-%s-raster.png' % name
+            cb_name = 'fmda-%s-raster-cb.png' % name
+            with open(osp.join(postproc_path, raster_name), 'w') as f:
+                f.write(raster_png)
+            with open(osp.join(postproc_path, cb_name), 'w') as f:
+                f.write(cb_png) 
+            mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+        for name in ['TD','PRECIPA','T2','HGT']:
+            raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
+            raster_name = 'fmda-%s-raster.png' % name
+            cb_name = 'fmda-%s-raster-cb.png' % name
+            with open(osp.join(postproc_path, raster_name), 'w') as f:
+                f.write(raster_png)
+            with open(osp.join(postproc_path, cb_name), 'w') as f:
+                f.write(cb_png) 
+            mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
 
     logging.info('writing manifest file %s' % osp.join(postproc_path, manifest_name) )
     json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'), indent=1, separators=(',',':'))
