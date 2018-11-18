@@ -52,11 +52,6 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     cycle_dir = 'fmda-%s-%04d%02d%02d-%02d' %  (region_cfg.code, cycle.year, cycle.month, cycle.day, cycle.hour)
     postproc_path = osp.join(wksp_path, year_month, cycle_dir)
 
-    # open and read in the fuel moisture values
-    d = netCDF4.Dataset(model_path)
-    fmc_gc = d.variables['FMC_GC'][:,:,:]
-    d.close()
-
     # read in the longitudes and latitudes
     geo_path = osp.join(wksp_path, '%s-geo.nc' % region_cfg.code)
     logging.info('CYCLER reading longitudes and latitudes from NetCDF file %s' % geo_path )
@@ -65,12 +60,18 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     lons = d.variables['XLONG'][:,:]
     d.close()
 
-    fm_wisdom = {
-       'native_unit' : '-',
-       'colorbar' : '-',
-       'colormap' : 'jet_r',
-       'scale' : [0.0, 0.4]
+    var_wisdom = {
+        'fm' : {
+            'native_unit' : '-',
+            'colorbar' : '-',
+            'colormap' : 'jet_r',
+            'scale' : [0.0, 0.4]
+        }
     }
+
+    # open and read in the fuel moisture values
+    d = netCDF4.Dataset(model_path)
+
 
     esmf_cycle = utc_to_esmf(cycle) 
     mf = { "1" : {esmf_cycle : {}}}
@@ -78,8 +79,9 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     ensure_dir(osp.join(postproc_path, manifest_name))
 
     for i,name in [(0, '1-hr'), (1, '10-hr'), (2, '100-hr')]:
+        fm_wisdom = var_wisdom['fm']
         fm_wisdom['name'] = '%s fuel moisture' % name
-        raster_png, coords, cb_png = scalar_field_to_raster(fmc_gc[:,:,i], lats, lons, fm_wisdom)
+        raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
         raster_name = 'fmda-%s-raster.png' % name
         cb_name = 'fmda-%s-raster-cb.png' % name
         with open(osp.join(postproc_path, raster_name), 'w') as f:
@@ -87,6 +89,10 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
         with open(osp.join(postproc_path, cb_name), 'w') as f:
             f.write(cb_png) 
         mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+
+    # for name in ['TD','PRECIPA','T2','HGT']:
+    d.close()
+
     logging.info('writing manifest file %s' % osp.join(postproc_path, manifest_name) )
     json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'), indent=1, separators=(',',':'))
     #logging.info(json.dumps(mf, indent=1, separators=(',',':')))
