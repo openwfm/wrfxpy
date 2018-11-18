@@ -87,8 +87,10 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
         with open(osp.join(postproc_path, cb_name), 'w') as f:
             f.write(cb_png) 
         mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
-        logging.info('writing manifest file %s' % osp.join(postproc_path, manifest_name) )
-        json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'))
+    logging.info('writing manifest file %s' % osp.join(postproc_path, manifest_name) )
+    json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'), indent=1, separators=(',',':'))
+    #logging.info(json.dumps(mf, indent=1, separators=(',',':')))
+    logging.info(json.dumps(mf))
 
     return postproc_path
 
@@ -162,13 +164,13 @@ def load_rtma_data(rtma_data, bbox):
     
     t2 = gf.values()[i1:i2,j1:j2] # temperature at 2m in K
     td = GribFile(rtma_data['td'])[1].values()[i1:i2,j1:j2] # dew point in K
-    rain = GribFile(rtma_data['precipa'])[1].values()[i1:i2,j1:j2] # precipitation
+    precipa = GribFile(rtma_data['precipa'])[1].values()[i1:i2,j1:j2] # precipitation
     hgt = GribFile('static/ds.terrainh.bin')[1].values()[i1:i2,j1:j2]
     
     # compute relative humidity
     rh = 100*np.exp(17.625*243.04*(td - t2) / (243.04 + t2 - 273.15) / (243.0 + td - 273.15))
     
-    return td, t2, rh, rain, hgt, lats[i1:i2,j1:j2], lons[i1:i2,j1:j2]
+    return td, t2, rh, precipa, hgt, lats[i1:i2,j1:j2], lons[i1:i2,j1:j2]
 
 
 def compute_equilibria(T, H):
@@ -228,9 +230,10 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     assert not dont_have_vars
     
     logging.info('CYCLER loading RTMA data for cycle %s.' % str(cycle))
-    TD, T2, RH, rain, hgt, lats, lons = load_rtma_data(have_vars, cfg.bbox)
+    TD, T2, RH, precipa, hgt, lats, lons = load_rtma_data(have_vars, cfg.bbox)
     Ed, Ew = compute_equilibria(T2, RH)
 
+    rain = precipa[:,:]
     # remove rain that is too small to make any difference 
     rain[rain < 0.01] = 0
     # remove bogus rain that is too large 
@@ -273,11 +276,6 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
         dt = 3600 # always 1 hr step in RTMA
         model.advance_model(Ed, Ew, rain, dt, Q)
 
-    ## store the  model  before DA
-    #model_path = compute_model_path(cycle, cfg.code, wksp_path) + '_before_da'
-    #logging.info('CYCLER writing model variables before DA to:  %s.' % model_path)
-    #model.to_netcdf(ensure_dir(model_path),{'EW':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'RAIN':rain,'HGT':hgt})
-    
     logging.info('CYCLER retrieving fm-10 observations for cycle %s.' % (str(cycle)))
     
     # perform assimilation with mesowest observations
@@ -301,7 +299,8 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path)
     logging.info('CYCLER writing model variables to:  %s.' % model_path)
-    model.to_netcdf(ensure_dir(model_path),{'EW':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'RAIN':rain,'HGT':hgt})
+    model.to_netcdf(ensure_dir(model_path),
+        {'EW':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'RAIN':rain,'HGT':hgt})
     
     return model
     
@@ -354,7 +353,8 @@ if __name__ == '__main__':
         print 'Example: ./rtma_cycler.sh 42, -124.6, 49, -116.4'
         exit(1) 
 
-    logging.info('regions: %s' % cfg.regions)
+    logging.info('regions: %s' % json.dumps(cfg.regions))
+    #logging.info('regions: %s' % json.dumps(cfg.regions, indent=1, separators=(',',':')))
 
     meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
