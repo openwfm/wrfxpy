@@ -465,7 +465,7 @@ def convert_value(unit_from, unit_to, value):
 
     func = _units_wisdom.get((unit_from, unit_to))
     if func is None:
-        return None
+        return value 
     else:
         return func(value)
 
