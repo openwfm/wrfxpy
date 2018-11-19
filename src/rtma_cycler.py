@@ -67,6 +67,13 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             'colormap' : 'jet_r',
             'scale' : [0.0, 0.4]
         },
+        'RH' : {
+            'name' : 'Relative humidity',
+            'native_unit' : '%',
+            'colorbar' : '%',
+            'colormap' : 'jet_r',
+            'scale' : [0.0, 100.0]
+        },
         'TD' : {
             'name' : 'Dew point temperature at 2m',
             'native_unit' : 'K',
@@ -102,7 +109,6 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             'colormap' : 'jet_r',
             'scale' : [0.0, 5000.0]
         },
-    
     }
 
     esmf_cycle = utc_to_esmf(cycle) 
@@ -123,7 +129,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             with open(osp.join(postproc_path, cb_name), 'w') as f:
                 f.write(cb_png) 
             mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
-        for name in ['TD','PRECIPA','T2','HGT','RAIN']:
+        for name in ['TD','PRECIPA','T2','HGT','RAIN','RH']:
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
             raster_name = 'fmda-%s-raster.png' % name
             cb_name = 'fmda-%s-raster-cb.png' % name
