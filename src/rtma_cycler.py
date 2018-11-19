@@ -77,19 +77,19 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
         'TD' : {
             'name' : 'Dew point temperature at 2m',
             'native_unit' : 'K',
-            'colorbar' : 'K',
+            'colorbar' : 'F',
             'colormap' : 'jet',
             'scale' : [270.0, 320.0]
         },
         'T2' : {
             'name' : 'Temperature at 2m',
             'native_unit' : 'K',
-            'colorbar' : 'K',
+            'colorbar' : 'F',
             'colormap' : 'jet',
             'scale' : [270.0, 320.0]
         },
         'PRECIPA' : {
-            'name' : 'RTMA Accumulated precipitation',
+            'name' : 'RTMA precipa',
             'native_unit' : 'kg/m^2/h',
             'colorbar' : 'kg/m^2/h',
             'colormap' : 'jet_r',
@@ -97,7 +97,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
         },
         'RAIN' : {
             'name' : 'Rain',
-            'native_unit' : 'kg/m^2/h',
+            'native_unit' : 'mm/h',
             'colorbar' : 'kg/m^2/h',
             'colormap' : 'jet_r',
             'scale' : [0.0, 10.0]
