@@ -93,14 +93,14 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             'native_unit' : 'kg/m^2/h',
             'colorbar' : 'kg/m^2/h',
             'colormap' : 'jet_r',
-            'scale' : [0.0, 10.0]
+            'scale' : [0.0, 2.0]
         },
         'RAIN' : {
             'name' : 'Rain',
             'native_unit' : 'mm/h',
             'colorbar' : 'kg/m^2/h',
             'colormap' : 'jet_r',
-            'scale' : [0.0, 10.0]
+            'scale' : [0.0, 2.0]
         },
         'HGT' : {
             'name' : 'Terrain height',
