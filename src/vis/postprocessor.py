@@ -72,6 +72,7 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         cb_unit = wisdom['colorbar']
         cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
         #  colorbar + add it to the KMZ as a screen overlay
+        logging.info('scalar_field_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
         cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
 
     # create the raster & get coordinate bounds

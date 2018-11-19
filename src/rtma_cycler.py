@@ -70,28 +70,35 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
         'TD' : {
             'name' : 'Dew point temperature at 2m',
             'native_unit' : 'K',
-            'colorbar' : '-',
-            'colormap' : 'jet_r',
+            'colorbar' : 'K',
+            'colormap' : 'jet',
             'scale' : [270.0, 320.0]
         },
         'T2' : {
             'name' : 'Temperature at 2m',
             'native_unit' : 'K',
-            'colorbar' : '-',
-            'colormap' : 'jet_r',
+            'colorbar' : 'K',
+            'colormap' : 'jet',
             'scale' : [270.0, 320.0]
         },
         'PRECIPA' : {
-            'name' : 'Accumulated precipitation',
+            'name' : 'RTMA Accumulated precipitation',
             'native_unit' : 'kg/m^2/h',
-            'colorbar' : '-',
+            'colorbar' : 'kg/m^2/h',
             'colormap' : 'jet_r',
-            'scale' : [0.0, 50.0]
+            'scale' : [0.0, 10.0]
+        },
+        'RAIN' : {
+            'name' : 'Rain',
+            'native_unit' : 'kg/m^2/h',
+            'colorbar' : 'kg/m^2/h',
+            'colormap' : 'jet_r',
+            'scale' : [0.0, 10.0]
         },
         'HGT' : {
             'name' : 'Terrain height',
             'native_unit' : 'm',
-            'colorbar' : '-',
+            'colorbar' : 'm',
             'colormap' : 'jet_r',
             'scale' : [0.0, 5000.0]
         },
@@ -116,7 +123,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             with open(osp.join(postproc_path, cb_name), 'w') as f:
                 f.write(cb_png) 
             mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
-        for name in ['TD','PRECIPA','T2','HGT']:
+        for name in ['TD','PRECIPA','T2','HGT','RAIN']:
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
             raster_name = 'fmda-%s-raster.png' % name
             cb_name = 'fmda-%s-raster-cb.png' % name
@@ -205,6 +212,10 @@ def load_rtma_data(rtma_data, bbox):
     td = GribFile(rtma_data['td'])[1].values()[i1:i2,j1:j2] # dew point in K
     precipa = GribFile(rtma_data['precipa'])[1].values()[i1:i2,j1:j2] # precipitation
     hgt = GribFile('static/ds.terrainh.bin')[1].values()[i1:i2,j1:j2]
+    logging.info('t2 min %s max %s' % (np.min(t2),np.max(t2)))
+    logging.info('td min %s max %s' % (np.min(td),np.max(td)))
+    logging.info('precipa min %s max %s' % (np.min(precipa),np.max(precipa)))
+    logging.info('hgt min %s max %s' % (np.min(hgt),np.max(hgt)))
     
     # compute relative humidity
     rh = 100*np.exp(17.625*243.04*(td - t2) / (243.04 + t2 - 273.15) / (243.0 + td - 273.15))
@@ -272,7 +283,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     TD, T2, RH, precipa, hgt, lats, lons = load_rtma_data(have_vars, cfg.bbox)
     Ed, Ew = compute_equilibria(T2, RH)
 
-    rain = precipa[:,:]
+    rain = precipa[:,:] + 0
     # remove rain that is too small to make any difference 
     rain[rain < 0.01] = 0
     # remove bogus rain that is too large 
