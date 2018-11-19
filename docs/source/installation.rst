@@ -44,7 +44,7 @@ Install pre-requisites:
 Add your environment (~/.custom.csh) the following line
   setenv PROJ_LIB "$HOME/anaconda2/share/proj"
 or if you are using bash to ~/.profile or ~/.bashrc
-  setenv PROJ_LIB "$HOME/anaconda2/share/proj"
+  export PROJ_LIB="$HOME/anaconda2/share/proj"
 
 Note that ``conda`` and ``pip`` are package managers available in the Anaconda Python distribution.
 
