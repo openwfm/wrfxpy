@@ -67,6 +67,20 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             'colormap' : 'jet_r',
             'scale' : [0.0, 0.4]
         },
+        'EQUILd FM' : {
+            'name' : 'Drying equilibrium FM',
+            'native_unit' : '-',
+            'colorbar' : 'i-',
+            'colormap' : 'jet_r',
+            'scale' : [0.0, 0.4]
+        },
+        'EQUILw FM' : {
+            'name' : 'Wetting equilibrium FM',
+            'native_unit' : '-',
+            'colorbar' : 'i-',
+            'colormap' : 'jet_r',
+            'scale' : [0.0, 0.4]
+        },
         'RH' : {
             'name' : 'Relative humidity',
             'native_unit' : '%',
@@ -129,7 +143,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             with open(osp.join(postproc_path, cb_name), 'w') as f:
                 f.write(cb_png) 
             mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
-        for name in ['TD','PRECIPA','T2','HGT','RAIN','RH']:
+        for name in ['TD','PRECIPA','T2','HGT','RAIN','RH','EQUILd FM','EQUILw FM']:
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
             raster_name = 'fmda-%s-raster.png' % name
             cb_name = 'fmda-%s-raster-cb.png' % name
@@ -356,7 +370,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     model_path = compute_model_path(cycle, cfg.code, wksp_path)
     logging.info('CYCLER writing model variables to:  %s.' % model_path)
     model.to_netcdf(ensure_dir(model_path),
-        {'EW':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'RAIN':rain,'HGT':hgt})
+        {'EQUILd FM':Ed,'EQUILw FM':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'RAIN':rain,'HGT':hgt})
     
     return model
     
