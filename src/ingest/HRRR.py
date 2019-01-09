@@ -42,7 +42,7 @@ class HRRR(GribForecast):
         :param cycle_start: UTC time of cycle start
         :param fc_hours: final forecast hour 
         """
-        path_tmpl = 'hrrr.%04d%02d%02d/hrrr.t%02dz.wrfprsf%02d.grib2'
+        path_tmpl = 'hrrr.%04d%02d%02d/conus/hrrr.t%02dz.wrfprsf%02d.grib2'
         grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, x) for x in fc_list]
 
         return grib_files

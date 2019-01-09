@@ -20,9 +20,9 @@
        },
        "Southwest GACC" : {
          "code" : "SWCC",
-         "bbox" : [27, -114.5, 37, -103]
+         "bbox" : [27, -114.5, 37, -100]
        },
-       "Soutern CA GACC" : {
+       "Southern CA GACC" : {
          "code" : "OSCC",
          "bbox" : [32, -123, 39, -114]
        },

@@ -57,6 +57,7 @@ class RTMA(object):
         """
         self.var_list = var_list
         self.ingest_path = ingest_path
+        logging.info('Initialized RTMA for ingest path %s variables %s' % (ingest_path,' '.join(var_list)))
 
 
     def retrieve_rtma(self, cycle):
