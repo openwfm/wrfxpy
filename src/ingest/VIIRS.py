@@ -27,7 +27,9 @@ class SNPP(VIIRS):
 	info_url=''
 	info='S-NPP Visible Infrared Imaging Radiometer Suite (VIIRS)'
 	prefix='VNP'
-	geo_extra_prefix='MODLL'
+	geo_prefix='VNP03MODLL'
+	fire_prefix='VNP14'
+	ref_prefix='VNP09'
 	platform=''
 
 class NOAA20(VIIRS):
@@ -42,5 +44,8 @@ class NOAA20(VIIRS):
 	info_url=''
 	info='NOAA-20 Visible Infrared Imaging Radiometer Suite (VIIRS)'
 	prefix=''
+	geo_prefix=''
+	fire_prefix=''
+	ref_prefix=''
 	platform=''
 

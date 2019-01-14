@@ -28,6 +28,9 @@ class Terra(MODIS):
 	info_url='https://terra.nasa.gov/about/terra-instruments/modis'
 	info='Terra Moderate Resolution Imaging Spectroradiometer (MODIS)'
 	prefix='MOD'
+	geo_prefix='MOD03'
+	fire_prefix='MOD14'
+	ref_prefix='MOD09'
 	platform='Terra'
 
 class Aqua(MODIS):
@@ -42,5 +45,8 @@ class Aqua(MODIS):
 	info_url='https://aqua.nasa.gov/modis'
 	info='Aqua Moderate Resolution Imaging Spectroradiometer (MODIS)'
 	prefix='MYD'
+	geo_prefix='MYD03'
+	fire_prefix='MYD14'
+	ref_prefix='MYD09'
 	platform='Aqua'
 

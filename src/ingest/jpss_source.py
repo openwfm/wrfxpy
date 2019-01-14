@@ -47,18 +47,17 @@ class JPSSSource(object):
 		else:
 			return False
 
-	def search_api_jpss(self, prod, bbox, time, version=None):
+	def search_api_jpss(self, sname, bbox, time, version=None):
 		"""
 		API search of the different satellite granules and return metadata dictionary
 
-		:param prod: JPSS product
+		:param sname: short name JPSS product, ex: 'MOD03'
 		:param bbox: polygon with the search bounding box
 		:param time: time interval (init_time_iso,final_time_iso)
 
 		:return metas: a dictionary with all the metadata for the API search
 		"""
 		maxg=100
-		sname=self.prefix+prod
 		time_utcf=(utc_to_utcf(time[0]),utc_to_utcf(time[1]))
 		api = GranuleQuery()
 		if not version:
@@ -91,7 +90,7 @@ class JPSSSource(object):
 		"""
 		Archive search of the different satellite granules
 
-		:param prod: string of product with version, for instance: '5000/VNP09'
+		:param prod: string of short name product, ex: 'VNP09'
 		:param time: time interval (init_time_datetime,final_time_datetime)
 		:param geo_metas: granules of the geolocation metadata
 		:return metas: dictionary with the metadata of the search
@@ -102,7 +101,7 @@ class JPSSSource(object):
 		nh=int(delta.total_seconds()/3600)
 		dates=[time[0]+datetime.timedelta(seconds=3600*k) for k in range(1,nh+1)]
 		fold=np.unique(['%d/%03d' % (date.timetuple().tm_year,date.timetuple().tm_yday) for date in dates])
-		urls=[self.url+'/'+self.prefix+prod+'/'+f for f in fold]
+		urls=[self.url+'/'+prod+'/'+f for f in fold]
 		for u in urls:
 			js=requests.get(u+'.json').json()
 			for j in js:
@@ -128,13 +127,13 @@ class JPSSSource(object):
 		:return granules: dictionary with the metadata of all the products
 		"""
 		metas=Dict([])
-		metas.geo=self.search_api_jpss('03'+self.geo_extra_prefix,bbox,time,self.version)
-		metas.fire=self.search_api_jpss('14',bbox,time)
+		metas.geo=self.search_api_jpss(self.geo_prefix,bbox,time,self.version)
+		metas.fire=self.search_api_jpss(self.fire_prefix,bbox,time)
 		if not metas.fire:
-			metas.fire=self.search_archive_jpss('14',time,metas.geo)
-		metas.ref=self.search_api_jpss('09',bbox,time)
+			metas.fire=self.search_archive_jpss(self.fire_prefix,time,metas.geo)
+		metas.ref=self.search_api_jpss(self.ref_prefix,bbox,time)
 		if not metas.ref:
-			metas.ref=self.search_archive_jpss('09',time,metas.geo)
+			metas.ref=self.search_archive_jpss(self.ref_prefix,time,metas.geo)
 		return metas
 
 
@@ -250,7 +249,9 @@ class JPSSSource(object):
 	info=None
 	url=None
 	prefix=None
-	geo_extra_prefix=''
+	geo_prefix=None
+	fire_prefix=None
+	ref_prefix=None
 	platform=None
 	version=None
 

@@ -11,7 +11,7 @@ import logging, sys, json
 if __name__ == '__main__':
 	if len(sys.argv) != 2:
 		print('Usage: %s input.json' % sys.argv[0])
-		print('		supported atellite sources: Terra, Aqua, SNPP')
+		print('		supported atellite sources: Terra, Aqua, S-NPP')
 		sys.exit(-1)
 
 	# load input JSON
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 		aqua=Aqua(sys_cfg)
 		# retrieve granules
 		m_aqua=aqua.retrieve_data_jpss(bounds, from_utc, to_utc)
-	if 'SNPP' in sat_sources:
+	if 'S-NPP' in sat_sources:
 		logging.info('> MODIS Aqua')
 		snpp=SNPP(sys_cfg)
 		# retrieve granules
