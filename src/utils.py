@@ -243,7 +243,6 @@ def esmf_to_utc(esmf):
     hour, min, sec = int(esmf[11:13]), int(esmf[14:16]), int(esmf[17:19])
     return datetime(year, mon, day, hour, min, sec, tzinfo=pytz.utc)
 
-
 def utc_to_esmf(utc):
     """
     Converts a UTC datetime into ESMF format.
