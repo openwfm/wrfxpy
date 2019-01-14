@@ -1,8 +1,8 @@
 {
     "profile": {
-        "info": "A two-domain configuration with 60x60km fire domain at 1km resolution and a 25m fire grid.",
-        "identifier": "2d-1km-NAM218",
-        "template": "profiles/2d_1km_NAM218.json",
+        "info": "Example for retrieving satellite data.",
+        "identifier": "test-satellite",
+        "template": "profiles/test_satellite.json",
         "title": "Two domains, 3km/1km resolution with 25m fire grid, NAM218 12km forcing"
     },
     "wall_time_hrs": 3,

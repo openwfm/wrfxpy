@@ -253,6 +253,15 @@ def utc_to_esmf(utc):
     """
     return "%04d-%02d-%02d_%02d:%02d:%02d" % (utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second)
 
+def utc_to_utcf(utc):
+    """
+    Converts a UTC datetime into UTC string format %Y-%m-%dT%H:%M:%SZ.
+
+    :param utc: python UTC datetime
+    :return: a string in UTC string format %Y-%m-%dT%H:%M:%SZ
+    """
+    return "%04d-%02d-%02dT%02d:%02d:%02dZ" % (utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second)
+
 
 def round_time_to_hour(utc, up=False, period_hours=1):
     """

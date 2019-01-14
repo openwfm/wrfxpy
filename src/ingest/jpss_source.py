@@ -7,7 +7,7 @@ import os.path as osp
 import numpy as np
 from urllib import urlopen
 from cmr import GranuleQuery
-from utils import Dict
+from utils import Dict, utc_to_utcf
 from downloader import download_url, DownloadError
 
 class JPSSError(Exception):
@@ -59,20 +59,21 @@ class JPSSSource(object):
 		"""
 		maxg=100
 		sname=self.prefix+prod
+		time_utcf=(utc_to_utcf(time[0]),utc_to_utcf(time[1]))
 		api = GranuleQuery()
 		if not version:
 			search = api.parameters(
 								short_name=sname,
 								downloadable=True,
 								polygon=bbox,
-								temporal=time
+								temporal=time_utcf
 								)
 		else:
 			search = api.parameters(
 								short_name=sname,
 								downloadable=True,
 								polygon=bbox,
-								temporal=time,
+								temporal=time_utcf,
 								version=version
 								)
 		sh=search.hits()
@@ -91,16 +92,15 @@ class JPSSSource(object):
 		Archive search of the different satellite granules
 
 		:param prod: string of product with version, for instance: '5000/VNP09'
-		:param time: time interval (init_time,final_time)
+		:param time: time interval (init_time_datetime,final_time_datetime)
 		:param geo_metas: granules of the geolocation metadata
 		:return metas: dictionary with the metadata of the search
 		"""
 		ids=['.'.join(gm['producer_granule_id'].split('.')[1:3]) for gm in geo_metas] # satellite ids in bounding box
 		metas=[]
-		dts=[datetime.datetime.strptime(d,'%Y-%m-%dT%H:%M:%SZ') for d in time]
-		delta=dts[1]-dts[0]
+		delta=time[1]-time[0]
 		nh=int(delta.total_seconds()/3600)
-		dates=[dts[0]+datetime.timedelta(seconds=3600*k) for k in range(1,nh+1)]
+		dates=[time[0]+datetime.timedelta(seconds=3600*k) for k in range(1,nh+1)]
 		fold=np.unique(['%d/%03d' % (date.timetuple().tm_year,date.timetuple().tm_yday) for date in dates])
 		urls=[self.url+'/'+self.prefix+prod+'/'+f for f in fold]
 		for u in urls:
@@ -113,6 +113,7 @@ class JPSSSource(object):
 					g.links=[{'href': u+'/'+g.name}]
 					g.time_start=geo_metas[ar]['time_start']
 					g.time_end=geo_metas[ar]['time_end']
+					g.producer_granule_id=j['name']
 					metas.append(g)
 		logging.info('Archive: %s gets %s hits in this range' % (self.prefix+prod,len(metas)))
 		return metas
@@ -122,7 +123,7 @@ class JPSSSource(object):
 		Get all the meta data for all the necessary products
 
 		:param bbox: polygon with the search bounding box
-		:param time: time interval (init_time_iso,final_time_iso)
+		:param time: time interval (init_time_datetime,final_time_datetime)
 		:param maxg: max number of granules to process
 		:return granules: dictionary with the metadata of all the products
 		"""
@@ -135,6 +136,57 @@ class JPSSSource(object):
 		if not metas.ref:
 			metas.ref=self.search_archive_jpss('09',time,metas.geo)
 		return metas
+
+
+	def download_jpss(self, url):
+		"""
+		Download a JPSS file from a JPSS service
+
+		:param url: the URL of the file
+		"""
+		logging.info('downloading %s jpss data from %s' % (self.prefix, url))
+		jpss_name = osp.basename(url)
+		jpss_path = osp.join(self.ingest_dir,jpss_name)
+		if self.available_locally_jpss(jpss_path):
+			logging.info('%s is available locally' % jpss_path)
+			return {'url': url,'local_path': jpss_path}
+		else:
+			try:
+				download_url(url, jpss_path)
+				return {'url': url,'local_path': jpss_path,'downloaded': datetime.datetime.now}
+			except DownloadError as e:
+				logging.error('%s cannot download jpss file %s' % (self.prefix, url))
+				logging.warning('Pleae check %s for %s' % (self.info_url, self.info))
+				return {}
+				raise JPSSError('JPSSSource: failed to download file %s' % url)
+
+	def retrieve_data_jpss(self, bounds, from_utc, to_utc):
+		"""
+		Retrieve JPSS data in a bounding box coordinates and time interval
+
+		:param bounds: polygon with the search bounding box
+		:param time: time interval (init_time_iso,final_time_iso)
+		:return data: dictonary with all the data
+		"""
+		lonmin,lonmax,latmin,latmax = bounds
+		bbox = [(lonmin,latmax),(lonmin,latmin),(lonmax,latmin),(lonmax,latmax),(lonmin,latmax)]
+		time = (from_utc, to_utc)
+
+		metas = self.get_metas_jpss(bbox,time)
+
+		logging.info('retrieve_jpss: saved %s metas for %s JPSS service' % (len(metas),self.prefix))
+
+		manifest = Dict({})
+
+		for k, mm in metas.items():
+			logging.info('downloading %s products' % k)
+			for m in mm:
+				id = m['producer_granule_id']
+				url = m['links'][0]['href']
+				m.update(self.download_jpss(url))
+				manifest.update({id: m})
+
+		return manifest
 
 	def group_files_jpss(self):
 		"""
@@ -172,24 +224,6 @@ class JPSSSource(object):
 								files[k].ref=f
 		return files
 
-	def download_jpss(self, url):
-		"""
-		Download a JPSS file from a JPSS service
-
-		:param url: the URL of the file
-		"""
-		logging.info('downloading %s jpss data from %s' % (self.prefix, url))
-		jpss_path = osp.join(self.ingest_dir,osp.basename(url))
-		if self.available_locally_jpss(jpss_path):
-			logging.info('%s is available locally' % jpss_path)
-		else:
-			try:
-				download_url(url, jpss_path)
-			except DownloadError as e:
-				logging.error('%s cannot download jpss file %s' % (self.prefix, url))
-				logging.warning('Pleae check %s for %s' % (self.info_url, self.info))
-				raise JPSSError('JPSSSource: failed to download file %s' % url)
-
 	def read_jpss(self, files, metas, bounds):
 		"""
 		Read all the JPSS files from a specific JPSS service
@@ -209,34 +243,6 @@ class JPSSSource(object):
 		:return ret: dictionary with Latitude, Longitude and fire mask arrays read
 		"""
 		pass
-
-	def retrieve_data_jpss(self, bounds, time):
-		"""
-		Retrieve JPSS data in a bounding box coordinates and time interval
-
-		:param bounds: polygon with the search bounding box
-		:param time: time interval (init_time_iso,final_time_iso)
-		:return data: dictonary with all the data
-		"""
-		lonmin,lonmax,latmin,latmax=bounds
-		bbox=[(lonmin,latmax),(lonmin,latmin),(lonmax,latmin),(lonmax,latmax),(lonmin,latmax)]
-
-		metas=self.get_metas_jpss(bbox,time)
-
-		logging.info('retrieve_jpss: saved %s metas for %s JPSS service' % (len(metas),self.prefix))
-
-		for k, mm in metas.items():
-			logging.info('downloading %s products' % k)
-			for m in mm:
-				url=m['links'][0]['href']
-				self.download_jpss(url)
-
-		#group=self.group_files_jpss()
-		#jpss_data=self.read_files_jpss()
-
-		#return jpss_data
-
-		return metas
 
 
 	# instance variables

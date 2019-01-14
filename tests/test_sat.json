@@ -1,0 +1,132 @@
+{
+    "profile": {
+        "info": "A large three-domain configuration with 91x91km fire domain at 555m resolution and a 28m fire grid.",
+        "identifier": "3d-555m_NAM218L_SAT",
+        "template": "profiles/3d_555m_NAM218L_SAT.json",
+        "title": "Three domains, 5km/1.6km/0.55km cell size, 28m fire grid., NAM218 12km forcing. Satellite test"
+    },
+    "wall_time_hrs": 6,
+    "end_utc": "2018-11-10_13:00:00",
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "postproc": {
+        "1": [
+            "WINDSPD",
+            "WINDVEC",
+            "WINDSPD1000FT",
+            "WINDVEC1000FT",
+            "SMOKE_INT",
+            "PM25_INT",
+            "PLUME_HEIGHT"
+        ],
+        "shuttle": "incremental",
+        "3": [
+            "WINDSPD",
+            "WINDVEC",
+            "WINDSPD1000FT",
+            "WINDVEC1000FT",
+            "SMOKE_INT",
+            "PM25_INT",
+            "PLUME_HEIGHT",
+            "FIRE_AREA"
+        ],
+        "2": [
+            "WINDSPD",
+            "WINDVEC",
+            "WINDSPD1000FT",
+            "WINDVEC1000FT",
+            "SMOKE_INT",
+            "PM25_INT",
+            "PLUME_HEIGHT"
+        ],
+        "description": "Camp Fire 11.08"
+    },
+    "ppn": 28,
+    "template": "/uufs/chpc.utah.edu/common/home/kochanski-group3/wrfxctrl/profiles/3d_555m_NAM218L_SAT.json",
+    "grid_code": "from-web-2018-11-14_17-07-10",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "domains": {
+        "1": {
+            "cell_size": [
+                5000,
+                5000
+            ],
+            "truelats": [
+                39.814746,
+                39.814746
+            ],
+            "stand_lon": -121.434525,
+            "center_latlon": [
+                39.814746,
+                -121.434525
+            ],
+            "history_interval": 60,
+            "geog_res": "30s",
+            "domain_size": [
+                97,
+                97
+            ],
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "time_step": 28
+        },
+        "3": {
+            "parent_time_step_ratio": 3,
+            "parent_start": [
+                21,
+                21
+            ],
+            "history_interval": 15,
+            "geog_res": ".3s",
+            "parent_id": 2,
+            "subgrid_ratio": [
+                20,
+                20
+            ],
+            "parent_end": [
+                75,
+                75
+            ],
+            "parent_cell_size_ratio": 3
+        },
+        "2": {
+            "parent_time_step_ratio": 3,
+            "parent_start": [
+                32,
+                32
+            ],
+            "history_interval": 30,
+            "geog_res": ".3s",
+            "parent_id": 1,
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "parent_end": [
+                63,
+                63
+            ],
+            "parent_cell_size_ratio": 3
+        }
+    },
+    "ignitions": {
+        "3": [
+            {
+                "time_utc": "2018-11-08_13:30:00",
+                "latlon": [
+                    39.814746,
+                    -121.434525
+                ],
+                "duration_s": 240
+            }
+        ]
+    },
+    "num_nodes": 6,
+    "grib_source": "NAM",
+    "satellite_source": ["Aqua","Terra","S-NPP"],
+    "start_utc": "2018-11-08_00:00:00",
+    "job_id": "satellite_test"
+}

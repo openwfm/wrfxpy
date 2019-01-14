@@ -32,7 +32,7 @@ if __name__ == '__main__':
         print('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0])
         print('       supported GRIB sources: HRRR, NAM, CFSR_P, CFSR_S, NARR')
         sys.exit(-1)
-    
+
 
     # configure the basic logger
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     from_utc = esmf_to_utc(sys.argv[2])
     to_utc = esmf_to_utc(sys.argv[3])
     ingest_dir = sys.argv[4]
-    js.ingest_dir = ingest_dir 
+    js.ingest_dir = ingest_dir
 
     grib_src = None
     if grib_src_name == 'HRRR':
@@ -63,12 +63,12 @@ if __name__ == '__main__':
     logging.info('Initiating download of files from GRIB source %s' % grib_src_name)
 
     gribs = grib_src.retrieve_gribs(from_utc, to_utc)
-    
+
     logging.info('SUCCESS, the following files are now available:')
     print('')
     for g in gribs:
         print(osp.join(ingest_dir, g))
-    
+
     print('\n** NOTE **')
     print('The following variable tables must be used with this grib source:')
     print(repr(grib_src.vtables()))
