@@ -2,11 +2,11 @@
 # Angel Farguell, CU Denver
 #
 
-from ingest.jpss_source import JPSSSource, JPSSError
+from ingest.sat_source import SatSource
 
-class MODIS(JPSSSource):
+class MODIS(SatSource):
 	"""
-	MODIS (Moderate Resolution Imaging Spectroradiometer) JPSS source.
+	MODIS (Moderate Resolution Imaging Spectroradiometer) satellite source.
 	"""
 
 	def __init__(self, arg):
@@ -18,7 +18,7 @@ class MODIS(JPSSSource):
 
 class Terra(MODIS):
 	"""
-	Terra MODIS (Moderate Resolution Imaging Spectroradiometer) JPSS source.
+	Terra MODIS (Moderate Resolution Imaging Spectroradiometer) satellite source.
 	"""
 
 	def __init__(self, arg):
@@ -35,7 +35,7 @@ class Terra(MODIS):
 
 class Aqua(MODIS):
 	"""
-	Aqua MODIS (Moderate Resolution Imaging Spectroradiometer) JPSS source.
+	Aqua MODIS (Moderate Resolution Imaging Spectroradiometer) satellite source.
 	"""
 
 	def __init__(self, arg):

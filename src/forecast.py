@@ -35,6 +35,9 @@ from ingest.NAM227 import NAM227
 from ingest.CFSR import CFSR_P, CFSR_S
 from ingest.NARR import NARR
 
+from ingest.MODIS import Terra, Aqua
+from ingest.VIIRS import SNPP
+
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
 from ssh_shuttle import send_product_to_server, ssh_command
@@ -74,6 +77,7 @@ class JobState(Dict):
         #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
         #self.grib_source = [self.resolve_grib_source(g, args) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
+        self.satellite_source=self.resolve_satellite_source(self.satellite_source,args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
@@ -96,14 +100,15 @@ class JobState(Dict):
         self.wrfxpy_dir = args['sys_install_path']
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
- 
-        
+
+
 
     def resolve_grib_source(self, gs_name, js):
         """
         Creates the right GribSource object from the name.
-        
+
         :param gs_name: the name of the grib source
+        :param js: configuration json
         """
         if gs_name == 'HRRR':
             return [HRRR(js)]
@@ -118,6 +123,24 @@ class JobState(Dict):
         else:
             raise ValueError('Unrecognized grib_source %s' % gs_name)
 
+    def resolve_satellite_source(self, sat_list, js):
+        """
+        Creates all the JPSSSource objects from the list of names.
+
+        :param sat_list: the list of JPSS sources
+        :param js: configuration json
+        """
+        sat=[]
+        if 'Terra' in sat_list:
+            terra=Terra(js)
+            sat.append(terra)
+        if 'Aqua' in sat_list:
+            aqua=Aqua(js)
+            sat.append(aqua)
+        if 'S-NPP' in sat_list:
+            snpp=SNPP(js)
+            sat.append(snpp)
+        return sat
 
     def parse_fmda(self, args):
         """
@@ -178,7 +201,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     wps_dir = osp.abspath(js.wps_dir)
     grib_dir = osp.join(wps_dir,grib_source.id)
     make_clean_dir(grib_dir)
-    wps_nml = js.wps_nml 
+    wps_nml = js.wps_nml
     try:
         logging.info("retrieving GRIB files from %s" % grib_source.id)
 
@@ -188,27 +211,27 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
 
         cache_colmet = len(manifest) > 1
         have_all_colmet = False
-        if cache_colmet:  
+        if cache_colmet:
             have_all_colmet = len(manifest.colmet_missing) == 0
             colmet_dir = osp.join(grib_source.cache_dir, manifest.colmet_prefix)
 
         logging.info('cache colmet %s, have all colmet %s' % (cache_colmet, have_all_colmet))
- 
+
         if not have_all_colmet:
             # this is also if we do not cache
             grib_source.symlink_gribs(manifest.grib_files, grib_dir)
 
             send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
             logging.info("running UNGRIB for %s" % grib_source.id)
-    
+
             logging.info("step 4: patch namelist for ungrib end execute ungrib on %s files" % grib_source.id)
-    
+
             update_namelist(wps_nml, grib_source.namelist_wps_keys())
             if cache_colmet:
                 wps_nml['share']['start_date'] = [utc_to_esmf(manifest.colmet_files_utc[0])] * js.num_doms
                 wps_nml['share']['end_date'] = [utc_to_esmf(manifest.colmet_files_utc[-1])] * js.num_doms
-    
-            # logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': '))) 
+
+            # logging.info("namelist.wps for UNGRIB: %s" % json.dumps(wps_nml, indent=4, separators=(',', ': ')))
             f90nml.write(wps_nml, osp.join(grib_dir, 'namelist.wps'), force=True)
             grib_source.clone_vtables(grib_dir)
             symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
@@ -235,7 +258,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             # move output
             for f in glob.glob(osp.join(grib_dir,grib_source.prefix() + '*')):
                 move(f,wps_dir)
-            
+
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
         logging.info('UNGRIB complete for %s' % grib_source.id)
@@ -258,7 +281,7 @@ def run_geogrid(js, q):
         logging.info("running GEOGRID")
         Geogrid(js.wps_dir).execute().check_output()
         logging.info('GEOGRID complete')
-        
+
         send_email(js, 'geogrid', 'GEOGRID complete.')
         q.put('SUCCESS')
 
@@ -303,7 +326,7 @@ def make_job_file(js):
     jsub.state = 'Preparing'
     jsub.qsys = js.qsys
     jsub.postproc = js.postproc
-    jsub.grid_code = js.grid_code 
+    jsub.grid_code = js.grid_code
     jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     return jsub
 
@@ -311,7 +334,7 @@ def make_kmz(args):
     ssh_command('wrfxweb/make_kmz.sh ' + args)
 
 def read_namelist(path):
-    logging.info('Reading namelist %s' % path) 
+    logging.info('Reading namelist %s' % path)
     return f90nml.read(path)
 
 def execute(args,job_args):
@@ -335,8 +358,8 @@ def execute(args,job_args):
     :param fire_namelist_path: the path to the namelist.fire file that will be used as template
     :param wps_geog_path: the path to the geogrid data directory providing terrain/fuel data
     :param email_notification: dictionary containing keys address and events indicating when a mail should be fired off
- 
-    
+
+
     """
 
     logging.info('step 0 initialize the job state from the arguments')
@@ -350,7 +373,7 @@ def execute(args,job_args):
     json.dump(job_args, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
     jsub = make_job_file(js)
     json.dump(jsub, open(jsub.jobfile,'w'), indent=4, separators=(',', ': '))
- 
+
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     sys.stdout.flush()
     send_email(js, 'start', 'Job %s started.' % js.job_id)
@@ -362,12 +385,12 @@ def execute(args,job_args):
     js.ems_nml = None
     if 'emissions_namelist_path' in js.args:
         js.ems_nml = read_namelist(js.args['emissions_namelist_path'])
-    
+
     # Parse and setup the domain configuration
     js.domain_conf = WPSDomainConf(js.domains)
 
     js.num_doms = len(js.domain_conf)
-    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds 
+    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds
 
     logging.info("number of domains defined is %d." % js.num_doms)
 
@@ -412,13 +435,13 @@ def execute(args,job_args):
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].start()
- 
+
     # wait until all tasks are done
     logging.info('waiting until all tasks are done')
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
-    
+
     if js.ungrib_only:
         return
     else:
@@ -436,7 +459,7 @@ def execute(args,job_args):
     logging.info("step 5: execute metgrid after ensuring all grids will be processed")
     update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
     js.domain_conf.prepare_for_metgrid(js.wps_nml)
-    logging.info("namelist.wps for METGRID: %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': '))) 
+    logging.info("namelist.wps for METGRID: %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': ')))
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
     logging.info("running METGRID")
@@ -452,7 +475,7 @@ def execute(args,job_args):
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
     time_ctrl = update_time_control(js.start_utc, js.end_utc, js.num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
-    js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds 
+    js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
@@ -468,16 +491,16 @@ def execute(args,job_args):
     f90nml.write(js.fire_nml, osp.join(js.wrf_dir, 'namelist.fire'), force=True)
 
     # step 7: execute real.exe
-    
+
     logging.info("running REAL")
     # try to run Real twice as it sometimes fails the first time
-    # it's not clear why this error happens 
+    # it's not clear why this error happens
     try:
         Real(js.wrf_dir).execute().check_output()
     except Exception as e:
         logging.error('Real step failed with exception %s, retrying ...' % str(e))
         Real(js.wrf_dir).execute().check_output()
-    
+
 
     logging.info('step 7b: if requested, do fuel moisture DA')
     logging.info('fmda = %s' % js.fmda)
@@ -496,7 +519,7 @@ def execute(args,job_args):
 
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
     logging.info("WRF job %s submitted with id %s, waiting for rsl.error.0000" % (jsub.job_num, js.task_id))
-  
+
     jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
@@ -533,7 +556,7 @@ def process_output(job_id):
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
     max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
- 
+
     if js.postproc.get('from', None) == 'wrfout':
         logging.info('Postprocessing all wrfout files.')
         # postprocess all wrfouts
@@ -578,7 +601,7 @@ def process_output(job_id):
         except IOError:
             logging.info('process_output: waiting 5 seconds for rsl.error.0000 file')
         time.sleep(5)
-    
+
     logging.info('process_output: Detected rsl.error.0000')
     js.run_utc = time.ctime(os.path.getmtime(rsl_path))
     js.processed_utc = time.asctime(time.gmtime())
@@ -591,10 +614,10 @@ def process_output(job_id):
         if not line:
             if not parallel_job_running(js):
                 logging.warning('WRF did not run to completion.')
-                break  
+                break
             if not wait_lines:
                 logging.info('Waiting for more output lines')
-            wait_lines = wait_lines + 1 
+            wait_lines = wait_lines + 1
             time.sleep(5)
             continue
         wait_lines = 0
@@ -627,10 +650,10 @@ def process_output(job_id):
                         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                         sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
                         already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
-        else: 
+        else:
             if not wait_wrfout:
                 logging.info('Waiting for wrfout')
-            wait_wrfout = wait_wrfout + 1 
+            wait_wrfout = wait_wrfout + 1
 
     # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':
@@ -654,7 +677,7 @@ def create_process_output_script(job_id):
         f.write('#!/usr/bin/env bash\n')
         f.write('cd ' + cfg.sys_install_path + '\n')
         f.write('LOG=' + log_path + '\n')
-        f.write(process_script + ' ' + job_id + ' &> $LOG \n') 
+        f.write(process_script + ' ' + job_id + ' &> $LOG \n')
 
     # make it executable
     st = os.stat(script_path)
@@ -673,9 +696,9 @@ def verify_inputs(args,sys_cfg):
     for key in sys_cfg:
         if key in args:
             if  sys_cfg[key] != args[key]:
-               logging_error('system configuration %s=%s attempted change to %s' 
+               logging_error('system configuration %s=%s attempted change to %s'
                    % (key, sys_cfg[key], args[key]))
-               raise ValueError('System configuration values may not be overwritten.') 
+               raise ValueError('System configuration values may not be overwritten.')
 
 
     # we don't check if job_id is a valid path
@@ -766,7 +789,7 @@ if __name__ == '__main__':
     keys = job_args.keys()
     for key in keys:
         if job_args[key] is None:
-            logging.warning('Job argument %s=None, ignoring' % key) 
+            logging.warning('Job argument %s=None, ignoring' % key)
             del job_args[key]
     args.update(job_args)
     # logging.info('updated args = %s' % json.dumps(args, indent=4, separators=(',', ': ')))
@@ -781,6 +804,6 @@ if __name__ == '__main__':
     # execute the job
     logging.info('calling execute')
     execute(args,job_args)
-    
+
     logging.info('forecast.py done')
 

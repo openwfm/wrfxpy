@@ -10,35 +10,35 @@ from cmr import GranuleQuery
 from utils import Dict, utc_to_utcf
 from downloader import download_url, DownloadError
 
-class JPSSError(Exception):
+class SatError(Exception):
 	"""
-	Raised when a JPSSSource cannot retrieve JPSS data.
+	Raised when a SatSource cannot retrieve satellite data.
 	"""
 	pass
 
-class JPSSSource(object):
+class SatSource(object):
 	"""
-	The parent class of all JPSS sources that implements common functionality, for example
+	The parent class of all satellite sources that implements common functionality, for example
 
-	- local JPSS validation (file size check)
-	- JPSS retrieval with retries (smart check whether server implements http-range)
+	- local satellite validation (file size check)
+	- Satellite retrieval with retries (smart check whether server implements http-range)
 	"""
 
 	def __init__(self, js):
 		"""
-		Initialize jpss source with ingest directory (where JPSS files are stored).
+		Initialize satellite source with ingest directory (where satellite files are stored).
 
-		:param js: job structure with at least ingest_path root of JPSS storage and sys_install_path
+		:param js: job structure with at least ingest_path root of satellite storage and sys_install_path
 		"""
 		self.ingest_dir=osp.abspath(osp.join(js.get('ingest_path','ingest'),self.prefix))
 		self.cache_dir=osp.abspath(js.get('cache_path','cache'))
 		self.sys_dir=osp.abspath(js.get('sys_install_path',None))
 
-	def available_locally_jpss(self, path):
+	def available_locally_sat(self, path):
 		"""
-		Check if a JPSS file is available locally and if it's file size checks out.
+		Check if a satellite file is available locally and if it's file size checks out.
 
-		:param path: the JPSS file path
+		:param path: the satellite file path
 		"""
 		info_path = path + '.size'
 		if osp.exists(path) and osp.exists(info_path):
@@ -47,11 +47,11 @@ class JPSSSource(object):
 		else:
 			return False
 
-	def search_api_jpss(self, sname, bbox, time, version=None):
+	def search_api_sat(self, sname, bbox, time, version=None):
 		"""
 		API search of the different satellite granules and return metadata dictionary
 
-		:param sname: short name JPSS product, ex: 'MOD03'
+		:param sname: short name satellite product, ex: 'MOD03'
 		:param bbox: polygon with the search bounding box
 		:param time: time interval (init_time_iso,final_time_iso)
 
@@ -79,14 +79,14 @@ class JPSSSource(object):
 		logging.info("CMR API: %s gets %s hits in this range" % (sname,sh))
 		if sh>maxg:
 			logging.warning("The number of hits %s is larger than the limit %s." % (sh,maxg))
-			logging.warning("Any JPSS data with prefix %s used." % self.prefix)
+			logging.warning("Any satellite data with prefix %s used." % self.prefix)
 			logging.warning("Use a reduced bounding box or a reduced time interval.")
 			metas = []
 		else:
 			metas = api.get(sh)
 		return metas
 
-	def search_archive_jpss(self, prod, time, geo_metas):
+	def search_archive_sat(self, prod, time, geo_metas):
 		"""
 		Archive search of the different satellite granules
 
@@ -117,7 +117,7 @@ class JPSSSource(object):
 		logging.info('Archive: %s gets %s hits in this range' % (self.prefix+prod,len(metas)))
 		return metas
 
-	def get_metas_jpss(self, bbox, time):
+	def get_metas_sat(self, bbox, time):
 		"""
 		Get all the meta data for all the necessary products
 
@@ -127,41 +127,47 @@ class JPSSSource(object):
 		:return granules: dictionary with the metadata of all the products
 		"""
 		metas=Dict([])
-		metas.geo=self.search_api_jpss(self.geo_prefix,bbox,time,self.version)
-		metas.fire=self.search_api_jpss(self.fire_prefix,bbox,time)
+		metas.geo=self.search_api_sat(self.geo_prefix,bbox,time,self.version)
+		if not metas.geo:
+			if not self.pre_geo_prefix:
+				logging.error('any geolocation data matches the search.')
+				raise SatError('SatSource: failed to find geolocation data.' % url)
+			else:
+				pre_geo=self.search_api_sat(self.pre_geo_prefix,bbox,time,self.version)
+				metas.geo=self.search_archive_sat(self.geo_prefix,time,pre_geo)
+		metas.fire=self.search_api_sat(self.fire_prefix,bbox,time)
 		if not metas.fire:
-			metas.fire=self.search_archive_jpss(self.fire_prefix,time,metas.geo)
-		metas.ref=self.search_api_jpss(self.ref_prefix,bbox,time)
+			metas.fire=self.search_archive_sat(self.fire_prefix,time,metas.geo)
+		metas.ref=self.search_api_sat(self.ref_prefix,bbox,time)
 		if not metas.ref:
-			metas.ref=self.search_archive_jpss(self.ref_prefix,time,metas.geo)
+			metas.ref=self.search_archive_sat(self.ref_prefix,time,metas.geo)
 		return metas
 
-
-	def download_jpss(self, url):
+	def download_sat(self, url):
 		"""
-		Download a JPSS file from a JPSS service
+		Download a satellite file from a satellite service
 
 		:param url: the URL of the file
 		"""
-		logging.info('downloading %s jpss data from %s' % (self.prefix, url))
-		jpss_name = osp.basename(url)
-		jpss_path = osp.join(self.ingest_dir,jpss_name)
-		if self.available_locally_jpss(jpss_path):
-			logging.info('%s is available locally' % jpss_path)
-			return {'url': url,'local_path': jpss_path}
+		logging.info('downloading %s satellite data from %s' % (self.prefix, url))
+		sat_name = osp.basename(url)
+		sat_path = osp.join(self.ingest_dir,sat_name)
+		if self.available_locally_sat(sat_path):
+			logging.info('%s is available locally' % sat_path)
+			return {'url': url,'local_path': sat_path}
 		else:
 			try:
-				download_url(url, jpss_path)
-				return {'url': url,'local_path': jpss_path,'downloaded': datetime.datetime.now}
+				download_url(url, sat_path)
+				return {'url': url,'local_path': sat_path,'downloaded': datetime.datetime.now}
 			except DownloadError as e:
-				logging.error('%s cannot download jpss file %s' % (self.prefix, url))
+				logging.error('%s cannot download satellite file %s' % (self.prefix, url))
 				logging.warning('Pleae check %s for %s' % (self.info_url, self.info))
 				return {}
-				raise JPSSError('JPSSSource: failed to download file %s' % url)
+				raise SatError('SatSource: failed to download file %s' % url)
 
-	def retrieve_data_jpss(self, bounds, from_utc, to_utc):
+	def retrieve_data_sat(self, bounds, from_utc, to_utc):
 		"""
-		Retrieve JPSS data in a bounding box coordinates and time interval
+		Retrieve satellite data in a bounding box coordinates and time interval
 
 		:param bounds: polygon with the search bounding box
 		:param time: time interval (init_time_iso,final_time_iso)
@@ -171,9 +177,9 @@ class JPSSSource(object):
 		bbox = [(lonmin,latmax),(lonmin,latmin),(lonmax,latmin),(lonmax,latmax),(lonmin,latmax)]
 		time = (from_utc, to_utc)
 
-		metas = self.get_metas_jpss(bbox,time)
+		metas = self.get_metas_sat(bbox,time)
 
-		logging.info('retrieve_jpss: saved %s metas for %s JPSS service' % (len(metas),self.prefix))
+		logging.info('retrieve_data_sat: saved %s metas for %s satellite service' % (sum([len(m) for m in metas]),self.prefix))
 
 		manifest = Dict({})
 
@@ -182,23 +188,22 @@ class JPSSSource(object):
 			for m in mm:
 				id = m['producer_granule_id']
 				url = m['links'][0]['href']
-				m.update(self.download_jpss(url))
+				m.update(self.download_sat(url))
 				manifest.update({id: m})
 
 		return manifest
 
-	def group_files_jpss(self):
+	def group_files_sat(self):
 		"""
 		Agrupate the geolocation (03), fire (14) (, and reflectance (09)) files of a specific product in a path
 
 		:return files: list of dictionaries with geolocation (03), fire (14) (, and reflectance (09)) file paths of the specific product
 		"""
 		path=self.ingest_dir
-		reg=self.prefix
 
-		files=[Dict({'geo':k}) for k in glob.glob(path+'/'+reg+'03*')]
-		filesf=glob.glob(path+'/'+reg+'14*')
-		filesr=glob.glob(path+'/'+reg+'09*')
+		files=[Dict({'geo':k}) for k in glob.glob(path+'/'+self.geo_prefix)]
+		filesf=glob.glob(path+'/'+self.fire_prefix)
+		filesr=glob.glob(path+'/'+self.ref_prefix)
 		if len(filesf)>0:
 			for f in filesf:
 				mf=re.split("/",f)
@@ -223,21 +228,21 @@ class JPSSSource(object):
 								files[k].ref=f
 		return files
 
-	def read_jpss(self, files, metas, bounds):
+	def read_sat(self, files, metas, bounds):
 		"""
-		Read all the JPSS files from a specific JPSS service
+		Read all the satellite files from a specific satellite service
 
-		:param file: dictionary with geolocation (03), fire (14) (, and reflectance (09)) file paths for JPSS service
+		:param file: dictionary with geolocation (03), fire (14) (, and reflectance (09)) file paths for satellite service
 		:param bounds: spatial bounds tuple (lonmin,lonmax,latmin,latmax)
 		:return ret: dictionary with Latitude, Longitude and fire mask arrays read
 		"""
 		pass
 
-	def read_files_jpss(self, file, bounds):
+	def read_files_sat(self, file, bounds):
 		"""
-		Read a specific JPSS files from a specific JPSS service
+		Read a specific satellite files from a specific satellite service
 
-		:param file: dictionary with geolocation (03), fire (14) (, and reflectance (09)) file paths for JPSS service
+		:param file: dictionary with geolocation (03), fire (14) (, and reflectance (09)) file paths for satellite service
 		:param bounds: spatial bounds tuple (lonmin,lonmax,latmin,latmax)
 		:return ret: dictionary with Latitude, Longitude and fire mask arrays read
 		"""
@@ -249,6 +254,7 @@ class JPSSSource(object):
 	info=None
 	url=None
 	prefix=None
+	pre_geo_prefix=None
 	geo_prefix=None
 	fire_prefix=None
 	ref_prefix=None

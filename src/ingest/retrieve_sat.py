@@ -3,7 +3,7 @@
 #
 
 from ingest.MODIS import Terra, Aqua
-from ingest.VIIRS import SNPP, NOAA20
+from ingest.VIIRS import SNPP, SNPPHR, NOAA20
 from wrf.wps_domains import WPSDomainConf
 from utils import load_sys_cfg, esmf_to_utc, Dict
 import logging, sys, json
@@ -36,21 +36,31 @@ if __name__ == '__main__':
 	from_utc = esmf_to_utc(js_input["start_utc"])
 	to_utc = esmf_to_utc(js_input["end_utc"])
 
-	# create JPSS classes
+	# create satellite classes
 	logging.info('Retrieving all the satellite data for:')
 	if 'Terra' in sat_sources:
 		logging.info('> MODIS Terra')
 		terra=Terra(sys_cfg)
 		# retrieve granules
-		m_terra=terra.retrieve_data_jpss(bounds, from_utc, to_utc)
+		m_terra=terra.retrieve_data_sat(bounds, from_utc, to_utc)
 	if 'Aqua' in sat_sources:
 		logging.info('> MODIS Aqua')
 		aqua=Aqua(sys_cfg)
 		# retrieve granules
-		m_aqua=aqua.retrieve_data_jpss(bounds, from_utc, to_utc)
+		m_aqua=aqua.retrieve_data_sat(bounds, from_utc, to_utc)
 	if 'S-NPP' in sat_sources:
-		logging.info('> MODIS Aqua')
+		logging.info('> S-NPP VIIRS')
 		snpp=SNPP(sys_cfg)
 		# retrieve granules
-		m_snpp=snpp.retrieve_data_jpss(bounds, from_utc, to_utc)
+		m_snpp=snpp.retrieve_data_sat(bounds, from_utc, to_utc)
+	if 'S-NPP_HR' in sat_sources:
+		logging.info('> High resolution S-NPP VIIRS')
+		snpphr=SNPPHR(sys_cfg)
+		# retrieve granules
+		m_snpphr=snpphr.retrieve_data_sat(bounds, from_utc, to_utc)
+	if 'NOAA-20' in sat_sources:
+		logging.info('> NOAA-20 VIIRS')
+		noaa20=NOAA20(sys_cfg)
+		# retrieve granules
+		m_noaa20=noaa20.retrieve_data_sat(bounds, from_utc, to_utc)
 
