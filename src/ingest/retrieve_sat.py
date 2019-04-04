@@ -11,7 +11,7 @@ import logging, sys, json
 if __name__ == '__main__':
 	if len(sys.argv) != 2:
 		print('Usage: %s input.json' % sys.argv[0])
-		print('		supported atellite sources: Terra, Aqua, S-NPP')
+		print('		supported satellite sources: Terra, Aqua, S-NPP')
 		sys.exit(-1)
 
 	# load input JSON

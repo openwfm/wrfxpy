@@ -35,7 +35,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     Create a colorbar to accompany a raseter image.
 
     See: http://matplotlib.org/examples/api/colorbar_only.html for more examples
-    
+
     :param rng: the minimum/maximum to display on the colorbar
     :param orientation: 'vertical' or 'horizontal'
     :param size_in: larger dimension in inches
@@ -125,5 +125,22 @@ def basemap_barbs_mercator(u,v,lat,lon):
     return str_io.getvalue(), float_bounds
 
 
+def basemap_scatter_mercator(bounds, lons, lats, vals, cmin, cmax, cmap):
 
+    # construct spherical mercator projection for region of interest
+    m = Basemap(projection='merc',llcrnrlat=bounds[0], urcrnrlat=bounds[1],
+                llcrnrlon=bounds[0],urcrnrlon=bounds[1])
+
+    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
+    plt.axis('off')
+    m.scatter(lon,lat,masked_grid,latlon=True,cmap=cmap,vmin=cmin,vmax=cmax)
+
+    # save png to a StringIO
+    str_io = StringIO.StringIO()
+    plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
+    plt.close()
+
+    numpy_bounds = [ (bounds[0],bounds[2]),(bounds[1],bounds[2]),(bounds[1],bounds[3]),(bounds[0],bounds[3]) ]
+    float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
+    return str_io.getvalue(), float_bounds
 
