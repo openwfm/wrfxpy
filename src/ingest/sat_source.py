@@ -130,8 +130,8 @@ class SatSource(object):
 		metas.geo=self.search_api_sat(self.geo_prefix,bbox,time,self.version)
 		if not metas.geo:
 			if not self.pre_geo_prefix:
-				logging.error('any geolocation data matches the search.')
-				raise SatError('SatSource: failed to find geolocation data.' % url)
+				logging.warning('any geolocation data matches the search.')
+				return metas
 			else:
 				pre_geo=self.search_api_sat(self.pre_geo_prefix,bbox,time,self.version)
 				metas.geo=self.search_archive_sat(self.geo_prefix,time,pre_geo)

@@ -19,7 +19,11 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-from ingest.grib_source import HRRR, NAM218, NAM227, CFSR_P, CFSR_S, NARR
+import HRRR
+import NARR
+import NAM218
+import NAM227
+from CFSR import CFSR_P, CFSR_S
 from utils import esmf_to_utc, load_sys_cfg
 
 import logging
