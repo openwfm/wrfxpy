@@ -6,7 +6,7 @@
         "title": "Three domains, 5km/1.6km/0.55km cell size, 28m fire grid., NAM218 12km forcing. Satellite test"
     },
     "wall_time_hrs": 6,
-    "end_utc": "2018-11-08_21:30:02",
+    "end_utc": "2018-11-08_21:00:00",
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
     "postproc": {
@@ -125,8 +125,8 @@
         ]
     },
     "num_nodes": 6,
-    "grib_source": "NAM",
+    "grib_source": "NARR",
     "satellite_source": ["Aqua","Terra","S-NPP","S-NPP_HR"],
-    "start_utc": "2018-11-08_19:55:00",
+    "start_utc": "2018-11-08_13:00:00",
     "job_id": "satellite_test"
 }
