@@ -117,7 +117,7 @@ class SatSource(object):
 		logging.info('Archive: %s gets %s hits in this range' % (self.prefix+prod,len(metas)))
 		return metas
 
-	def get_metas_sat(self, bbox, time):
+	def get_metas_sat(self, bbox, time, burned=False):
 		"""
 		Get all the meta data for all the necessary products
 
@@ -138,9 +138,10 @@ class SatSource(object):
 		metas.fire=self.search_api_sat(self.fire_prefix,bbox,time)
 		if not metas.fire:
 			metas.fire=self.search_archive_sat(self.fire_prefix,time,metas.geo)
-		metas.ref=self.search_api_sat(self.ref_prefix,bbox,time)
-		if not metas.ref:
-			metas.ref=self.search_archive_sat(self.ref_prefix,time,metas.geo)
+		if burned:
+			metas.ref=self.search_api_sat(self.ref_prefix,bbox,time)
+			if not metas.ref:
+				metas.ref=self.search_archive_sat(self.ref_prefix,time,metas.geo)
 		return metas
 
 	def download_sat(self, url):

@@ -74,6 +74,50 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     return str_io.getvalue()
 
 
+def make_discrete_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
+    """
+    Create a discrete colorbar to accompany a scatter raseter image.
+
+    See: http://matplotlib.org/examples/api/colorbar_only.html for more examples
+
+    :param rng: the minimum/maximum to display on the colorbar
+    :param orientation: 'vertical' or 'horizontal'
+    :param size_in: larger dimension in inches
+    :param cmap: the colormap in use
+    :param cb_label: the colorbar label
+    :param dpi: dots per inch
+    :return: a StringIO object with the colorbar as PNG data
+    """
+    kwargs = { 'norm':mpl.colors.Normalize(rng[0],rng[1]),
+               'orientation':orientation,
+               'spacing':'proportional',
+               'cmap':cmap}
+
+    # build figure according to requested orientation
+    hsize, wsize = (size_in,size_in*0.5) if orientation == 'vertical' else (size_in*0.5,size_in)
+    fig = plt.figure(figsize=(wsize,hsize))
+
+    # proportions that work with axis title (horizontal not tested)
+    ax = fig.add_axes([.5,.03,.12,.8]) if orientation=='vertical' else fig.add_axes([0.03,.4,.8,.12])
+
+    # construct the colorbar and modify properties
+    cb = mpl.colorbar.ColorbarBase(ax,**kwargs)
+    cb.set_label(cb_label,color='1',fontsize=8,labelpad=-40)
+
+    # move ticks to left side
+    ax.yaxis.set_ticks_position('left')
+    for tick_lbl in ax.get_yticklabels():
+        tick_lbl.set_color('1')
+        tick_lbl.set_fontsize(8)
+
+    # save png to a StringIO
+    str_io = StringIO.StringIO()
+    fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
+    plt.close()
+
+    return str_io.getvalue()
+
+
 def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
 
     # longitude/latitude extent
