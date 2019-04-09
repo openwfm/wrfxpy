@@ -126,7 +126,7 @@
     },
     "num_nodes": 6,
     "grib_source": "NAM",
-    "satellite_source": ["Aqua","Terra","S-NPP","S-NPP_HR"],
+    "satellite_source": ["Aqua","Terra","S-NPP"],
     "start_utc": "2018-11-08_19:55:00",
     "job_id": "satellite_test"
 }
