@@ -32,24 +32,24 @@ class NAM227(GribForecast):
         """
         return { 'domains' : { 'num_metgrid_levels': 43, 'num_metgrid_soil_levels' : 4 }}
 
-    
+
     def file_names(self, cycle_start, fc_list):
         """
         Computes the relative paths of required GRIB files.
         Dependent on the grib source.
-    
+
         :param cycle_start: UTC time of cycle start
         :param fc_list: list of hours in the cycle when forecast will be donwloaded
         """
 
         path_tmpl = 'nam.%04d%02d%02d/nam.t%02dz.conusnest.hiresf%02d.tm00.grib2'
         grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, x) for x in fc_list]
-      
+
         return grib_files
 
 
     # instance variables
-    remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
+    remote_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     id = "NAM227"
     info_url="http://www.nco.ncep.noaa.gov/pmb/products/nam"
     info_text="NAM NEST over CONUS (5 km Resolution - Grid 227)"
@@ -60,5 +60,5 @@ class NAM227(GribForecast):
     grib_forecast_hours_periods = [{'hours':60,'period':1}]
     period_hours = 3    # for METGRID and WRF
     cycle_hours = 6
-    remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
- 
+    remote_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
+
