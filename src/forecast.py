@@ -77,7 +77,7 @@ class JobState(Dict):
         #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
         #self.grib_source = [self.resolve_grib_source(g, args) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
-        self.satellite_source=self.resolve_satellite_source(self.satellite_source,args)
+        self.satellite_source=self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
@@ -123,14 +123,15 @@ class JobState(Dict):
         else:
             raise ValueError('Unrecognized grib_source %s' % gs_name)
 
-    def resolve_satellite_source(self, sat_list, js):
+    def resolve_satellite_source(self, js):
         """
         Creates all the JPSSSource objects from the list of names.
 
         :param sat_list: the list of JPSS sources
         :param js: configuration json
         """
-        sat=[]
+        sat_list = self.parse_satellite_source(js)
+        sat = []
         if 'Terra' in sat_list:
             terra=Terra(js)
             sat.append(terra)
@@ -141,6 +142,18 @@ class JobState(Dict):
             snpp=SNPP(js)
             sat.append(snpp)
         return sat
+
+    def parse_satellite_source(self, args):
+        """
+        Parse information inside the satellite source, if any.
+
+        :param args: the forecast job argument dictionary
+        """
+        if 'satellite_source' in args:
+            sats = args['satellite_source']
+            return sats
+        else:
+            return None
 
     def parse_fmda(self, args):
         """
