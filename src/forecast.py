@@ -471,11 +471,8 @@ def execute(args,job_args):
 	for grib_source in js.grib_source:
 		grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
-	logging.info('starting Satellite, GEOGRID and GRIB2/UNGRIB')
+	logging.info('starting GEOGRID and GRIB2/UNGRIB')
 	logging.info('%s' % [s.id for s in js.satellite_source])
-
-	for satellite_source in js.satellite_source:
-		sat_proc[satellite_source.id].start()
 
 	if js.ungrib_only:
 		logging.info('ungrib_only set, skipping GEOGRID, will exit after UNGRIB')
@@ -485,11 +482,12 @@ def execute(args,job_args):
 	for grib_source in js.grib_source:
 		grib_proc[grib_source.id].start()
 
+	for satellite_source in js.satellite_source:
+		sat_proc[satellite_source.id].start()
+		sat_proc[satellite_source.id].join()
+
 	# wait until all tasks are done
 	logging.info('waiting until all tasks are done')
-
-	for satellite_source in js.satellite_source:
-		sat_proc[satellite_source.id].join()
 
 	for grib_source in js.grib_source:
 		grib_proc[grib_source.id].join()
