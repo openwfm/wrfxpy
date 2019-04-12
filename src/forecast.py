@@ -472,6 +472,7 @@ def execute(args,job_args):
 		grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
 	logging.info('starting Satellite, GEOGRID and GRIB2/UNGRIB')
+	logging.info('%s' % [s.id for s in js.satellite_source])
 
 	for satellite_source in js.satellite_source:
 		sat_proc[satellite_source.id].start()

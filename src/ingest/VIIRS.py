@@ -24,6 +24,7 @@ class SNPP(VIIRS):
 		super(SNPP, self).__init__(arg)
 
 	# instance variables
+	id='SNPP'
 	info_url='https://www.nasa.gov/mission_pages/NPP/mission_overview/index.html'
 	info='S-NPP Visible Infrared Imaging Radiometer Suite (VIIRS)'
 	prefix='VNP'
@@ -41,6 +42,7 @@ class SNPPHR(VIIRS):
 		super(SNPPHR, self).__init__(arg)
 
 	# instance variables
+	id='SNPPHR'
 	info_url='https://www.nasa.gov/mission_pages/NPP/mission_overview/index.html'
 	info='High Resolution S-NPP Visible Infrared Imaging Radiometer Suite (VIIRS)'
 	prefix='VNP'
@@ -59,6 +61,7 @@ class NOAA20(VIIRS):
 		super(NOAA20, self).__init__(arg)
 
 	# instance variables
+	id='NOAA20'
 	info_url=''
 	info='NOAA-20 Visible Infrared Imaging Radiometer Suite (VIIRS)'
 	prefix=''
