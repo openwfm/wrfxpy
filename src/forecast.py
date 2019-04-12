@@ -201,6 +201,33 @@ def send_email(js, event, body):
             mail_serv.sendmail(js.emails.origin, [js.emails.to], msg.as_string())
             mail_serv.quit()
 
+def retrieve_satellite(js, sat_source, q):
+    """
+    This function retrieves required Satellite files.
+
+    It returns either 'SUCCESS' or 'FAILURE' on completion.
+
+    :param js: the JobState object containing the forecast configuration
+    :param sat_source: the SatSource object
+    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
+    """
+    try:
+        logging.info("retrieving Satellite files from %s" % sat_source.id)
+        domain = js.domain_conf.domains[-1]
+        latloni=domain.ij_to_latlon(0,0)
+        latlonf=domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
+        bounds = (latloni[1],latlonf[1],latloni[0],latlonf[0])
+        manifest = sat_source.retrieve_data_sat(bounds, js.start_utc, js.end_utc)
+
+        send_email(js, 'satellite', 'Job %s - ungrib complete.' % js.job_id)
+        logging.info('Satellite retrieval complete for %s' % sat_source.id)
+        q.put('SUCCESS')
+
+    except Exception as e:
+        logging.error('Satellite retrieving step failed with exception %s' % repr(e))
+        traceback.print_exc()
+        q.put('FAILURE')
+
 def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     """
     This function retrieves required GRIB files and runs ungrib.
