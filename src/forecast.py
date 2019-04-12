@@ -484,10 +484,12 @@ def execute(args,job_args):
 
     for satellite_source in js.satellite_source:
         sat_proc[satellite_source.id].start()
-        sat_proc[satellite_source.id].join()
 
     # wait until all tasks are done
     logging.info('waiting until all tasks are done')
+
+    for satellite_source in js.satellite_source:
+        sat_proc[satellite_source.id].join()
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
