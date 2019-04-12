@@ -135,10 +135,11 @@ class SatSource(object):
 			else:
 				pre_geo=self.search_api_sat(self.pre_geo_prefix,bbox,time,self.version)
 				metas.geo=self.search_archive_sat(self.geo_prefix,time,pre_geo)
-		metas.fire=self.search_api_sat(self.fire_prefix,bbox,time)
-		if metas.fire:
+		fire=self.search_api_sat(self.fire_prefix,bbox,time)
+		if fire:
 			# eliminate NRT products (duplicated)
-			nlist=[m for m in metas.fire if not m['data_center']=='LANCEMODIS']
+			nlist=[m for m in fire if m['data_center']!='LANCEMODIS']
+			logging.info('eliminating %d NRT products (duplicated)' % int(abs(len(fire)-len(nlist))))
 			metas.fire=nlist
 		else:
 			metas.fire=self.search_archive_sat(self.fire_prefix,time,metas.geo)
@@ -184,7 +185,7 @@ class SatSource(object):
 
 		metas = self.get_metas_sat(bbox,time)
 
-		logging.info('retrieve_data_sat: saved %s metas for %s satellite service' % (sum([len(m) for m in metas]),self.prefix))
+		logging.info('retrieve_data_sat: saved %s metas for %s satellite service' % (sum([len(m) for m in metas.items()]),self.prefix))
 
 		manifest = Dict({})
 
