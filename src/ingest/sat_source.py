@@ -251,6 +251,7 @@ class SatSource(object):
 
 
 	# instance variables
+	id=None
 	info_url=None
 	info=None
 	url=None

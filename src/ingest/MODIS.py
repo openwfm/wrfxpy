@@ -25,6 +25,7 @@ class Terra(MODIS):
 		super(Terra, self).__init__(arg)
 
 	# instance variables
+	id='Terra'
 	info_url='https://terra.nasa.gov/about/terra-instruments/modis'
 	info='Terra Moderate Resolution Imaging Spectroradiometer (MODIS)'
 	prefix='MOD'
@@ -42,6 +43,7 @@ class Aqua(MODIS):
 		super(Aqua, self).__init__(arg)
 
 	# instance variables
+	id='Aqua'
 	info_url='https://aqua.nasa.gov/modis'
 	info='Aqua Moderate Resolution Imaging Spectroradiometer (MODIS)'
 	prefix='MYD'
