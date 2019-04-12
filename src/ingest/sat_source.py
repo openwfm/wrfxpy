@@ -136,7 +136,11 @@ class SatSource(object):
 				pre_geo=self.search_api_sat(self.pre_geo_prefix,bbox,time,self.version)
 				metas.geo=self.search_archive_sat(self.geo_prefix,time,pre_geo)
 		metas.fire=self.search_api_sat(self.fire_prefix,bbox,time)
-		if not metas.fire:
+		if metas.fire:
+			# eliminate NRT products (duplicated)
+			nlist=[m for m in metas.fire if not m['data_center']=='LANCEMODIS']
+			metas.fire=nlist
+		else:
 			metas.fire=self.search_archive_sat(self.fire_prefix,time,metas.geo)
 		if burned:
 			metas.ref=self.search_api_sat(self.ref_prefix,bbox,time)
