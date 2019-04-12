@@ -454,11 +454,16 @@ def execute(args,job_args):
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
-    # do steps 2 & 3 & 4 in parallel (two execution streams)
+    # do steps 2 & 3 & 4 in parallel (three execution streams)
+    #  -> Satellite retrieval ->
     #  -> GEOGRID ->
     #  -> GRIB2 download ->  UNGRIB ->
 
     proc_q = Queue()
+
+    sat_proc = {}
+    for satellite_source in js.satellite_source:
+        sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
 
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
     # grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q, ref_utc))
@@ -466,7 +471,10 @@ def execute(args,job_args):
     for grib_source in js.grib_source:
         grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
-    logging.info('starting GEOGRID and GRIB2/UNGRIB')
+    logging.info('starting Satellite, GEOGRID and GRIB2/UNGRIB')
+
+    for satellite_source in js.satellite_source:
+        sat_proc[satellite_source.id].start()
 
     if js.ungrib_only:
         logging.info('ungrib_only set, skipping GEOGRID, will exit after UNGRIB')
@@ -479,6 +487,9 @@ def execute(args,job_args):
     # wait until all tasks are done
     logging.info('waiting until all tasks are done')
 
+    for satellite_source in js.satellite_source:
+        sat_proc[satellite_source.id].join()
+
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
 
@@ -486,6 +497,10 @@ def execute(args,job_args):
         return
     else:
         geogrid_proc.join()
+
+    for satellite_source in js.satellite_source:
+    if proc_q.get() != 'SUCCESS':
+        return
 
     for grib_source in js.grib_source:
         if proc_q.get() != 'SUCCESS':
