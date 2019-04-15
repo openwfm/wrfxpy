@@ -782,7 +782,13 @@ def verify_inputs(args,sys_cfg):
 
 	# check for valid grib source
 	if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR']:
-		raise ValueError('Invalid grib source, must be one of HRRR, NAM, NAM227, NARR, CFSR')
+		raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR' % args['grib_source'])
+
+	# check for valid satellite source
+	if 'satellite_source' in args:
+		for sat in args['satellite_source']:
+			if sat not in ['Terra','Aqua','SNPP','SNPPHR','NOA20']:
+				raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP, SNPPHR, NOA20' % sat)
 
 	# if precomputed key is present, check files linked in
 	if 'precomputed' in args:
