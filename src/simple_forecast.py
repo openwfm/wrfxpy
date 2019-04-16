@@ -161,7 +161,7 @@ def questionnaire():
     print_question('Process satellite data? [default=no]')
     sat = read_boolean('no')
     if sat:
-        cfg['satellite_source'] = ["Aqua","Terra","S-NPP"]
+        cfg['satellite_source'] = ["Aqua","Terra","SNPP"]
         print_answer('Selected Satellite sources %s' % cfg['satellite_source'])
     else:
         print_answer('No Satellite sources selected.')

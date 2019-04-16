@@ -25,7 +25,7 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move
+                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, json_join
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -77,7 +77,7 @@ class JobState(Dict):
         #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
         #self.grib_source = [self.resolve_grib_source(g, args) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
-        self.satellite_source=self.resolve_satellite_source(args)
+        self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
@@ -138,7 +138,7 @@ class JobState(Dict):
         if 'Aqua' in sat_list:
             aqua=Aqua(js)
             sat.append(aqua)
-        if 'S-NPP' in sat_list:
+        if 'SNPP' in sat_list:
             snpp=SNPP(js)
             sat.append(snpp)
         return sat
@@ -212,19 +212,23 @@ def retrieve_satellite(js, sat_source, q):
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
     try:
-        logging.info("retrieving Satellite files from %s" % sat_source.id)
+        logging.info("retrieving satellite files from %s" % sat_source.id)
+        jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
         domain = js.domain_conf.domains[-1]
         latloni=domain.ij_to_latlon(0,0)
         latlonf=domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
         bounds = (latloni[1],latlonf[1],latloni[0],latlonf[0])
         manifest = sat_source.retrieve_data_sat(bounds, js.start_utc, js.end_utc)
+        # write a json file with satellite information
+        sat_file = sat_source.id+'.json'
+        json.dump(manifest, open(osp.join(jobdir,sat_file),'w'), indent=4, separators=(',', ': '))
 
         send_email(js, 'satellite', 'Job %s - ungrib complete.' % js.job_id)
-        logging.info('Satellite retrieval complete for %s' % sat_source.id)
+        logging.info('satellite retrieval complete for %s' % sat_source.id)
         q.put('SUCCESS')
 
     except Exception as e:
-        logging.error('Satellite retrieving step failed with exception %s' % repr(e))
+        logging.error('satellite retrieving step failed with exception %s' % repr(e))
         traceback.print_exc()
         q.put('FAILURE')
 
@@ -461,7 +465,9 @@ def execute(args,job_args):
 
     proc_q = Queue()
 
-    sat_proc = {}
+    if js.satellite_source:
+        sat_proc = {}
+
     for satellite_source in js.satellite_source:
         sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
 
@@ -488,14 +494,14 @@ def execute(args,job_args):
     # wait until all tasks are done
     logging.info('waiting until all tasks are done')
 
-    for satellite_source in js.satellite_source:
-        sat_proc[satellite_source.id].join()
-
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
 
+        for satellite_source in js.satellite_source:
+            sat_proc[satellite_source.id].join()
+
     if js.ungrib_only:
-        return
+        pass
     else:
         geogrid_proc.join()
 
@@ -507,10 +513,18 @@ def execute(args,job_args):
         if proc_q.get() != 'SUCCESS':
             return
 
-    if proc_q.get() != 'SUCCESS':
-        return
+    if not js.ungrib_only:
+        if proc_q.get() != 'SUCCESS':
+            return
 
     proc_q.close()
+
+    logging.info('execute: finished parallel GEOGRID, GRIB2/UNGRIB, and Satellite')
+
+    if js.satellite_source:
+        # joining all satellite manifests
+        sat_manifest = json_join(jobdir,args['satellite_source'],'sat.json')
+        print sat_manifest
 
     logging.info("step 5: execute metgrid after ensuring all grids will be processed")
     update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
@@ -787,8 +801,8 @@ def verify_inputs(args,sys_cfg):
     # check for valid satellite source
     if 'satellite_source' in args:
         for sat in args['satellite_source']:
-            if sat not in ['Terra','Aqua','SNPP','SNPPHR','NOA20']:
-                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP, SNPPHR, NOA20' % sat)
+            if sat not in ['Terra','Aqua','SNPP']:
+                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP' % sat)
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
