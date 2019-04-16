@@ -530,3 +530,17 @@ def get_ip_address():
     s.connect(("8.8.8.8", 80))
     return s.getsockname()[0]
 
+def json_join(path,json_list,json_out):
+    manifest = Dict({})
+    for jj in json_list:
+	json_path = osp.join(path,str(jj)+'.json')
+	try:
+		f = json.load(open(json_path), 'ascii')
+		manifest.update({jj: f})
+	except:
+		logging.warning('no satellite data for source %s in manifest json file %s' % (jj,json_path))
+		manifest.update({jj: {}})
+		pass
+	remove(json_path)
+    json.dump(manifest, open(osp.join(path,'sat.json'),'w'), indent=4, separators=(',', ': '))
+    return manifest
