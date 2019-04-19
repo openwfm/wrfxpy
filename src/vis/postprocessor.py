@@ -5,16 +5,18 @@ mpl.use('AGG')
 import simplekml as kml
 import numpy as np
 import netCDF4 as nc4
+from pyhdf.SD import SD, SDC
+import h5py
 import sys
 import os
 import json
 import logging
 import os.path as osp
 import traceback
-from utils import dump, traceargs
+from utils import dump, traceargs, esmf_to_utc, utc_to_esmf
 from vis_utils import print_stats
 
-from vis.rasterizer import make_colorbar, basemap_raster_mercator, basemap_barbs_mercator
+from vis.rasterizer import make_colorbar, make_discrete_colorbar, basemap_raster_mercator, basemap_barbs_mercator, basemap_scatter_mercator
 from vis.var_wisdom import convert_value, get_wisdom, is_windvec
 
 
@@ -231,7 +233,7 @@ class Postprocessor(object):
         :return: the raster png as a StringIO, and the coordinates
         """
         # gather wisdom about the variable
-        wisdom = get_wisdom(var)
+        wisdom = get_wisdom(var).copy()
         wisdom.update(self.wisdom_update.get(var, {}))
         native_unit = wisdom['native_unit']
         u_name, v_name = wisdom['components']
@@ -267,6 +269,73 @@ class Postprocessor(object):
         raster_png_data,corner_coords = basemap_barbs_mercator(u[::s,::s],v[::s,::s],lat[::s,::s],lon[::s,::s])
 
         return raster_png_data, corner_coords
+
+
+    def _sat2raster(self, dg, df, sat, bounds):
+        """
+        Postprocess a satellite granule into raster.
+
+        :param dg: the open geolocation file
+        :param df: the open fire file
+        :param sat: the name of the satellite variable in var_wisdom
+        :param bounds: bounds for the bounding box satellite data
+	:return: the raster png as a StringIO, and the coordinates
+        """
+        # gather wisdom about the satellite variable
+        wisdom = get_wisdom(sat).copy()
+        wisdom.update(self.wisdom_update.get(sat, {}))   
+	native_unit = wisdom['native_unit']
+	prod_name = wisdom['name']
+	cmap_name = wisdom['colormap']
+
+	# extract variables
+        lat, lon = wisdom['grid'](dg)
+	fa = wisdom['retrieve_as'](df)	
+
+        # check variables
+        if fa.shape != lat.shape:
+            raise PostprocError("Variable %s size does not correspond to grid size." % sat)
+	
+	# process variables
+	flon = lon.ravel()
+	flat = lat.ravel()
+	mask = fa.ravel()
+	bbox = np.logical_and(np.logical_and(np.logical_and(flon>bounds[0],flon<bounds[1]),flat>bounds[2]),flat<bounds[3])	
+	categories = (np.array(mask[bbox] == 3), np.array(mask[bbox] == 5),
+			np.array(mask[bbox] == 7), np.array(mask[bbox] == 8),
+			np.array(mask[bbox] == 9))
+	alphas = (.1,.2,.4,.5,.6)
+	labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+	colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+	lon = []
+	lat = []
+	val = []
+	for i,cat in enumerate(categories):
+		lon.append(flon[bbox][cat])
+		lat.append(flat[bbox][cat])
+		val.append(np.ones(lon[i].shape)*i)	
+	N = len(categories)
+
+	# create discrete colormap	
+	if cmap_name == 'discrete':
+		cmap = mpl.colors.LinearSegmentedColormap.from_list(cmap_name, colors, N=N)
+	else:
+		cmap = mpl.cm.get_cmap(cmap_name) 
+	
+	# only create the colorbar if requested
+        cb_png_data = None
+        if wisdom['colorbar'] is not None:
+            #  colorbar + add it to the KMZ as a screen overlay
+            legend = ''
+            logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
+            cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)	
+
+        # create the raster & get coordinate bounds, HACK to get better quiver resolution
+	cmin = -.5
+	cmax = N-.5
+        raster_png_data,corner_coords = basemap_scatter_mercator(val,lon,lat,bounds,alphas,cmin,cmax,cmap)
+
+        return raster_png_data, corner_coords, cb_png_data
 
 
     def _scalar2png(self, d, var, tndx, out_path):
@@ -316,6 +385,36 @@ class Postprocessor(object):
             f.write(raster_png_data)
 
         return raster_path, corner_coords
+
+
+    def _sat2png(self, dg, df, sat, bounds, out_path):
+        """
+        Postprocess a single sat granule variable ``sat`` and stores result in a raster file.
+
+        :param dg: the open geolocation file
+        :param df: the open fire file
+        :param sat: the satellite variable name
+	:param bounds: bounds for the bounding box satellite data
+        :param out_path: the path to the KMZ output
+        :return: the path to the raster and the bounding coordinates
+        """
+        # render the raster & colorbar
+        raster_png_data, corner_coords, cb_png_data = self._sat2raster(dg, df, sat, bounds)
+
+        raster_path = out_path + '-raster.png'
+	logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
+        
+	with open(raster_path, 'w') as f:
+            f.write(raster_png_data)
+	
+	# write colorbar file
+        colorbar_path = None
+        if cb_png_data is not None:
+            colorbar_path = out_path + "-cb.png"
+            with open(colorbar_path, "w") as f:
+                f.write(cb_png_data)
+
+        return raster_path, colorbar_path, corner_coords
 
 
     def _scalar2kmz(self, d, var, tndx, ts_esmf_begin, ts_esmf_end, out_path, cleanup = True):
@@ -413,7 +512,158 @@ class Postprocessor(object):
         
         return kmz_path, raster_path, corner_coords
 
-    
+
+    def _sat2kmz(self, dg, df, sat, gran, ts_esmf_begin, ts_esmf_end, bounds, out_path, cleanup = True):
+        """
+        Postprocess a single vector variable ``var`` and store result in out_path.
+
+        :param dg: the open geolocation file
+        :param df: the open fire file
+        :param sat: the sat name
+	:param gran: a granule id
+        :param ts_esmf_begin: time string yyyy-mm-dd_HH:MM:SS
+        :param ts_esmf_end: time string yyyy-mm-dd_HH:MM:SS
+	:param bounds: bounds for the bounding box satellite data
+        :param out_path: the path to the KMZ output
+        :param cleanup: if True, PNG files are deleted after KMZ is build
+        :return: the path to the generated KMZ
+        """
+	# construct kml file
+
+        name = ts_esmf_begin + ' ' + sat + ' ' + gran 
+        file = kml.Kml(name = name)
+        doc = file.newdocument(name = name)
+        doc.timespan.begin=ts_esmf_begin.replace('_','T')+'Z'
+        if ts_esmf_end is not None:
+            doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
+
+        # generate the png files
+        raster_path, cb_path, corner_coords = self._sat2png(dg, df, sat, bounds, out_path)
+
+        # add colorbar to KMZ
+        if cb_path is not None:
+            cbo = doc.newscreenoverlay(name='colorbar')
+            cbo.overlayxy = kml.OverlayXY(x=0,y=1,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
+            cbo.screenxy = kml.ScreenXY(x=0.02,y=0.95,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
+            cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixel,yunits=kml.Units.pixel)
+            cbo.color = kml.Color.rgb(255,255,255,a=150)
+            cbo.visibility = 1
+            #doc.addfile(cb_path)
+            cbo.icon.href=cb_path
+
+        # add ground overlay
+        ground = doc.newgroundoverlay(name=sat,color='80ffffff')
+        ground.gxlatlonquad.coords = corner_coords
+        #doc.addfile(raster_path)
+        ground.icon.href = raster_path
+
+        # build output file
+        kmz_path = out_path + ".kmz"
+        file.savekmz(kmz_path)
+
+        # cleanup
+        if cleanup:
+            os.remove(raster_path)
+            if cb_path is not None:
+                os.remove(cb_path)
+
+        return kmz_path, raster_path, cb_path, corner_coords
+
+    def open_file(self, path_file):
+	"""
+	Open file depending on its extension
+
+	:param path_file: local path to the file
+	"""
+	if not osp.exists(path_file):
+		logging.error('open_file: file %s does not exist locally' % path_file)	
+		return
+	ext = osp.splitext(path_file)[1]
+	logging.info('open_file: open file %s with extension %s' % (path_file, ext))
+	if ext == ".nc":
+		try:
+			d = nc4.Dataset(str(path_file),'r')
+		except Exception as e:
+			logging.error('open_file: can not open file %s with exception %s' % (path_file,e))
+	elif ext == ".hdf":
+		try:
+			d = SD(str(path_file),SDC.READ)
+		except Exception as e:
+			logging.error('open_file: can not open file %s with exception %s' % (path_file,e))
+			sys.exit(1)
+	elif ext == ".h5":
+		try:
+			d = h5py.File(str(path_file),'r')
+		except Exception as e:
+			logging.error('open_file: can not open file %s with exception %s' % (path_file,e))
+	else:
+		logging.error('open_file: unrecognized extension %s' % ext)
+		return
+	return d,ext
+
+    def close_file(self, d, ext):
+	"""
+	Close file depending on its extension
+
+	:param d: open file to close
+	:param ext: extension of the file
+	"""
+	if ext == ".nc":
+		d.close()
+	elif ext == ".hdf":
+		d.end()
+	elif ext == ".h5":
+		d.close()
+	else:
+		logging.error('close_file: unrecognized extension %s' % ext)
+		
+    def process_sats(self, jsat, dom_id, ts_esmf, dt, sats):
+	"""
+	Postprocess satellite data at a given simulation interval into PNG and KMZ files.
+	
+	:param jsat: dictionary of satellite products acquiered
+	:param dom_id: the domain identifier
+      	:param ts_esmf: time stamp in ESMF format
+        :param dt: time interval to consider the satellite data on
+	:param sats: list of sat variables to process
+	"""
+	traceargs()
+	
+	ts_initial = esmf_to_utc(ts_esmf)
+	ts_final = ts_initial + dt
+	logging.info('process_vars: looking from time %s to time %s' % (ts_initial,ts_final))
+	
+	for sat in sats:
+		logging.info('process_sats: postprocessing %s for time %s' % (sat, ts_esmf))		
+		logging.info('process_sats: convertion %s' % jsat['satprod_satsource'])
+		sat_source = jsat['satprod_satsource'][sat]
+		logging.info('process_sats: from %s to %s' % (sat,sat_source))
+		for k,gran in jsat[sat_source].items():
+			logging.info('process_sats: postprocessing granule %s for source %s for time %s' % (k, sat, ts_esmf))		
+			gran_time = esmf_to_utc(gran['time_start_iso'])
+			logging.info('process_sats: postprocessing granule %s at time %s for source %s for time %s' % (k, utc_to_esmf(gran_time), sat, ts_esmf))		
+			if gran_time >= ts_initial and gran_time < ts_final:		
+            			logging.info('process_sats: granule %s at time %s is in output process interval %s - %s' % (k, utc_to_esmf(gran_time), ts_esmf, utc_to_esmf(ts_final)))
+            			try:
+					outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + sat + "_" + k)
+					dg,eg = self.open_file(gran['geo_local_path'])
+					df,ef = self.open_file(gran['fire_local_path'])
+                			kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
+                    			kmz_path,raster_path,cb_path,coords = self._sat2kmz(dg, df, sat, k, ts_esmf, None, jsat.bounds, outpath_base, cleanup=False)
+                    			if cb_path is not None:
+                        			mf_upd['colorbar'] = osp.basename(cb_path)
+                			mf_upd['kml'] = osp.basename(kmz_path)
+                			mf_upd['raster'] = osp.basename(raster_path)
+                			mf_upd['coords'] = coords
+                			logging.info("New manifest to update %s" % mf_upd)
+					self._update_manifest(dom_id, ts_esmf, sat, mf_upd)
+				except Exception as e:
+                			logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
+                			logging.warning(traceback.print_exc())
+				self.close_file(dg,eg)
+				self.close_file(df,ef)
+   			else:
+				logging.info('process_sats: granule %s at time %s not in output process interval %s - %s' % (k, utc_to_esmf(gran_time), ts_esmf, utc_to_esmf(ts_final))) 
     def process_vars(self, wrfout_path, dom_id, ts_esmf, vars):
         """
         Postprocess a list of scalar or vector fields at a given simulation time into PNG and KMZ
@@ -454,7 +704,6 @@ class Postprocessor(object):
                 mf_upd['kml'] = osp.basename(kmz_path)
                 mf_upd['raster'] = osp.basename(raster_path)
                 mf_upd['coords'] = coords
-                self._update_manifest(dom_id, ts_esmf, var, mf_upd)
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
                 logging.warning(traceback.print_exc())
@@ -598,7 +847,7 @@ class Postprocessor(object):
         dom = self.manifest.get(str(dom_id), {})
         self.manifest[str(dom_id)] = dom
 
-        # extract timestamp
+	# extract timestamp
         td = dom.get(ts_esmf, {})
         dom[ts_esmf] = td
 
@@ -609,7 +858,7 @@ class Postprocessor(object):
 
         # synchronize the file
         mf_path = os.path.join(self.output_path, self.product_name + '.json')
-        json.dump(self.manifest, open(mf_path, 'w'),indent=1, separators=(',',':'))
+        json.dump(self.manifest, open(mf_path, 'w'),indent=1, separators=(',',':'))	
 
 
 

@@ -35,6 +35,7 @@ import shutil
 import psutil
 import requests
 import socket
+import collections
 
 
 class Dict(dict):
@@ -530,7 +531,13 @@ def get_ip_address():
     s.connect(("8.8.8.8", 80))
     return s.getsockname()[0]
 
-def json_join(path,json_list,json_out):
+def json_join(path,json_list):
+    """
+    Join local jsons in a singular json and remove the previous jsons
+	
+    :param path: local path to the jsons
+    :param json_list: list of json names to join
+    """
     manifest = Dict({})
     for jj in json_list:
 	json_path = osp.join(path,str(jj)+'.json')
@@ -542,5 +549,18 @@ def json_join(path,json_list,json_out):
 		manifest.update({jj: {}})
 		pass
 	remove(json_path)
-    json.dump(manifest, open(osp.join(path,'sat.json'),'w'), indent=4, separators=(',', ': '))
     return manifest
+
+def duplicates(replist):
+    """
+    Give dictionary of repeated elements (keys) and their indexes (array in values)
+
+    :param replist: list to look for repetitions	
+    """
+    counter=collections.Counter(replist)
+    dups=[i for i in counter if counter[i]!=1]
+    result={}
+    for item in dups:
+	result[item]=[i for i,j in enumerate(replist) if j==item]
+    return result
+
