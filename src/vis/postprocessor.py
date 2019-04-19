@@ -704,6 +704,7 @@ class Postprocessor(object):
                 mf_upd['kml'] = osp.basename(kmz_path)
                 mf_upd['raster'] = osp.basename(raster_path)
                 mf_upd['coords'] = coords
+		self._update_manifest(dom_id, ts_esmf, var, mf_upd)
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
                 logging.warning(traceback.print_exc())
