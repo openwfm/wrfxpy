@@ -7,7 +7,7 @@ import os.path as osp
 import numpy as np
 from urllib import urlopen
 from cmr import GranuleQuery
-from utils import Dict, utc_to_utcf
+from utils import Dict, utc_to_utcf, duplicates
 from downloader import download_url, DownloadError
 
 class SatError(Exception):
@@ -62,19 +62,19 @@ class SatSource(object):
 		api = GranuleQuery()
 		if not version:
 			search = api.parameters(
-								short_name=sname,
-								downloadable=True,
-								polygon=bbox,
-								temporal=time_utcf
-								)
+					short_name=sname,
+					downloadable=True,
+					polygon=bbox,
+					temporal=time_utcf
+				)
 		else:
 			search = api.parameters(
-								short_name=sname,
-								downloadable=True,
-								polygon=bbox,
-								temporal=time_utcf,
-								version=version
-								)
+					short_name=sname,
+					downloadable=True,
+					polygon=bbox,
+					temporal=time_utcf,
+					version=version
+				)
 		sh=search.hits()
 		logging.info("CMR API: %s gets %s hits in this range" % (sname,sh))
 		if sh>maxg:
@@ -189,50 +189,71 @@ class SatSource(object):
 
 		manifest = Dict({})
 
-		for k, mm in metas.items():
+		for k, meta in metas.items():
 			logging.info('downloading %s products' % k)
-			for m in mm:
-				id = m['producer_granule_id']
+			for m in meta:
+				id = osp.splitext(m['producer_granule_id'])[0]
 				url = m['links'][0]['href']
 				m.update(self.download_sat(url))
 				manifest.update({id: m})
+		
+		group_manifest = self.group_files_sat(manifest)	
+	
+		return group_manifest
 
-		return manifest
-
-	def group_files_sat(self):
+	def group_files_sat(self, manifest):
 		"""
-		Agrupate the geolocation (03), fire (14) (, and reflectance (09)) files of a specific product in a path
+                Group all the satellite files from downloaded manifest
 
-		:return files: list of dictionaries with geolocation (03), fire (14) (, and reflectance (09)) file paths of the specific product
-		"""
-		path=self.ingest_dir
+                :param manifest: satellite manifest from retrieving
+		:return result: groupped and cleanned manifest
+                """	
+		if not manifest:
+			return manifest
+		result = Dict({})
+		geore = re.compile(r'%s' % self.geo_prefix)
+		pregeore = re.compile(r'%s' % self.pre_geo_prefix)
+		firere = re.compile(r'%s' % self.fire_prefix)
+		keys = np.array(manifest.keys())
+		labels = np.array([''.join(k.split('.')[1:3]) for k in keys])
+		indexes = duplicates(labels)	
+		for k,ind in indexes.items():
+			lenind = len(ind)
+			if lenind != 2:
+				logging.warning('retrieve_data_sat: number of geo and fire granules %d different than 2' % lenind)
+				if lenind < 2:
+					logging.error('retrieve_data_sat: geo or fire file is missing, number of granules %d different than 2' % lenind)
+					continue
+			geo = filter(geore.search,keys[ind])
+			pregeo = filter(pregeore.search,keys[ind])
+			fire = filter(firere.search,keys[ind])
+			if not geo:
+				if pregeo:
+					geok = pregeo[0]
+				else:
+					logging.error('retrieve_data_sat: no geo data in the manifest')
+					continue				
+			else:
+				geok = geo[0]
 
-		files=[Dict({'geo':k}) for k in glob.glob(path+'/'+self.geo_prefix)]
-		filesf=glob.glob(path+'/'+self.fire_prefix)
-		filesr=glob.glob(path+'/'+self.ref_prefix)
-		if len(filesf)>0:
-			for f in filesf:
-				mf=re.split("/",f)
-				if mf is not None:
-					m=mf[-1].split('.')
-					if m is not None:
-						for k,g in enumerate(files):
-							mmf=re.split("/",g.geo)
-							mm=mmf[-1].split('.')
-							if mm[0][1]==m[0][1] and mm[1]+'.'+mm[2]==m[1]+'.'+m[2]:
-								files[k].fire=f
-		if len(filesr)>0:
-			for f in filesr:
-				mf=re.split("/",f)
-				if mf is not None:
-					m=mf[-1].split('.')
-					if m is not None:
-						for k,g in enumerate(files):
-							mmf=re.split("/",g.geo)
-							mm=mmf[-1].split('.')
-							if mm[0][1]==m[0][1] and mm[1]+'.'+mm[2]==m[1]+'.'+m[2]:
-								files[k].ref=f
-		return files
+			if fire:
+				firek = fire[0]
+			else:
+				logging.error('retrieve_data_sat: no fire data in the manifest')
+				continue
+			r = Dict({
+					'time_start_iso' : manifest[geok]['time_start'],
+					'time_end_iso' : manifest[geok]['time_end'],
+					'geo_url' : manifest[geok]['url'],
+					'geo_local_path' : manifest[geok]['local_path'],
+					'geo_description' : manifest[geok]['dataset_id'],
+					'fire_url' : manifest[firek]['url'],
+					'fire_local_path' : manifest[firek]['local_path'],
+					'fire_description' : manifest[firek]['dataset_id']
+				})
+			result.update({k: r})
+		return result
+
 
 	def read_sat(self, files, metas, bounds):
 		"""

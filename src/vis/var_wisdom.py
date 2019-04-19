@@ -433,29 +433,35 @@ _var_wisdom = {
        'retrieve_as' : lambda d,t: d.variables['FMC_EQUI'][t,0,:,:],
        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
-    'TERRA' : {
-	'name' : 'MODIS Terra satellite data',
-	'native_unit' : '-',
-	'colorbar' : 'discrete',
-	'scale' : 'discrete',
-	'retrieve_as' : lambda d,m : d.select('fire mask').get()[m.astype(int)],
-	'grid' : lambda d,m : d.select('Latitude').get()[m.astype(int)], d.select('Longitude').get()[m.astype(int)]
+    'TERRA_AF' : {
+       'name' : 'MODIS Terra Active Fires satellite data',
+       'source' : 'Terra',
+       'native_unit' : '-',
+       'colorbar' : '-',
+       'colormap' : 'discrete',
+       'scale' : 'discrete',
+       'retrieve_as' : lambda d : d.select('fire mask').get(),
+       'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
     },
-    'AQUA' : {
-	'name' : 'MODIS Aqua satellite data',
-	'native_unit' : '-',
-	'colorbar' : 'discrete',
+    'AQUA_AF' : {
+	'name' : 'MODIS Aqua Active Fires satellite data',
+       	'source' : 'Aqua',	
+        'native_unit' : '-',
+	'colorbar' : '-',
+	'colormap' : 'discrete',
 	'scale' : 'discrete',
-	'retrieve_as' : lambda d,m : d.select('fire mask').get()[m.astype(int)],
-	'grid' : lambda d,m : d.select('Latitude').get().ravel()[m.astype(int)], d.select('Longitude').get().ravel()[m.astype(int)]
+	'retrieve_as' : lambda d : d.select('fire mask').get(),
+	'grid' : lambda d : (d.select('Latitude').get(), d.select('Longitude').get())
     },
-    'SNPP' : {
-	'name' : 'VIIRS S-NPP satellite data',
+    'SNPP_AF' : {
+	'name' : 'VIIRS S-NPP Active Fires satellite data',
+       	'source' : 'SNPP',	
 	'native_unit' : '-',
-	'colorbar' : 'discrete',
+	'colorbar' : '-',
+	'colormap' : 'discrete',
 	'scale' : 'discrete',
-	'retrieve_as' : lambda d,m : d['fire mask'][:][m.astype(int)],
-	'grid' : lambda d,m : d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'][m.astype(int)], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'][m.astype(int)]
+	'retrieve_as' : lambda d : d['fire mask'][:],
+	'grid' : lambda d : (d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'])
     }
 }
 

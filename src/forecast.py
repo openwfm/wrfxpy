@@ -98,6 +98,10 @@ class JobState(Dict):
 		self.fmda = self.parse_fmda(args)
 		self.postproc = args['postproc']
 		self.wrfxpy_dir = args['sys_install_path']
+		if 'clean_dir' in args:
+			self.clean_dir = args['clean_dir']
+		else:
+			self.clean_dir = True
 		self.args = args
 		logging.debug('JobState initialized: ' + str(self))
 
@@ -214,16 +218,12 @@ def retrieve_satellite(js, sat_source, q):
 	try:
 		logging.info("retrieving satellite files from %s" % sat_source.id)
 		jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
-		domain = js.domain_conf.domains[-1]
-		latloni=domain.ij_to_latlon(0,0)
-		latlonf=domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
-		bounds = (latloni[1],latlonf[1],latloni[0],latlonf[0])
-		manifest = sat_source.retrieve_data_sat(bounds, js.start_utc, js.end_utc)
+		manifest = sat_source.retrieve_data_sat(js.bounds, js.start_utc, js.end_utc)
 		# write a json file with satellite information	
 		sat_file = sat_source.id+'.json'
 		json.dump(manifest, open(osp.join(jobdir,sat_file),'w'), indent=4, separators=(',', ': '))
 	
-		send_email(js, 'satellite', 'Job %s - ungrib complete.' % js.job_id)
+		send_email(js, 'satellite', 'Job %s - satellite retrieving complete.' % js.job_id)
 		logging.info('satellite retrieval complete for %s' % sat_source.id)
 		q.put('SUCCESS')
 
@@ -407,12 +407,11 @@ def execute(args,job_args):
 	"""
 
 	logging.info('step 0 initialize the job state from the arguments')
-	## logging.info('args = %s' % json.dumps(jargs, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': ')))
 	js = JobState(args)
-	## logging.info('js = %s' % json.dumps(js, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': ')))
 
 	jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
-	make_clean_dir(jobdir)
+	if js.clean_dir or not osp.exists(osp.join(jobdir,'input.json')):
+		make_clean_dir(jobdir)
 
 	json.dump(job_args, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
 	jsub = make_job_file(js)
@@ -466,13 +465,17 @@ def execute(args,job_args):
 	proc_q = Queue()
 	
 	if js.satellite_source:
-		sat_proc = {}
-	
+		domain = js.domain_conf.domains[-1]
+                latloni = domain.ij_to_latlon(0,0)
+                latlonf = domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
+		bounds = (latloni[1],latlonf[1],latloni[0],latlonf[0])
+		js.bounds = bounds
+		sat_proc = {}	
 	for satellite_source in js.satellite_source:
 		sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
 
 	geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
-	# grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q, ref_utc))
+	
 	grib_proc = {}
 	for grib_source in js.grib_source:
 		grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
@@ -523,8 +526,13 @@ def execute(args,job_args):
 
 	if js.satellite_source:
 		# joining all satellite manifests
-		sat_manifest = json_join(jobdir,args['satellite_source'],'sat.json')	
-		print sat_manifest
+		sat_manifest = json_join(jobdir,args['satellite_source'])	
+		sat_manifest.bounds = js.bounds
+		sat_manifest.time_interval = (utc_to_esmf(js.start_utc), utc_to_esmf(js.end_utc))
+		max_dom = max([int(x) for x in filter(lambda x: len(x) == 1, args['domains'].keys())])
+		sat_manifest.dt = args['domains'][str(max_dom)]['history_interval']
+		sat_manifest.satprod_satsource = js.satprod_satsource
+		json.dump(sat_manifest, open(osp.join(jobdir,'sat.json'),'w'), indent=4, separators=(',', ': '))
 
 	logging.info("step 5: execute metgrid after ensuring all grids will be processed")
 	update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
@@ -598,6 +606,7 @@ def execute(args,job_args):
 def process_output(job_id):
 	args = load_sys_cfg()
 	jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
+	satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
 	logging.info('process_output: loading job description from %s' % jobfile)
 	try:
 		js = Dict(json.load(open(jobfile,'r')))
@@ -605,6 +614,18 @@ def process_output(job_id):
 		logging.error('Cannot load the job description file %s' % jobfile)
 		logging.error('%s' % e)
 		sys.exit(1)
+	logging.info('process_output: loading satellite description from %s' % satfile)
+	try:
+		jsat = Dict(json.load(open(satfile,'r')))
+		available_sats = [sat.upper()+'_AF' for sat in jsat.keys() if sat not in ['time_interval', 'bounds', 'dt', 'satprod_satsource']]
+		not_empty_sats = [sat.upper()+'_AF' for sat in jsat.keys() if sat not in ['time_interval', 'bounds', 'dt', 'satprod_satsource'] and jsat[sat]]
+	except:
+		logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
+		available_sats = []
+		not_empty_sats = []
+		pass
+	logging.info('process_output: available satellite data %s' % available_sats)
+	logging.info('process_output: not empty satellite data %s' % not_empty_sats)
 	js.old_pid = js.pid
 	js.pid = os.getpid()
 	js.state = 'Processing'
@@ -626,6 +647,9 @@ def process_output(job_id):
 	js.manifest_filename= 'wfc-' + js.grid_code + '.json'
 	logging.debug('Postprocessor created manifest %s',js.manifest_filename)
 	max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
+	if available_sats:
+		dt = timedelta(minutes=jsat['dt'])
+		logging.info('dt for satellite postprocessing = %s' % dt)	
 
 	if js.postproc.get('from', None) == 'wrfout':
 		logging.info('Postprocessing all wrfout files.')
@@ -641,9 +665,17 @@ def process_output(job_id):
 			for esmf_time in sorted(times):
 				logging.info("Processing domain %d for time %s." % (dom_id, esmf_time))
 				if js.postproc is not None and str(dom_id) in js.postproc:
-					var_list = [str(x) for x in js.postproc[str(dom_id)]]
+					if available_sats:
+						sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
+						var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]
+						sat_list = [sat for sat in sat_list if sat in not_empty_sats]
+						logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
+					else:
+						var_list = [str(x) for x in js.postproc[str(dom_id)]]
 					logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
 					try:
+						if sat_list:
+							pp.process_sats(jsat, dom_id, esmf_time, dt, sat_list)
 						pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
 						# in incremental mode, upload to server
 						if js.postproc.get('shuttle', None) == 'incremental':
@@ -652,6 +684,7 @@ def process_output(job_id):
 							already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
 					except Exception as e:
 						logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+					
 
 		# if we are to send out the postprocessed files after completion, this is the time
 		if js.postproc.get('shuttle', None) == 'on_completion':
@@ -707,10 +740,18 @@ def process_output(job_id):
 			dom_id = int(domain_str)
 			logging.info("Detected history write for domain %d for time %s." % (dom_id, esmf_time))
 			if js.postproc is not None and str(dom_id) in js.postproc:
-				var_list = [str(x) for x in js.postproc[str(dom_id)]]
+				if available_sats:
+					sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
+					var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]
+					sat_list = [sat for sat in sat_list if sat in not_empty_sats]
+					logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
+				else:
+					var_list = [str(x) for x in js.postproc[str(dom_id)]]
 				logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
 				wrfout_path = find_wrfout(js.wrf_dir, dom_id, esmf_time)
 				try:
+					if sat_list:
+						pp.process_sats(jsat, dom_id, esmf_time, dt, sat_list)
 					pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
 				except Exception as e:
 					logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
@@ -838,11 +879,22 @@ def process_arguments(args):
 	args['start_utc'] = round_time_to_hour(start_utc)
 	args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
 	args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
+	args['satprod_satsource'] = Dict({})
+	
+	# add postprocess satellite data
+	if 'satellite_source' in args:
+		if 'postproc' in args:
+			max_dom = max([int(x) for x in filter(lambda x: len(x) == 1, args['postproc'])])
+			sats = args['satellite_source']
+			for sat in sats:
+				satprod = sat.upper()+'_AF'
+				args['postproc'][str(max_dom)].append(satprod)
+				args['satprod_satsource'].update({satprod: sat})
 
 	# defaults
 	if args['ref_utc'] is not None:
 		args['ref_utc'] = timespec_to_utc(args['ref_utc'], args['start_utc'])
-
+	
 	for k, v in args.iteritems():
 		if type(v) == unicode:
 			args[k] = v.encode('ascii')
