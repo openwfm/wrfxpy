@@ -116,6 +116,8 @@ def parallel_job_running(js):
                 return False
             else:
                 logging.error(e.output)
+    elif not qstat_arg:
+        ret = subprocess.check_output([qstat_cmd],stderr=subprocess.STDOUT)
     else:
         ret = subprocess.check_output([qstat_cmd,qstat_arg],stderr=subprocess.STDOUT)
     for line in ret.split('\n'):
