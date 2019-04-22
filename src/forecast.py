@@ -481,7 +481,7 @@ def execute(args,job_args):
 		grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
 	logging.info('starting GEOGRID and GRIB2/UNGRIB')
-	logging.info('%s' % [s.id for s in js.satellite_source])
+	logging.info('satellite sources %s' % [s.id for s in js.satellite_source])
 
 	if js.ungrib_only:
 		logging.info('ungrib_only set, skipping GEOGRID, will exit after UNGRIB')
