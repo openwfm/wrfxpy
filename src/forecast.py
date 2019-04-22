@@ -157,7 +157,7 @@ class JobState(Dict):
 			sats = args['satellite_source']
 			return sats
 		else:
-			return None
+			return []
 
 	def parse_fmda(self, args):
 		"""
