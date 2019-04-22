@@ -183,10 +183,10 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
     m = Basemap(projection='merc',llcrnrlat=bounds[2], urcrnrlat=bounds[3],
                 		llcrnrlon=bounds[0],urcrnrlon=bounds[1])
     
-    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*2)
+    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
     for i in range(N):
-    	m.scatter(lon[i],lat[i],50,c=val[i],latlon=True,marker='.',cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
+    	m.scatter(lon[i],lat[i],60,c=val[i],latlon=True,marker='.',cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
 
     # save png to a StringIO
     str_io = StringIO.StringIO()
