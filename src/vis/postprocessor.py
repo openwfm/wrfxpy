@@ -286,8 +286,14 @@ class Postprocessor(object):
         wisdom.update(self.wisdom_update.get(sat, {}))   
 	cmap_name = wisdom['colormap']
 
-	lon,lat,val = [],[],[]
+	values = (3,5,7,8,9)
+	alphas = (.5,.5,.6,.7,.8)
+	labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+	colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+	
 	# for each pair of files
+	N = len(values)
+	lons,lats,vals = [[]]*N,[[]]*N,[[]]*N
 	for dg,df in zip(dgs,dfs):
 		# extract variables
         	lat, lon = wisdom['grid'](dg)
@@ -302,21 +308,14 @@ class Postprocessor(object):
 		flat = lat.ravel()
 		mask = fa.ravel()
 		bbox = np.logical_and(np.logical_and(np.logical_and(flon>bounds[0],flon<bounds[1]),flat>bounds[2]),flat<bounds[3])	
-		categories = (np.array(mask[bbox] == 3), np.array(mask[bbox] == 5),
-			np.array(mask[bbox] == 7), np.array(mask[bbox] == 8),
-			np.array(mask[bbox] == 9))
+		categories = [np.array(mask[bbox] == value) for value in values]
 	
 		for i,cat in enumerate(categories):
-			lon.append(flon[bbox][cat])
-			lat.append(flat[bbox][cat])
-			val.append(np.ones(lon[i].shape)*i)	
+			lons[i] = np.append(lons[i],flon[bbox][cat])
+			lats[i] = np.append(lats[i],flat[bbox][cat])
+			vals[i] = np.append(vals[i],np.ones(cat.sum())*i)
+			logging.info('_sat2raster: variable %s, category %s, shape of data (%s,%s,%s)' % (sat,i,lons[i].shape,lats[i].shape,vals[i].shape))	
 	
-	alphas = (.5,.5,.6,.7,.8)
-	labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
-	colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
-	
-	N = len(categories)
-
 	# create discrete colormap	
 	if cmap_name == 'discrete':
 		cmap = mpl.colors.LinearSegmentedColormap.from_list(cmap_name, colors, N=N)
@@ -334,7 +333,7 @@ class Postprocessor(object):
         # create the raster & get coordinate bounds
 	cmin = -.5
 	cmax = N-.5
-        raster_png_data,corner_coords = basemap_scatter_mercator(val,lon,lat,bounds,alphas,cmin,cmax,cmap)
+        raster_png_data,corner_coords = basemap_scatter_mercator(vals,lons,lats,bounds,alphas,cmin,cmax,cmap)
 
         return raster_png_data, corner_coords, cb_png_data
 
@@ -579,14 +578,13 @@ class Postprocessor(object):
         return kmz_path, raster_path, corner_coords
 
 
-    def _sat2kmz(self, dgs, dfs, sat, gran, ts_esmf_begin, ts_esmf_end, bounds, out_path, cleanup = True):
+    def _sat2kmz(self, dgs, dfs, sat, ts_esmf_begin, ts_esmf_end, bounds, out_path, cleanup = True):
         """
         Postprocess a single satellite variable ``sat`` and store result in out_path.
 
         :param dgs: list of open geolocation files
         :param dfs: list of open fire files
         :param sat: the sat name
-	:param gran: a granule id
         :param ts_esmf_begin: time string yyyy-mm-dd_HH:MM:SS
         :param ts_esmf_end: time string yyyy-mm-dd_HH:MM:SS
 	:param bounds: bounds for the bounding box satellite data
@@ -596,7 +594,7 @@ class Postprocessor(object):
         """
 	# construct kml file
 
-        name = ts_esmf_begin + ' ' + sat + ' ' + gran 
+        name = ts_esmf_begin + ' ' + sat 
         file = kml.Kml(name = name)
         doc = file.newdocument(name = name)
         doc.timespan.begin=ts_esmf_begin.replace('_','T')+'Z'
@@ -639,7 +637,6 @@ class Postprocessor(object):
         Postprocess an empty satellite variable ``sat`` and store result in out_path.
 
         :param sat: the sat name
-	:param gran: a granule id
         :param ts_esmf_begin: time string yyyy-mm-dd_HH:MM:SS
         :param ts_esmf_end: time string yyyy-mm-dd_HH:MM:SS
 	:param bounds: bounds for the bounding box satellite data
@@ -755,9 +752,8 @@ class Postprocessor(object):
 	
 	for sat in sats:
 		logging.info('process_sats: postprocessing %s for time %s' % (sat, ts_esmf))		
-		logging.info('process_sats: convertion %s' % jsat['satprod_satsource'])
 		sat_source = jsat['satprod_satsource'][sat]
-		logging.info('process_sats: from %s to %s' % (sat,sat_source))
+		logging.info('process_sats: product %s from %s source' % (sat,sat_source))
 		dgs,dfs,egs,efs = [],[],[],[]		
 		for k,gran in jsat[sat_source].items():
 			gran_time = esmf_to_utc(gran['time_start_iso'])
@@ -774,7 +770,7 @@ class Postprocessor(object):
                 			logging.warning("Exception %s while evaluating granule %s from product %s for time %s" % (e.message, gran, sat, ts_esmf))
                 			logging.warning(traceback.print_exc())
    		if not dgs:
-			logging.info('process_sats: any product %s in output process interval %s - %s' % (sat, ts_esmf, utc_to_esmf(ts_final)))
+			logging.info('process_sats: any granule %s in output process interval %s - %s' % (sat, ts_esmf, utc_to_esmf(ts_final)))
 			try:
 				outpath_base = osp.join(self.output_path, self.product_name + "-sat_empty")
 				kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
@@ -803,7 +799,7 @@ class Postprocessor(object):
 				logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
 				logging.warning(traceback.print_exc())
 		else:
-            		logging.info('process_sats: some granule %s is in output process interval %s - %s' % (k, ts_esmf, utc_to_esmf(ts_final)))
+            		logging.info('process_sats: some granule %s is in output process interval %s - %s' % (sat, ts_esmf, utc_to_esmf(ts_final)))
 			try:
 				outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + sat)
                 		kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
