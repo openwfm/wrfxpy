@@ -460,7 +460,7 @@ _var_wisdom = {
 	'colorbar' : '-',
 	'colormap' : 'discrete',
 	'scale' : 'discrete',
-	'retrieve_as' : lambda d : d['fire mask'][:],
+	'retrieve_as' : lambda d : d.variables['fire mask'][:],
 	'grid' : lambda d : (d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'])
     }
 }

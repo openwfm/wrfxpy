@@ -304,9 +304,9 @@ class Postprocessor(object):
             		raise PostprocError("Variable %s size does not correspond to grid size." % sat)
 	
 		# process variables
-		flon = lon.ravel()
-		flat = lat.ravel()
-		mask = fa.ravel()
+		flon = np.array(lon).ravel()
+		flat = np.array(lat).ravel()
+		mask = np.array(fa).ravel()
 		bbox = np.logical_and(np.logical_and(np.logical_and(flon>bounds[0],flon<bounds[1]),flat>bounds[2]),flat<bounds[3])	
 		categories = [np.array(mask[bbox] == value) for value in values]
 	
