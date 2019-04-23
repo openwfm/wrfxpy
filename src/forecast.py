@@ -74,8 +74,6 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
-        #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
-        #self.grib_source = [self.resolve_grib_source(g, args) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
         self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
@@ -83,8 +81,6 @@ class JobState(Dict):
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
         self.cycle_start_utc = round_time_to_hour(self.get('cycle_start_utc',None), period_hours=self.grib_source[0].cycle_hours);
         logging.info('Simulation times rounded  %s to %s' % (str(self.start_utc), str(self.end_utc)))
-        #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
-        #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
         self.fc_hrs = timedelta_hours(self.end_utc - self.start_utc)
         if 'job_id' in args:
             logging.info('job_id %s given in the job description' % args['job_id'])
@@ -92,6 +88,12 @@ class JobState(Dict):
         else:
             logging.warning('job_id not given, creating.')
             self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(self.fc_hrs)
+        if 'restart' in args:
+            logging.info('restart %s given in the job description' % args['restart'])
+            self.restart = args['restart']
+        else:
+            self.restart = False
+            logging.info('restart not in arguments, default restart option %s')
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
         self.ignitions = args.get('ignitions', None)
