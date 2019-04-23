@@ -25,7 +25,8 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
 				  update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
 				  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-				  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, json_join
+				  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, json_join, \
+				  number_minutes
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -604,6 +605,8 @@ def execute(args,job_args):
 	json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 	process_output(js.job_id)
+	
+	return jobfile 
 
 def process_output(job_id):
 	args = load_sys_cfg()
@@ -836,7 +839,7 @@ def process_sat_output(job_id):
 	dom_id = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
 	t_int = esmf_to_utc(jsat['time_interval'][0])					
 	t_fin = esmf_to_utc(jsat['time_interval'][1])			
-	ndts = int(np.floor((t_fin-t_int).total_seconds()/60./int(dt)))
+	ndts = number_minutes(t_int,t_fin,jsat['dt'])
 	times = [t_int + tt*dt for tt in range(ndts)]
 	sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
 	for time in times:
