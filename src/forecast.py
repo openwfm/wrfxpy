@@ -794,6 +794,75 @@ def create_process_output_script(job_id):
 	st = os.stat(script_path)
 	os.chmod(script_path, st.st_mode | stat.S_IEXEC)
 
+def process_sat_output(job_id):
+	args = load_sys_cfg()
+	jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
+	satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+	logging.info('process_output: loading job description from %s' % jobfile)
+	try:
+		js = Dict(json.load(open(jobfile,'r')))
+	except Exception as e:
+		logging.error('Cannot load the job description file %s' % jobfile)
+		logging.error('%s' % e)
+		sys.exit(1)
+	logging.info('process_output: loading satellite description from %s' % satfile)
+	try:
+		jsat = Dict(json.load(open(satfile,'r')))
+		available_sats = [sat.upper()+'_AF' for sat in jsat.keys() if sat not in ['time_interval', 'bounds', 'dt', 'satprod_satsource']]
+		not_empty_sats = [sat.upper()+'_AF' for sat in jsat.keys() if sat not in ['time_interval', 'bounds', 'dt', 'satprod_satsource'] and jsat[sat]]
+	except:
+		logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
+		available_sats = []
+		not_empty_sats = []
+		return
+	logging.info('process_output: available satellite data %s' % available_sats)
+	logging.info('process_output: not empty satellite data %s' % not_empty_sats)
+	if not not_empty_sats:
+		logging.warning('Do not have satellite data to postprocess')
+		return
+	
+	pp = None
+	already_sent_files, max_pp_dom = [], -1
+	delete_visualization(js.job_id)
+	js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
+	make_clean_dir(js.pp_dir)
+	pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
+	js.manifest_filename= 'wfc-' + js.grid_code + '.json'
+	logging.debug('Postprocessor created manifest %s',js.manifest_filename)
+	dt = timedelta(minutes=jsat['dt'])
+	logging.info('dt for satellite postprocessing = %s' % dt)	
+	dom_id = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
+	t_int = esmf_to_utc(jsat['time_interval'][0])					
+	t_fin = esmf_to_utc(jsat['time_interval'][1])			
+	ndts = int(np.floor((t_fin-t_int).total_seconds()/60./int(dt)))
+	times = [t_int + tt*dt for tt in range(ndts)]
+	sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
+	for time in times:
+		try:
+			esmf_time = utc_to_esmf(time)
+			logging.info('Posprocessing satellite data for time %s' % esmf_time)
+			pp.process_sats(jsat, dom_id, esmf_time, dt, sat_list)
+			if js.postproc.get('shuttle', None) == 'incremental':
+				desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+				sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+				already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+		except Exception as e:
+			logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+
+	 # if we are to send out the postprocessed files after completion, this is the time
+        if js.postproc.get('shuttle', None) == 'on_completion':
+                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+
+        if js.postproc.get('shuttle', None) is not None:
+                make_kmz(js.job_id)  # arguments can be added to the job id string
+
+        js.old_pid = js.pid
+        js.pid = None
+        js.state = 'Completed'
+        json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+	
+
 def verify_inputs(args,sys_cfg):
 	"""
 	Check if arguments (eventually) supplied to execute(...) are valid - if not exception is thrown.
@@ -864,7 +933,7 @@ def verify_inputs(args,sys_cfg):
 		raise ValueError('One or more unrecognized variables in postproc.')
 
 
-def process_arguments(args):
+def process_arguments(job_args,sys_cfg):
 	"""
 	Convert arguments passed into program via the JSON configuration file and job json argument.
 	This is processed after the configuration is updated by the job json file.
@@ -873,6 +942,17 @@ def process_arguments(args):
 
 	:param args: the input arguments
 	"""
+	# note: the execution flow allows us to override anything in the etc/conf.json file
+	# dump(sys_cfg,'sys_cfg')
+	args = sys_cfg
+	keys = job_args.keys()
+	for key in keys:
+		if job_args[key] is None:
+			logging.warning('Job argument %s=None, ignoring' % key)
+			del job_args[key]
+	args.update(job_args)
+	# logging.info('updated args = %s' % json.dumps(args, indent=4, separators=(',', ': ')))
+
 	# resolve possible relative time specifications
 	start_utc = timespec_to_utc(args['start_utc'])
 	args['orig_start_utc'] = start_utc
@@ -898,6 +978,11 @@ def process_arguments(args):
 	for k, v in args.iteritems():
 		if type(v) == unicode:
 			args[k] = v.encode('ascii')
+	
+	# sanity check, also that nothing in etc/conf got overrident
+	verify_inputs(args,sys_cfg)
+
+	return args	
 
 if __name__ == '__main__':
 
@@ -908,26 +993,14 @@ if __name__ == '__main__':
 	# load configuration JSON
 	sys_cfg = load_sys_cfg()
 	# logging.info('sys_cfg = %s' % json.dumps(sys_cfg, indent=4, separators=(',', ': ')))
-
-	# note: the execution flow allows us to override anything in the etc/conf.json file
-	# dump(sys_cfg,'sys_cfg')
+	
+	# load job JSON
 	job_args = json.load(open(sys.argv[1]), 'ascii')
 	# logging.info('job_args = %s' % json.dumps(job_args, indent=4, separators=(',', ': ')))
-	args = sys_cfg
-	keys = job_args.keys()
-	for key in keys:
-		if job_args[key] is None:
-			logging.warning('Job argument %s=None, ignoring' % key)
-			del job_args[key]
-	args.update(job_args)
-	# logging.info('updated args = %s' % json.dumps(args, indent=4, separators=(',', ': ')))
 
-	process_arguments(args)
+	# process arguments
+	args = process_arguments(job_args,sys_cfg)
 	# logging.info('processed args = %s' % str(args))
-
-	# sanity check, also that nothing in etc/conf got overrident
-	verify_inputs(args,sys_cfg)
-	# logging.info('verified args = %s' % str(args))
 
 	# execute the job
 	logging.info('calling execute')
