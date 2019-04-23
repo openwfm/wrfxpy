@@ -603,6 +603,8 @@ def execute(args,job_args):
 	json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 	process_output(js.job_id)
+	
+	return jobfile 
 
 def process_output(job_id):
 	args = load_sys_cfg()
