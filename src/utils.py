@@ -564,3 +564,12 @@ def duplicates(replist):
 	result[item]=[i for i,j in enumerate(replist) if j==item]
     return result
 
+def number_minutes(t_int,t_fin,dt):
+    """
+    Total number of minutes between two datetimes using a specific time step in minutes
+
+    :param t_int: initial datetime
+    :param t_fin: final datetime
+    :param dt: time step in minutes
+    """
+    return int(np.floor((t_fin-t_int).total_seconds()/60./int(dt)))

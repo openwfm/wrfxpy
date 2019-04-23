@@ -25,7 +25,8 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
 				  update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
 				  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-				  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, json_join
+				  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, json_join, \
+				  number_minutes
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -834,7 +835,7 @@ def process_sat_output(job_id):
 	dom_id = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
 	t_int = esmf_to_utc(jsat['time_interval'][0])					
 	t_fin = esmf_to_utc(jsat['time_interval'][1])			
-	ndts = int(np.floor((t_fin-t_int).total_seconds()/60./int(dt)))
+	ndts = number_minutes(t_int,t_fin,jsat['dt'])
 	times = [t_int + tt*dt for tt in range(ndts)]
 	sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
 	for time in times:
@@ -862,6 +863,20 @@ def process_sat_output(job_id):
         js.state = 'Completed'
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 	
+def send_products_to_server(job_id):
+	args = load_sys_cfg()
+        jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
+	logging.info('sent_products_to_server: loading job description from %s' % jobfile)
+        try:
+                js = Dict(json.load(open(jobfile,'r')))
+        except Exception as e:
+                logging.error('Cannot load the job description file %s' % jobfile)
+                logging.error('%s' % e)
+                sys.exit(1)
+	desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+	pp_dir = js.get('pp_dir',osp.abspath(osp.join(args.workspace_path, job_id, "products")))
+	manifest_filename = js.get('manifest_filename','wfc-' + js.grid_code + '.json')
+	send_product_to_server(args, pp_dir, job_id, job_id, manifest_filename, desc)
 
 def verify_inputs(args,sys_cfg):
 	"""
