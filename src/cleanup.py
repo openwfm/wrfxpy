@@ -17,7 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from ssh_shuttle import SSHShuttle
+from ssh_shuttle import SSHShuttle, send_product_to_server
 import json
 import os
 import os.path as osp
@@ -242,11 +242,26 @@ def update(name):
 
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
+def send_products_to_server(job_id):
+        args = load_sys_cfg()
+        jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
+        logging.info('sent_products_to_server: loading job description from %s' % jobfile)
+        try:
+                js = Dict(json.load(open(jobfile,'r')))
+        except Exception as e:
+                logging.error('Cannot load the job description file %s' % jobfile)
+                logging.error('%s' % e)
+                sys.exit(1)
+        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+        pp_dir = js.get('pp_dir',osp.abspath(osp.join(args.workspace_path, job_id, "products")))
+        manifest_filename = js.get('manifest_filename','wfc-' + js.grid_code + '.json')
+        send_product_to_server(args, pp_dir, job_id, job_id, manifest_filename, desc)
+
 if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    commands = [ 'list', 'cancel', 'output', 'delete', 'workspace', 'update']
+    commands = [ 'list', 'cancel', 'output', 'delete', 'workspace', 'update', 'send']
 
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
         print('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]')
@@ -256,10 +271,11 @@ if __name__ == '__main__':
         print('delete <job_id> : cancel, and delete all files')
         print('workspace       : delete jobs that are not on the visulalization server')
         print('update <job_id> : check if the job is running and update its job state file')
+	print('send <job_id>   : send local simulation to the server')
         sys.exit(1)
 
     cmd = sys.argv[1]
-    if cmd in ['delete' , 'cancel', 'output', 'update', 'visualization']: 
+    if cmd in ['delete' , 'cancel', 'output', 'update', 'visualization', 'send']: 
         if len(sys.argv) == 3 and not sys.argv[2] == "" :
             job_id = sys.argv[2]
         else:
@@ -294,4 +310,8 @@ if __name__ == '__main__':
 
     if cmd == 'update':
         update(job_id)
+
+    if cmd == 'send':
+	send_products_to_server(job_id)
+		
 

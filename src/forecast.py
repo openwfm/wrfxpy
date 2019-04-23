@@ -863,20 +863,6 @@ def process_sat_output(job_id):
         js.state = 'Completed'
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
-def send_products_to_server(job_id):
-    args = load_sys_cfg()
-        jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-    logging.info('sent_products_to_server: loading job description from %s' % jobfile)
-        try:
-                js = Dict(json.load(open(jobfile,'r')))
-        except Exception as e:
-                logging.error('Cannot load the job description file %s' % jobfile)
-                logging.error('%s' % e)
-                sys.exit(1)
-    desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-    pp_dir = js.get('pp_dir',osp.abspath(osp.join(args.workspace_path, job_id, "products")))
-    manifest_filename = js.get('manifest_filename','wfc-' + js.grid_code + '.json')
-    send_product_to_server(args, pp_dir, job_id, job_id, manifest_filename, desc)
 
 def verify_inputs(args,sys_cfg):
     """
