@@ -604,6 +604,8 @@ def execute(args,job_args):
 
     process_output(js.job_id)
 
+    return jobfile
+
 def process_output(job_id):
     args = load_sys_cfg()
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
