@@ -3,7 +3,7 @@ cd $(dirname "$0")
 PYTHONPATH=src
 if [ $# -eq 0 ]
   then
-     echo usage: ./forecast.sh job.json
+     echo usage: ./cycling.sh job.json
      exit 1
 fi
-python src/forecast.py $1
+python src/cycling.py $1
