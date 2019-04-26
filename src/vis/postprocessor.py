@@ -746,8 +746,8 @@ class Postprocessor(object):
 	"""
 	traceargs()
 	
-	ts_initial = esmf_to_utc(ts_esmf)
-	ts_final = ts_initial + dt
+	ts_initial = esmf_to_utc(ts_esmf).replace(second=0, microsecond=0)
+	ts_final = (ts_initial + dt).replace(second=0, microsecond=0)
 	logging.info('process_vars: looking from time %s to time %s' % (ts_initial,ts_final))
 	
 	for sat in sats:
@@ -755,7 +755,7 @@ class Postprocessor(object):
 		sat_source = jsat['satprod_satsource'][sat]
 		logging.info('process_sats: product %s from %s source' % (sat,sat_source))
 		dgs,dfs,egs,efs = [],[],[],[]		
-		for k,gran in jsat[sat_source].items():
+		for k,gran in jsat.granules[sat_source].items():
 			gran_time = esmf_to_utc(gran['time_start_iso'])
 			logging.info('process_sats: evaluating product %s, granule %s, at time %s, and for time %s' % (sat, k, utc_to_esmf(gran_time), ts_esmf))		
 			if gran_time >= ts_initial and gran_time < ts_final:
@@ -772,7 +772,7 @@ class Postprocessor(object):
    		if not dgs:
 			logging.info('process_sats: any granule %s in output process interval %s - %s' % (sat, ts_esmf, utc_to_esmf(ts_final)))
 			try:
-				outpath_base = osp.join(self.output_path, self.product_name + "-sat_empty")
+				outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + "-sat_empty")
 				kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
 				if osp.exists(outpath_base+".kmz"):
 					logging.info('process_sats: empty sat %s already processed' % (outpath_base+".kmz"))
