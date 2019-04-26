@@ -573,3 +573,14 @@ def number_minutes(t_int,t_fin,dt):
     :param dt: time step in minutes
     """
     return int(np.floor((t_fin-t_int).total_seconds()/60./int(dt)))
+
+def serial_json(obj):
+    """
+    JSON serializer for objects not serializable by default json code
+
+    :param obj: object
+    """
+    if isinstance(obj, datetime):
+	return utc_to_esmf(obj)
+    raise TypeError("Type %s not serializable" % type(obj))
+

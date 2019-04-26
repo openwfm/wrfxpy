@@ -26,7 +26,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
                   make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, json_join, \
-                  number_minutes
+                  number_minutes, serial_json
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -75,8 +75,6 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
-        #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
-        #self.grib_source = [self.resolve_grib_source(g, args) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
         self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
@@ -84,8 +82,6 @@ class JobState(Dict):
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
         self.cycle_start_utc = round_time_to_hour(self.get('cycle_start_utc',None), period_hours=self.grib_source[0].cycle_hours);
         logging.info('Simulation times rounded  %s to %s' % (str(self.start_utc), str(self.end_utc)))
-        #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
-        #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
         self.fc_hrs = timedelta_hours(self.end_utc - self.start_utc)
         if 'job_id' in args:
             logging.info('job_id %s given in the job description' % args['job_id'])
@@ -93,6 +89,12 @@ class JobState(Dict):
         else:
             logging.warning('job_id not given, creating.')
             self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(self.fc_hrs)
+        if 'restart' in args:
+            logging.info('restart %s given in the job description' % args['restart'])
+            self.restart = args['restart']
+        else:
+            self.restart = False
+            logging.info('restart not in arguments, default restart option %s' % self.restart)
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
         self.ignitions = args.get('ignitions', None)
@@ -218,11 +220,10 @@ def retrieve_satellite(js, sat_source, q):
     """
     try:
         logging.info("retrieving satellite files from %s" % sat_source.id)
-        jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
         manifest = sat_source.retrieve_data_sat(js.bounds, js.start_utc, js.end_utc)
         # write a json file with satellite information
         sat_file = sat_source.id+'.json'
-        json.dump(manifest, open(osp.join(jobdir,sat_file),'w'), indent=4, separators=(',', ': '))
+        json.dump(manifest, open(osp.join(js.jobdir,sat_file),'w'), indent=4, separators=(',', ': '))
 
         send_email(js, 'satellite', 'Job %s - satellite retrieving complete.' % js.job_id)
         logging.info('satellite retrieval complete for %s' % sat_source.id)
@@ -252,7 +253,9 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
 
         download_whole_cycle = js.get('download_whole_cycle',False)
         manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc, js.cycle_start_utc, download_whole_cycle)
-        # logging.info('manifest: ' + str(manifest))
+        logging.info('manifest: ' + str(manifest))
+        grib_file = grib_source.id+'.json'
+        json.dump(manifest, open(osp.join(js.jobdir,grib_file),'w'), indent=4, separators=(',', ': '), default=serial_json)
 
         cache_colmet = len(manifest) > 1
         have_all_colmet = False
@@ -411,10 +414,11 @@ def execute(args,job_args):
     js = JobState(args)
 
     jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
-    if js.clean_dir or not osp.exists(osp.join(jobdir,'input.json')):
-        make_clean_dir(jobdir)
+    js.jobdir = jobdir
+    if js.clean_dir or not osp.exists(osp.join(js.jobdir,'input.json')):
+        make_clean_dir(js.jobdir)
 
-    json.dump(job_args, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
+    json.dump(job_args, open(osp.join(js.jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
     jsub = make_job_file(js)
     json.dump(jsub, open(jsub.jobfile,'w'), indent=4, separators=(',', ': '))
 
@@ -439,8 +443,8 @@ def execute(args,job_args):
     logging.info("number of domains defined is %d." % js.num_doms)
 
     # build directories in workspace
-    js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
-    js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
+    js.wps_dir = osp.abspath(osp.join(js.jobdir, 'wps'))
+    js.wrf_dir = osp.abspath(osp.join(js.jobdir, 'wrf'))
 
     #check_obj(args,'args')
     #check_obj(js,'Initial job state')
@@ -527,13 +531,14 @@ def execute(args,job_args):
 
     if js.satellite_source:
         # joining all satellite manifests
-        sat_manifest = json_join(jobdir,args['satellite_source'])
+        sat_manifest = Dict({})
+        sat_manifest.granules = json_join(js.jobdir, args['satellite_source'])
         sat_manifest.bounds = js.bounds
         sat_manifest.time_interval = (utc_to_esmf(js.start_utc), utc_to_esmf(js.end_utc))
         max_dom = max([int(x) for x in filter(lambda x: len(x) == 1, args['domains'].keys())])
         sat_manifest.dt = args['domains'][str(max_dom)]['history_interval']
         sat_manifest.satprod_satsource = js.satprod_satsource
-        json.dump(sat_manifest, open(osp.join(jobdir,'sat.json'),'w'), indent=4, separators=(',', ': '))
+        json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
 
     logging.info("step 5: execute metgrid after ensuring all grids will be processed")
     update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
@@ -599,7 +604,7 @@ def execute(args,job_args):
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
     logging.info("WRF job %s submitted with id %s, waiting for rsl.error.0000" % (jsub.job_num, js.task_id))
 
-    jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
+    jobfile = osp.abspath(osp.join(js.jobdir, 'job.json'))
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     process_output(js.job_id)
@@ -620,8 +625,8 @@ def process_output(job_id):
     logging.info('process_output: loading satellite description from %s' % satfile)
     try:
         jsat = Dict(json.load(open(satfile,'r')))
-        available_sats = [sat.upper()+'_AF' for sat in jsat.keys() if sat not in ['time_interval', 'bounds', 'dt', 'satprod_satsource']]
-        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.keys() if sat not in ['time_interval', 'bounds', 'dt', 'satprod_satsource'] and jsat[sat]]
+        available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
+        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
     except:
         logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
         available_sats = []
