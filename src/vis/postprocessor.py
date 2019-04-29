@@ -13,6 +13,7 @@ import json
 import logging
 import os.path as osp
 import traceback
+from datetime import timedelta
 from utils import dump, traceargs, esmf_to_utc, utc_to_esmf
 from vis_utils import print_stats
 
@@ -734,22 +735,29 @@ class Postprocessor(object):
 		logging.error('close_file: unrecognized extension %s' % ext)
 
 		
-    def process_sats(self, jsat, dom_id, ts_esmf, dt, sats):
+    def process_sats(self, jsat, dom_id, ts_esmf, sats):
 	"""
 	Postprocess satellite data at a given simulation interval into PNG and KMZ files.
 	
 	:param jsat: dictionary of satellite products acquiered
 	:param dom_id: the domain identifier
       	:param ts_esmf: time stamp in ESMF format
-        :param dt: time interval to consider the satellite data on
 	:param sats: list of sat variables to process
 	"""
 	traceargs()
-	
-	ts_initial = esmf_to_utc(ts_esmf).replace(second=0, microsecond=0)
-	ts_final = (ts_initial + dt).replace(second=0, microsecond=0)
-	logging.info('process_vars: looking from time %s to time %s' % (ts_initial,ts_final))
-	
+
+	dt_before = timedelta(minutes = jsat.sat_interval[str(dom_id)][0])	
+	dt_after = timedelta(minutes = jsat.sat_interval[str(dom_id)][1])
+	dt = timedelta(minutes = jsat.dt[str(dom_id)])	
+	if dt_after + dt_before < dt:
+		dt_after = dt
+		dt_before = timedelta(minutes=0)
+	ts_initial = (esmf_to_utc(ts_esmf) - dt_before).replace(second=0, microsecond=0)
+	ts_final = (esmf_to_utc(ts_esmf) + dt_after).replace(second=0, microsecond=0)
+	logging.info('process_sats: looking from time %s to time %s' % (ts_initial,ts_final))
+	bounds = jsat.bounds[str(dom_id)]
+	logging.info('process_sats: bounding box %s' % bounds)	
+
 	for sat in sats:
 		logging.info('process_sats: postprocessing %s for time %s' % (sat, ts_esmf))		
 		sat_source = jsat['satprod_satsource'][sat]
@@ -770,24 +778,24 @@ class Postprocessor(object):
                 			logging.warning("Exception %s while evaluating granule %s from product %s for time %s" % (e.message, gran, sat, ts_esmf))
                 			logging.warning(traceback.print_exc())
    		if not dgs:
-			logging.info('process_sats: any granule %s in output process interval %s - %s' % (sat, ts_esmf, utc_to_esmf(ts_final)))
+			logging.info('process_sats: any granule %s in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
 			try:
-				outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + "-sat_empty")
+				outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + "sat_empty")
 				kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
 				if osp.exists(outpath_base+".kmz"):
 					logging.info('process_sats: empty sat %s already processed' % (outpath_base+".kmz"))
 					kmz_path = outpath_base+".kmz"
 					raster_path = outpath_base+"-raster.png"
 					cb_path = outpath_base+"-cb.png"
-					numpy_bounds = [ (jsat.bounds[0],jsat.bounds[2]),
-							(jsat.bounds[1],jsat.bounds[2]),
-							(jsat.bounds[1],jsat.bounds[3]),
-							(jsat.bounds[0],jsat.bounds[3]) ]
+					numpy_bounds = [ (bounds[0],bounds[2]),
+							(bounds[1],bounds[2]),
+							(bounds[1],bounds[3]),
+							(bounds[0],bounds[3]) ]
     					float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
 					coords = float_bounds
 				else:
 					logging.info('process_sats: processing empty sat %s for the first time' % (outpath_base+".kmz"))
-					kmz_path,raster_path,cb_path,coords = self._sat2kmz_empty(sat, ts_esmf, None, jsat.bounds, outpath_base, cleanup=False)
+					kmz_path,raster_path,cb_path,coords = self._sat2kmz_empty(sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
 				if cb_path is not None:
 					mf_upd['colorbar'] = osp.basename(cb_path)
 				mf_upd['kml'] = osp.basename(kmz_path)
@@ -799,11 +807,11 @@ class Postprocessor(object):
 				logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
 				logging.warning(traceback.print_exc())
 		else:
-            		logging.info('process_sats: some granule %s is in output process interval %s - %s' % (sat, ts_esmf, utc_to_esmf(ts_final)))
+            		logging.info('process_sats: some granule %s is in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
 			try:
 				outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + sat)
                 		kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
-                    		kmz_path,raster_path,cb_path,coords = self._sat2kmz(dgs, dfs, sat, ts_esmf, None, jsat.bounds, outpath_base, cleanup=False)
+                    		kmz_path,raster_path,cb_path,coords = self._sat2kmz(dgs, dfs, sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
                     		if cb_path is not None:
                         		mf_upd['colorbar'] = osp.basename(cb_path)
                 		mf_upd['kml'] = osp.basename(kmz_path)
