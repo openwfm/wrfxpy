@@ -745,7 +745,7 @@ class Postprocessor(object):
 	:param sats: list of sat variables to process
 	"""
 	traceargs()
-
+	
 	dt_before = timedelta(minutes = jsat.sat_interval[str(dom_id)][0])	
 	dt_after = timedelta(minutes = jsat.sat_interval[str(dom_id)][1])
 	dt = timedelta(minutes = jsat.dt[str(dom_id)])	
