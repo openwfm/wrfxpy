@@ -95,6 +95,8 @@ class JobState(Dict):
 		else:
 			self.restart = False
 			logging.info('restart not in arguments, default restart option %s' % self.restart)
+		if self.restart:
+			args['clean_dir'] = False
 		self.emails = self.parse_emails(args)
 		self.domains = args['domains']
 		self.ignitions = args.get('ignitions', None)
@@ -417,7 +419,7 @@ def execute(args,job_args):
 
 	jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
 	js.jobdir = jobdir
-	if js.clean_dir or not osp.exists(osp.join(js.jobdir,'input.json')):
+	if js.clean_dir or not osp.exists(js.jobdir):
 		make_clean_dir(js.jobdir)
 
 	json.dump(job_args, open(osp.join(js.jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))

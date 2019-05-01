@@ -198,6 +198,21 @@ def move(src,tgt):
     remove(tgt)
     shutil.move(src,tgt)
 
+def copy(src, dst):
+    """
+    Copy file at the path src to destination dst
+
+    :param src: file path
+    :param dst: destination directory
+    """
+    if not osp.isdir(dst):
+        logging.error('%s is not directory' % str(dst))
+        raise Exception('%s is not directory' % str(dst))
+    if not osp.isfile(src):
+        logging.error('%s is not file' % str(src))
+        raise Exception('%s is not file' % str(src))
+    logging.info('Copying %s to %s' % (osp.realpath(src), osp.realpath(dst)))
+    shutil.copyfile(osp.realpath(src),osp.realpath(dst))
 
 def cache_file(path, cache_dir):
     """
@@ -213,7 +228,7 @@ def cache_file(path, cache_dir):
         raise Exception('%s is not directory' % str(cache_dir))
     if not osp.isfile(path):
         logging.error('%s is not file' % str(path))
-        raise Exception('%s is not directory' % str(cache_dir))
+        raise Exception('%s is not file' % str(path))
     dst = osp.join(cache_dir,osp.basename(path))
     if osp.islink(path):
         if osp.dirname(osp.realpath(path)) is osp.realpath(cache_dir):
@@ -291,6 +306,15 @@ def timedelta_hours(timedelta_utc, up = True):
     """
     return int(timedelta_utc.total_seconds() + ((3600 - 0.001)if up else 0 ))/ 3600
 
+def matching_files(src_dir, glob_pattern):
+    """
+    Retrieves all files in directory src_dir matching glob_pattern.
+
+    :param src_dir: source directory, must be absolute path
+    :param glob_pattern: the shell glob pattern (ls style) to match against files
+    """
+    files = glob.glob(osp.join(src_dir, glob_pattern))
+    return files
 
 def symlink_matching_files(tgt_dir, src_dir, glob_pattern):
     """
@@ -302,7 +326,6 @@ def symlink_matching_files(tgt_dir, src_dir, glob_pattern):
     """
     files = glob.glob(osp.join(src_dir, glob_pattern))
     map(lambda f: symlink_unless_exists(f, osp.join(tgt_dir, osp.basename(f))), files)
-
 
 def update_time_keys(time_utc, which, num_domains):
     """
