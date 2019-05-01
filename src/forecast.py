@@ -771,11 +771,14 @@ def process_output(job_id):
 				except Exception as e:
 					logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
 				else:
-					# in incremental mode, upload to server
-					if js.postproc.get('shuttle', None) == 'incremental':
-						desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-						sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-						already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+					try:
+						# in incremental mode, upload to server
+						if js.postproc.get('shuttle', None) == 'incremental':
+							desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+							sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+							already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+					except Exception as e:
+						logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
 		else:
 			if not wait_wrfout:
 				logging.info('Waiting for wrfout')
@@ -809,6 +812,7 @@ def create_process_output_script(job_id):
 	st = os.stat(script_path)
 	os.chmod(script_path, st.st_mode | stat.S_IEXEC)
 
+
 def process_sat_output(job_id):
 	args = load_sys_cfg()
 	jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
@@ -823,8 +827,8 @@ def process_sat_output(job_id):
 	logging.info('process_output: loading satellite description from %s' % satfile)
 	try:
 		jsat = Dict(json.load(open(satfile,'r')))
-		available_sats = [sat.upper()+'_AF' for sat in jsat.keys() if sat not in ['time_interval', 'bounds', 'dt', 'satprod_satsource']]
-		not_empty_sats = [sat.upper()+'_AF' for sat in jsat.keys() if sat not in ['time_interval', 'bounds', 'dt', 'satprod_satsource'] and jsat[sat]]
+		available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
+		not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
 	except:
 		logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
 		available_sats = []
@@ -835,6 +839,10 @@ def process_sat_output(job_id):
 	if not not_empty_sats:
 		logging.warning('Do not have satellite data to postprocess')
 		return
+	js.old_pid = js.pid
+        js.pid = os.getpid()
+        js.state = 'Processing'
+        json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))	
 	
 	pp = None
 	already_sent_files = []
@@ -844,25 +852,32 @@ def process_sat_output(job_id):
 	pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
 	js.manifest_filename= 'wfc-' + js.grid_code + '.json'
 	logging.debug('Postprocessor created manifest %s',js.manifest_filename)
-	dom_id = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
-	dt = timedelta(minutes=jsat.dt[str(dom_id)])
-	logging.info('dt for satellite postprocessing = %s' % dt)	
-	t_int = esmf_to_utc(jsat['time_interval'][0])					
-	t_fin = esmf_to_utc(jsat['time_interval'][1])			
-	ndts = number_minutes(t_int,t_fin,jsat.dt[str(dom_id)])
-	times = [t_int + tt*dt for tt in range(ndts)]
-	sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
-	for time in times:
-		try:
-			esmf_time = utc_to_esmf(time)
-			logging.info('Posprocessing satellite data for time %s' % esmf_time)
-			pp.process_sats(jsat, dom_id, esmf_time, sat_list)
-			if js.postproc.get('shuttle', None) == 'incremental':
-				desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-				sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-				already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
-		except Exception as e:
-			logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+	domains = sorted([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
+	for dom_id in domains:
+		logging.info('Processing domain %s' % str(dom_id))
+		dt = timedelta(minutes=jsat.dt[str(dom_id)])
+		logging.info('dt for satellite postprocessing = %s' % dt)	
+		t_int = esmf_to_utc(jsat['time_interval'][0])					
+		t_fin = esmf_to_utc(jsat['time_interval'][1])			
+		ndts = number_minutes(t_int,t_fin,jsat.dt[str(dom_id)])
+		times = [t_int + tt*dt for tt in range(ndts)]
+		sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
+		if sat_list:
+			for time in times:
+				try:
+					esmf_time = utc_to_esmf(time)
+					logging.info('Posprocessing satellite data for time %s' % esmf_time)
+					pp.process_sats(jsat, dom_id, esmf_time, sat_list)
+				except Exception as e:
+					logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+				else:
+					try:
+						if js.postproc.get('shuttle', None) == 'incremental':
+                                        		desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                                        		sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+                                        		already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+					except Exception as e:
+						logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
 
 	 # if we are to send out the postprocessed files after completion, this is the time
         if js.postproc.get('shuttle', None) == 'on_completion':
