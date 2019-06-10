@@ -136,6 +136,7 @@ class RTMA(object):
         """
         # find last-modified time of file in UTC timezone
         url = self._remote_var_url(cycle.hour, var)
+        logging.info('Reading %s' % url)
         r = readhead(url)
         if r.status_code != 200:
             logging.error('Cannot find variable %s for hour %d at url %s' % (var, cycle.hour, url))
@@ -158,7 +159,7 @@ class RTMA(object):
         :param var: the variable to download
         """
         # rtma_base = 'http://weather.noaa.gov/pub/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus/'
-        rtma_base = 'http://tgftp.nws.noaa.gov/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus/'
+        rtma_base = 'https://tgftp.nws.noaa.gov/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus/'
         return rtma_base + '/RT.%02d/' % hour + 'ds.%s.bin' % var
 
 
