@@ -66,9 +66,9 @@ class NAM218(GribForecast):
     # grib_forecast_hours_periods = [{'hours':36,'period':3} , {'hours':84,'period':3}]
     grib_forecast_hours_periods = [{'hours':84,'period':3}]
     cycle_hours = 6
-    remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
+    remote_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     period_hours = 3    # for METGRID and WRF
     info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
-    info_url = "http://www.nco.ncep.noaa.gov/pmb/products/nam/"
+    info_url = "https://www.nco.ncep.noaa.gov/pmb/products/nam/"
  
 
