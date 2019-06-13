@@ -187,8 +187,26 @@ def remove(tgt):
     os.remove wrapper
     """
     if osp.isfile(tgt):
-        logging.warning('remove: file %s exists, removing' % tgt)
+        logging.info('remove: file %s exists, removing' % tgt)
         os.remove(tgt)
+
+def force_copy(src,tgt):
+    """
+    remove target if exists and copy there, making directories as needed
+    """
+    remove(tgt)
+    shutil.copy(src,ensure_dir(tgt))
+
+def link2copy(src):
+    """
+    replace link by a copy ot the target file
+    """
+    try:
+        link_target = os.readlink(src)
+    except OSError as e:
+        return
+    os.remove(src)
+    shutil.copy(link_target,src)
 
 def move(src,tgt):
     """
