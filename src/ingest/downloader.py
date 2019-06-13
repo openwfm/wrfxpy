@@ -30,7 +30,7 @@ import subprocess
 import random
 
 from utils import ensure_dir, load_sys_cfg, remove
- 
+
 cfg = load_sys_cfg()
 sleep_seconds_def = cfg.get('sleep_seconds', 20)
 max_retries_def = cfg.get('max_retries', 3)
@@ -71,8 +71,8 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     time.sleep(sec)
 
     use_urllib2 = url[:6] == 'ftp://'
-    
-    try:    
+
+    try:
         r = urllib2.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
     except Exception as e:
         if max_retries > 0:
@@ -82,7 +82,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             time.sleep(sleep_seconds)
             download_url(url, local_path, max_retries = max_retries-1)
         return
-         
+
     logging.info('down load_url %s as %s' % (url,local_path))
     remove(local_path)
     command=[wget,'-O',ensure_dir(local_path),url]
