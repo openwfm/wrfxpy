@@ -539,22 +539,3 @@ def get_ip_address():
     s.connect(("8.8.8.8", 80))
     return s.getsockname()[0]
 
-def write_divide(file,divide='=',count=25):
-    """
-    Write a dividing line
-    """
-    f=open(file,'a')
-    f.write(divide * count + '\n')
-    f.close()
-    
-def write_table(file,lines,mode='w'):
-    """
-    write table with lines key = value
-    """
-    f=open(file,mode)
-    for key,value in lines.iteritems():
-        f.write("%s = %s\n" % (key,value))
-    f.close()
-    
-    
-    
