@@ -21,7 +21,9 @@
 import numpy as np
 import sys
 import logging
-from utils import inq
+from utils import inq, ensure_dir
+from ingest.rtma_source import RTMA
+from write_geogrid import write_geogrid_var
 
 class FuelMoistureModel:
     """
@@ -387,12 +389,24 @@ class FuelMoistureModel:
         
         d.close()
 
-    def to_geogrid(self, path, lats, lons):
+    def to_geogrid(self, path, index, lats, lons):
         """
         Store model to geogrid files
         """
-        logging.info("fmda.fuel_moisture_model.to_geogrid at %s lats %s lons %s" % (path, inq(lats), inq(lons)))
+        logging.info("fmda.fuel_moisture_model.to_geogrid path=%s lats %s lons %s" % (path, inq(lats), inq(lons)))
+        logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid_index="+str(index))
+        ensure_dir(path)
+        index.update({'known_x':1.0,'known_y':1.0,'known_lat':lats[1,1],'known_lon':lons[1,1]})
+        logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid updated="+str(index))
+        xsize, ysize, n = self.m_ext.shape
+        if n != 5:
+            logging.error('wrong number of state fields')
+        FMC_GC = np.zeros((xsize, ysize, n))
+        FMC_GC[:,:,:3] = self.m_ext[:,:,:3]
+        FMEP = self.m_ext[:,:,3:]
         
+        write_geogrid_var(path,'FMC_GC',FMC_GC,'1h, 10h, 100h fuel moisture',index,bits=32)
+        write_geogrid_var(path,'FMEP',FMEP,'fuel moisture drying/wetting and rain equilibrium adjustments',index,bits=32)
         
     @classmethod
     def from_netcdf(cls, path):

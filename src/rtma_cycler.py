@@ -378,7 +378,9 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     model.to_netcdf(ensure_dir(model_path),
         {'EQUILd FM':Ed,'EQUILw FM':Ew,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
     geo_path = compute_model_path(cycle, cfg.code, wksp_path,ext="geo")
-    model.to_geogrid(geo_path,lats,lons)
+    index = rtma.geogrid_index()
+    print 'index',index
+    model.to_geogrid(geo_path,index,lats,lons)
     
     return model
     
