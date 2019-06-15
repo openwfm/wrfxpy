@@ -386,6 +386,12 @@ class FuelMoistureModel:
        
         
         d.close()
+
+    def to_geogrid(self, path, lats, lons):
+        """
+        Store model to geogrid files
+        """
+        logging.info("fmda.fuel_moisture_model.to_geogrid at %s lats %s lons %s" % (path, inq(lats), inq(lons)))
         
         
     @classmethod
