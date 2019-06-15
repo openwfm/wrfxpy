@@ -110,6 +110,21 @@ class RTMA(object):
 
         return not_ready, ready
 
+    def geogrid_index(self):
+        """
+        Geolocation in a form suitable for geogrid index.
+        According to the paper: https://journals.ametsoc.org/doi/pdf/10.1175/WAF-D-10-05037.1 fig 1
+        for CONUS grid, modified per gdalinfo on the grib files.
+        See also https://graphical.weather.gov/docs/ndfdSRS.htm
+        This should really be replaced by geolocation metadata from the grib files.
+        :return: dictionary key:value 
+        """
+        return {'projection': 'lambert',
+                'dx' : 2539.703,
+                'dy' : -2539.703,
+                'truelat1' : 25.0,
+                'truelat2' : 25.0,
+                'stdlon' : 265}
 
    
     def _local_var_path(self, ts, var):
