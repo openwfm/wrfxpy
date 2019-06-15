@@ -365,15 +365,17 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     
     # run the data assimilation step
     covs = [np.ones(dom_shape), hgt / 2000.0]
+    covs_names = ['const','hgt/2000']
     if np.any(rain > 0.01):
         covs.append(rain)
-    execute_da_step(model, cycle, covs, fm10)
+        covs_names.append('rain')
+    execute_da_step(model, cycle, covs, covs_names, fm10)
     
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path)
     logging.info('CYCLER writing model variables to:  %s.' % model_path)
     model.to_netcdf(ensure_dir(model_path),
-        {'EQUILd FM':Ed,'EQUILw FM':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
+        {'EQUILd FM':Ed,'EQUILw FM':Ew,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
     
     return model
     

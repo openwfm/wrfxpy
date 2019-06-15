@@ -539,3 +539,16 @@ def get_ip_address():
     s.connect(("8.8.8.8", 80))
     return s.getsockname()[0]
 
+def inq(x):
+    """
+    Inquire object for shape if one exists
+    :param x: object
+    :return string:
+    """
+    try:
+        s= str(x.shape)
+    except:
+        s=str(x)
+    return s
+
+
