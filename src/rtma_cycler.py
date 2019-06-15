@@ -164,7 +164,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     return postproc_path
 
 
-def compute_model_path(cycle, region_code, wksp_path):
+def compute_model_path(cycle, region_code, wksp_path, ext='nc'):
     """
     Construct a relative path to the fuel moisture model file
     for the region code and cycle.
@@ -175,7 +175,7 @@ def compute_model_path(cycle, region_code, wksp_path):
     :return: a relative path (w.r.t. workspace and region) of the fuel model file
     """
     year_month = '%04d%02d' % (cycle.year, cycle.month)
-    filename = 'fmda-%s-%04d%02d%02d-%02d.nc' %  (region_code, cycle.year, cycle.month, cycle.day, cycle.hour)
+    filename = 'fmda-%s-%04d%02d%02d-%02d.%s' %  (region_code, cycle.year, cycle.month, cycle.day, cycle.hour, ext)
     return osp.join(wksp_path,region_code,year_month,filename) 
 
 
@@ -283,6 +283,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     :param meso_token: the mesowest API access token
     :return: the model advanced and assimilated at the current cycle
     """
+    logging.info("rtma_cycler.fmda_advance_region: %s" % str(cycle))
     model = None
     prev_cycle = cycle - timedelta(hours=1)
     prev_model_path = compute_model_path(prev_cycle, cfg.code, wksp_path)
@@ -376,6 +377,8 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     logging.info('CYCLER writing model variables to:  %s.' % model_path)
     model.to_netcdf(ensure_dir(model_path),
         {'EQUILd FM':Ed,'EQUILw FM':Ew,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
+    geo_path = compute_model_path(cycle, cfg.code, wksp_path,ext="geo")
+    model.to_geogrid(geo_path,lats,lons)
     
     return model
     
