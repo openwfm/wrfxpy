@@ -541,12 +541,12 @@ def get_ip_address():
 
 def inq(x):
     """
-    Inquire object for shape if one exists
+    Inquire numpy array for shape min max
     :param x: object
     :return string:
     """
     try:
-        s= str(x.shape)
+        s= 'size %s min %g max %g' % (str(x.shape), np.min(x), np.max(x))
     except:
         s=str(x)
     return s
