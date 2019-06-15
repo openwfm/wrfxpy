@@ -3,7 +3,8 @@
 
 import os.path as osp
 import numpy as np
-import sys, os
+import sys, os, logging
+from utils import inq
 
 def write_divide(file,divide='=',count=25):
     """
@@ -13,14 +14,39 @@ def write_divide(file,divide='=',count=25):
     f.write(divide * count + '\n')
     f.close()
     
-def write_table(file,lines,mode='w'):
+def write_table(file,lines_dict,mode='w',divider_char='=',divider_count=25,divider_before=False,divider_after=False):
     """
-    write table with lines key = value
+    write table 
     """
     f=open(file,mode)
-    for key,value in lines.iteritems():
+    if divider_before:
+        f.write(divider_char * divider_count + '\n')
+    for key,value in lines_dict.iteritems():
         f.write("%s = %s\n" % (key,value))
+    if divider_after:
+        f.write(divider_char * divider_count + '\n')
     f.close()
+
+def write_geogrid_var(path_dir,varname,array,description,index,bits=32):
+    """
+    write geogrid dataset and index 
+    """
+    path_dir=osp.abspath(path_dir)
+    logging.info('write_geogrid_var path_dir=%s varname=%s array=%s index=%s' % (path_dir, varname, inq(array), str(index)))
+    if not osp.exists(path_dir):
+        os.makedirs(path_dir)
+
+    geogrid_ds_path = osp.join(path_dir,varname)
+    index['description']=description
+    write_geogrid(geogrid_ds_path,array,index,bits=bits)
+
+    # add segment of GEOGRID.TBL
+    geogrid_tbl_path=osp.join(path_dir,'GEOGRID.TBL')
+    write_table(geogrid_tbl_path, {'name':varname,
+                   'dest_type':'continuous',
+                   'interp_option':'average_4pt',
+                   'abs_path':geogrid_ds_path,
+                   'priority':1}, mode='a', divider_after=True)
     
 def write_geogrid(path,array,index,bits=32):
     """
@@ -31,9 +57,9 @@ def write_geogrid(path,array,index,bits=32):
     :param bits: 16 or 32 (default)
     """
 
+    logging.info('write_geogrid_var path=%s array=%s index=%s' % (path, inq(array), str(index)))
     if not osp.exists(path):
         os.makedirs(path)
-
     # write binary data file
     a=np.array(array)
     dims=a.shape
