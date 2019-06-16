@@ -393,6 +393,8 @@ class FuelMoistureModel:
         """
         Store model to geogrid files
         """
+        test_latslons=True
+
         logging.info("fmda.fuel_moisture_model.to_geogrid path=%s lats %s lons %s" % (path, inq(lats), inq(lons)))
         logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid_index="+str(index))
         ensure_dir(path)
@@ -400,9 +402,14 @@ class FuelMoistureModel:
         logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid updated="+str(index))
         xsize, ysize, n = self.m_ext.shape
         if n != 5:
-            logging.error('wrong number of state fields')
-        FMC_GC = np.zeros((xsize, ysize, n))
+            logging.error('wrong number of extended state fields, expecting 5')
+
+        FMC_GC = np.zeros((xsize, ysize, 5))
         FMC_GC[:,:,:3] = self.m_ext[:,:,:3]
+        if test_latslons:
+            logging.info("fmda.fuel_moisture_model.to_geogrid: storing lons lats to FMC_GC(:,:,4:5) to test in WRF against XLONG and XLAT")
+            FMC_GC[:,:,3] = lons
+            FMC_GC[:,:,4] = lats
         FMEP = self.m_ext[:,:,3:]
         
         write_geogrid_var(path,'FMC_GC',FMC_GC,'1h, 10h, 100h fuel moisture',index,bits=32)
