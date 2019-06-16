@@ -37,6 +37,10 @@ import os.path as osp
 from datetime import datetime, timedelta
 import pytz
 
+# setup environment
+sys_cfg = Dict(json.load(open('etc/conf.json')))
+cfg = Dict(json.load(open('etc/rtma_cycler.json')))
+meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
 def postprocess_cycle(cycle, region_cfg, wksp_path):
     """
@@ -405,10 +409,6 @@ if __name__ == '__main__':
     
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    # setup environment
-    sys_cfg = Dict(json.load(open('etc/conf.json')))
-    cfg = Dict(json.load(open('etc/rtma_cycler.json')))
- 
     if len(sys.argv) == 2:
         pass
     elif len(sys.argv) == 5:
@@ -438,7 +438,6 @@ if __name__ == '__main__':
     logging.info('regions: %s' % json.dumps(cfg.regions))
     #logging.info('regions: %s' % json.dumps(cfg.regions, indent=1, separators=(',',':')))
 
-    meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
     # current time
     now = datetime.now(pytz.UTC)
