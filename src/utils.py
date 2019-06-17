@@ -196,6 +196,15 @@ def force_copy(src,tgt):
     remove(tgt)
     shutil.copy(src,ensure_dir(tgt))
 
+def append2file(addl,base):
+    """
+    Append a file to another
+    """
+    logging.info("appending file %s to %s" % (addl,base)) 
+    with open(base,'a') as base_file:
+        with open(addl,'r') as addl_file:
+            base_file.write(addl_file.read())
+
 def link2copy(src):
     """
     replace link by a copy ot the target file
@@ -204,6 +213,7 @@ def link2copy(src):
         link_target = os.readlink(src)
     except OSError as e:
         return
+    logging.info("replacing soft link %s -> %s by a copy" % (src,link_target))
     os.remove(src)
     shutil.copy(link_target,src)
 

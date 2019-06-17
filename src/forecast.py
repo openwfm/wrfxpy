@@ -25,8 +25,8 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, json_join, \
-                  number_minutes, serial_json
+                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
+                  link2copy, append2file
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -35,9 +35,6 @@ from ingest.HRRR import HRRR
 from ingest.NAM227 import NAM227
 from ingest.CFSR import CFSR_P, CFSR_S
 from ingest.NARR import NARR
-
-from ingest.MODIS import Terra, Aqua
-from ingest.VIIRS import SNPP
 
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
@@ -75,13 +72,16 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
+        #self.grib_source = [self.grib_source] if isinstance(self.grib_source, basestring) else self.grib_source
+        #self.grib_source = [self.resolve_grib_source(g, args) for g in self.grib_source]
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
-        self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
         self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source[0].period_hours);
         self.cycle_start_utc = round_time_to_hour(self.get('cycle_start_utc',None), period_hours=self.grib_source[0].cycle_hours);
         logging.info('Simulation times rounded  %s to %s' % (str(self.start_utc), str(self.end_utc)))
+        #self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source.period_hours);
+        #self.end_utc = round_time_to_hour(self.end_utc, up=True, period_hours=self.grib_source.period_hours);
         self.fc_hrs = timedelta_hours(self.end_utc - self.start_utc)
         if 'job_id' in args:
             logging.info('job_id %s given in the job description' % args['job_id'])
@@ -89,22 +89,12 @@ class JobState(Dict):
         else:
             logging.warning('job_id not given, creating.')
             self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(self.fc_hrs)
-        if 'restart' in args:
-            logging.info('restart %s given in the job description' % args['restart'])
-            self.restart = args['restart']
-        else:
-            self.restart = False
-            logging.info('restart not in arguments, default restart option %s' % self.restart)
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
         self.ignitions = args.get('ignitions', None)
         self.fmda = self.parse_fmda(args)
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
-        if 'clean_dir' in args:
-            self.clean_dir = args['clean_dir']
-        else:
-            self.clean_dir = True
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
 
@@ -115,7 +105,6 @@ class JobState(Dict):
         Creates the right GribSource object from the name.
 
         :param gs_name: the name of the grib source
-        :param js: configuration json
         """
         if gs_name == 'HRRR':
             return [HRRR(js)]
@@ -130,37 +119,6 @@ class JobState(Dict):
         else:
             raise ValueError('Unrecognized grib_source %s' % gs_name)
 
-    def resolve_satellite_source(self, js):
-        """
-        Creates all the JPSSSource objects from the list of names.
-
-        :param sat_list: the list of JPSS sources
-        :param js: configuration json
-        """
-        sat_list = self.parse_satellite_source(js)
-        sat = []
-        if 'Terra' in sat_list:
-            terra=Terra(js)
-            sat.append(terra)
-        if 'Aqua' in sat_list:
-            aqua=Aqua(js)
-            sat.append(aqua)
-        if 'SNPP' in sat_list:
-            snpp=SNPP(js)
-            sat.append(snpp)
-        return sat
-
-    def parse_satellite_source(self, args):
-        """
-        Parse information inside the satellite source, if any.
-
-        :param args: the forecast job argument dictionary
-        """
-        if 'satellite_source' in args:
-            sats = args['satellite_source']
-            return sats
-        else:
-            return []
 
     def parse_fmda(self, args):
         """
@@ -208,34 +166,6 @@ def send_email(js, event, body):
             mail_serv.sendmail(js.emails.origin, [js.emails.to], msg.as_string())
             mail_serv.quit()
 
-def retrieve_satellite(js, sat_source, q):
-    """
-    This function retrieves required Satellite files.
-
-    It returns either 'SUCCESS' or 'FAILURE' on completion.
-
-    :param js: the JobState object containing the forecast configuration
-    :param sat_source: the SatSource object
-    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
-    """
-    try:
-        logging.info("retrieving satellite files from %s" % sat_source.id)
-        # retrieve satellite granules intersecting the last domain
-        max_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.bounds.keys())])
-        manifest = sat_source.retrieve_data_sat(js.bounds[str(max_dom)], js.start_utc, js.end_utc)
-        # write a json file with satellite information
-        sat_file = sat_source.id+'.json'
-        json.dump(manifest, open(osp.join(js.jobdir,sat_file),'w'), indent=4, separators=(',', ': '))
-
-        send_email(js, 'satellite', 'Job %s - satellite retrieving complete.' % js.job_id)
-        logging.info('satellite retrieval complete for %s' % sat_source.id)
-        q.put('SUCCESS')
-
-    except Exception as e:
-        logging.error('satellite retrieving step failed with exception %s' % repr(e))
-        traceback.print_exc()
-        q.put('FAILURE')
-
 def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     """
     This function retrieves required GRIB files and runs ungrib.
@@ -255,9 +185,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
 
         download_whole_cycle = js.get('download_whole_cycle',False)
         manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc, js.cycle_start_utc, download_whole_cycle)
-        logging.info('manifest: ' + str(manifest))
-        grib_file = grib_source.id+'.json'
-        json.dump(manifest, open(osp.join(js.jobdir,grib_file),'w'), indent=4, separators=(',', ': '), default=serial_json)
+        # logging.info('manifest: ' + str(manifest))
 
         cache_colmet = len(manifest) > 1
         have_all_colmet = False
@@ -413,14 +341,14 @@ def execute(args,job_args):
     """
 
     logging.info('step 0 initialize the job state from the arguments')
+    ## logging.info('args = %s' % json.dumps(jargs, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': ')))
     js = JobState(args)
+    ## logging.info('js = %s' % json.dumps(js, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': ')))
 
     jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
-    js.jobdir = jobdir
-    if js.clean_dir or not osp.exists(osp.join(js.jobdir,'input.json')):
-        make_clean_dir(js.jobdir)
+    make_clean_dir(jobdir)
 
-    json.dump(job_args, open(osp.join(js.jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
+    json.dump(job_args, open(osp.join(jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
     jsub = make_job_file(js)
     json.dump(jsub, open(jsub.jobfile,'w'), indent=4, separators=(',', ': '))
 
@@ -445,8 +373,8 @@ def execute(args,job_args):
     logging.info("number of domains defined is %d." % js.num_doms)
 
     # build directories in workspace
-    js.wps_dir = osp.abspath(osp.join(js.jobdir, 'wps'))
-    js.wrf_dir = osp.abspath(osp.join(js.jobdir, 'wrf'))
+    js.wps_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wps'))
+    js.wrf_dir = osp.abspath(osp.join(js.workspace_path, js.job_id, 'wrf'))
 
     #check_obj(args,'args')
     #check_obj(js,'Initial job state')
@@ -463,33 +391,24 @@ def execute(args,job_args):
     js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+    if 'geogrid_tbl_addl_path' in js:
+       geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
+       link2copy(geogrid_tbl_path)
+       append2file(osp.abspath(js.geogrid_tbl_addl_path),geogrid_tbl_path)
 
-    # do steps 2 & 3 & 4 in parallel (three execution streams)
-    #  -> Satellite retrieval ->
+    # do steps 2 & 3 & 4 in parallel (two execution streams)
     #  -> GEOGRID ->
     #  -> GRIB2 download ->  UNGRIB ->
 
     proc_q = Queue()
 
-    if js.satellite_source:
-        js.bounds = Dict({})
-        for k,domain in enumerate(js.domain_conf.domains):
-                    latloni = domain.ij_to_latlon(0,0)
-                    latlonf = domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
-            bounds = (latloni[1],latlonf[1],latloni[0],latlonf[0])
-            js.bounds[str(k+1)] = bounds
-        sat_proc = {}
-    for satellite_source in js.satellite_source:
-        sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
-
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
-
+    # grib_proc = Process(target=retrieve_gribs_and_run_ungrib_all, args=(js, proc_q, ref_utc))
     grib_proc = {}
     for grib_source in js.grib_source:
         grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
     logging.info('starting GEOGRID and GRIB2/UNGRIB')
-    logging.info('satellite sources %s' % [s.id for s in js.satellite_source])
 
     if js.ungrib_only:
         logging.info('ungrib_only set, skipping GEOGRID, will exit after UNGRIB')
@@ -499,55 +418,25 @@ def execute(args,job_args):
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].start()
 
-    for satellite_source in js.satellite_source:
-        sat_proc[satellite_source.id].start()
-
     # wait until all tasks are done
     logging.info('waiting until all tasks are done')
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
 
-        for satellite_source in js.satellite_source:
-            sat_proc[satellite_source.id].join()
-
     if js.ungrib_only:
-        pass
+        return
     else:
         geogrid_proc.join()
-
-    for satellite_source in js.satellite_source:
-        if proc_q.get() != 'SUCCESS':
-            return
 
     for grib_source in js.grib_source:
         if proc_q.get() != 'SUCCESS':
             return
 
-    if not js.ungrib_only:
-        if proc_q.get() != 'SUCCESS':
-            return
+    if proc_q.get() != 'SUCCESS':
+        return
 
     proc_q.close()
-
-    logging.info('execute: finished parallel GEOGRID, GRIB2/UNGRIB, and Satellite')
-
-    if js.satellite_source:
-        # joining all satellite manifests
-        sat_manifest = Dict({})
-        sat_manifest.granules = json_join(js.jobdir, args['satellite_source'])
-        sat_manifest.bounds = js.bounds
-        sat_manifest.time_interval = (utc_to_esmf(js.start_utc), utc_to_esmf(js.end_utc))
-        sat_manifest.dt = Dict({})
-        sat_manifest.sat_interval = Dict({})
-        for k in args['domains'].keys():
-            sat_manifest.dt[k] = args['domains'][k]['history_interval']
-            if 'sat_interval' in args['domains'][k].keys():
-                sat_manifest.sat_interval[k] = args['domains'][k]['sat_interval']
-            else:
-                sat_manifest.sat_interval[k] = (args['domains'][k]['history_interval'], args['domains'][k]['history_interval'])
-        sat_manifest.satprod_satsource = js.satprod_satsource
-        json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
 
     logging.info("step 5: execute metgrid after ensuring all grids will be processed")
     update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
@@ -613,17 +502,14 @@ def execute(args,job_args):
     send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
     logging.info("WRF job %s submitted with id %s, waiting for rsl.error.0000" % (jsub.job_num, js.task_id))
 
-    jobfile = osp.abspath(osp.join(js.jobdir, 'job.json'))
+    jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     process_output(js.job_id)
 
-    return jobfile
-
 def process_output(job_id):
     args = load_sys_cfg()
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-    satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
     logging.info('process_output: loading job description from %s' % jobfile)
     try:
         js = Dict(json.load(open(jobfile,'r')))
@@ -631,18 +517,6 @@ def process_output(job_id):
         logging.error('Cannot load the job description file %s' % jobfile)
         logging.error('%s' % e)
         sys.exit(1)
-    logging.info('process_output: loading satellite description from %s' % satfile)
-    try:
-        jsat = Dict(json.load(open(satfile,'r')))
-        available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
-        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
-    except:
-        logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
-        available_sats = []
-        not_empty_sats = []
-        pass
-    logging.info('process_output: available satellite data %s' % available_sats)
-    logging.info('process_output: not empty satellite data %s' % not_empty_sats)
     js.old_pid = js.pid
     js.pid = os.getpid()
     js.state = 'Processing'
@@ -651,7 +525,7 @@ def process_output(job_id):
     js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
 
     pp = None
-    already_sent_files = []
+    already_sent_files, max_pp_dom = [], -1
     if js.postproc is None:
         logging.info('No postprocessing specified, exiting.')
         return
@@ -663,10 +537,10 @@ def process_output(job_id):
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
+    max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
 
     if js.postproc.get('from', None) == 'wrfout':
         logging.info('Postprocessing all wrfout files.')
-        failures = cases = 0
         # postprocess all wrfouts
         for wrfout_path in sorted(glob.glob(osp.join(js.wrf_dir,'wrfout_d??_????-??-??_??:??:??'))):
             logging.info("Found %s" % wrfout_path)
@@ -679,19 +553,9 @@ def process_output(job_id):
             for esmf_time in sorted(times):
                 logging.info("Processing domain %d for time %s." % (dom_id, esmf_time))
                 if js.postproc is not None and str(dom_id) in js.postproc:
-                    case += 1
-                    if available_sats:
-                        sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
-                        var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]
-                        sat_list = [sat for sat in sat_list if sat in not_empty_sats]
-                        logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
-                    else:
-                        sat_list = []
-                        var_list = [str(x) for x in js.postproc[str(dom_id)]]
+                    var_list = [str(x) for x in js.postproc[str(dom_id)]]
                     logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                     try:
-                        if sat_list:
-                            pp.process_sats(jsat, dom_id, esmf_time, sat_list)
                         pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
                         # in incremental mode, upload to server
                         if js.postproc.get('shuttle', None) == 'incremental':
@@ -700,18 +564,11 @@ def process_output(job_id):
                             already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
-                        failures += 1
 
-        if cases != failures:
-            logging.info('number of postprocessing steps is %d and number of postprocessing failures is %d' % (cases,failures))
-            # if we are to send out the postprocessed files after completion, this is the time
-            if js.postproc.get('shuttle', None) == 'on_completion':
-                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
-
-        else:
-            logging.error('All postprocessing steps failed')
-            js.state = 'Postprocessing failed'
+        # if we are to send out the postprocessed files after completion, this is the time
+        if js.postproc.get('shuttle', None) == 'on_completion':
+            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
         return
@@ -734,7 +591,6 @@ def process_output(job_id):
     # step 10: track log output and check for history writes fro WRF
     wait_lines = 0
     wait_wrfout = 0
-    failures = cases = 0
     while True:
         line = wrf_out.readline().strip()
         if not line:
@@ -763,56 +619,35 @@ def process_output(job_id):
             dom_id = int(domain_str)
             logging.info("Detected history write for domain %d for time %s." % (dom_id, esmf_time))
             if js.postproc is not None and str(dom_id) in js.postproc:
-                cases += 1
-                if available_sats:
-                    sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
-                    var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]
-                    sat_list = [sat for sat in sat_list if sat in not_empty_sats]
-                    logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
-                else:
-                    sat_list = []
-                    var_list = [str(x) for x in js.postproc[str(dom_id)]]
+                var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                 wrfout_path = find_wrfout(js.wrf_dir, dom_id, esmf_time)
                 try:
-                    if sat_list:
-                        pp.process_sats(jsat, dom_id, esmf_time, sat_list)
                     pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
                 except Exception as e:
                     logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
-                    failures += 1
                 else:
-                    try:
-                        # in incremental mode, upload to server
-                        if js.postproc.get('shuttle', None) == 'incremental':
-                            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
-                    except Exception as e:
-                        logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
+                    # in incremental mode, upload to server
+                    if js.postproc.get('shuttle', None) == 'incremental':
+                        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                        sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+                        already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
         else:
             if not wait_wrfout:
                 logging.info('Waiting for wrfout')
             wait_wrfout = wait_wrfout + 1
 
     # if we are to send out the postprocessed files after completion, this is the time
-    if cases != failures:
-        logging.info('number of postprocessing steps is %d and number of postprocessing failures is %d' % (cases,failures))
-        if js.postproc.get('shuttle', None) == 'on_completion':
-            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+    if js.postproc.get('shuttle', None) == 'on_completion':
+        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
-        if js.postproc.get('shuttle', None) is not None:
-            make_kmz(js.job_id)  # arguments can be added to the job id string
-
-        js.state = 'Completed'
-
-    else:
-        logging.error('All postprocessing steps failed')
-        js.state = 'Postprocessing failed'
+    if js.postproc.get('shuttle', None) is not None:
+        make_kmz(js.job_id)  # arguments can be added to the job id string
 
     js.old_pid = js.pid
     js.pid = None
+    js.state = 'Completed'
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def create_process_output_script(job_id):
@@ -829,87 +664,6 @@ def create_process_output_script(job_id):
     # make it executable
     st = os.stat(script_path)
     os.chmod(script_path, st.st_mode | stat.S_IEXEC)
-
-
-def process_sat_output(job_id):
-    args = load_sys_cfg()
-    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-    satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
-    logging.info('process_output: loading job description from %s' % jobfile)
-    try:
-        js = Dict(json.load(open(jobfile,'r')))
-    except Exception as e:
-        logging.error('Cannot load the job description file %s' % jobfile)
-        logging.error('%s' % e)
-        sys.exit(1)
-    logging.info('process_output: loading satellite description from %s' % satfile)
-    try:
-        jsat = Dict(json.load(open(satfile,'r')))
-        available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
-        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
-    except:
-        logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
-        available_sats = []
-        not_empty_sats = []
-        return
-    logging.info('process_output: available satellite data %s' % available_sats)
-    logging.info('process_output: not empty satellite data %s' % not_empty_sats)
-    if not not_empty_sats:
-        logging.warning('Do not have satellite data to postprocess')
-        return
-    js.old_pid = js.pid
-    js.pid = os.getpid()
-    js.state = 'Processing'
-    json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
-
-    pp = None
-    already_sent_files = []
-    delete_visualization(js.job_id)
-    js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-    make_clean_dir(js.pp_dir)
-    pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
-    js.manifest_filename= 'wfc-' + js.grid_code + '.json'
-    logging.debug('Postprocessor created manifest %s',js.manifest_filename)
-    domains = sorted([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
-    for dom_id in domains:
-        logging.info('Processing domain %s' % str(dom_id))
-        dt = timedelta(minutes=jsat.dt[str(dom_id)])
-        logging.info('dt for satellite postprocessing = %s' % dt)
-        t_int = esmf_to_utc(jsat['time_interval'][0])
-        t_fin = esmf_to_utc(jsat['time_interval'][1])
-        ndts = number_minutes(t_int,t_fin,jsat.dt[str(dom_id)])
-        times = [t_int + tt*dt for tt in range(ndts)]
-        sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
-        if sat_list:
-            for time in times:
-                try:
-                    esmf_time = utc_to_esmf(time)
-                    logging.info('Posprocessing satellite data for time %s' % esmf_time)
-                    pp.process_sats(jsat, dom_id, esmf_time, sat_list)
-                except Exception as e:
-                    logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
-                else:
-                    try:
-                        if js.postproc.get('shuttle', None) == 'incremental':
-                            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
-                    except Exception as e:
-                        logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
-
-    # if we are to send out the postprocessed files after completion, this is the time
-    if js.postproc.get('shuttle', None) == 'on_completion':
-        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
-
-    if js.postproc.get('shuttle', None) is not None:
-        make_kmz(js.job_id)  # arguments can be added to the job id string
-
-    js.old_pid = js.pid
-    js.pid = None
-    js.state = 'Completed'
-    json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
-
 
 def verify_inputs(args,sys_cfg):
     """
@@ -954,13 +708,7 @@ def verify_inputs(args,sys_cfg):
 
     # check for valid grib source
     if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR']:
-        raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR' % args['grib_source'])
-
-    # check for valid satellite source
-    if 'satellite_source' in args:
-        for sat in args['satellite_source']:
-            if sat not in ['Terra','Aqua','SNPP']:
-                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP' % sat)
+        raise ValueError('Invalid grib source, must be one of HRRR, NAM, NAM227, NARR, CFSR')
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
@@ -981,7 +729,7 @@ def verify_inputs(args,sys_cfg):
         raise ValueError('One or more unrecognized variables in postproc.')
 
 
-def process_arguments(job_args,sys_cfg):
+def process_arguments(args):
     """
     Convert arguments passed into program via the JSON configuration file and job json argument.
     This is processed after the configuration is updated by the job json file.
@@ -990,34 +738,12 @@ def process_arguments(job_args,sys_cfg):
 
     :param args: the input arguments
     """
-    # note: the execution flow allows us to override anything in the etc/conf.json file
-    # dump(sys_cfg,'sys_cfg')
-    args = sys_cfg
-    keys = job_args.keys()
-    for key in keys:
-        if job_args[key] is None:
-            logging.warning('Job argument %s=None, ignoring' % key)
-            del job_args[key]
-    args.update(job_args)
-    # logging.info('updated args = %s' % json.dumps(args, indent=4, separators=(',', ': ')))
-
     # resolve possible relative time specifications
     start_utc = timespec_to_utc(args['start_utc'])
     args['orig_start_utc'] = start_utc
     args['start_utc'] = round_time_to_hour(start_utc)
     args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
     args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
-    args['satprod_satsource'] = Dict({})
-
-    # add postprocess satellite data
-    if 'satellite_source' in args:
-        if 'postproc' in args:
-            max_dom = max([int(x) for x in filter(lambda x: len(x) == 1, args['postproc'])])
-            sats = args['satellite_source']
-            for sat in sats:
-                satprod = sat.upper()+'_AF'
-                args['postproc'][str(max_dom)].append(satprod)
-                args['satprod_satsource'].update({satprod: sat})
 
     # defaults
     if args['ref_utc'] is not None:
@@ -1026,11 +752,6 @@ def process_arguments(job_args,sys_cfg):
     for k, v in args.iteritems():
         if type(v) == unicode:
             args[k] = v.encode('ascii')
-
-    # sanity check, also that nothing in etc/conf got overrident
-    verify_inputs(args,sys_cfg)
-
-    return args
 
 if __name__ == '__main__':
 
@@ -1042,13 +763,25 @@ if __name__ == '__main__':
     sys_cfg = load_sys_cfg()
     # logging.info('sys_cfg = %s' % json.dumps(sys_cfg, indent=4, separators=(',', ': ')))
 
-    # load job JSON
+    # note: the execution flow allows us to override anything in the etc/conf.json file
+    # dump(sys_cfg,'sys_cfg')
     job_args = json.load(open(sys.argv[1]), 'ascii')
     # logging.info('job_args = %s' % json.dumps(job_args, indent=4, separators=(',', ': ')))
+    args = sys_cfg
+    keys = job_args.keys()
+    for key in keys:
+        if job_args[key] is None:
+            logging.warning('Job argument %s=None, ignoring' % key)
+            del job_args[key]
+    args.update(job_args)
+    # logging.info('updated args = %s' % json.dumps(args, indent=4, separators=(',', ': ')))
 
-    # process arguments
-    args = process_arguments(job_args,sys_cfg)
+    process_arguments(args)
     # logging.info('processed args = %s' % str(args))
+
+    # sanity check, also that nothing in etc/conf got overrident
+    verify_inputs(args,sys_cfg)
+    # logging.info('verified args = %s' % str(args))
 
     # execute the job
     logging.info('calling execute')
