@@ -3,7 +3,7 @@
 
 import os.path as osp
 import numpy as np
-import sys, os, logging
+import sys, os, logging, json
 from utils import inq
 
 def write_divide(file,divide='=',count=25):
@@ -36,17 +36,42 @@ def write_geogrid_var(path_dir,varname,array,description,index,bits=32):
     if not osp.exists(path_dir):
         os.makedirs(path_dir)
 
+    # write geogrid dataset
     geogrid_ds_path = osp.join(path_dir,varname)
     index['description']=description
     write_geogrid(geogrid_ds_path,array,index,bits=bits)
+ 
+    # write also the index as json entry to modify later
+    index_json_path = osp.join(path_dir,'index.json')
+    try:
+        index_json = json.load(open(index_json_path,'r'))
+    except:
+        index_json = {}
+    index_json[varname]=index
+    json.dump(index_json,open(index_json_path,'w'), indent=4, separators=(',', ': ')) 
 
-    # add segment of GEOGRID.TBL
-    geogrid_tbl_path=osp.join(path_dir,'GEOGRID.TBL')
-    write_table(geogrid_tbl_path, {'name':varname,
+    geogrid_tbl_var = {'name':varname,
                    'dest_type':'continuous',
                    'interp_option':'average_4pt',
                    'abs_path':geogrid_ds_path,
-                   'priority':1}, mode='a', divider_after=True)
+                   'priority':1}
+
+    # write a segment of GEOGRID.TBL
+    geogrid_tbl_path=osp.join(path_dir,'GEOGRID.TBL')
+    write_table(geogrid_tbl_path, geogrid_tbl_var, mode='a', divider_after=True)
+
+    # write also as json 
+    geogrid_tbl_json_path = osp.join(path_dir,'geogrid_tbl.json')
+    try:
+        geogrid_tbl = json.load(open(geogrid_tbl_json_path,'r'))
+    except:
+        geogrid_tbl = {}
+    geogrid_tbl[varname]=geogrid_tbl_var 
+    json.dump(index,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
+    
+    
+    json.dump(geogrid_tbl,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
+
     
 def write_geogrid(path,array,index,bits=32):
     """

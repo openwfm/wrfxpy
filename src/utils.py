@@ -207,7 +207,7 @@ def append2file(addl,base):
 
 def link2copy(src):
     """
-    replace link by a copy ot the target file
+    replace link by a copy of the target file
     """
     try:
         link_target = os.readlink(src)
@@ -224,7 +224,6 @@ def move(src,tgt):
     logging.info('moving %s to %s' % (src, tgt))
     remove(tgt)
     shutil.move(src,tgt)
-    
 
 def cache_file(path, cache_dir):
     """

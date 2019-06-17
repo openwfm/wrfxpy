@@ -71,5 +71,5 @@
     "grib_source": "CFSR",
     "num_nodes": 2,
     "start_utc": "2018-07-06_20:00:00",
-    "geogrid_tbl_addl_path": "wksp_fmda/GBCC/201906/fmda-GBCC-20190616-18.geo/GEOGRID.TBL"
+    "fmda_geogrid_path": "wksp_fmda/GBCC/201906/fmda-GBCC-20190617-06.geo"
 }
