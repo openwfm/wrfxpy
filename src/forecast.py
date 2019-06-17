@@ -25,7 +25,8 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move
+                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
+                  link2copy, append2file     
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -390,6 +391,10 @@ def execute(args,job_args):
     js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+    if 'geogrid_tbl_addl_path' in js:
+       geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
+       link2copy(geogrid_tbl_path)
+       append2file(osp.abspath(js.geogrid_tbl_addl_path),geogrid_tbl_path)
 
     # do steps 2 & 3 & 4 in parallel (two execution streams)
     #  -> GEOGRID ->
