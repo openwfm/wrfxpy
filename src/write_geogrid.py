@@ -38,7 +38,9 @@ def write_geogrid_var(path_dir,varname,array,description,index,bits=32):
 
     # write geogrid dataset
     geogrid_ds_path = osp.join(path_dir,varname)
-    index['description']=description
+    index['description']=addquotes(description)
+    index['tile_bdr']=0
+
     write_geogrid(geogrid_ds_path,array,index,bits=bits)
  
     # write also the index as json entry to modify later
@@ -52,7 +54,7 @@ def write_geogrid_var(path_dir,varname,array,description,index,bits=32):
 
     geogrid_tbl_var = {'name':varname,
                    'dest_type':'continuous',
-                   'interp_option':'average_4pt',
+                   'interp_option':'default:average_gcell(4.0)+four_pt+average_4pt',
                    'abs_path':geogrid_ds_path,
                    'priority':1}
 
