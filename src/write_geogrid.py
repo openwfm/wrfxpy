@@ -92,14 +92,15 @@ def write_geogrid(path,array,index,bits=32):
         dims = dims + (1,)
     xsize, ysize, zsize = dims
     scale = 2**(np.ceil(np.log2(np.max(np.abs(a))))-bits+1)
-    a = np.round(a.transpose().flatten()/scale)
+    aa = np.round(a/scale)
     if bits == 32:
-        a = np.int32(a) 
+        aa = np.int32(aa) 
     elif bits == 16:
-        a = np.int16(a) 
+        aa = np.int16(aa) 
     else:
         print 'unsupported word size'
         sys.exit(1) 
+    a = aa.transpose().flatten()
     data_file = "00001-%05i.00001-%05i" % (xsize, ysize)
     data_path = osp.join(path,data_file)
     a.tofile(data_path)
