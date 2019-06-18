@@ -100,10 +100,11 @@ def write_geogrid(path,array,index,bits=32):
     else:
         print 'unsupported word size'
         sys.exit(1) 
-    a = aa.transpose().flatten()
+    a = aa.transpose(2,0,1)
+    zsize, ysize, xsize = a.shape
     data_file = "00001-%05i.00001-%05i" % (xsize, ysize)
     data_path = osp.join(path,data_file)
-    a.tofile(data_path)
+    a.flatten().tofile(data_path)
     
     # write index
     index.update({'type':'continuous',
