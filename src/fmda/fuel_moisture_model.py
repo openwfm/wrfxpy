@@ -23,7 +23,7 @@ import sys
 import logging
 from utils import inq, ensure_dir
 from ingest.rtma_source import RTMA
-from write_geogrid import write_geogrid_var
+from write_geogrid import write_geogrid_var, addquotes
 
 class FuelMoistureModel:
     """
@@ -398,11 +398,15 @@ class FuelMoistureModel:
         logging.info("fmda.fuel_moisture_model.to_geogrid path=%s lats %s lons %s" % (path, inq(lats), inq(lons)))
         logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid_index="+str(index))
         ensure_dir(path)
-        index.update({'known_x':1.0,'known_y':1.0,'known_lat':lats[1,1],'known_lon':lons[1,1]})
-        logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid updated="+str(index))
         xsize, ysize, n = self.m_ext.shape
         if n != 5:
             logging.error('wrong number of extended state fields, expecting 5')
+        x=1
+        y=1
+        x=int(xsize*0.5)
+        y=int(ysize*0.5)
+        index.update({'known_x':float(y),'known_y':float(x),'known_lat':lats[x-1,y-1],'known_lon':lons[x-1,y-1]})
+        logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid updated="+str(index))
 
         FMC_GC = np.zeros((xsize, ysize, 5))
         FMC_GC[:,:,:3] = self.m_ext[:,:,:3]
@@ -411,6 +415,7 @@ class FuelMoistureModel:
             FMC_GC[:,:,3] = lons
             FMC_GC[:,:,4] = lats
         FMEP = self.m_ext[:,:,3:]
+        index['units']=addquotes('1')
         
         write_geogrid_var(path,'FMC_GC',FMC_GC,'1h, 10h, 100h fuel moisture',index,bits=32)
         write_geogrid_var(path,'FMEP',FMEP,'fuel moisture drying/wetting and rain equilibrium adjustments',index,bits=32)

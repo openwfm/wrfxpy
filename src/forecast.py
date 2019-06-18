@@ -347,18 +347,24 @@ def fmda_add_to_geogrid(js):
     if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
         logging.error('fmda_add_to_geogrid: WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
         sys.exit(1)
-    # write index
+    """
     for varname,varindex in index.iteritems():
-        varindex['known_x']=i
-        varindex['known_y']=j
-        varindex['known_lat']=lats[i,j]
-        varindex['known_lon']=lons[i,j]
+        # update index 
+        varindex['known_y']=float(i)
+        varindex['known_x']=float(j)
+        varindex['known_lat']=lats[i-1,j-1]
+        varindex['known_lon']=lons[i-1,j-1]
+        logging.info('fmda_add_to_geogrid: updating index known_x=%s known_y=%s known_lat=%s known_lon=%s' % 
+           (varindex['known_x'],varindex['known_y'],varindex['known_lat'],varindex['known_lon']))
         varindex_path=osp.join(fmda_geogrid_path,varname,'index')
         write_table(varindex_path,varindex)
+    """
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
     geogrid_tbl_json_path = osp.join(fmda_geogrid_path,'geogrid_tbl.json')
+    logging.info('fmda_add_to_geogrid: updating GEOGRID.TBL at %s from %s' % 
+        (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in geogrid_tbl_json.iteritems():
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
