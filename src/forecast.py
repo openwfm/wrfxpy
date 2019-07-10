@@ -213,12 +213,12 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             grib_source.clone_vtables(grib_dir)
             symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
 
-            print(grib_dir + ':')
+            print((grib_dir + ':'))
             os.system('ls -l %s' % grib_dir)
 
             Ungrib(grib_dir).execute().check_output()
 
-            print(grib_dir + ':')
+            print((grib_dir + ':'))
             os.system('ls -l %s' % grib_dir)
 
             if cache_colmet:
@@ -531,7 +531,7 @@ def process_output(job_id):
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
-    max_pp_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
+    max_pp_dom = max([int(x) for x in [x for x in js.postproc if len(x) == 1]])
  
     if js.postproc.get('from', None) == 'wrfout':
         logging.info('Postprocessing all wrfout files.')
@@ -555,7 +555,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
 
@@ -625,7 +625,7 @@ def process_output(job_id):
                     if js.postproc.get('shuttle', None) == 'incremental':
                         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                         sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                        already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+                        already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
         else: 
             if not wait_wrfout:
                 logging.info('Waiting for wrfout')
@@ -706,7 +706,7 @@ def verify_inputs(args,sys_cfg):
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
-      for key,path in args['precomputed'].iteritems():
+      for key,path in args['precomputed'].items():
           if not osp.exists(path):
               raise OSError('Precomputed entry %s points to non-existent file %s' % (key,path))
 
@@ -714,7 +714,7 @@ def verify_inputs(args,sys_cfg):
     wvs = get_wisdom_variables()
     failing = False
     if 'postproc' in args:
-        for dom in filter(lambda x: len(x) == 1, args['postproc'].keys()):
+        for dom in [x for x in list(args['postproc'].keys()) if len(x) == 1]:
             for vname in args['postproc'][dom]:
                 if vname not in wvs:
                     logging.error('unrecognized variable %s in postproc key for domain %s.' % (vname, dom))
@@ -743,8 +743,8 @@ def process_arguments(args):
     if args['ref_utc'] is not None:
         args['ref_utc'] = timespec_to_utc(args['ref_utc'], args['start_utc'])
 
-    for k, v in args.iteritems():
-        if type(v) == unicode:
+    for k, v in args.items():
+        if type(v) == str:
             args[k] = v.encode('ascii')
 
 if __name__ == '__main__':
@@ -759,10 +759,10 @@ if __name__ == '__main__':
 
     # note: the execution flow allows us to override anything in the etc/conf.json file
     # dump(sys_cfg,'sys_cfg')
-    job_args = json.load(open(sys.argv[1]), 'ascii')
+    job_args = json.load(open(sys.argv[1]))
     # logging.info('job_args = %s' % json.dumps(job_args, indent=4, separators=(',', ': ')))
     args = sys_cfg
-    keys = job_args.keys()
+    keys = list(job_args.keys())
     for key in keys:
         if job_args[key] is None:
             logging.warning('Job argument %s=None, ignoring' % key) 

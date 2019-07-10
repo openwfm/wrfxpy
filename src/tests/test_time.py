@@ -17,33 +17,33 @@ def test_time():
 
 
 
-    print cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour
+    print(cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour)
 
     fc_hours = int((to_utc - cycle_start).total_seconds())/3600
 
 
     delta = from_utc - cycle_start
-    print str(delta)
-    print delta.days, delta.seconds, delta.total_seconds()
-    print (to_utc - cycle_start).total_seconds() 
-    print timedelta_hours(to_utc - cycle_start)
-    print timedelta_hours(to_utc - cycle_start, False)
+    print(str(delta))
+    print(delta.days, delta.seconds, delta.total_seconds())
+    print((to_utc - cycle_start).total_seconds()) 
+    print(timedelta_hours(to_utc - cycle_start))
+    print(timedelta_hours(to_utc - cycle_start, False))
 
     fc_start, fc_hours = g.forecast_times(cycle_start, from_utc, to_utc)
-    print 'fc_start = ', fc_start
-    print 'fc_hours = ',fc_hours
+    print('fc_start = ', fc_start)
+    print('fc_hours = ',fc_hours)
     fc_list, colmet_list_utc = g.file_times(cycle_start, fc_start, fc_hours)
     grib_files, colmet_prefix, colmet_files = g.file_names(cycle_start, fc_list, colmet_list_utc)
-    print 'fc_list = ',fc_list
-    print 'colmet_list_utc = '
+    print('fc_list = ',fc_list)
+    print('colmet_list_utc = ')
     for x in colmet_list_utc:
-        print x   
-    print 'grib_files = '
+        print(x)   
+    print('grib_files = ')
     for x in grib_files:
-        print x   
-    print 'colmet_files = '
+        print(x)   
+    print('colmet_files = ')
     for x in colmet_files:
-        print colmet_prefix + '/' + x   
+        print(colmet_prefix + '/' + x)   
     
 
      

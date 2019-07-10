@@ -1,6 +1,6 @@
 from ingest.grib_source import GribError, GribSource
 from utils import ensure_dir, symlink_unless_exists, timedelta_hours, readhead, Dict
-from downloader import download_url, DownloadError
+from .downloader import download_url, DownloadError
 from datetime import datetime, timedelta
 import pytz
 import requests
@@ -63,17 +63,17 @@ class GribReanalysis(GribSource):
         if len(colmet_missing) > 0:
             # print 'grib_files = ' + str(grib_files)
             # check what's available locally
-            nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), grib_files)
+            nonlocals = [x for x in grib_files if not self.grib_available_locally(osp.join(self.ingest_dir, x))]
             #print 'nonlocals = ' + str(nonlocals)
             # check if GRIBs we don't have are available remotely
             url_base = self.remote_url
             logging.info('Retrieving CFSR GRIBs from %s' % url_base)
-            unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
+            unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
             if len(unavailables) > 0:
                 raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
 
             # download all gribs not available remotely
-            map(lambda x: self.download_grib(url_base, x), nonlocals)
+            list(map(lambda x: self.download_grib(url_base, x), nonlocals))
 
         # return manifest
         return Dict({'grib_files': grib_files, 

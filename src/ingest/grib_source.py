@@ -18,7 +18,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from utils import ensure_dir, symlink_unless_exists, timedelta_hours, readhead, Dict
-from downloader import download_url, DownloadError
+from .downloader import download_url, DownloadError
 from datetime import datetime, timedelta
 import pytz
 import requests
@@ -103,7 +103,7 @@ class GribSource(object):
         # vtables: a dictionary with keys from list ['geogrid_vtable', 'ungrib_vtable', 'metgrid_vtable'],
         #               which contain paths of the variable tables relative to 'etc/vtables'
 
-        for vtable_id, vtable_path in vtables.iteritems():
+        for vtable_id, vtable_path in vtables.items():
             # build path to link location
             symlink_path = osp.join(tgt, vtable_locs[vtable_id])
 

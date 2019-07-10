@@ -289,7 +289,7 @@ def get_wisdom(var_name):
 
 def get_wisdom_variables():
     """Return the variables for which wisdom is available."""
-    return _var_wisdom.keys()
+    return list(_var_wisdom.keys())
 
 def convert_value(unit_from, unit_to, value):
     # handle the simple case

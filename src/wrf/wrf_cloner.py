@@ -63,7 +63,7 @@ class WRFCloner(object):
         make_dir(tgt)
 
         # clone all WPS executables
-        map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks)
+        list(map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks))
 
     def clone_wrf(self, tgt, with_files):
         """
@@ -83,7 +83,7 @@ class WRFCloner(object):
         make_dir(tgt)
 
         # symlink all at once
-        map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks)
+        list(map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks))
 
     # list of executable file that must be symlinked in WPS directory
     wps_exec_files = ['geogrid.exe', 'metgrid.exe', 'ungrib.exe']

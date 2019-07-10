@@ -125,7 +125,7 @@ def parallel_job_running(js):
                  status = ls[4]
              else:
                  status = '??'
-                 print ret
+                 print(ret)
              logging.info('WRF job %s status is %s' % (js.job_num, status))
              return True
     logging.info('WRF job %s is not running.' % js.job_num)
@@ -138,10 +138,10 @@ def list(s):
     s.connect()
     cat = s.retrieve_catalog()
     s.disconnect()
-    print('%-60s desc' % 'id')
-    print('-' * 70)
+    print(('%-60s desc' % 'id'))
+    print(('-' * 70))
     for k in sorted(cat):
-        print('%-60s %s' % (k, cat[k]['description']))
+        print(('%-60s %s' % (k, cat[k]['description'])))
 
 def workspace(s):
     logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     commands = [ 'list', 'cancel', 'output', 'delete', 'workspace', 'update']
 
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
-        print('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]')
+        print(('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]'))
         print('list            : show list of current simulations with their job_id and description')
         print('cancel <job_id> : kill all processes and the WRF parallel job, do not delete any files')
         print('output <job id> : cancel, and delete all WRF output and visualization files only')
@@ -251,7 +251,7 @@ if __name__ == '__main__':
         if len(sys.argv) == 3 and not sys.argv[2] == "" :
             job_id = sys.argv[2]
         else:
-            print('%s function requires one job id' % cmd)
+            print(('%s function requires one job id' % cmd))
             sys.exit(1)
     else:
         job_id = None

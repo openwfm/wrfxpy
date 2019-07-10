@@ -10,7 +10,7 @@ def read_csv(csv_path):
     Return file contents as json {1:{header1:value1,...},2:}
     """
 
-    print('Reading file %s\n' % csv_path)
+    print(('Reading file %s\n' % csv_path))
     with open(csv_path,'rU') as csv_file:
         reader = csv.reader(csv_file, delimiter=',', quotechar='"')
         row_num=0
@@ -114,7 +114,7 @@ def json2kml(s,kml_path):
 
         kml.write('</Document>\n</kml>\n')
     
-    print('Created file %s\n' % kml_path)
+    print(('Created file %s\n' % kml_path))
             
 if __name__ == '__main__':
 

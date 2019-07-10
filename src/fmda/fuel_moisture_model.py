@@ -249,15 +249,15 @@ class FuelMoistureModel:
             P2[:, :] = P[i, j, :, :]
 
             if np.any(np.diag(P2) < 0.0):
-                print("ERROR: negative diagonal %s" % (str(np.diag(P2))))
+                print(("ERROR: negative diagonal %s" % (str(np.diag(P2)))))
 
             # compute Kalman gain
             I = np.dot(np.dot(Ho, P2), Ho.T) + V[i, j, :, :]
             K = np.dot(np.dot(P2, Ho.T), np.linalg.inv(I))
 
             if K[1, 0] > 1.0 or K[1, 0] < 0.0:
-                print("ERROR at %s, Kalman gain %g out of bounds! I=%g V=%g" % (
-                    str((i, j)), K[fuel_type, 0], I, V[s[0], s[1], 0, 0]))
+                print(("ERROR at %s, Kalman gain %g out of bounds! I=%g V=%g" % (
+                    str((i, j)), K[fuel_type, 0], I, V[s[0], s[1], 0, 0])))
 
             # update state and state covariance
             m_ext[i, j, :] += np.dot(K, O[i, j, :] - m_ext[i, j, fuel_types])
@@ -289,14 +289,14 @@ class FuelMoistureModel:
                 #print(P2)
 
                 if np.any(np.diag(P2) < 0.0):
-                    print("ERROR: negative diagonal %s" % (str(np.diag(P2))))
+                    print(("ERROR: negative diagonal %s" % (str(np.diag(P2)))))
 
                 I = P2[fuel_type, fuel_type] + V[i, j, 0, 0]
                 K = P2[:, fuel_type] / I
 
                 if K[fuel_type] > 1.0 or K[fuel_type] < 0.0:
-                    print("WARN: at %s, Kalman gain %g out of bounds! I=%g V=%g" % (
-                        str((i, j)), K[fuel_type], I, V[i, j, 0, 0]))
+                    print(("WARN: at %s, Kalman gain %g out of bounds! I=%g V=%g" % (
+                        str((i, j)), K[fuel_type], I, V[i, j, 0, 0])))
 
                 m_ext[i, j, :] += K * (O[i, j, 0] - m_ext[i, j, fuel_type])
 
@@ -387,10 +387,10 @@ class FuelMoistureModel:
         """
         import netCDF4
 
-        print "reading from netCDF file", path
+        print("reading from netCDF file", path)
         d = netCDF4.Dataset(path)
         ncfmc = d.variables['FMC_GC'][:,:,:]
-        print "FuelMoistureModel.from_netcdf: reading FMC_GC shape",ncfmc.shape
+        print("FuelMoistureModel.from_netcdf: reading FMC_GC shape",ncfmc.shape)
 
         d0, d1, k = ncfmc.shape
         P = d.variables['FMC_COV'][:,:,:,:]

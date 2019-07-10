@@ -399,7 +399,7 @@ if __name__ == '__main__':
 
     # parse a JSON domain configuration and a namelist.wps file and build the correct wps
     if len(sys.argv) != 3 and len(sys.argv) != 4:
-        print('usage: %s <domains_json_file> <namelist.wps> [namelist.input]' % sys.argv[0])
+        print(('usage: %s <domains_json_file> <namelist.wps> [namelist.input]' % sys.argv[0]))
         sys.exit(1)
 
     dcfg = WPSDomainConf(json.load(open(sys.argv[1])))

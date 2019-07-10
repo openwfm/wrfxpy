@@ -29,7 +29,7 @@ import os.path as osp
 ## Standalone script that can be used to simply download files
 if __name__ == '__main__':
     if len(sys.argv) != 5:
-        print('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0])
+        print(('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
         print('       supported GRIB sources: HRRR, NAM, CFSR_P, CFSR_S, NARR')
         sys.exit(-1)
     
@@ -67,12 +67,12 @@ if __name__ == '__main__':
     logging.info('SUCCESS, the following files are now available:')
     print('')
     for g in gribs:
-        print(osp.join(ingest_dir, g))
+        print((osp.join(ingest_dir, g)))
     
     print('\n** NOTE **')
     print('The following variable tables must be used with this grib source:')
-    print(repr(grib_src.vtables()))
+    print((repr(grib_src.vtables())))
     print('The following keys must be set in namelists:')
-    print(repr(grib_src.namelist_keys()))
+    print((repr(grib_src.namelist_keys())))
 
 

@@ -26,7 +26,7 @@ import numpy as np
 import netCDF4 as nc4
 import sys
 import os
-import StringIO
+import io
 
 
 def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
@@ -66,7 +66,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
         tick_lbl.set_fontsize(8)
 
     # save png to a StringIO
-    str_io = StringIO.StringIO()
+    str_io = io.StringIO()
     fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
     plt.close()
 
@@ -90,7 +90,7 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
     cmap = mpl.cm.get_cmap(cmap_name)
     m.pcolormesh(lon,lat,masked_grid,latlon=True,cmap=cmap,vmin=cmin,vmax=cmax)
 
-    str_io = StringIO.StringIO()
+    str_io = io.StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
     plt.close()
 
@@ -114,7 +114,7 @@ def basemap_barbs_mercator(u,v,lat,lon):
     plt.axis('off')
     m.quiver(lon,lat,u,v,latlon=True)
 
-    str_io = StringIO.StringIO()
+    str_io = io.StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
     plt.close()
 

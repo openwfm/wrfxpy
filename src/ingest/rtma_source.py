@@ -17,7 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from downloader import download_url, DownloadError
+from .downloader import download_url, DownloadError
 from utils import esmf_to_utc, load_sys_cfg
 
 import requests
@@ -27,7 +27,7 @@ import logging
 import os.path as osp
 from utils import readhead
 import time
-from grib_file import grib_messages
+from .grib_file import grib_messages
 
 # global parameter
 min_content_size = 10000
@@ -72,9 +72,9 @@ class RTMA(object):
         ts = cycle.replace(minute=0, second=0, microsecond=0)
         logging.info('RTMA retrieving variables %s for cycle %s.' % (self.var_list, str(ts)))
 
-        vars_paths = map(lambda x: (x, self._local_var_path(ts, x)), self.var_list)
-        ready = dict(filter(lambda x: self._is_var_cached(x[1]), vars_paths))
-        nonlocals = filter(lambda x: not self._is_var_cached(x[1]), vars_paths)
+        vars_paths = [(x, self._local_var_path(ts, x)) for x in self.var_list]
+        ready = dict([x for x in vars_paths if self._is_var_cached(x[1])])
+        nonlocals = [x for x in vars_paths if not self._is_var_cached(x[1])]
         if nonlocals:
             nl_vars = [x[0] for x in nonlocals]
             logging.info('RTMA variables %s are not available locally, trying to download.' % nl_vars)
@@ -201,7 +201,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     if len(sys.argv) != 2:
-        print('usage: %s <esmf_time>' % sys.argv[0])
+        print(('usage: %s <esmf_time>' % sys.argv[0]))
         sys.exit(1)
 
     # initialize the RTMA object with standard variables

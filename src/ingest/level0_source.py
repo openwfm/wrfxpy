@@ -4,7 +4,7 @@
 # CONUS = [-124.7844079,-66.9513812,24.7433195,49.3457868]
 
 from utils import ensure_dir, symlink_unless_exists
-from downloader import download_url, DownloadError, get_dList
+from .downloader import download_url, DownloadError, get_dList
 
 # fast searching of dList
 from bisect import bisect
@@ -61,7 +61,7 @@ class data_source(object):
 
         elif to_utc < two_weeks_ago:
             # filter geo_list on intersection with lonlat, the hdf library i'd want to use here isn't ready yet
-            geo_list = filter(lambda x: geo_intersects(self.ingest_dir + '/' + x, lonlat), self.retrieve_geo(from_utc, to_utc))
+            geo_list = [x for x in self.retrieve_geo(from_utc, to_utc) if geo_intersects(self.ingest_dir + '/' + x, lonlat)]
             # geo_list = retrieve_geo(from_utc, to_utc)
             manifest.extend(geo_list)
             manifest.extend(self.retrieve_af(geo_list))
@@ -70,7 +70,7 @@ class data_source(object):
             manifest.extend(self.retrieve_l0(two_weeks_ago + timedelta(minutes=10), to_utc))
 
             # filter geo_list on intersection with lonlat
-            geo_list = filter(lambda x: geo_intersect(self.ingest_dir + '/' + x, lonlat), self.retrieve_geo(from_utc, two_weeks_ago))
+            geo_list = [x for x in self.retrieve_geo(from_utc, two_weeks_ago) if geo_intersect(self.ingest_dir + '/' + x, lonlat)]
             # geo_list = retrieve_geo(from_utc, two_weeks_ago)
             manifest.extend(geo_list)
             manifest.extend(self.retrieve_af(geo_list))
@@ -231,11 +231,11 @@ class MODIS_TERRA(data_source):
 
         manifest = self.compute_geo_manifest(from_utc, to_utc)
 
-        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+        nonlocals = [x for x in manifest if not self.available_locally(osp.join(self.ingest_dir, x))]
 
         logging.info('Retrieving geolocation data from %s' % (self.url_base_hdf + '/' + self.filepath_geo))
 
-        map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_geo + '/' + x[7:11] + '/' + x[11:14], x), nonlocals)
+        list(map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_geo + '/' + x[7:11] + '/' + x[11:14], x), nonlocals))
 
         return manifest
 
@@ -290,11 +290,11 @@ class MODIS_TERRA(data_source):
         """
         manifest = self.compute_af_manifest(geo_list)
 
-        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+        nonlocals = [x for x in manifest if not self.available_locally(osp.join(self.ingest_dir, x))]
 
         logging.info('Retrieving active fire data from %s' % (self.url_base_hdf + '/' + self.filepath_af))
 
-        map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_af + '/' + x[7:11] + '/' + x[11:14], x), nonlocals)
+        list(map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_af + '/' + x[7:11] + '/' + x[11:14], x), nonlocals))
 
         return manifest
 
@@ -341,12 +341,12 @@ class MODIS_TERRA(data_source):
 
         manifest = self.compute_l0_manifest(from_utc, to_utc)
 
-        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+        nonlocals = [x for x in manifest if not self.available_locally(osp.join(self.ingest_dir, x))]
 
 
         logging.info('Retrieving level0s from %s' % (self.url_base_l0 + '/' + self.filepath_l0))
 
-        map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0, x), nonlocals)
+        list(map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0, x), nonlocals))
 
         return manifest
 
@@ -448,11 +448,11 @@ class MODIS_AQUA(data_source):
         """
         manifest = self.compute_geo_manifest(from_utc, to_utc)
 
-        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+        nonlocals = [x for x in manifest if not self.available_locally(osp.join(self.ingest_dir, x))]
 
         logging.info('Retrieving geolocation data from %s' % (self.url_base_hdf + '/' + self.filepath_geo))
 
-        map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_geo + '/' + x[7:11] + '/' + x[11:14], x), nonlocals)
+        list(map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_geo + '/' + x[7:11] + '/' + x[11:14], x), nonlocals))
 
         return manifest
 
@@ -527,11 +527,11 @@ class MODIS_AQUA(data_source):
         """
         manifest = self.compute_af_manifest(geo_list)
 
-        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+        nonlocals = [x for x in manifest if not self.available_locally(osp.join(self.ingest_dir, x))]
 
         logging.info('Retrieving active fire data from %s' % (self.url_base_hdf + '/' + self.filepath_af))
 
-        map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_af + '/' + x[7:11] + '/' + x[11:14], x), nonlocals)
+        list(map(lambda x: self.download_file(self.url_base_hdf + '/' + self.filepath_af + '/' + x[7:11] + '/' + x[11:14], x), nonlocals))
 
         return manifest
 
@@ -582,14 +582,14 @@ class MODIS_AQUA(data_source):
         manifest_m = self.compute_l0_manifest_m(from_utc, to_utc)
         manifest_g = self.compute_l0_manifest_g(from_utc, to_utc)
 
-        nonlocals_m = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest_m)
-        nonlocals_g = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest_g)
+        nonlocals_m = [x for x in manifest_m if not self.available_locally(osp.join(self.ingest_dir, x))]
+        nonlocals_g = [x for x in manifest_g if not self.available_locally(osp.join(self.ingest_dir, x))]
 
         logging.info('Retrieving level0s from %s' % self.url_base_l0 + '/' + self.filepath_l0_m)
-        map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0_m, x), nonlocals_m)
+        list(map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0_m, x), nonlocals_m))
 
         logging.info('Retrieving level0s from %s' % self.url_base_l0 + '/' + self.filepath_l0_g)
-        map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0_g, x), nonlocals_g)
+        list(map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0_g, x), nonlocals_g))
 
         return manifest_m + manifest_g
 
@@ -764,12 +764,12 @@ class VIIRS_NPP(data_source):
 
         manifest = self.compute_l0_manifest(from_utc, to_utc)
 
-        nonlocals = filter(lambda x: not self.available_locally(osp.join(self.ingest_dir, x)), manifest)
+        nonlocals = [x for x in manifest if not self.available_locally(osp.join(self.ingest_dir, x))]
 
 
         logging.info('Retrieving level0s from %s' % self.url_base_l0 + '/' + self.filepath_l0)
 
-        map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0, x), nonlocals)
+        list(map(lambda x:self.download_file(self.url_base_l0 + '/' + self.filepath_l0, x), nonlocals))
 
         return manifest
 

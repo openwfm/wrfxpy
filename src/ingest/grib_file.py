@@ -88,7 +88,7 @@ class GribFile(object):
         return self
         
         
-    def next(self):
+    def __next__(self):
         """
         Implementation of iterator interface.
         
@@ -165,8 +165,8 @@ if __name__ == '__main__':
     import sys
     
     if len(sys.argv) < 2:
-        print('usage: %s list <grib_file>' % sys.argv[0])
-        print('usage: %s to_netcdf <grib_file> <message-name> <netcdf_file>' % sys.argv[0])
+        print(('usage: %s list <grib_file>' % sys.argv[0]))
+        print(('usage: %s to_netcdf <grib_file> <message-name> <netcdf_file>' % sys.argv[0]))
         sys.exit(1)
         
     if sys.argv[1] == 'list':
@@ -181,7 +181,7 @@ if __name__ == '__main__':
         gf = GribFile(sys.argv[2])
         msg_name = sys.argv[3]
         gm = gf[msg_name]
-        vals = gm.values()
+        vals = list(gm.values())
         lats, lons = gm.latlons()
         nc_path = sys.argv[4]
         d = netCDF4.Dataset(nc_path, 'w', format='NETCDF4')

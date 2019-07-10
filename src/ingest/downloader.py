@@ -17,10 +17,10 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from __future__ import print_function
+
 
 import requests
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 import os.path as osp
 import os
@@ -40,7 +40,7 @@ class DownloadError(Exception):
     pass
 
 def get_dList(url):
-    dList = urllib2.urlopen(url).read().splitlines()
+    dList = urllib.request.urlopen(url).read().splitlines()
     listing = []
     for l in dList:
         listing.append(l.split()[-1])
@@ -65,7 +65,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     use_urllib2 = url[:6] == 'ftp://'
     
     try:    
-        r = urllib2.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
+        r = urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
     except Exception as e:
         if max_retries > 0:
             # logging.error(str(e))
@@ -107,7 +107,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     file_size = osp.getsize(local_path)
 
     # content size may have changed during download
-    r = urllib2.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
+    r = urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
     content_size = int(r.headers['Content-Length'])
 
     logging.info('local file size %d downloaded %d remote content size %d' % (file_size, s, content_size))

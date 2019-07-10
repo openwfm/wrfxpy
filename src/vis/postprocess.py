@@ -32,7 +32,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     
     if len(sys.argv) != 4 and len(sys.argv) != 5:
-        print('usage: %s <wrfout_path> <var_instr> <prefix> [skip]' % sys.argv[0])
+        print(('usage: %s <wrfout_path> <var_instr> <prefix> [skip]' % sys.argv[0]))
         sys.exit(1)
 
     wrf_path = sys.argv[1]
@@ -48,6 +48,6 @@ if __name__ == '__main__':
         skip = int(sys.argv[4])
 
     p = Postprocessor(os.path.dirname(prefix), os.path.basename(prefix), var_instr)
-    p.process_file(wrf_path, var_instr.keys(), skip)
+    p.process_file(wrf_path, list(var_instr.keys()), skip)
 
 

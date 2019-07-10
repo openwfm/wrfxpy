@@ -1,6 +1,6 @@
 from ingest.grib_source import GribError, GribSource
 from utils import ensure_dir, symlink_unless_exists, timedelta_hours, readhead, Dict
-from downloader import download_url, DownloadError
+from .downloader import download_url, DownloadError
 from datetime import datetime, timedelta
 import pytz
 import requests
@@ -85,12 +85,12 @@ class GribForecast(GribSource):
             if len(colmet_missing) > 0:
 
                 # check what's available locally
-                nonlocals = filter(lambda x: not self.grib_available_locally(osp.join(self.ingest_dir, x)), grib_files)
+                nonlocals = [x for x in grib_files if not self.grib_available_locally(osp.join(self.ingest_dir, x))]
     
                 # check if GRIBs we don't are available remotely
                 url_base = self.remote_url
                 logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
-                unavailables = filter(lambda x: readhead(url_base + '/' + x).status_code != 200, nonlocals)
+                unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
                 if len(unavailables) > 0:
                     logging.warning('%s failed retrieving cycle data for cycle %s, unavailables %s'
                     % (self.id, cycle_start, repr(unavailables)))
@@ -98,7 +98,7 @@ class GribForecast(GribSource):
                     continue
     
                 # download all gribs we need
-                map(lambda x: self.download_grib(url_base, x), nonlocals)
+                list(map(lambda x: self.download_grib(url_base, x), nonlocals))
 
             # return manifest
 
@@ -169,8 +169,8 @@ class GribForecast(GribSource):
         g=self.grib_forecast_hours_periods
         fc_seq = [] 
         for i in range(0, len(g)):
-	        fc_seq += range(max(fc_start, 0 if i is 0 else g[i-1]['hours'] + g[i]['period']), 
-	        g[i]['hours'] + g[i]['period'], g[i]['period'])
+	        fc_seq += list(range(max(fc_start, 0 if i is 0 else g[i-1]['hours'] + g[i]['period']), 
+	        g[i]['hours'] + g[i]['period'], g[i]['period']))
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
         fc_list.append(fc_seq[len(fc_list)])

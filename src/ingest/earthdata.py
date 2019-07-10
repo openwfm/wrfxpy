@@ -105,7 +105,7 @@ if __name__ == '__main__':
     sys_cfg = load_sys_cfg()
 
     if len(sys.argv) != 3: 
-         print 'Usage: ./earthdata.sh username password'
+         print('Usage: ./earthdata.sh username password')
          sys.exit(1)
 
     e = Earthdata()

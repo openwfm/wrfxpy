@@ -3,7 +3,7 @@
 #
 
 # from ingest.level0_source import MODIS_AQUA, MODIS_TERRA, VIIRS_NPP
-import var_wisdom as vw
+from . import var_wisdom as vw
 from utils import esmf_to_utc
 
 import logging
@@ -14,7 +14,7 @@ import os.path as osp
 
 if __name__ == '__main__':
     if len(sys.argv) != 9  and len(sys.argv) != 5:
-        print('Usage: %s <sat_name> <esmf_from_utc> <esmf_to_utc> <target_directory> <low_long> <high_long> <low_lat> <high_lat>' % sys.argv[0])
+        print(('Usage: %s <sat_name> <esmf_from_utc> <esmf_to_utc> <target_directory> <low_long> <high_long> <low_lat> <high_lat>' % sys.argv[0]))
         print('        supported HDF sources: MODIS_AQUA, MODIS_TERRA')
         print('        time of format YYYY.MM.DD-HH.MM.SS')
         print('        (lonlat parameters optional, CONUS = -124.7844079 -66.9513812 24.7433195 49.3457868)')
@@ -26,10 +26,10 @@ if __name__ == '__main__':
 
     sat_name = sys.argv[1]
     if sat_name not in vw.get_sat_wisdom_variables():
-        print 'Invalid instrument/satellite name!'
-        print 'supported instrument/satellite pairs:'
+        print('Invalid instrument/satellite name!')
+        print('supported instrument/satellite pairs:')
         for sat in vw.get_sat_wisdom_variables():
-            print sat
+            print(sat)
         sys.exit(-1)
 
     from_utc = esmf_to_utc(sys.argv[2])
@@ -92,4 +92,4 @@ if __name__ == '__main__':
     print('')
 
     for h in hdfs:
-        print(osp.join(ingest_dir, h))
+        print((osp.join(ingest_dir, h)))
