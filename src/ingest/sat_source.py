@@ -47,6 +47,23 @@ class SatSource(object):
 		else:
 			return False
 
+	# instance variables
+	id=None
+	info_url=None
+	info=None
+	url=None
+	prefix=None
+	platform=None
+	version=None
+
+class SatOrbit(SatSource):
+	"""
+	Orbit satellites (they come with geolocation file and fire file)
+	"""
+
+	def __init__(self, args):
+		super(SatOrbit, self).__init__(arg)
+
 	def search_api_sat(self, sname, bbox, time, version=None):
 		"""
 		API search of the different satellite granules and return metadata dictionary
@@ -54,10 +71,9 @@ class SatSource(object):
 		:param sname: short name satellite product, ex: 'MOD03'
 		:param bbox: polygon with the search bounding box
 		:param time: time interval (init_time_iso,final_time_iso)
-
 		:return metas: a dictionary with all the metadata for the API search
 		"""
-		maxg=100
+		maxg=150
 		time_utcf=(utc_to_utcf(time[0]),utc_to_utcf(time[1]))
 		api = GranuleQuery()
 		if not version:
@@ -123,7 +139,7 @@ class SatSource(object):
 
 		:param bbox: polygon with the search bounding box
 		:param time: time interval (init_time_datetime,final_time_datetime)
-		:param maxg: max number of granules to process
+		:param burned: get metas for burned area product
 		:return granules: dictionary with the metadata of all the products
 		"""
 		metas=Dict([])
@@ -176,7 +192,8 @@ class SatSource(object):
 		Retrieve satellite data in a bounding box coordinates and time interval
 
 		:param bounds: polygon with the search bounding box
-		:param time: time interval (init_time_iso,final_time_iso)
+		:param from_utc: initial time in UTC format
+		:param to_utc: final time in UTC format
 		:return data: dictonary with all the data
 		"""
 		lonmin,lonmax,latmin,latmax = bounds
@@ -196,18 +213,18 @@ class SatSource(object):
 				url = m['links'][0]['href']
 				m.update(self.download_sat(url))
 				manifest.update({id: m})
-		
-		group_manifest = self.group_files_sat(manifest)	
-	
+
+		group_manifest = self.group_files_sat(manifest)
+
 		return group_manifest
 
 	def group_files_sat(self, manifest):
 		"""
-                Group all the satellite files from downloaded manifest
+		Group all the satellite files from downloaded manifest
 
-                :param manifest: satellite manifest from retrieving
+		:param manifest: satellite manifest from retrieving
 		:return result: groupped and cleanned manifest
-                """	
+		"""
 		if not manifest:
 			return manifest
 		result = Dict({})
@@ -216,7 +233,7 @@ class SatSource(object):
 		firere = re.compile(r'%s' % self.fire_prefix)
 		keys = np.array(manifest.keys())
 		labels = np.array([''.join(k.split('.')[1:3]) for k in keys])
-		indexes = duplicates(labels)	
+		indexes = duplicates(labels)
 		for k,ind in indexes.items():
 			lenind = len(ind)
 			if lenind != 2:
@@ -232,7 +249,7 @@ class SatSource(object):
 					geok = pregeo[0]
 				else:
 					logging.error('retrieve_data_sat: no geo data in the manifest')
-					continue				
+					continue
 			else:
 				geok = geo[0]
 
@@ -275,17 +292,51 @@ class SatSource(object):
 		"""
 		pass
 
-
 	# instance variables
-	id=None
-	info_url=None
-	info=None
-	url=None
-	prefix=None
 	pre_geo_prefix=None
 	geo_prefix=None
 	fire_prefix=None
 	ref_prefix=None
-	platform=None
-	version=None
 
+class SatGeo(SatSource):
+	"""
+	Geostationary satellites
+	"""
+
+	def __init__(self, args):
+		super(SatGeo, self).__init__(arg)
+
+
+	def get_metas_sat(self, bbox, time):
+		"""
+		Get all the meta data for all the necessary products
+
+		:param bbox: polygon with the search bounding box
+		:param time: time interval (init_time_datetime,final_time_datetime)
+		:return granules: dictionary with the metadata of all the products
+		"""
+
+	def download_sat(self, url):
+		"""
+		Download a satellite file from a satellite service
+
+		:param url: the URL of the file
+		"""
+
+	def retrieve_data_sat(self, bounds, from_utc, to_utc):
+		"""
+		Retrieve satellite data in a bounding box coordinates and time interval
+
+		:param bounds: polygon with the search bounding box
+		:param from_utc: initial time in UTC format
+		:param to_utc: final time in UTC format
+		:return data: dictonary with all the data
+		"""
+
+	def group_files_sat(self, manifest):
+		"""
+		Group all the satellite files from downloaded manifest
+
+		:param manifest: satellite manifest from retrieving
+		:return result: groupped and cleanned manifest
+		"""

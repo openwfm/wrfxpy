@@ -2,9 +2,9 @@
 # Angel Farguell, CU Denver
 #
 
-from ingest.sat_source import SatSource
+from ingest.sat_source import SatOrbit
 
-class VIIRS(SatSource):
+class VIIRS(SatOrbit):
 	"""
 	VIIRS (Visible Infrared Imaging Radiometer Suite) satellite source.
 	"""

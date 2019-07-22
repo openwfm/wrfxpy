@@ -2,9 +2,9 @@
 # Angel Farguell, CU Denver
 #
 
-from ingest.sat_source import SatSource
+from ingest.sat_source import SatOrbit
 
-class MODIS(SatSource):
+class MODIS(SatOrbit):
 	"""
 	MODIS (Moderate Resolution Imaging Spectroradiometer) satellite source.
 	"""
