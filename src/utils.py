@@ -540,15 +540,15 @@ def json_join(path,json_list):
     """
     manifest = Dict({})
     for jj in json_list:
-    json_path = osp.join(path,str(jj)+'.json')
-    try:
-        f = json.load(open(json_path), 'ascii')
-        manifest.update({jj: f})
-    except:
-        logging.warning('no satellite data for source %s in manifest json file %s' % (jj,json_path))
-        manifest.update({jj: {}})
-        pass
-    remove(json_path)
+        json_path = osp.join(path,str(jj)+'.json')
+        try:
+            f = json.load(open(json_path), 'ascii')
+            manifest.update({jj: f})
+        except:
+            logging.warning('no satellite data for source %s in manifest json file %s' % (jj,json_path))
+            manifest.update({jj: {}})
+            pass
+        remove(json_path)
     return manifest
 
 def duplicates(replist):
@@ -561,7 +561,7 @@ def duplicates(replist):
     dups=[i for i in counter if counter[i]!=1]
     result={}
     for item in dups:
-    result[item]=[i for i,j in enumerate(replist) if j==item]
+        result[item]=[i for i,j in enumerate(replist) if j==item]
     return result
 
 def number_minutes(t_int,t_fin,dt):
@@ -581,6 +581,6 @@ def serial_json(obj):
     :param obj: object
     """
     if isinstance(obj, datetime):
-    return utc_to_esmf(obj)
+        return utc_to_esmf(obj)
     raise TypeError("Type %s not serializable" % type(obj))
 
