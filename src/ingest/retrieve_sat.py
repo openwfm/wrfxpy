@@ -58,6 +58,7 @@ if __name__ == '__main__':
 		snpphr=SNPPHR(sys_cfg)
 		# retrieve granules
 		m_snpphr=snpphr.retrieve_data_sat(bounds, from_utc, to_utc)
+		print m_snpphr
 	if 'NOAA-20' in sat_sources:
 		logging.info('> NOAA-20 VIIRS')
 		noaa20=NOAA20(sys_cfg)
