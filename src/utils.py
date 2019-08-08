@@ -27,7 +27,7 @@ import numpy as np
 import math
 import pprint
 import logging
-import dill 
+import dill
 import json
 import pickle
 import inspect
@@ -35,6 +35,7 @@ import shutil
 import psutil
 import requests
 import socket
+import collections
 
 
 class Dict(dict):
@@ -68,11 +69,11 @@ def traceargs():
     frame = inspect.currentframe()
     args, _, _, values = inspect.getargvalues(frame)
     for i in args:
-        print "    %s:\n%s" % (i, pprint.pformat(values[i]))
-    
+        print("    %s:\n%s" % (i, pprint.pformat(values[i])))
+
 def dump(obj,title):
     frame = inspect.currentframe()
-    outframe = inspect.getouterframes(frame, 2) 
+    outframe = inspect.getouterframes(frame, 2)
     logging.info(outframe[1][1] + ':' + outframe[1][3] + ":" + title + ':\n' + pprint.pformat(obj,width=-1))
 
 def check_obj(obj, title):
@@ -140,7 +141,7 @@ def delete(dir):
             shutil.rmtree(dir)
         except Exception as e:
             logging.warning(str(e))
-            #logging.warning('This is often caused by hidden files on NSF mounted volumes, which is harmless.') 
+            #logging.warning('This is often caused by hidden files on NSF mounted volumes, which is harmless.')
 
 def make_clean_dir(dir):
     """
@@ -167,7 +168,7 @@ def make_dir(dir):
 def symlink_unless_exists(link_tgt, link_loc):
     """
     Create a symlink at link_loc pointing to link_tgt unless file already exists.
-    
+
     :param link_tgt: link target
     :param link_loc: link location
     """
@@ -186,36 +187,8 @@ def remove(tgt):
     os.remove wrapper
     """
     if osp.isfile(tgt):
-        logging.info('remove: file %s exists, removing' % tgt)
+        logging.warning('remove: file %s exists, removing' % tgt)
         os.remove(tgt)
-
-def force_copy(src,tgt):
-    """
-    remove target if exists and copy there, making directories as needed
-    """
-    remove(tgt)
-    shutil.copy(src,ensure_dir(tgt))
-
-def append2file(addl,base):
-    """
-    Append a file to another
-    """
-    logging.info("appending file %s to %s" % (addl,base)) 
-    with open(base,'a') as base_file:
-        with open(addl,'r') as addl_file:
-            base_file.write(addl_file.read())
-
-def link2copy(src):
-    """
-    replace link by a copy of the target file
-    """
-    try:
-        link_target = os.readlink(src)
-    except OSError as e:
-        return
-    logging.info("replacing soft link %s -> %s by a copy" % (src,link_target))
-    os.remove(src)
-    shutil.copy(link_target,src)
 
 def move(src,tgt):
     """
@@ -225,14 +198,15 @@ def move(src,tgt):
     remove(tgt)
     shutil.move(src,tgt)
 
+
 def cache_file(path, cache_dir):
     """
     Move file at the path to cache directory and replace by symlink
     except when it is symlink to the cache direcory already
     except if the file is symlink to elsewhere, copy the file to cache directory and replace by symlink
 
-    :path: file name 
-    :param cache_dir: source directory, must be absolute path 
+    :path: file name
+    :param cache_dir: source directory, must be absolute path
     """
     if not osp.isdir(cache_dir):
         logging.error('%s is not directory' % str(cache_dir))
@@ -250,7 +224,7 @@ def cache_file(path, cache_dir):
         else:
             src = osp.realpath(path)
             logging.info('Copying %s to %s' % (src, dst))
-            shutil.copyfile(src,dst)           
+            shutil.copyfile(src,dst)
     else:
         logging.info('Moving %s to %s' % (path, dst))
         shutil.move(path,dst)
@@ -270,7 +244,6 @@ def esmf_to_utc(esmf):
     hour, min, sec = int(esmf[11:13]), int(esmf[14:16]), int(esmf[17:19])
     return datetime(year, mon, day, hour, min, sec, tzinfo=pytz.utc)
 
-
 def utc_to_esmf(utc):
     """
     Converts a UTC datetime into ESMF format.
@@ -280,13 +253,22 @@ def utc_to_esmf(utc):
     """
     return "%04d-%02d-%02d_%02d:%02d:%02d" % (utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second)
 
+def utc_to_utcf(utc):
+    """
+    Converts a UTC datetime into UTC string format %Y-%m-%dT%H:%M:%SZ.
+
+    :param utc: python UTC datetime
+    :return: a string in UTC string format %Y-%m-%dT%H:%M:%SZ
+    """
+    return "%04d-%02d-%02dT%02d:%02d:%02dZ" % (utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second)
+
 
 def round_time_to_hour(utc, up=False, period_hours=1):
     """
     Round the utc time to the nearest hour up or down.
 
     :param utc: the datetime
-    :param up: round up 
+    :param up: round up
     :param hours: round to multiple of this from the start of day
     :return: a new datetime rounded as specified
     """
@@ -295,8 +277,8 @@ def round_time_to_hour(utc, up=False, period_hours=1):
     tm = utc + timedelta(hours=1, seconds=-1) if up else utc
     tm = tm.replace(minute=0, second=0)
     h = period_hours * ((tm.hour + period_hours - 1 if up else tm.hour) / period_hours)
-    tm = tm + timedelta(hours=h-tm.hour) if h > tm.hour else tm - timedelta(hours=tm.hour - h) 
-    return tm 
+    tm = tm + timedelta(hours=h-tm.hour) if h > tm.hour else tm - timedelta(hours=tm.hour - h)
+    return tm
 
 
 def timedelta_hours(timedelta_utc, up = True):
@@ -315,7 +297,7 @@ def symlink_matching_files(tgt_dir, src_dir, glob_pattern):
     Retrieves all files in directory src_dir matching glob_pattern and creates symlinks in tgt_dir.
 
     :param tgt_dir: target directory
-    :param src_dir: source directory, must be absolute path 
+    :param src_dir: source directory, must be absolute path
     :param glob_pattern: the shell glob pattern (ls style) to match against files
     """
     files = glob.glob(osp.join(src_dir, glob_pattern))
@@ -396,8 +378,8 @@ def render_ignitions(js, max_dom):
     orig_start_time = js.orig_start_utc
 
     keys = [ "fire_ignition_start_lat", "fire_ignition_end_lat",
-             "fire_ignition_start_lon", "fire_ignition_end_lon", 
-             "fire_ignition_start_time", "fire_ignition_end_time", 
+             "fire_ignition_start_lon", "fire_ignition_end_lon",
+             "fire_ignition_start_time", "fire_ignition_end_time",
              "fire_ignition_radius", "fire_ignition_ros" ]
 
     nml_fire = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom,
@@ -417,7 +399,7 @@ def render_ignitions(js, max_dom):
         nml_fire['fmoist_interp'][dom_id-1] = True # interpolate fm onto fire mesh
         nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
 
-        # for each ignition 
+        # for each ignition
         for ndx,ign in enumerate(dom_igns):
             start_time = timespec_to_utc(ign['time_utc'], orig_start_time)
             start = int((start_time - js.start_utc).total_seconds())
@@ -462,12 +444,12 @@ def great_circle_distance(lon1, lat1, lon2, lat2):
     """
     Computes the great circle distance between two points given as (lon1,lat1), (lon2,lat2)
     in kilometers.
-    
+
         d = great_circle_distance(lon1, lat1, lon2, lat2)
     """
     rlat1, rlat2 = np.pi * lat1 / 180.0, np.pi * lat2 / 180.0
     rlon1, rlon2 = np.pi * lon1 / 180.0, np.pi * lon2 / 180.0
-    
+
     a = math.sin(0.5*(rlat1 - rlat2))**2 + math.cos(rlat1)*math.cos(rlat2)*math.sin(0.5*(rlon1 - rlon2))**2
     c = 2 * math.atan2(a**0.5, (1-a)**0.5)
     return 6371.0 * c
@@ -486,9 +468,10 @@ def load_sys_cfg():
     try:
         sys_cfg = Dict(json.load(open('etc/conf.json')))
     except IOError:
+        import sys
         logging.critical('Cannot find system configuration, have you created etc/conf.json?')
         sys.exit(2)
-    
+
     # set defaults
     sys = sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
     # configuration defaults + make directories if they do not exist
@@ -500,7 +483,7 @@ def load_sys_cfg():
     return sys_cfg
 
 class response_object(object):
-    status_code = 0 
+    status_code = 0
     def __init__(self,status_code):
         self.status_code = status_code
 
@@ -514,7 +497,7 @@ def readhead(url):
     except Exception as e:
         logging.error(e)
         ret = response_object(-1)
-    return ret 
+    return ret
 
 def json2xml(d):
     if isinstance(d,dict):
@@ -548,16 +531,56 @@ def get_ip_address():
     s.connect(("8.8.8.8", 80))
     return s.getsockname()[0]
 
-def inq(x):
+def json_join(path,json_list):
     """
-    Inquire numpy array for shape min max
-    :param x: object
-    :return string:
+    Join local jsons in a singular json and remove the previous jsons
+	
+    :param path: local path to the jsons
+    :param json_list: list of json names to join
     """
-    try:
-        s= 'size %s min %g max %g' % (str(x.shape), np.min(x), np.max(x))
-    except:
-        s=str(x)
-    return s
+    manifest = Dict({})
+    for jj in json_list:
+	json_path = osp.join(path,str(jj)+'.json')
+	try:
+		f = json.load(open(json_path), 'ascii')
+		manifest.update({jj: f})
+	except:
+		logging.warning('no satellite data for source %s in manifest json file %s' % (jj,json_path))
+		manifest.update({jj: {}})
+		pass
+	remove(json_path)
+    return manifest
 
+def duplicates(replist):
+    """
+    Give dictionary of repeated elements (keys) and their indexes (array in values)
+
+    :param replist: list to look for repetitions	
+    """
+    counter=collections.Counter(replist)
+    dups=[i for i in counter if counter[i]!=1]
+    result={}
+    for item in dups:
+	result[item]=[i for i,j in enumerate(replist) if j==item]
+    return result
+
+def number_minutes(t_int,t_fin,dt):
+    """
+    Total number of minutes between two datetimes using a specific time step in minutes
+
+    :param t_int: initial datetime
+    :param t_fin: final datetime
+    :param dt: time step in minutes
+    """
+    return int(np.floor((t_fin-t_int).total_seconds()/60./int(dt)))
+
+def serial_json(obj):
+    """
+    JSON serializer for objects not serializable by default json code
+
+    :param obj: object
+    """
+    if isinstance(obj, datetime):
+	return utc_to_esmf(obj)
+    raise TypeError("Type %s not serializable" % type(obj))
 
