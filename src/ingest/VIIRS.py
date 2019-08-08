@@ -45,7 +45,7 @@ class SNPPHR(VIIRS):
 	id='SNPPHR'
 	info_url='https://www.nasa.gov/mission_pages/NPP/mission_overview/index.html'
 	info='High Resolution S-NPP Visible Infrared Imaging Radiometer Suite (VIIRS)'
-	prefix='VNP'
+	prefix='VNPHR'
 	pre_geo_prefix='VNP03MODLL'
 	geo_prefix='NPP_IMFTS_L1'
 	fire_prefix='VNP14IMG'
