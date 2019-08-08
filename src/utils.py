@@ -69,7 +69,7 @@ def traceargs():
     frame = inspect.currentframe()
     args, _, _, values = inspect.getargvalues(frame)
     for i in args:
-        print "    %s:\n%s" % (i, pprint.pformat(values[i]))
+        print("    %s:\n%s" % (i, pprint.pformat(values[i])))
 
 def dump(obj,title):
     frame = inspect.currentframe()
