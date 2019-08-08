@@ -158,3 +158,9 @@ def ncwrfmeta(d):
     print('geotransform: ',geotransform)
 
     return csr, geotransform
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        raise SystemExit('usage: ./process_output_tiffs.sh job_id')
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    process_outputs_tiff(sys.argv[1])
