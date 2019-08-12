@@ -767,7 +767,7 @@ class Postprocessor(object):
                 gran_time = esmf_to_utc(gran['time_start_iso'])
                 logging.info('process_sats: evaluating product %s, granule %s, at time %s, and for time %s' % (sat, k, utc_to_esmf(gran_time), ts_esmf))
                 if gran_time >= ts_initial and gran_time < ts_final:
-                            try:
+                    try:
                         dg,eg = self.open_file(gran['geo_local_path'])
                         df,ef = self.open_file(gran['fire_local_path'])
                         dgs.append(dg)
@@ -775,8 +775,8 @@ class Postprocessor(object):
                         egs.append(eg)
                         efs.append(ef)
                     except Exception as e:
-                                logging.warning("Exception %s while evaluating granule %s from product %s for time %s" % (e.message, gran, sat, ts_esmf))
-                                logging.warning(traceback.print_exc())
+                        logging.warning("Exception %s while evaluating granule %s from product %s for time %s" % (e.message, gran, sat, ts_esmf))
+                        logging.warning(traceback.print_exc())
             if not dgs:
                 logging.info('process_sats: any granule %s in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
                 try:
@@ -807,16 +807,16 @@ class Postprocessor(object):
                     logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
                     logging.warning(traceback.print_exc())
             else:
-                        logging.info('process_sats: some granule %s is in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
+                logging.info('process_sats: some granule %s is in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
                 try:
                     outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + sat)
-                            kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
-                                kmz_path,raster_path,cb_path,coords = self._sat2kmz(dgs, dfs, sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
-                                if cb_path is not None:
-                                    mf_upd['colorbar'] = osp.basename(cb_path)
-                            mf_upd['kml'] = osp.basename(kmz_path)
-                            mf_upd['raster'] = osp.basename(raster_path)
-                            mf_upd['coords'] = coords
+                    kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
+                    kmz_path,raster_path,cb_path,coords = self._sat2kmz(dgs, dfs, sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
+                    if cb_path is not None:
+                        mf_upd['colorbar'] = osp.basename(cb_path)
+                    mf_upd['kml'] = osp.basename(kmz_path)
+                    mf_upd['raster'] = osp.basename(raster_path)
+                    mf_upd['coords'] = coords
                     logging.info("updating manifest for variable %s at time %s with manifest %s" % (sat, ts_esmf, mf_upd))
                     self._update_manifest(dom_id, ts_esmf, sat, mf_upd)
                     for i in range(len(dgs)):
