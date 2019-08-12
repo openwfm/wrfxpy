@@ -298,7 +298,7 @@ class Postprocessor(object):
     for dg,df in zip(dgs,dfs):
         # extract variables
             lat, lon = wisdom['grid'](dg)
-        fa = wisdom['retrieve_as'](df)
+            fa = wisdom['retrieve_as'](df)
 
             # check variables
             if fa.shape != lat.shape:
