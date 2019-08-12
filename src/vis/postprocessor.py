@@ -280,50 +280,50 @@ class Postprocessor(object):
         :param dfs: list of open fire files
         :param sat: the name of the satellite variable in var_wisdom
         :param bounds: bounds for the bounding box satellite data
-    :return: the raster png as a StringIO, and the coordinates
+        :return: the raster png as a StringIO, and the coordinates
         """
         # gather wisdom about the satellite variable
         wisdom = get_wisdom(sat).copy()
         wisdom.update(self.wisdom_update.get(sat, {}))
-    cmap_name = wisdom['colormap']
+        cmap_name = wisdom['colormap']
 
-    values = (3,5,7,8,9)
-    alphas = (.5,.5,.6,.7,.8)
-    labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
-    colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+        values = (3,5,7,8,9)
+        alphas = (.5,.5,.6,.7,.8)
+        labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+        colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
 
-    # for each pair of files
-    N = len(values)
-    lons,lats,vals = [[]]*N,[[]]*N,[[]]*N
-    for dg,df in zip(dgs,dfs):
-        # extract variables
-        lat, lon = wisdom['grid'](dg)
-        fa = wisdom['retrieve_as'](df)
+        # for each pair of files
+        N = len(values)
+        lons,lats,vals = [[]]*N,[[]]*N,[[]]*N
+        for dg,df in zip(dgs,dfs):
+            # extract variables
+            lat, lon = wisdom['grid'](dg)
+            fa = wisdom['retrieve_as'](df)
 
-        # check variables
-        if fa.shape != lat.shape:
-                raise PostprocError("Variable %s size does not correspond to grid size." % sat)
+            # check variables
+            if fa.shape != lat.shape:
+                    raise PostprocError("Variable %s size does not correspond to grid size." % sat)
 
-        # process variables
-        flon = np.array(lon).ravel()
-        flat = np.array(lat).ravel()
-        mask = np.array(fa).ravel()
-        bbox = np.logical_and(np.logical_and(np.logical_and(flon>bounds[0],flon<bounds[1]),flat>bounds[2]),flat<bounds[3])
-        categories = [np.array(mask[bbox] == value) for value in values]
+            # process variables
+            flon = np.array(lon).ravel()
+            flat = np.array(lat).ravel()
+            mask = np.array(fa).ravel()
+            bbox = np.logical_and(np.logical_and(np.logical_and(flon>bounds[0],flon<bounds[1]),flat>bounds[2]),flat<bounds[3])
+            categories = [np.array(mask[bbox] == value) for value in values]
 
-        for i,cat in enumerate(categories):
-            lons[i] = np.append(lons[i],flon[bbox][cat])
-            lats[i] = np.append(lats[i],flat[bbox][cat])
-            vals[i] = np.append(vals[i],np.ones(cat.sum())*i)
-            logging.info('_sat2raster: variable %s, category %s, shape of data (%s,%s,%s)' % (sat,i,lons[i].shape,lats[i].shape,vals[i].shape))
+            for i,cat in enumerate(categories):
+                lons[i] = np.append(lons[i],flon[bbox][cat])
+                lats[i] = np.append(lats[i],flat[bbox][cat])
+                vals[i] = np.append(vals[i],np.ones(cat.sum())*i)
+                logging.info('_sat2raster: variable %s, category %s, shape of data (%s,%s,%s)' % (sat,i,lons[i].shape,lats[i].shape,vals[i].shape))
 
-    # create discrete colormap
-    if cmap_name == 'discrete':
-        cmap = mpl.colors.LinearSegmentedColormap.from_list(cmap_name, colors, N=N)
-    else:
-        cmap = mpl.cm.get_cmap(cmap_name)
+        # create discrete colormap
+        if cmap_name == 'discrete':
+            cmap = mpl.colors.LinearSegmentedColormap.from_list(cmap_name, colors, N=N)
+        else:
+            cmap = mpl.cm.get_cmap(cmap_name)
 
-    # only create the colorbar if requested
+        # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
             #  colorbar + add it to the KMZ as a screen overlay
@@ -332,8 +332,8 @@ class Postprocessor(object):
             cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
 
         # create the raster & get coordinate bounds
-    cmin = -.5
-    cmax = N-.5
+        cmin = -.5
+        cmax = N-.5
         raster_png_data,corner_coords = basemap_scatter_mercator(vals,lons,lats,bounds,alphas,cmin,cmax,cmap)
 
         return raster_png_data, corner_coords, cb_png_data
