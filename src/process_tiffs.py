@@ -6,6 +6,7 @@ import os.path as osp
 import numpy as np
 import netCDF4 as nc4
 
+from vis.postprocessor import Postprocessor
 from utils import load_sys_cfg, Dict, make_clean_dir
 from vis.var_wisdom import get_wisdom, is_windvec
 
