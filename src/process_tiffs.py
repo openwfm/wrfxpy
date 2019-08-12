@@ -63,6 +63,7 @@ def process_vars_tiff(pp, d, dom_id, times, vars):
         try:
             tiff_path, coords, mf_upd = None, None, {}
             if is_windvec(var):
+                continue
                 #tiff_path = vector2shps(outpath_base, data, projection, geotransform, times, var)
             else:
                 wisdom = get_wisdom(var).copy()
