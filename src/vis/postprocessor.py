@@ -686,145 +686,145 @@ class Postprocessor(object):
 
 
     def open_file(self, path_file):
-    """
-    Open file depending on its extension
+        """
+        Open file depending on its extension
 
-    :param path_file: local path to the file
-    """
-    if not osp.exists(path_file):
-        logging.error('open_file: file %s does not exist locally' % path_file)
-        return
-    ext = osp.splitext(path_file)[1]
-    logging.info('open_file: open file %s with extension %s' % (path_file, ext))
-    if ext == ".nc":
-        try:
-            d = nc4.Dataset(str(path_file),'r')
-        except Exception as e:
-            logging.error('open_file: can not open file %s with exception %s' % (path_file,e))
-    elif ext == ".hdf":
-        try:
-            d = SD(str(path_file),SDC.READ)
-        except Exception as e:
-            logging.error('open_file: can not open file %s with exception %s' % (path_file,e))
-            sys.exit(1)
-    elif ext == ".h5":
-        try:
-            d = h5py.File(str(path_file),'r')
-        except Exception as e:
-            logging.error('open_file: can not open file %s with exception %s' % (path_file,e))
-    else:
-        logging.error('open_file: unrecognized extension %s' % ext)
-        return
-    return d,ext
+        :param path_file: local path to the file
+        """
+        if not osp.exists(path_file):
+            logging.error('open_file: file %s does not exist locally' % path_file)
+            return
+        ext = osp.splitext(path_file)[1]
+        logging.info('open_file: open file %s with extension %s' % (path_file, ext))
+        if ext == ".nc":
+            try:
+                d = nc4.Dataset(str(path_file),'r')
+            except Exception as e:
+                logging.error('open_file: can not open file %s with exception %s' % (path_file,e))
+        elif ext == ".hdf":
+            try:
+                d = SD(str(path_file),SDC.READ)
+            except Exception as e:
+                logging.error('open_file: can not open file %s with exception %s' % (path_file,e))
+                sys.exit(1)
+        elif ext == ".h5":
+            try:
+                d = h5py.File(str(path_file),'r')
+            except Exception as e:
+                logging.error('open_file: can not open file %s with exception %s' % (path_file,e))
+        else:
+            logging.error('open_file: unrecognized extension %s' % ext)
+            return
+        return d,ext
 
 
     def close_file(self, d, ext):
-    """
-    Close file depending on its extension
+        """
+        Close file depending on its extension
 
-    :param d: open file to close
-    :param ext: extension of the file
-    """
-    if ext == ".nc":
-        d.close()
-    elif ext == ".hdf":
-        d.end()
-    elif ext == ".h5":
-        d.close()
-    else:
-        logging.error('close_file: unrecognized extension %s' % ext)
+        :param d: open file to close
+        :param ext: extension of the file
+        """
+        if ext == ".nc":
+            d.close()
+        elif ext == ".hdf":
+            d.end()
+        elif ext == ".h5":
+            d.close()
+        else:
+            logging.error('close_file: unrecognized extension %s' % ext)
 
 
     def process_sats(self, jsat, dom_id, ts_esmf, sats):
-    """
-    Postprocess satellite data at a given simulation interval into PNG and KMZ files.
+        """
+        Postprocess satellite data at a given simulation interval into PNG and KMZ files.
 
-    :param jsat: dictionary of satellite products acquiered
-    :param dom_id: the domain identifier
-        :param ts_esmf: time stamp in ESMF format
-    :param sats: list of sat variables to process
-    """
-    traceargs()
+        :param jsat: dictionary of satellite products acquiered
+        :param dom_id: the domain identifier
+            :param ts_esmf: time stamp in ESMF format
+        :param sats: list of sat variables to process
+        """
+        traceargs()
 
-    dt_before = timedelta(minutes = jsat.sat_interval[str(dom_id)][0])
-    dt_after = timedelta(minutes = jsat.sat_interval[str(dom_id)][1])
-    dt = timedelta(minutes = jsat.dt[str(dom_id)])
-    if dt_after + dt_before < dt:
-        dt_after = dt
-        dt_before = timedelta(minutes=0)
-    ts_initial = (esmf_to_utc(ts_esmf) - dt_before).replace(second=0, microsecond=0)
-    ts_final = (esmf_to_utc(ts_esmf) + dt_after).replace(second=0, microsecond=0)
-    logging.info('process_sats: looking from time %s to time %s' % (ts_initial,ts_final))
-    bounds = jsat.bounds[str(dom_id)]
-    logging.info('process_sats: bounding box %s' % bounds)
+        dt_before = timedelta(minutes = jsat.sat_interval[str(dom_id)][0])
+        dt_after = timedelta(minutes = jsat.sat_interval[str(dom_id)][1])
+        dt = timedelta(minutes = jsat.dt[str(dom_id)])
+        if dt_after + dt_before < dt:
+            dt_after = dt
+            dt_before = timedelta(minutes=0)
+        ts_initial = (esmf_to_utc(ts_esmf) - dt_before).replace(second=0, microsecond=0)
+        ts_final = (esmf_to_utc(ts_esmf) + dt_after).replace(second=0, microsecond=0)
+        logging.info('process_sats: looking from time %s to time %s' % (ts_initial,ts_final))
+        bounds = jsat.bounds[str(dom_id)]
+        logging.info('process_sats: bounding box %s' % bounds)
 
-    for sat in sats:
-        logging.info('process_sats: postprocessing %s for time %s' % (sat, ts_esmf))
-        sat_source = jsat['satprod_satsource'][sat]
-        logging.info('process_sats: product %s from %s source' % (sat,sat_source))
-        dgs,dfs,egs,efs = [],[],[],[]
-        for k,gran in jsat.granules[sat_source].items():
-            gran_time = esmf_to_utc(gran['time_start_iso'])
-            logging.info('process_sats: evaluating product %s, granule %s, at time %s, and for time %s' % (sat, k, utc_to_esmf(gran_time), ts_esmf))
-            if gran_time >= ts_initial and gran_time < ts_final:
-                        try:
-                    dg,eg = self.open_file(gran['geo_local_path'])
-                    df,ef = self.open_file(gran['fire_local_path'])
-                    dgs.append(dg)
-                    dfs.append(df)
-                    egs.append(eg)
-                    efs.append(ef)
+        for sat in sats:
+            logging.info('process_sats: postprocessing %s for time %s' % (sat, ts_esmf))
+            sat_source = jsat['satprod_satsource'][sat]
+            logging.info('process_sats: product %s from %s source' % (sat,sat_source))
+            dgs,dfs,egs,efs = [],[],[],[]
+            for k,gran in jsat.granules[sat_source].items():
+                gran_time = esmf_to_utc(gran['time_start_iso'])
+                logging.info('process_sats: evaluating product %s, granule %s, at time %s, and for time %s' % (sat, k, utc_to_esmf(gran_time), ts_esmf))
+                if gran_time >= ts_initial and gran_time < ts_final:
+                            try:
+                        dg,eg = self.open_file(gran['geo_local_path'])
+                        df,ef = self.open_file(gran['fire_local_path'])
+                        dgs.append(dg)
+                        dfs.append(df)
+                        egs.append(eg)
+                        efs.append(ef)
+                    except Exception as e:
+                                logging.warning("Exception %s while evaluating granule %s from product %s for time %s" % (e.message, gran, sat, ts_esmf))
+                                logging.warning(traceback.print_exc())
+            if not dgs:
+                logging.info('process_sats: any granule %s in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
+                try:
+                    outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + "sat_empty")
+                    kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
+                    if osp.exists(outpath_base+".kmz"):
+                        logging.info('process_sats: empty sat %s already processed' % (outpath_base+".kmz"))
+                        kmz_path = outpath_base+".kmz"
+                        raster_path = outpath_base+"-raster.png"
+                        cb_path = outpath_base+"-cb.png"
+                        numpy_bounds = [ (bounds[0],bounds[2]),
+                                (bounds[1],bounds[2]),
+                                (bounds[1],bounds[3]),
+                                (bounds[0],bounds[3]) ]
+                            float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
+                        coords = float_bounds
+                    else:
+                        logging.info('process_sats: processing empty sat %s for the first time' % (outpath_base+".kmz"))
+                        kmz_path,raster_path,cb_path,coords = self._sat2kmz_empty(sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
+                    if cb_path is not None:
+                        mf_upd['colorbar'] = osp.basename(cb_path)
+                    mf_upd['kml'] = osp.basename(kmz_path)
+                    mf_upd['raster'] = osp.basename(raster_path)
+                    mf_upd['coords'] = coords
+                    logging.info("updating manifest for variable %s at time %s with manifest %s" % (sat, ts_esmf, mf_upd))
+                    self._update_manifest(dom_id, ts_esmf, sat, mf_upd)
                 except Exception as e:
-                            logging.warning("Exception %s while evaluating granule %s from product %s for time %s" % (e.message, gran, sat, ts_esmf))
-                            logging.warning(traceback.print_exc())
-        if not dgs:
-            logging.info('process_sats: any granule %s in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
-            try:
-                outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + "sat_empty")
-                kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
-                if osp.exists(outpath_base+".kmz"):
-                    logging.info('process_sats: empty sat %s already processed' % (outpath_base+".kmz"))
-                    kmz_path = outpath_base+".kmz"
-                    raster_path = outpath_base+"-raster.png"
-                    cb_path = outpath_base+"-cb.png"
-                    numpy_bounds = [ (bounds[0],bounds[2]),
-                            (bounds[1],bounds[2]),
-                            (bounds[1],bounds[3]),
-                            (bounds[0],bounds[3]) ]
-                        float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
-                    coords = float_bounds
-                else:
-                    logging.info('process_sats: processing empty sat %s for the first time' % (outpath_base+".kmz"))
-                    kmz_path,raster_path,cb_path,coords = self._sat2kmz_empty(sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
-                if cb_path is not None:
-                    mf_upd['colorbar'] = osp.basename(cb_path)
-                mf_upd['kml'] = osp.basename(kmz_path)
-                mf_upd['raster'] = osp.basename(raster_path)
-                mf_upd['coords'] = coords
-                logging.info("updating manifest for variable %s at time %s with manifest %s" % (sat, ts_esmf, mf_upd))
-                self._update_manifest(dom_id, ts_esmf, sat, mf_upd)
-            except Exception as e:
-                logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
-                logging.warning(traceback.print_exc())
-        else:
-                    logging.info('process_sats: some granule %s is in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
-            try:
-                outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + sat)
-                        kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
-                            kmz_path,raster_path,cb_path,coords = self._sat2kmz(dgs, dfs, sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
-                            if cb_path is not None:
-                                mf_upd['colorbar'] = osp.basename(cb_path)
-                        mf_upd['kml'] = osp.basename(kmz_path)
-                        mf_upd['raster'] = osp.basename(raster_path)
-                        mf_upd['coords'] = coords
-                logging.info("updating manifest for variable %s at time %s with manifest %s" % (sat, ts_esmf, mf_upd))
-                self._update_manifest(dom_id, ts_esmf, sat, mf_upd)
-                for i in range(len(dgs)):
-                    self.close_file(dgs[i],egs[i])
-                    self.close_file(dfs[i],efs[i])
-            except Exception as e:
-                logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
-                logging.warning(traceback.print_exc())
+                    logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
+                    logging.warning(traceback.print_exc())
+            else:
+                        logging.info('process_sats: some granule %s is in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
+                try:
+                    outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + sat)
+                            kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
+                                kmz_path,raster_path,cb_path,coords = self._sat2kmz(dgs, dfs, sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
+                                if cb_path is not None:
+                                    mf_upd['colorbar'] = osp.basename(cb_path)
+                            mf_upd['kml'] = osp.basename(kmz_path)
+                            mf_upd['raster'] = osp.basename(raster_path)
+                            mf_upd['coords'] = coords
+                    logging.info("updating manifest for variable %s at time %s with manifest %s" % (sat, ts_esmf, mf_upd))
+                    self._update_manifest(dom_id, ts_esmf, sat, mf_upd)
+                    for i in range(len(dgs)):
+                        self.close_file(dgs[i],egs[i])
+                        self.close_file(dfs[i],efs[i])
+                except Exception as e:
+                    logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
+                    logging.warning(traceback.print_exc())
 
 
     def process_vars(self, wrfout_path, dom_id, ts_esmf, vars):
