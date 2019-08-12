@@ -297,12 +297,12 @@ class Postprocessor(object):
     lons,lats,vals = [[]]*N,[[]]*N,[[]]*N
     for dg,df in zip(dgs,dfs):
         # extract variables
-            lat, lon = wisdom['grid'](dg)
-            fa = wisdom['retrieve_as'](df)
+        lat, lon = wisdom['grid'](dg)
+        fa = wisdom['retrieve_as'](df)
 
-            # check variables
-            if fa.shape != lat.shape:
-                    raise PostprocError("Variable %s size does not correspond to grid size." % sat)
+        # check variables
+        if fa.shape != lat.shape:
+                raise PostprocError("Variable %s size does not correspond to grid size." % sat)
 
         # process variables
         flon = np.array(lon).ravel()
