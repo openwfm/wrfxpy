@@ -345,24 +345,24 @@ class Postprocessor(object):
 
         :param sat: the name of the satellite variable in var_wisdom
         :param bounds: bounds for the bounding box satellite data
-    :return: the raster png as a StringIO, and the coordinates
-    """
+        :return: the raster png as a StringIO, and the coordinates
+        """
         # gather wisdom about the satellite variable
         wisdom = get_wisdom(sat).copy()
         wisdom.update(self.wisdom_update.get(sat, {}))
-    cmap_name = wisdom['colormap']
+        cmap_name = wisdom['colormap']
 
-    labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
-    colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
-    N = len(labels)
+        labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+        colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+        N = len(labels)
 
-    # create discrete colormap
-    if cmap_name == 'discrete':
-        cmap = mpl.colors.LinearSegmentedColormap.from_list(cmap_name, colors, N=N)
-    else:
-        cmap = mpl.cm.get_cmap(cmap_name)
+        # create discrete colormap
+        if cmap_name == 'discrete':
+            cmap = mpl.colors.LinearSegmentedColormap.from_list(cmap_name, colors, N=N)
+        else:
+            cmap = mpl.cm.get_cmap(cmap_name)
 
-    # only create the colorbar if requested
+        # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
             #  colorbar + add it to the KMZ as a screen overlay
@@ -370,7 +370,7 @@ class Postprocessor(object):
             logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
             cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
 
-    # create the raster & get coordinate bounds
+        # create the raster & get coordinate bounds
         raster_png_data,corner_coords = basemap_scatter_mercator([],[],[],bounds,[],0,0,cmap)
 
         return raster_png_data, corner_coords, cb_png_data
@@ -432,7 +432,7 @@ class Postprocessor(object):
         :param dgs: list of open geolocation files
         :param dfs: list of open fire files
         :param sat: the satellite variable name
-    :param bounds: bounds for the bounding box satellite data
+        :param bounds: bounds for the bounding box satellite data
         :param out_path: the path to the KMZ output
         :return: the path to the raster and the bounding coordinates
         """
@@ -440,12 +440,12 @@ class Postprocessor(object):
         raster_png_data, corner_coords, cb_png_data = self._sat2raster(dgs, dfs, sat, bounds)
 
         raster_path = out_path + '-raster.png'
-    logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
+        logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
 
-    with open(raster_path, 'w') as f:
-            f.write(raster_png_data)
+        with open(raster_path, 'w') as f:
+                f.write(raster_png_data)
 
-    # write colorbar file
+        # write colorbar file
         colorbar_path = None
         if cb_png_data is not None:
             colorbar_path = out_path + "-cb.png"
@@ -460,7 +460,7 @@ class Postprocessor(object):
         Postprocess an empty sat granule variable ``sat`` and stores result in an empty raster file.
 
         :param sat: the satellite variable name
-    :param bounds: bounds for the bounding box satellite data
+        :param bounds: bounds for the bounding box satellite data
         :param out_path: the path to the KMZ output
         :return: the path to the raster and the bounding coordinates
         """
@@ -468,12 +468,12 @@ class Postprocessor(object):
         raster_png_data, corner_coords, cb_png_data = self._sat2raster_empty(sat, bounds)
 
         raster_path = out_path + '-raster.png'
-    logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
+        logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
 
-    with open(raster_path, 'w') as f:
-            f.write(raster_png_data)
+        with open(raster_path, 'w') as f:
+                f.write(raster_png_data)
 
-    # write colorbar file
+        # write colorbar file
         colorbar_path = None
         if cb_png_data is not None:
             colorbar_path = out_path + "-cb.png"
@@ -588,12 +588,12 @@ class Postprocessor(object):
         :param sat: the sat name
         :param ts_esmf_begin: time string yyyy-mm-dd_HH:MM:SS
         :param ts_esmf_end: time string yyyy-mm-dd_HH:MM:SS
-    :param bounds: bounds for the bounding box satellite data
+        :param bounds: bounds for the bounding box satellite data
         :param out_path: the path to the KMZ output
         :param cleanup: if True, PNG files are deleted after KMZ is build
         :return: the path to the generated KMZ
         """
-    # construct kml file
+        # construct kml file
 
         name = ts_esmf_begin + ' ' + sat
         file = kml.Kml(name = name)
@@ -640,12 +640,12 @@ class Postprocessor(object):
         :param sat: the sat name
         :param ts_esmf_begin: time string yyyy-mm-dd_HH:MM:SS
         :param ts_esmf_end: time string yyyy-mm-dd_HH:MM:SS
-    :param bounds: bounds for the bounding box satellite data
+        :param bounds: bounds for the bounding box satellite data
         :param out_path: the path to the KMZ output
         :param cleanup: if True, PNG files are deleted after KMZ is build
         :return: the path to the generated KMZ
         """
-    # construct kml file
+        # construct kml file
 
         name = ts_esmf_begin + ' ' + sat
         file = kml.Kml(name = name)
