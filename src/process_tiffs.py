@@ -132,16 +132,21 @@ def process_outputs_tiff(job_id):
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def ncwrfmeta(d):
-    # projection
+    # getting metadata
     lat1 = d.TRUELAT1
     lat2 = d.TRUELAT2
-    lat0 = d.MOAD_CEN_LAT # MOAD_CEN_LAT or CEN_LAT? CEN_LAT is from nest
-    lon0 = d.STAND_LON # STAND_LON or CEN_LON? CEN_LON is from nest
+    lat0 = d.MOAD_CEN_LAT
+    lon0 = d.STAND_LON
+    clat = nc.CEN_LAT
+    clon = nc.CEN_LON
+    # computing projection
     csr = osr.SpatialReference()
     proj4 = '+proj=lcc +lat_1=%.10f +lat_2=%.10f +lat_0=%.10f +lon_0=%.10f +a=6370000.0 +b=6370000.0' % (lat1,lat2,lat0,lon0)
     print('proj4: %s' % proj4)
     csr.ImportFromProj4(proj4)
-    # geotransform
+    # computing geotransform
+    wgs_proj = pyproj.Proj('+proj=latlong +datum=WGS84')
+    wrf_proj = pyproj.Proj(proj4)
     dx_atm = nc.DX
     dy_atm = nc.DY
     nx_atm = nc.dimensions['west_east_stag'].size
@@ -152,11 +157,10 @@ def ncwrfmeta(d):
     sry = int(ny/ny_atm)
     dx = dx_atm/srx
     dy = dy_atm/sry
-    p = pyproj.Proj(proj4)
-    top_left_lon = nc['FXLONG'][0,-1,0]
-    top_left_lat = nc['FXLAT'][0,-1,0]
-    top_left = p(top_left_lon,top_left_lat)
-    geotransform = (top_left[0],dx,0,top_left[1],0,-dy)
+    e, n = pyproj.transform(wgs_proj, wrf_proj, clon, clat)
+    x0 = -nx / 2. * dx + e # left coordinate of the side of the cell
+    y1 = ny / 2. * dy + n # top coordinate of the side of the cell
+    geotransform = (x0,dx,0,y1,0,-dy)
     print('geotransform: ',geotransform)
 
     return csr, geotransform
