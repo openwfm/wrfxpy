@@ -791,7 +791,7 @@ class Postprocessor(object):
                                 (bounds[1],bounds[2]),
                                 (bounds[1],bounds[3]),
                                 (bounds[0],bounds[3]) ]
-                            float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
+                        float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
                         coords = float_bounds
                     else:
                         logging.info('process_sats: processing empty sat %s for the first time' % (outpath_base+".kmz"))
