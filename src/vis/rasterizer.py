@@ -29,7 +29,7 @@ import os
 import logging
 try:
     # python 2
-    from StringIO import StringIO
+    import StringIO
 except ImportError:
     # python 3
     from io import StringIO
