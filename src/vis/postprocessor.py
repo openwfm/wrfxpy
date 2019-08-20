@@ -15,7 +15,7 @@ import os.path as osp
 import traceback
 from datetime import timedelta
 from utils import dump, traceargs, esmf_to_utc, utc_to_esmf
-from vis_utils import print_stats
+from vis.vis_utils import print_stats
 
 from vis.rasterizer import make_colorbar, make_discrete_colorbar, basemap_raster_mercator, basemap_barbs_mercator, basemap_scatter_mercator
 from vis.var_wisdom import convert_value, get_wisdom, is_windvec

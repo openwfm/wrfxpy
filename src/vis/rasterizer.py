@@ -26,9 +26,13 @@ import numpy as np
 import netCDF4 as nc4
 import sys
 import os
-import StringIO
 import logging
-
+try:
+    # python 2
+    from StringIO import StringIO
+except ImportError:
+    # python 3
+    from io import StringIO
 
 def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     """

@@ -1,4 +1,5 @@
- #!/usr/bin/env bash
+ #!/bin/bash
+source ~/.conda_init
 cd $(dirname "$0")
 PYTHONPATH=src
 if [ $# -eq 0 ]
@@ -8,5 +9,5 @@ if [ $# -eq 0 ]
 fi
 # if this fails, install conda and run:
 #   conda create -n gdal python=3.4 gdal netcdf4 jpeg=8 pyproj matplotlib
-#   conda activate gdal
+conda activate gdal
 python src/process_tiffs.py $1
