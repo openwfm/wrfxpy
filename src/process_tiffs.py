@@ -131,7 +131,7 @@ def process_outputs_tiff(job_id):
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def ncwrfmeta(d):
-    # projection
+    # getting metadata
     lat1 = d.TRUELAT1
     lat2 = d.TRUELAT2
     lat0 = d.MOAD_CEN_LAT 
@@ -162,7 +162,6 @@ def ncwrfmeta(d):
     y1 = ny / 2. * dy + n
     geotransform = (x0,dx,0,y1,0,-dy)
     logging.info('geotransform: ',geotransform)
-
     return csr, geotransform
 
 if __name__ == '__main__':
