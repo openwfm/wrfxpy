@@ -29,8 +29,7 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
         array[np.isnan(array)] = ndv
         # create a driver
         driver = gdal.GetDriverByName('GTiff')
-        ts_esmf = times[i].replace('_','T')+'Z'
-        tiff_path = osp.join(output_path + ts_esmf + "-" + var + '.tif')
+        tiff_path = osp.join(output_path + times[i] + "-" + var + '.tif')
         logging.info('creating tif file: %s' % tiff_path)
         # set up the dataset with zsize bands
         dataset = driver.Create(tiff_path,xsize,ysize,1,datatype)
@@ -79,8 +78,6 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
             logging.warning("Exception %s while postprocessing %s" % (e.message, var))
             logging.warning(traceback.print_exc())
 
-    d.close()
-
 def process_outputs_tiff(job_id):
     args = load_sys_cfg()
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
@@ -121,8 +118,6 @@ def process_outputs_tiff(job_id):
                 process_vars_tiff(pp, d, wrfout_path, dom_id, times, var_list)
             except Exception as e:
                 logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
-            for esmf_time in sorted(times):
-                logging.info("Saving manifest for domain %d for time %s." % (dom_id, esmf_time))
         d.close()
 
     js.old_pid = js.pid
@@ -161,7 +156,7 @@ def ncwrfmeta(d):
     x0 = -nx / 2. * dx + e
     y1 = ny / 2. * dy + n
     geotransform = (x0,dx,0,y1,0,-dy)
-    logging.info('geotransform: ',geotransform)
+    logging.info('geotransform: (%g,%g,%g,%g,%g,%g)' % geotransform)
     return csr, geotransform
 
 if __name__ == '__main__':
