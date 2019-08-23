@@ -74,8 +74,8 @@ def v8p_ft(d,t,level_ft):
 def is_windvec(name):
        return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC']
 
-def is_satvar(name):
-       return name in ['TERRA_AF','AQUA_AF','SNPP_AF']
+def is_fire_var(name):
+       return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FIRE_HFX','F_ROS','F_INT','NFUEL_CAT','ZSF','FMC_G']
 
 _var_wisdom = {
      'CLOUDTO700HPA' : {
