@@ -45,10 +45,7 @@ def vector2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
     '''
     Creates new GeoTiffs for each time from 2D array
     '''
-    u_name, v_name = wisdom['components']
-    uw, vw = get_wisdom(u_name), get_wisdom(v_name)
-    uw.update(self.wisdom_update.get(u_name, {}))
-    vw.update(self.wisdom_update.get(v_name, {}))
+    uw,vw = wisdom
     array = uw['retrieve_as'](d, 0)
     datatype = gdal_array.NumericTypeCodeToGDALTypeCode(array.dtype)
     if type(datatype)!=np.int:
@@ -104,7 +101,11 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
             wisdom = get_wisdom(var).copy()
             wisdom.update(pp.wisdom_update.get(var, {}))
             if is_windvec(var):
-                tiff_path = vector2tiffs(outpath_base, d, wisdom, projection, geotransform, times, var)
+                u_name, v_name = wisdom['components']
+                uw, vw = get_wisdom(u_name), get_wisdom(v_name)
+                uw.update(pp.wisdom_update.get(u_name, {}))
+                vw.update(pp.wisdom_update.get(v_name, {}))
+                tiff_path = vector2tiffs(outpath_base, d, (uw,vw), projection, geotransform, times, var)
             else:
                 tiff_path = scalar2tiffs(outpath_base, d, wisdom, projection, geotransform, times, var)
 
@@ -119,6 +120,7 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
 def process_outputs_tiff(job_id):
     args = load_sys_cfg()
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
+    satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
     logging.info('process_tiffs: loading job description from %s' % jobfile)
     try:
         js = Dict(json.load(open(jobfile,'r')))
@@ -173,7 +175,7 @@ def process_outputs_tiff(job_id):
             logging.info("Executing postproc tiff instructions for vars %s for domain %d." % (str(var_list), dom_id))
             try:
                 if sat_list:
-                    continue
+                    pass
                     #process_sats_tiff()
                 process_vars_tiff(pp, d, wrfout_path, dom_id, times, var_list)
             except Exception as e:
