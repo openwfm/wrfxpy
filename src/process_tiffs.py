@@ -41,6 +41,45 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
         tiffiles.append(tiff_path)
     return tiffiles
 
+def vector2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999.0):
+    '''
+    Creates new GeoTiffs for each time from 2D array
+    '''
+    u_name, v_name = wisdom['components']
+    uw, vw = get_wisdom(u_name), get_wisdom(v_name)
+    uw.update(self.wisdom_update.get(u_name, {}))
+    vw.update(self.wisdom_update.get(v_name, {}))
+    array = uw['retrieve_as'](d, 0)
+    datatype = gdal_array.NumericTypeCodeToGDALTypeCode(array.dtype)
+    if type(datatype)!=np.int:
+        if datatype.startswith('gdal.GDT_')==False:
+            datatype=eval('gdal.GDT_'+datatype)
+    ysize,xsize = array.shape
+    zsize = len(times)
+    # write each slice of the array along the zsize
+    tiffiles = []
+    for i in range(zsize):
+        uarray = uw['retrieve_as'](d, i)
+        varray = vw['retrieve_as'](d, i)
+        # set nans to the original No Data Value
+        uarray[np.isnan(uarray)] = ndv
+        varray[np.isnan(varray)] = ndv
+        # create a driver
+        driver = gdal.GetDriverByName('GTiff')
+        tiff_path = osp.join(output_path + times[i] + "-" + var + '.tif')
+        logging.info('creating tif file: %s' % tiff_path)
+        # set up the dataset with zsize bands
+        dataset = driver.Create(tiff_path,xsize,ysize,2,datatype)
+        dataset.SetGeoTransform(geot)
+        dataset.SetProjection(projection.ExportToWkt())
+        dataset.GetRasterBand(1).WriteArray(np.flipud(uarray))
+        dataset.GetRasterBand(2).WriteArray(np.flipud(varray))
+        dataset.GetRasterBand(1).SetNoDataValue(ndv)
+        dataset.GetRasterBand(2).SetNoDataValue(ndv)
+        dataset.FlushCache()
+        tiffiles.append(tiff_path)
+    return tiffiles
+
 def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
     """
     Postprocess a list of scalar or vector fields for a given wrfout file into TIFF files.
@@ -62,12 +101,11 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
         logging.info('process_vars_tiff: postprocessing %s' % var)
         try:
             tiff_path, coords, mf_upd = None, None, {}
+            wisdom = get_wisdom(var).copy()
+            wisdom.update(pp.wisdom_update.get(var, {}))
             if is_windvec(var):
-                continue
-                #tiff_path = vector2shps(outpath_base, data, projection, geotransform, times, var)
+                tiff_path = vector2tiffs(outpath_base, d, wisdom, projection, geotransform, times, var)
             else:
-                wisdom = get_wisdom(var).copy()
-                wisdom.update(pp.wisdom_update.get(var, {}))
                 tiff_path = scalar2tiffs(outpath_base, d, wisdom, projection, geotransform, times, var)
 
             for idx,time in enumerate(times):
@@ -88,6 +126,19 @@ def process_outputs_tiff(job_id):
         logging.error('Cannot load the job description file %s' % jobfile)
         logging.error('%s' % e)
         sys.exit(1)
+    logging.info('process_tiffs: loading satellite description from %s' % satfile)
+    try:
+        jsat = Dict(json.load(open(satfile,'r')))
+        available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
+        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
+    except:
+        logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
+        available_sats = []
+        not_empty_sats = []
+        pass
+    logging.info('process_tiffs: available satellite data %s' % available_sats)
+    logging.info('process_tiffs: not empty satellite data %s' % not_empty_sats)
+
     js.old_pid = js.pid
     js.pid = os.getpid()
     js.state = 'Processing'
@@ -112,9 +163,18 @@ def process_outputs_tiff(job_id):
         # extract ESMF string times
         times = [''.join(x.astype(str)) for x in d.variables['Times'][:]]
         if js.postproc is not None and str(dom_id) in js.postproc:
-            var_list = [str(x) for x in js.postproc[str(dom_id)]]
+            if available_sats:
+                sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
+                var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]
+                sat_list = [sat for sat in sat_list if sat in not_empty_sats]
+                logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
+            else:
+                var_list = [str(x) for x in js.postproc[str(dom_id)]]
             logging.info("Executing postproc tiff instructions for vars %s for domain %d." % (str(var_list), dom_id))
             try:
+                if sat_list:
+                    continue
+                    #process_sats_tiff()
                 process_vars_tiff(pp, d, wrfout_path, dom_id, times, var_list)
             except Exception as e:
                 logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
@@ -129,7 +189,7 @@ def ncwrfmeta(d):
     # getting metadata
     lat1 = d.TRUELAT1
     lat2 = d.TRUELAT2
-    lat0 = d.MOAD_CEN_LAT 
+    lat0 = d.MOAD_CEN_LAT
     lon0 = d.STAND_LON
     clat = d.CEN_LAT
     clon = d.CEN_LON
