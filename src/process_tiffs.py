@@ -8,7 +8,7 @@ import netCDF4 as nc4
 
 from vis.postprocessor import Postprocessor
 from utils import load_sys_cfg, Dict, make_clean_dir
-from vis.var_wisdom import get_wisdom, is_windvec
+from vis.var_wisdom import get_wisdom, is_windvec, is_fire_var
 
 def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999.0):
     '''
@@ -93,7 +93,7 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
 
     logging.info('process_vars_tiff: looking for file %s' % wrfout_path)
     # netCDF WRF metadata
-    projection, geotransform = ncwrfmeta(d)
+    projection, geotransform_atm, geotransform_fire = ncwrfmeta(d)
 
     outpath_base = osp.join(pp.output_path, pp.product_name + ("-%02d-" % dom_id))
     # build an output file per variable
@@ -103,6 +103,11 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
             tiff_path, coords, mf_upd = None, None, {}
             wisdom = get_wisdom(var).copy()
             wisdom.update(pp.wisdom_update.get(var, {}))
+            if is_fire_var(var):
+                geotransform = geotransform_fire
+            else:
+                geotransform = geotransform_atm
+
             if is_windvec(var):
                 tiff_path = vector2tiffs(outpath_base, d, wisdom, projection, geotransform, times, var)
             else:
@@ -112,6 +117,7 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
                 mf_upd['tiff'] = osp.basename(tiff_path[idx])
                 ts_esmf = time.replace('_','T')+'Z'
                 pp._update_manifest(dom_id, ts_esmf, var, mf_upd)
+
         except Exception as e:
             logging.warning("Exception %s while postprocessing %s" % (e.message, var))
             logging.warning(traceback.print_exc())
@@ -200,24 +206,29 @@ def ncwrfmeta(d):
     ll_proj = pyproj.Proj('+proj=latlong +datum=WGS84')
     wrf_proj = pyproj.Proj(proj4)
     # geotransform
-    dx = d.DX
-    dy = d.DY
-    nx = d.dimensions['west_east'].size
-    ny = d.dimensions['south_north'].size
-    if 'west_east_subgrid' in d.dimensions:
-        dx_atm,dy_atm,nx_atm,ny_atm = dx,dy,nx,ny
-        nx = d.dimensions['west_east_subgrid'].size
-        ny = d.dimensions['south_north_subgrid'].size
-        srx = int(nx/(nx_atm+1))
-        sry = int(ny/(ny_atm+1))
-        dx = dx_atm/srx
-        dy = dy_atm/sry
     e,n = pyproj.transform(ll_proj,wrf_proj,clon,clat)
-    x0 = -nx / 2. * dx + e
-    y1 = ny / 2. * dy + n
-    geotransform = (x0,dx,0,y1,0,-dy)
-    logging.info('geotransform: (%g,%g,%g,%g,%g,%g)' % geotransform)
-    return csr, geotransform
+    dx_atm = d.DX
+    dy_atm = d.DY
+    nx_atm = d.dimensions['west_east'].size
+    ny_atm = d.dimensions['south_north'].size
+    x0_atm = -nx_atm / 2. * dx_atm + e
+    y1_atm = ny_atm / 2. * dy_atm + n
+    geotransform_atm = (x0,dx,0,y1,0,-dy)
+    if 'west_east_subgrid' in d.dimensions:
+        nx_fire = d.dimensions['west_east_subgrid'].size
+        ny_fire = d.dimensions['south_north_subgrid'].size
+        srx = int(nx_fire/(nx_atm+1))
+        sry = int(ny_fire/(ny_atm+1))
+        dx_fire = dx_atm/srx
+        dy_fire = dy_atm/sry
+        x0_fire = -nx_atm / 2. * dx_atm + e
+        y1_fire = ny_atm / 2. * dy_atm + n
+        geotransform_fire = (x0_fire,dx_fire,0,y1_fire,0,-dy_fire)
+    else:
+        geotransform_fire = None
+    logging.info('geotransform_atm: (%g,%g,%g,%g,%g,%g)' % geotransform_atm)
+    logging.info('geotransform_fire: (%g,%g,%g,%g,%g,%g)' % geotransform_fire)
+    return csr, geotransform_atm, geotransform_fire
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
