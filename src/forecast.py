@@ -666,6 +666,7 @@ def process_output(job_id):
 
     if js.postproc.get('from', None) == 'wrfout':
         logging.info('Postprocessing all wrfout files.')
+        failures = cases = 0
         # postprocess all wrfouts
         for wrfout_path in sorted(glob.glob(osp.join(js.wrf_dir,'wrfout_d??_????-??-??_??:??:??'))):
             logging.info("Found %s" % wrfout_path)
@@ -678,12 +679,14 @@ def process_output(job_id):
             for esmf_time in sorted(times):
                 logging.info("Processing domain %d for time %s." % (dom_id, esmf_time))
                 if js.postproc is not None and str(dom_id) in js.postproc:
+                    case += 1
                     if available_sats:
                         sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
                         var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]
                         sat_list = [sat for sat in sat_list if sat in not_empty_sats]
                         logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
                     else:
+                        sat_list = []
                         var_list = [str(x) for x in js.postproc[str(dom_id)]]
                     logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                     try:
@@ -697,12 +700,18 @@ def process_output(job_id):
                             already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+                        failures += 1
 
+        if cases != failures:
+            logging.info('number of postprocessing steps is %d and number of postprocessing failures is %d' % (cases,failures))
+            # if we are to send out the postprocessed files after completion, this is the time
+            if js.postproc.get('shuttle', None) == 'on_completion':
+                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
-        # if we are to send out the postprocessed files after completion, this is the time
-        if js.postproc.get('shuttle', None) == 'on_completion':
-            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+        else:
+            logging.error('All postprocessing steps failed')
+            js.state = 'Postprocessing failed'
 
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
         return
@@ -725,6 +734,7 @@ def process_output(job_id):
     # step 10: track log output and check for history writes fro WRF
     wait_lines = 0
     wait_wrfout = 0
+    failures = cases = 0
     while True:
         line = wrf_out.readline().strip()
         if not line:
@@ -753,12 +763,14 @@ def process_output(job_id):
             dom_id = int(domain_str)
             logging.info("Detected history write for domain %d for time %s." % (dom_id, esmf_time))
             if js.postproc is not None and str(dom_id) in js.postproc:
+                cases += 1
                 if available_sats:
                     sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
                     var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]
                     sat_list = [sat for sat in sat_list if sat in not_empty_sats]
                     logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
                 else:
+                    sat_list = []
                     var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                 wrfout_path = find_wrfout(js.wrf_dir, dom_id, esmf_time)
@@ -768,6 +780,7 @@ def process_output(job_id):
                     pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
                 except Exception as e:
                     logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+                    failures += 1
                 else:
                     try:
                         # in incremental mode, upload to server
@@ -783,16 +796,23 @@ def process_output(job_id):
             wait_wrfout = wait_wrfout + 1
 
     # if we are to send out the postprocessed files after completion, this is the time
-    if js.postproc.get('shuttle', None) == 'on_completion':
-        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+    if cases != failures:
+        logging.info('number of postprocessing steps is %d and number of postprocessing failures is %d' % (cases,failures))
+        if js.postproc.get('shuttle', None) == 'on_completion':
+            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
-    if js.postproc.get('shuttle', None) is not None:
-        make_kmz(js.job_id)  # arguments can be added to the job id string
+        if js.postproc.get('shuttle', None) is not None:
+            make_kmz(js.job_id)  # arguments can be added to the job id string
+
+        js.state = 'Completed'
+
+    else:
+        logging.error('All postprocessing steps failed')
+        js.state = 'Postprocessing failed'
 
     js.old_pid = js.pid
     js.pid = None
-    js.state = 'Completed'
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def create_process_output_script(job_id):
@@ -838,9 +858,9 @@ def process_sat_output(job_id):
         logging.warning('Do not have satellite data to postprocess')
         return
     js.old_pid = js.pid
-        js.pid = os.getpid()
-        js.state = 'Processing'
-        json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+    js.pid = os.getpid()
+    js.state = 'Processing'
+    json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     pp = None
     already_sent_files = []
@@ -871,24 +891,24 @@ def process_sat_output(job_id):
                 else:
                     try:
                         if js.postproc.get('shuttle', None) == 'incremental':
-                                                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                                                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                                                already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+                            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+                            already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
                     except Exception as e:
                         logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
 
-     # if we are to send out the postprocessed files after completion, this is the time
-        if js.postproc.get('shuttle', None) == 'on_completion':
-                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+    # if we are to send out the postprocessed files after completion, this is the time
+    if js.postproc.get('shuttle', None) == 'on_completion':
+        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
-        if js.postproc.get('shuttle', None) is not None:
-                make_kmz(js.job_id)  # arguments can be added to the job id string
+    if js.postproc.get('shuttle', None) is not None:
+        make_kmz(js.job_id)  # arguments can be added to the job id string
 
-        js.old_pid = js.pid
-        js.pid = None
-        js.state = 'Completed'
-        json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+    js.old_pid = js.pid
+    js.pid = None
+    js.state = 'Completed'
+    json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 
 def verify_inputs(args,sys_cfg):
