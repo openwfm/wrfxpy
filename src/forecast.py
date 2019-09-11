@@ -23,10 +23,11 @@ from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
 from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
-				  update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
-				  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-				  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, json_join, \
-				  number_minutes, serial_json
+                  update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
+                  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
+                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
+                  json_join, number_minutes, serial_json, link2copy, append2file
+from write_geogrid import write_table
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -53,6 +54,7 @@ from multiprocessing import Process, Queue
 import glob
 import netCDF4 as nc4
 import shutil
+import numpy as np
 
 import smtplib
 from email.mime.text import MIMEText
@@ -387,6 +389,58 @@ def read_namelist(path):
 	logging.info('Reading namelist %s' % path)
 	return f90nml.read(path)
 
+def fmda_add_to_geogrid(js):
+    """
+    Add fmda datasets to geogrid if specified
+    """
+    if 'fmda_geogrid_path' in js:
+        fmda_geogrid_path = osp.abspath(js['fmda_geogrid_path'])
+        logging.info('fmda_geogrid_path is %s' % fmda_geogrid_path)
+    else:
+        return
+        logging.info('fmda_geogrid_path not given')
+    try:
+        index_path = osp.join(fmda_geogrid_path,'index.json')
+        index = json.load(open(index_path,'r'))
+        logging.info('Loaded fmda geogrid index at %s' % index_path)
+    except:
+        logging.error('Cannot open %s' % index_path)
+        sys.exit(1)
+    geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
+    logging.info('fmda_add_to_geogrid reading longitudes and latitudes from NetCDF file %s' % geo_path )
+    with nc4.Dataset(geo_path) as d:
+        lats = d.variables['XLAT'][:,:]
+        lons = d.variables['XLONG'][:,:]
+    ndomains = len(js['domains'])
+    lat,lon = js['domains'][str(ndomains)]['center_latlon']
+    bbox = (np.min(lats), np.min(lons), np.max(lats), np.max(lons))
+    logging.info('fmda_add_to_geogrid: fmda bounding box is %s %s %s %s' % bbox)
+    i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)  
+    if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
+        logging.error('fmda_add_to_geogrid: WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
+        sys.exit(1)
+    """
+    for varname,varindex in index.iteritems():
+        # update index 
+        varindex['known_y']=float(i)
+        varindex['known_x']=float(j)
+        varindex['known_lat']=lats[i-1,j-1]
+        varindex['known_lon']=lons[i-1,j-1]
+        logging.info('fmda_add_to_geogrid: updating index known_x=%s known_y=%s known_lat=%s known_lon=%s' % 
+           (varindex['known_x'],varindex['known_y'],varindex['known_lat'],varindex['known_lon']))
+        varindex_path=osp.join(fmda_geogrid_path,varname,'index')
+        write_table(varindex_path,varindex)
+    """
+    # update geogrid table
+    geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
+    link2copy(geogrid_tbl_path)
+    geogrid_tbl_json_path = osp.join(fmda_geogrid_path,'geogrid_tbl.json')
+    logging.info('fmda_add_to_geogrid: updating GEOGRID.TBL at %s from %s' % 
+        (geogrid_tbl_path,geogrid_tbl_json_path))
+    geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
+    for varname,vartable in geogrid_tbl_json.iteritems():
+        write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
+    
 def execute(args,job_args):
 	"""
 	Executes a weather/fire simulation.

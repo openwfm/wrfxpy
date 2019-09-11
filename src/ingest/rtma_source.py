@@ -110,6 +110,21 @@ class RTMA(object):
 
         return not_ready, ready
 
+    def geogrid_index(self):
+        """
+        Geolocation in a form suitable for geogrid index.
+        According to the paper: https://journals.ametsoc.org/doi/pdf/10.1175/WAF-D-10-05037.1 fig 1
+        for CONUS grid, modified per gdalinfo on the grib files.
+        See also https://graphical.weather.gov/docs/ndfdSRS.htm
+        This should really be replaced by geolocation metadata from the grib files.
+        :return: dictionary key:value 
+        """
+        return {'projection': 'lambert',
+                'dx' : 2539.703,
+                'dy' : -2539.703,
+                'truelat1' : 25.0,
+                'truelat2' : 25.0,
+                'stdlon' : 265}
 
    
     def _local_var_path(self, ts, var):
@@ -136,6 +151,7 @@ class RTMA(object):
         """
         # find last-modified time of file in UTC timezone
         url = self._remote_var_url(cycle.hour, var)
+        logging.info('Reading %s' % url)
         r = readhead(url)
         if r.status_code != 200:
             logging.error('Cannot find variable %s for hour %d at url %s' % (var, cycle.hour, url))
@@ -158,7 +174,7 @@ class RTMA(object):
         :param var: the variable to download
         """
         # rtma_base = 'http://weather.noaa.gov/pub/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus/'
-        rtma_base = 'http://tgftp.nws.noaa.gov/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus/'
+        rtma_base = 'https://tgftp.nws.noaa.gov/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus/'
         return rtma_base + '/RT.%02d/' % hour + 'ds.%s.bin' % var
 
 

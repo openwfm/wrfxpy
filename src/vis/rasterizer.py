@@ -130,6 +130,8 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
     lons = (np.amin(lon), np.amax(lon))
     lats = (np.amin(lat), np.amax(lat))
 
+    logging.info('basemap_raster_mercator: bounding box %s %s %s %s' % (lons + lats))
+
     # construct spherical mercator projection for region of interest
     m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],
                 llcrnrlon=lons[0],urcrnrlon=lons[1])
