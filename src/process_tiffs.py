@@ -177,6 +177,7 @@ def process_outputs_tiff(job_id):
                 sat_list = [sat for sat in sat_list if sat in not_empty_sats]
                 logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
             else:
+                sat_list = []
                 var_list = [str(x) for x in js.postproc[str(dom_id)]]
             logging.info("Executing postproc tiff instructions for vars %s for domain %d." % (str(var_list), dom_id))
             try:
@@ -185,7 +186,7 @@ def process_outputs_tiff(job_id):
                     #process_sats_tiff()
                 process_vars_tiff(pp, d, wrfout_path, dom_id, times, var_list)
             except Exception as e:
-                logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+                logging.warning('Failed to postprocess with error %s.' % str(e))
         d.close()
 
     js.old_pid = js.pid

@@ -474,8 +474,8 @@ def execute(args,job_args):
     if js.satellite_source:
         js.bounds = Dict({})
         for k,domain in enumerate(js.domain_conf.domains):
-                    latloni = domain.ij_to_latlon(0,0)
-                    latlonf = domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
+            latloni = domain.ij_to_latlon(0,0)
+            latlonf = domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
             bounds = (latloni[1],latlonf[1],latloni[0],latlonf[0])
             js.bounds[str(k+1)] = bounds
         sat_proc = {}
@@ -508,8 +508,8 @@ def execute(args,job_args):
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
 
-        for satellite_source in js.satellite_source:
-            sat_proc[satellite_source.id].join()
+    for satellite_source in js.satellite_source:
+        sat_proc[satellite_source.id].join()
 
     if js.ungrib_only:
         pass
@@ -838,9 +838,9 @@ def process_sat_output(job_id):
         logging.warning('Do not have satellite data to postprocess')
         return
     js.old_pid = js.pid
-        js.pid = os.getpid()
-        js.state = 'Processing'
-        json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+    js.pid = os.getpid()
+    js.state = 'Processing'
+    json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     pp = None
     already_sent_files = []
@@ -871,24 +871,24 @@ def process_sat_output(job_id):
                 else:
                     try:
                         if js.postproc.get('shuttle', None) == 'incremental':
-                                                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                                                sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                                                already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+                            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
+                            already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
                     except Exception as e:
                         logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
 
-     # if we are to send out the postprocessed files after completion, this is the time
-        if js.postproc.get('shuttle', None) == 'on_completion':
-                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+    # if we are to send out the postprocessed files after completion, this is the time
+    if js.postproc.get('shuttle', None) == 'on_completion':
+        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
-        if js.postproc.get('shuttle', None) is not None:
-                make_kmz(js.job_id)  # arguments can be added to the job id string
+    if js.postproc.get('shuttle', None) is not None:
+        make_kmz(js.job_id)  # arguments can be added to the job id string
 
-        js.old_pid = js.pid
-        js.pid = None
-        js.state = 'Completed'
-        json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+    js.old_pid = js.pid
+    js.pid = None
+    js.state = 'Completed'
+    json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 
 def verify_inputs(args,sys_cfg):
