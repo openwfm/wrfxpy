@@ -1,4 +1,4 @@
-from osgeo import gdal, osr, gdal_array
+from osgeo import gdal, osr
 import pyproj
 
 import os, logging, json, sys, glob, re, traceback
@@ -15,10 +15,6 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
     Creates new GeoTiffs for each time from 2D array
     '''
     array = wisdom['retrieve_as'](d,0)
-    datatype = gdal_array.NumericTypeCodeToGDALTypeCode(array.dtype)
-    if type(datatype)!=np.int:
-        if datatype.startswith('gdal.GDT_')==False:
-            datatype=eval('gdal.GDT_'+datatype)
     ysize,xsize = array.shape
     zsize = len(times)
     # write each slice of the array along the zsize
@@ -32,7 +28,7 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
         tiff_path = osp.join(output_path + times[i] + "-" + var + '.tif')
         logging.info('creating tif file: %s' % tiff_path)
         # set up the dataset with zsize bands
-        dataset = driver.Create(tiff_path,xsize,ysize,1,datatype)
+        dataset = driver.Create(tiff_path,xsize,ysize,1,gdal.GDT_Float32)
         dataset.SetGeoTransform(geot)
         dataset.SetProjection(projection.ExportToWkt())
         dataset.GetRasterBand(1).WriteArray(np.flipud(array))
@@ -47,10 +43,6 @@ def vector2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
     '''
     uw,vw = wisdom
     array = uw['retrieve_as'](d, 0)
-    datatype = gdal_array.NumericTypeCodeToGDALTypeCode(array.dtype)
-    if type(datatype)!=np.int:
-        if datatype.startswith('gdal.GDT_')==False:
-            datatype=eval('gdal.GDT_'+datatype)
     ysize,xsize = array.shape
     zsize = len(times)
     # write each slice of the array along the zsize
@@ -66,7 +58,7 @@ def vector2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
         tiff_path = osp.join(output_path + times[i] + "-" + var + '.tif')
         logging.info('creating tif file: %s' % tiff_path)
         # set up the dataset with zsize bands
-        dataset = driver.Create(tiff_path,xsize,ysize,2,datatype)
+        dataset = driver.Create(tiff_path,xsize,ysize,2,gdal.GDT_Float32)
         dataset.SetGeoTransform(geot)
         dataset.SetProjection(projection.ExportToWkt())
         dataset.GetRasterBand(1).WriteArray(np.flipud(uarray))
