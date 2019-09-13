@@ -112,7 +112,7 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
                 pp._update_manifest(dom_id, ts_esmf, var, mf_upd)
 
         except Exception as e:
-            logging.warning("Exception %s while postprocessing %s" % (e.message, var))
+            logging.warning("Exception %s while postprocessing %s" % (e, var))
             logging.warning(traceback.print_exc())
 
 def process_outputs_tiff(job_id):
