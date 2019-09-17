@@ -528,8 +528,8 @@ def execute(args,job_args):
 	if js.satellite_source:
 		js.bounds = Dict({})
 		for k,domain in enumerate(js.domain_conf.domains):
-                	latloni = domain.ij_to_latlon(0,0)
-                	latlonf = domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
+			latloni = domain.ij_to_latlon(0,0)
+			latlonf = domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
 			bounds = (latloni[1],latlonf[1],latloni[0],latlonf[0])
 			js.bounds[str(k+1)] = bounds
 		sat_proc = {}
@@ -562,8 +562,8 @@ def execute(args,job_args):
 	for grib_source in js.grib_source:
 		grib_proc[grib_source.id].join()
 
-    	for satellite_source in js.satellite_source:
-        	sat_proc[satellite_source.id].join()
+	for satellite_source in js.satellite_source:
+		sat_proc[satellite_source.id].join()
 
 	if js.ungrib_only:
 		pass
