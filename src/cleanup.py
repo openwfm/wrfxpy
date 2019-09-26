@@ -148,21 +148,21 @@ def list(s):
 def workspace(s):
     logging.info('Deleting all directories in local workspace that are not in the remote catalog.')
     s.connect()
-    cat = s.retrieve_catalog(s)
+    cat = s.retrieve_catalog()
     s.disconnect()
     for f in glob.glob(osp.join(cfg['workspace_path'],'*')):
         if osp.isdir(f):
             ff = osp.basename(f)
             if ff not in cat:
                 logging.error('%s not in the catalog' % ff)
-                local_rmdir(cfg, f)
+                local_rmdir(f)
 
 def output(s,name):
     logging.info('Trying to delete WRF output and visualization of job %s' % name)
     s.connect()
     remote_rmdir(s, name)
     s.disconnect()
-    local_rmdir(cfg,osp.join(name,'products'))
+    local_rmdir(osp.join(name,'products'))
     wrf_dir = osp.join(cfg['workspace_path'], name,'wrf')
     files = glob.glob(osp.join(wrf_dir,'rsl.*'))+glob.glob(osp.join(wrf_dir,'wrfout_*'))
     logging.info('Deleting %s WRF output files in  %s' % (len(files),wrf_dir ))
