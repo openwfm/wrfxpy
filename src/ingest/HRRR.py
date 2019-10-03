@@ -49,8 +49,8 @@ class HRRR(GribForecast):
 
     # instance variables
     id = "HRRR"
-    remote_url = 'http://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/'
-    grib_forecast_hours_periods = [{'hours':15,'period':1}]
+    remote_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/'
+    grib_forecast_hours_periods = [{'hours':36,'period':1}]
     cycle_hours = 1
     period_hours = 1
     hours_behind_real_time = 1     # choose forecast cycle at least one hour behind
