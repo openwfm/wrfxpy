@@ -54,8 +54,11 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
         dataset = driver.Create(tiff_path,xsize,ysize,1,gdal.GDT_Float32)
         dataset.SetGeoTransform(geot)
         dataset.SetProjection(projection.ExportToWkt())
-        dataset.GetRasterBand(1).WriteArray(np.flipud(array))
-        dataset.GetRasterBand(1).SetNoDataValue(ndv)
+        band = dataset.GetRasterBand(1)
+        band.WriteArray(np.flipud(array))
+        band.SetUnitType(wisdom['native_unit'])
+        band.SetDescription(wisdom['name'])
+        band.SetNoDataValue(ndv)
         dataset.FlushCache()
         tiffiles.append(tiff_path)
     return tiffiles
