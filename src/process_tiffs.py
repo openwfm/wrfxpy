@@ -67,7 +67,7 @@ def vector2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
     '''
     Creates new GeoTiffs for each time from 2D array
     '''
-    uw,vw = wisdom
+    w,uw,vw = wisdom
     array = uw['retrieve_as'](d, 0)
     ysize,xsize = array.shape
     zsize = len(times)
@@ -89,12 +89,12 @@ def vector2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
         dataset.SetProjection(projection.ExportToWkt())
         band1 = dataset.GetRasterBand(1)
         band1.WriteArray(np.flipud(uarray))
-        band1.SetUnitType(wisdom['native_unit'])
+        band1.SetUnitType(w['native_unit'])
         band1.SetDescription(uw['name'])
         band1.SetNoDataValue(ndv)
         band2 = dataset.GetRasterBand(2)
         band2.WriteArray(np.flipud(varray))
-        band2.SetUnitType(wisdom['native_unit'])
+        band2.SetUnitType(w['native_unit'])
         band2.SetDescription(vw['name'])
         band2.SetNoDataValue(ndv)
         dataset.FlushCache()
@@ -134,7 +134,7 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
                 uw, vw = get_wisdom(u_name), get_wisdom(v_name)
                 uw.update(pp.wisdom_update.get(u_name, {}))
                 vw.update(pp.wisdom_update.get(v_name, {}))
-                tiff_path = vector2tiffs(outpath_base, d, (uw,vw), projection, geotransform, times, var)
+                tiff_path = vector2tiffs(outpath_base, d, (wisdom,uw,vw), projection, geotransform, times, var)
             else:
                 tiff_path = scalar2tiffs(outpath_base, d, wisdom, projection, geotransform, times, var)
 
