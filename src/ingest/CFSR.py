@@ -82,9 +82,14 @@ class CFSR_P(CFSR):
         :return: the relative URL
         """
         path_tmpl = '%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.pgrbh00.grib2'
-        
+        path_tmpl_opt = '%04d/%04d%02d/%04d%02d%02d/%04d%02d%02dcdas1.t%02dz.pgrbh00.grib2'
+
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
-        return path_tmpl % (year, year, mon, year, mon, day, hour)
+
+        if readhead(self.remote_url + '/' + path_tmpl % (year, year, mon, year, mon, day, hour)).status_code == 200:
+            return path_tmpl % (year, year, mon, year, mon, day, hour)
+        else:
+            return path_tmpl_opt % (year, year, mon, year, mon, day, year, mon, day, hour)
 
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_pgbh'
@@ -129,12 +134,18 @@ class CFSR_S(CFSR):
         :return: the relative URL
         """
         path_tmpl = '%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.sfluxgrbf00.grib2'
+        path_tmpl_opt = '%04d/%04d%02d/%04d%02d%02d/%04d%02d%02dcdas1.t%02dz.sfluxgrbf00.grib2'
 
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
-        return path_tmpl % (year, year, mon, year, mon, day, hour)
+
+        if readhead(self.remote_url + '/' + path_tmpl % (year, year, mon, year, mon, day, hour)).status_code == 200:
+            return path_tmpl % (year, year, mon, year, mon, day, hour)
+        else:
+            return path_tmpl_opt % (year, year, mon, year, mon, day, year, mon, day, hour)
+
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_flxf'
     id = "CFSR_S"
     prefix = 'COLMET_S'
 
-	
+

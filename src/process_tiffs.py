@@ -14,13 +14,36 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
     '''
     Creates new GeoTiffs for each time from 2D array
     '''
+    # read wisdom variables
+    scale = wisdom['scale']
+    if 'transparent_values' in wisdom:
+        rng = wisdom['transparent_values']
+
     array = wisdom['retrieve_as'](d,0)
     ysize,xsize = array.shape
     zsize = len(times)
     # write each slice of the array along the zsize
     tiffiles = []
     for i in range(zsize):
+        # get array
         array = wisdom['retrieve_as'](d,i)
+        # mask transparent values
+        if 'transparent_values' in wisdom:
+            array = np.ma.masked_array(array,np.logical_and(array >= rng[0], array <= rng[1]))
+        else:
+            array = np.ma.masked_array(array)
+
+        # scale data
+        if scale != 'original':
+            m = array.mask.copy()
+            a_min, a_max = scale[0], scale[1]
+            array[array < a_min] = a_min
+            array[array > a_max] = a_max
+            array.mask = m
+
+        # all masked data fill with Nans
+        array.data[array.mask] = np.nan
+        array.fill_value = np.nan
         # set nans to the original No Data Value
         array[np.isnan(array)] = ndv
         # create a driver
@@ -31,8 +54,11 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
         dataset = driver.Create(tiff_path,xsize,ysize,1,gdal.GDT_Float32)
         dataset.SetGeoTransform(geot)
         dataset.SetProjection(projection.ExportToWkt())
-        dataset.GetRasterBand(1).WriteArray(np.flipud(array))
-        dataset.GetRasterBand(1).SetNoDataValue(ndv)
+        band = dataset.GetRasterBand(1)
+        band.WriteArray(np.flipud(array))
+        band.SetUnitType(wisdom['native_unit'])
+        band.SetDescription(wisdom['name'])
+        band.SetNoDataValue(ndv)
         dataset.FlushCache()
         tiffiles.append(tiff_path)
     return tiffiles
