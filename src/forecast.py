@@ -25,8 +25,9 @@ from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, json_join, \
-                  number_minutes, serial_json
+                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
+                  json_join, number_minutes, serial_json, link2copy, append2file
+from write_geogrid import write_table
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -53,6 +54,7 @@ from multiprocessing import Process, Queue
 import glob
 import netCDF4 as nc4
 import shutil
+import numpy as np
 
 import smtplib
 from email.mime.text import MIMEText
@@ -387,6 +389,58 @@ def read_namelist(path):
     logging.info('Reading namelist %s' % path)
     return f90nml.read(path)
 
+def fmda_add_to_geogrid(js):
+    """
+    Add fmda datasets to geogrid if specified
+    """
+    if 'fmda_geogrid_path' in js:
+        fmda_geogrid_path = osp.abspath(js['fmda_geogrid_path'])
+        logging.info('fmda_geogrid_path is %s' % fmda_geogrid_path)
+    else:
+        return
+        logging.info('fmda_geogrid_path not given')
+    try:
+        index_path = osp.join(fmda_geogrid_path,'index.json')
+        index = json.load(open(index_path,'r'))
+        logging.info('Loaded fmda geogrid index at %s' % index_path)
+    except:
+        logging.error('Cannot open %s' % index_path)
+        sys.exit(1)
+    geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
+    logging.info('fmda_add_to_geogrid reading longitudes and latitudes from NetCDF file %s' % geo_path )
+    with nc4.Dataset(geo_path) as d:
+        lats = d.variables['XLAT'][:,:]
+        lons = d.variables['XLONG'][:,:]
+    ndomains = len(js['domains'])
+    lat,lon = js['domains'][str(ndomains)]['center_latlon']
+    bbox = (np.min(lats), np.min(lons), np.max(lats), np.max(lons))
+    logging.info('fmda_add_to_geogrid: fmda bounding box is %s %s %s %s' % bbox)
+    i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)
+    if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
+        logging.error('fmda_add_to_geogrid: WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
+        sys.exit(1)
+    """
+    for varname,varindex in index.iteritems():
+        # update index
+        varindex['known_y']=float(i)
+        varindex['known_x']=float(j)
+        varindex['known_lat']=lats[i-1,j-1]
+        varindex['known_lon']=lons[i-1,j-1]
+        logging.info('fmda_add_to_geogrid: updating index known_x=%s known_y=%s known_lat=%s known_lon=%s' %
+           (varindex['known_x'],varindex['known_y'],varindex['known_lat'],varindex['known_lon']))
+        varindex_path=osp.join(fmda_geogrid_path,varname,'index')
+        write_table(varindex_path,varindex)
+    """
+    # update geogrid table
+    geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
+    link2copy(geogrid_tbl_path)
+    geogrid_tbl_json_path = osp.join(fmda_geogrid_path,'geogrid_tbl.json')
+    logging.info('fmda_add_to_geogrid: updating GEOGRID.TBL at %s from %s' %
+        (geogrid_tbl_path,geogrid_tbl_json_path))
+    geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
+    for varname,vartable in geogrid_tbl_json.iteritems():
+        write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
+
 def execute(args,job_args):
     """
     Executes a weather/fire simulation.
@@ -512,7 +566,7 @@ def execute(args,job_args):
         sat_proc[satellite_source.id].join()
 
     if js.ungrib_only:
-        pass
+        return
     else:
         geogrid_proc.join()
 
@@ -524,9 +578,8 @@ def execute(args,job_args):
         if proc_q.get() != 'SUCCESS':
             return
 
-    if not js.ungrib_only:
-        if proc_q.get() != 'SUCCESS':
-            return
+    if proc_q.get() != 'SUCCESS':
+        return
 
     proc_q.close()
 
@@ -666,6 +719,7 @@ def process_output(job_id):
 
     if js.postproc.get('from', None) == 'wrfout':
         logging.info('Postprocessing all wrfout files.')
+        failures = cases = 0
         # postprocess all wrfouts
         for wrfout_path in sorted(glob.glob(osp.join(js.wrf_dir,'wrfout_d??_????-??-??_??:??:??'))):
             logging.info("Found %s" % wrfout_path)
@@ -678,12 +732,14 @@ def process_output(job_id):
             for esmf_time in sorted(times):
                 logging.info("Processing domain %d for time %s." % (dom_id, esmf_time))
                 if js.postproc is not None and str(dom_id) in js.postproc:
+                    case += 1
                     if available_sats:
                         sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
                         var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]
                         sat_list = [sat for sat in sat_list if sat in not_empty_sats]
                         logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
                     else:
+                        sat_list = []
                         var_list = [str(x) for x in js.postproc[str(dom_id)]]
                     logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                     try:
@@ -697,12 +753,18 @@ def process_output(job_id):
                             already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+                        failures += 1
 
+        if cases != failures:
+            logging.info('number of postprocessing steps is %d and number of postprocessing failures is %d' % (cases,failures))
+            # if we are to send out the postprocessed files after completion, this is the time
+            if js.postproc.get('shuttle', None) == 'on_completion':
+                desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
-        # if we are to send out the postprocessed files after completion, this is the time
-        if js.postproc.get('shuttle', None) == 'on_completion':
-            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+        else:
+            logging.error('All postprocessing steps failed')
+            js.state = 'Postprocessing failed'
 
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
         return
@@ -725,6 +787,7 @@ def process_output(job_id):
     # step 10: track log output and check for history writes fro WRF
     wait_lines = 0
     wait_wrfout = 0
+    failures = cases = 0
     while True:
         line = wrf_out.readline().strip()
         if not line:
@@ -753,12 +816,14 @@ def process_output(job_id):
             dom_id = int(domain_str)
             logging.info("Detected history write for domain %d for time %s." % (dom_id, esmf_time))
             if js.postproc is not None and str(dom_id) in js.postproc:
+                cases += 1
                 if available_sats:
                     sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
                     var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]
                     sat_list = [sat for sat in sat_list if sat in not_empty_sats]
                     logging.info("Executing postproc instructions for sats %s for domain %d." % (str(sat_list), dom_id))
                 else:
+                    sat_list = []
                     var_list = [str(x) for x in js.postproc[str(dom_id)]]
                 logging.info("Executing postproc instructions for vars %s for domain %d." % (str(var_list), dom_id))
                 wrfout_path = find_wrfout(js.wrf_dir, dom_id, esmf_time)
@@ -768,6 +833,7 @@ def process_output(job_id):
                     pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
                 except Exception as e:
                     logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
+                    failures += 1
                 else:
                     try:
                         # in incremental mode, upload to server
@@ -783,16 +849,23 @@ def process_output(job_id):
             wait_wrfout = wait_wrfout + 1
 
     # if we are to send out the postprocessed files after completion, this is the time
-    if js.postproc.get('shuttle', None) == 'on_completion':
-        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+    if cases != failures:
+        logging.info('number of postprocessing steps is %d and number of postprocessing failures is %d' % (cases,failures))
+        if js.postproc.get('shuttle', None) == 'on_completion':
+            desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
 
-    if js.postproc.get('shuttle', None) is not None:
-        make_kmz(js.job_id)  # arguments can be added to the job id string
+        if js.postproc.get('shuttle', None) is not None:
+            make_kmz(js.job_id)  # arguments can be added to the job id string
+
+        js.state = 'Completed'
+
+    else:
+        logging.error('All postprocessing steps failed')
+        js.state = 'Postprocessing failed'
 
     js.old_pid = js.pid
     js.pid = None
-    js.state = 'Completed'
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def create_process_output_script(job_id):

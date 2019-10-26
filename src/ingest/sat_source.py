@@ -33,6 +33,7 @@ class SatSource(object):
 		self.ingest_dir=osp.abspath(osp.join(js.get('ingest_path','ingest'),self.prefix))
 		self.cache_dir=osp.abspath(js.get('cache_path','cache'))
 		self.sys_dir=osp.abspath(js.get('sys_install_path',None))
+		self.appkey=js.get('appkey',None)
 
 	def available_locally_sat(self, path):
 		"""
@@ -164,7 +165,7 @@ class SatSource(object):
 			return {'url': url,'local_path': sat_path}
 		else:
 			try:
-				download_url(url, sat_path)
+				download_url(url, sat_path, appkey=self.appkey)
 				return {'url': url,'local_path': sat_path,'downloaded': datetime.datetime.now}
 			except DownloadError as e:
 				logging.error('%s cannot download satellite file %s' % (self.prefix, url))

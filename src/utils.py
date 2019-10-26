@@ -187,8 +187,36 @@ def remove(tgt):
     os.remove wrapper
     """
     if osp.isfile(tgt):
-        logging.warning('remove: file %s exists, removing' % tgt)
+        logging.info('remove: file %s exists, removing' % tgt)
         os.remove(tgt)
+
+def force_copy(src,tgt):
+    """
+    remove target if exists and copy there, making directories as needed
+    """
+    remove(tgt)
+    shutil.copy(src,ensure_dir(tgt))
+
+def append2file(addl,base):
+    """
+    Append a file to another
+    """
+    logging.info("appending file %s to %s" % (addl,base))
+    with open(base,'a') as base_file:
+        with open(addl,'r') as addl_file:
+            base_file.write(addl_file.read())
+
+def link2copy(src):
+    """
+    replace link by a copy of the target file
+    """
+    try:
+        link_target = os.readlink(src)
+    except OSError as e:
+        return
+    logging.info("replacing soft link %s -> %s by a copy" % (src,link_target))
+    os.remove(src)
+    shutil.copy(link_target,src)
 
 def move(src,tgt):
     """
@@ -197,7 +225,6 @@ def move(src,tgt):
     logging.info('moving %s to %s' % (src, tgt))
     remove(tgt)
     shutil.move(src,tgt)
-
 
 def cache_file(path, cache_dir):
     """
@@ -583,4 +610,16 @@ def serial_json(obj):
     if isinstance(obj, datetime):
         return utc_to_esmf(obj)
     raise TypeError("Type %s not serializable" % type(obj))
+
+def inq(x):
+    """
+    Inquire numpy array for shape min max
+    :param x: object
+    :return string:
+    """
+    try:
+        s= 'size %s min %g max %g' % (str(x.shape), np.min(x), np.max(x))
+    except:
+        s=str(x)
+    return s
 
