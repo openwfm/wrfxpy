@@ -189,6 +189,21 @@ class GribSource(object):
             logging.info('Missing in cache ' +f)
         return colmet_missing
 
+    def available_online(self,links):
+        """
+        Make link available online from a list of links
+        :param links: list of links
+        :return: link available online, '' otherwise
+        """
+
+        logging.info('GribSource: Looking for grib links available online')
+        available = filter(lambda x: readhead(self.remote_url + '/' + x, msg_level=0).status_code == 200, links)
+        if len(available) > 0:
+            return available[0]
+        else:
+            logging.error('Any %s available for %04d%02d%02d at %02d' % (self.id, year, mon, day, hour))
+            raise GribError('GribSource: failed to find an available online file')
+
 
     # instance variables  
     prefix = 'COLMET'
