@@ -86,7 +86,7 @@ class CFSR_P(CFSR):
 
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
 
-        if readhead(self.remote_url + '/' + path_tmpl % (year, year, mon, year, mon, day, hour)).status_code == 200:
+        if readhead(self.remote_url + '/' + path_tmpl % (year, year, mon, year, mon, day, hour),msg_level=0).status_code == 200:
             return path_tmpl % (year, year, mon, year, mon, day, hour)
         else:
             return path_tmpl_opt % (year, year, mon, year, mon, day, year, mon, day, hour)
@@ -138,7 +138,7 @@ class CFSR_S(CFSR):
 
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
 
-        if readhead(self.remote_url + '/' + path_tmpl % (year, year, mon, year, mon, day, hour)).status_code == 200:
+        if readhead(self.remote_url + '/' + path_tmpl % (year, year, mon, year, mon, day, hour),msg_level=0).status_code == 200:
             return path_tmpl % (year, year, mon, year, mon, day, hour)
         else:
             return path_tmpl_opt % (year, year, mon, year, mon, day, year, mon, day, hour)
