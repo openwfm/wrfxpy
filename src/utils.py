@@ -515,14 +515,16 @@ class response_object(object):
         self.status_code = status_code
 
 
-def readhead(url):
-    logging.info('reading http head of %s ' % url)
+def readhead(url,msg_level=1):
+    if msg_level > 0:
+        logging.info('reading http head of %s ' % url)
     try:
         ret=requests.head(url)
         ret.raise_for_status()
     #except (requests.RequestException, requests.exceptions.Timeout, requests.exceptions.TooManyRedirects, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
     except Exception as e:
-        logging.error(e)
+        if msg_level > 0:
+            logging.error(e)
         ret = response_object(-1)
     return ret
 
