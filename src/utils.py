@@ -498,9 +498,16 @@ def load_sys_cfg():
         import sys
         logging.critical('Cannot find system configuration, have you created etc/conf.json?')
         sys.exit(2)
+    
+    # load tokens if etc/tokens.json exists
+    try:
+        sys_cfg.update(json.load(open('etc/tokens.json')))
+    except:
+        logging.warning('Any etc/tokens.json specified, any token is going to be used.')
+        pass
 
     # set defaults
-    sys = sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
+    sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
     # configuration defaults + make directories if they do not exist
     sys_cfg.workspace_path = make_dir(osp.abspath(sys_cfg.get('workspace_path','wksp')))
     sys_cfg.ingest_path = make_dir(osp.abspath(sys_cfg.get('ingest_path','ingest')))
