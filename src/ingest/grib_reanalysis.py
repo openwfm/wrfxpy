@@ -42,7 +42,7 @@ class GribReanalysis(GribSource):
         end_utc = end_utc.replace(hour=end_utc.hour - end_utc.hour % self.period_hours)
 
         if (start_utc < self.available_from_utc) | (end_utc > self.available_to_utc):
-            logging.error('%s is available from %s to %s only' % (self.id, self.available_from_utc, sef.available_to_utc))
+            logging.error('%s is available from %s to %s only' % (self.id, self.available_from_utc, self.available_to_utc))
             logging.info('Check %s for %s' % (self.info_url, self.info))
             raise GribError('Unsatisfiable: %s not available for the requested dates' % self.id)
 
