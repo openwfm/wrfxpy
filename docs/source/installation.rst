@@ -34,7 +34,7 @@ Install pre-requisites:
 
 ::
 
-  conda install basemap netcdf4 pyproj paramiko dill
+  conda install basemap netcdf4 pyproj paramiko dill psutil requests
   conda install -c conda-forge simplekml pygrib f90nml
   conda install -c anaconda numpy
   pip install MesoPy
