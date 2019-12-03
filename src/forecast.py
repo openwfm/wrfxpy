@@ -477,6 +477,7 @@ def execute(args,job_args):
         grib_proc[grib_source.id].join()
     
     if js.ungrib_only:
+        logging.info("ungrib_only requested, exiting.")
         return
     else:
         geogrid_proc.join()
