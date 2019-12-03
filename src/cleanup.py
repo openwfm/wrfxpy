@@ -119,8 +119,9 @@ def parallel_job_running(js):
     else:
         ret = subprocess.check_output([qstat_cmd,qstat_arg],stderr=subprocess.STDOUT)
     for line in ret.split('\n'):
-        ls=line.split()
-        if len(ls) >0 and ls[0] == str(js.job_num):
+        logging.info(line)
+        ls=line.split(None) # on whitespace
+        if len(ls) >0 and ls[0].split('.')[0] == str(js.job_num):
              if len(ls) >4:
                  status = ls[4]
              else:
