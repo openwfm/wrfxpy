@@ -7,6 +7,7 @@
   "workspace_path": "wksp",
   "wps_install_path": "path/to/WPS",
   "wrf_install_path": "path/to/WRF",
+  "wrf_serial_install_path": "path/to/WRF with serial binaries",
   "sys_install_path": "/path/to/wrfxpy",
   "wps_geog_path" : "/path/to/your/default/wps_geog",
   "wget" : /path/to/wget",
