@@ -42,7 +42,7 @@ def read_string(default):
     read_in = sys.stdin.readline().strip('\n')
     return read_in if read_in != '' else default
 
-    
+
 def read_integer(default):
     return int(read_string(default))
 
@@ -84,7 +84,7 @@ def questionnaire():
     """
     Give a questionnaire to the user (with sensible default) to create
     a simple domain configuration.
-    
+
     :return: a dictionary with the configuration of a fire simulation
     """
     cfg = {}
@@ -107,7 +107,7 @@ def questionnaire():
 
     print_question('Enter the ignition time in UTC timezone as an ESMF string or relative time')
     print('Examples: 2016-03-30_16:00:00 or T-60 or T+30 (minutes), [default = now]')
-    ign_utc = read_time_indicator('T+0') 
+    ign_utc = read_time_indicator('T+0')
     print_answer('Ignition time is %s\n' % str(ign_utc))
 
     print_question('Enter the duration of the ignition process in seconds [default = 240]')
@@ -127,7 +127,7 @@ def questionnaire():
         print('Simulation start must be before ignition time %s' % utils.utc_to_esmf(ign_utc))
     cfg['start_utc'] = utils.utc_to_esmf(start_utc)
     print_answer('Simulation will start at %s.' % cfg['start_utc'])
-    
+
     end_utc = start_utc + timedelta(hours=5)
     while True:
         print_question('Enter the end time of the simulation [default = start_time + 5 hours]')
@@ -157,6 +157,14 @@ def questionnaire():
 
     cfg['grib_source'] = select_grib_source(start_utc)
     print_answer('Selected GRIB2 source %s' % cfg['grib_source'])
+
+    print_question('Process satellite data? [default=no]')
+    sat = read_boolean('no')
+    if sat:
+        cfg['satellite_source'] = ["Aqua","Terra","SNPP"]
+        print_answer('Selected Satellite sources %s' % cfg['satellite_source'])
+    else:
+        print_answer('No Satellite sources selected.')
 
     def_geog_path = None
     try:
@@ -221,7 +229,7 @@ def questionnaire():
     if shuttle:
         print_question('Enter a short description of your job [default=experimental run]')
         desc = read_string('experimental run')
-    
+
     cfg['postproc'] = { '1' : pp_vars }
     if shuttle:
         cfg['postproc']['shuttle'] = 'incremental'

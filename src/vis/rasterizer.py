@@ -26,16 +26,20 @@ import numpy as np
 import netCDF4 as nc4
 import sys
 import os
-import StringIO
 import logging
-
+try:
+    # python 2
+    import StringIO
+except ImportError:
+    # python 3
+    from io import StringIO
 
 def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     """
     Create a colorbar to accompany a raseter image.
 
     See: http://matplotlib.org/examples/api/colorbar_only.html for more examples
-    
+
     :param rng: the minimum/maximum to display on the colorbar
     :param orientation: 'vertical' or 'horizontal'
     :param size_in: larger dimension in inches
@@ -44,7 +48,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     :param dpi: dots per inch
     :return: a StringIO object with the colorbar as PNG data
     """
-    kwargs = { 'norm':mpl.colors.Normalize(rng[0],rng[1]),
+    kwargs = { 'norm': mpl.colors.Normalize(rng[0],rng[1]),
                'orientation':orientation,
                'spacing':'proportional',
                'cmap':cmap}
@@ -65,6 +69,56 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     for tick_lbl in ax.get_yticklabels():
         tick_lbl.set_color('1')
         tick_lbl.set_fontsize(8)
+
+    # save png to a StringIO
+    str_io = StringIO.StringIO()
+    fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
+    plt.close()
+
+    return str_io.getvalue()
+
+
+def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=200):
+    """
+    Create a discrete colorbar to accompany a scatter raseter image.
+
+    See: http://matplotlib.org/examples/api/colorbar_only.html for more examples
+
+    :param labels: list of labels for each colorbar tick
+    :param colors: list of colors for each colorbar tick
+    :param orientation: 'vertical' or 'horizontal'
+    :param size_in: larger dimension in inches
+    :param cmap: the colormap in use
+    :param cb_label: the colorbar label
+    :param dpi: dots per inch
+    :return: a StringIO object with the colorbar as PNG data
+    """
+    N = len(labels)
+
+    kwargs = { 'norm': mpl.colors.Normalize(-.5,N-.5),
+	       'orientation': orientation,
+               'spacing': 'proportional',
+	       'ticks': range(0,N),
+               'cmap': cmap}
+
+    # build figure according to requested orientation
+    hsize, wsize = (size_in,size_in*0.5) if orientation == 'vertical' else (size_in*0.5,size_in)
+    fig = plt.figure(figsize=(wsize,hsize))
+
+    # proportions that work with axis title (horizontal not tested)
+    ax = fig.add_axes([.5,.03,.12,.8]) if orientation=='vertical' else fig.add_axes([0.03,.4,.8,.12])
+
+    # construct the colorbar and modify properties
+    cb = mpl.colorbar.ColorbarBase(ax,**kwargs)
+    cb.ax.tick_params(length=0)
+    cb.ax.set_yticklabels(labels)
+    cb.set_label(cb_label,color='1',fontsize=8,labelpad=-40)
+
+    # move ticks to left side
+    ax.yaxis.set_ticks_position('left')
+    for tick_lbl in ax.get_yticklabels():
+        tick_lbl.set_color('1')
+        tick_lbl.set_fontsize(5)
 
     # save png to a StringIO
     str_io = StringIO.StringIO()
@@ -127,5 +181,25 @@ def basemap_barbs_mercator(u,v,lat,lon):
     return str_io.getvalue(), float_bounds
 
 
+def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
+    # number of scatter elements
+    N = len(val)	
+   
+    # construct spherical mercator projection for region of interest
+    m = Basemap(projection='merc',llcrnrlat=bounds[2], urcrnrlat=bounds[3],
+                		llcrnrlon=bounds[0],urcrnrlon=bounds[1])
+    
+    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
+    plt.axis('off')
+    for i in range(N):
+    	m.scatter(lon[i],lat[i],60,c=val[i],latlon=True,marker='.',cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
 
+    # save png to a StringIO
+    str_io = StringIO.StringIO()
+    plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
+    plt.close()
+
+    numpy_bounds = [ (bounds[0],bounds[2]),(bounds[1],bounds[2]),(bounds[1],bounds[3]),(bounds[0],bounds[3]) ]
+    float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
+    return str_io.getvalue(), float_bounds
 

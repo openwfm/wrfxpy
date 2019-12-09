@@ -136,7 +136,7 @@ class Ungrib(Executor):
         """
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of ungrib.' not in open(output_path).read():
-            print open(osp.join(self.work_dir, self.exec_name + '.stderr')).read() 
+            print open(osp.join(self.work_dir, self.exec_name + '.stderr')).read()
             print 'Execution of %s was not successful.' % self.exec_name
             print 'Examine %s for details.' % output_path
             raise OutputCheckFailed()
@@ -164,7 +164,7 @@ class Metgrid(Executor):
         """
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of metgrid.' not in open(output_path).read():
-            print open(osp.join(self.work_dir, self.exec_name + '.stderr')).read() 
+            print open(osp.join(self.work_dir, self.exec_name + '.stderr')).read()
             print "Execution of %s was not successful." % self.exec_name
             print "Examine %s for details." % output_path
             raise OutputCheckFailed()
@@ -194,7 +194,7 @@ class Real(Executor):
         causes real.exe to output stdout and stderr into rsl.out.0000 and rsl.error.0000 respectively.
         We don't redirect these (we can't) but we rename the output files after the fact.
 
-        NOTE: on some machines it is OK to run real.exe from command line, but generally mpirun is required! 
+        NOTE: on some machines it is OK to run real.exe from command line, but generally mpirun is required!
 
         If cfg.wrf_serial_install_path is not None, run real.exe as serial,
         This is to support systems that do not allow executing mpi binary from command line.
@@ -272,7 +272,7 @@ class Submitter(object):
         :param nodes: number of nodes to request for parallel job
         :param ppn: processors per nodes to request
         :param wall_time_hrs: wall time to request for job
-        :return: job number string to be used in further queue manager commands 
+        :return: job number string to be used in further queue manager commands
         """
         qsys = self.qsys_infos[self.qsys_id]
         qsub = qsys['qsub_cmd']
@@ -293,8 +293,8 @@ class Submitter(object):
         job_num = ret.split(qsys.get('qsub_delimiter',' '))[qsys['qsub_job_num_index']].rstrip()
         logging.info('job number %s submitted' % job_num)
 	return job_num
-       
- 
+
+
 class WRF(Submitter):
     """
     Handles job submission for wrf.exe into a job manager.
@@ -319,7 +319,7 @@ class WRF(Submitter):
         :param nodes: number of nodes to request for parallel job
         :param ppn: processors per nodes to request
         :param wall_time_hrs: wall time to request for job
-        :return: job number string to be used in further queue manager commands 
+        :return: job number string to be used in further queue manager commands
         """
         ret = super(WRF, self).submit(task_id, "./wrf.exe", nodes, ppn, wall_time_hrs)
         return ret
