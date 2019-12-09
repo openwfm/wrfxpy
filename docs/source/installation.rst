@@ -26,25 +26,17 @@ Python and packages
 Download and install the Python 2 `Anaconda Python <https://www.continuum.io/downloads>`_ distribution for your platform.  We recommend an installation into the users home directory.
 
 ::
-  wget https://repo.continuum.io/archive/Anaconda2-5.3.0-Linux-x86_64.sh
-  chmod +x Anaconda2-5.3.0-Linux-x86_64.sh
-  ./Anaconda2-5.3.0-Linux-x86_64.sh
+  wget Anaconda[your current version].sh
+  chmod +x Anaconda[your current version].sh
+  Anaconda[your current version].sh
 
 Install pre-requisites: 
 
 ::
 
-  conda install basemap netcdf4 pyproj paramiko dill psutil requests
-  conda install -c conda-forge simplekml pygrib f90nml
-  conda install -c anaconda numpy
-  pip install MesoPy
-  pip install python-cmr
-
-
-Add your environment (~/.custom.csh) the following line
-  setenv PROJ_LIB "$HOME/anaconda2/share/proj"
-or if you are using bash to ~/.profile or ~/.bashrc
-  export PROJ_LIB="$HOME/anaconda2/share/proj"
+  conda install basemap netcdf4 pyproj paramiko dill psutil requests numpy anaconda h5py
+  conda install -c conda-forge simplekml pygrib f90nml pyhdf
+  pip install MesoPy python-cmr
 
 Note that ``conda`` and ``pip`` are package managers available in the Anaconda Python distribution.
 
