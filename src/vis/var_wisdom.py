@@ -273,7 +273,16 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
-
+     'PM25_SFC_CHEM' : {
+        'name' : 'surface PM2.5 from WRF-CHEM',
+        'native_unit' : smoke_integrated_unit,
+        'colorbar' : 'ug/m^2',
+        'colormap' : 'rainbow',
+        'transparent_values' : [-np.inf, 10],
+        'scale' : [20, 90],
+        'retrieve_as' : lambda d,t: d.variables['PM2_5_DRY'][t,0,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
     'T2' : {
         'name' : 'temperature at 2m',
         'native_unit' : 'K',

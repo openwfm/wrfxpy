@@ -730,7 +730,7 @@ def process_output(job_id):
             for esmf_time in sorted(times):
                 logging.info("Processing domain %d for time %s." % (dom_id, esmf_time))
                 if js.postproc is not None and str(dom_id) in js.postproc:
-                    case += 1
+                    cases += 1
                     if available_sats:
                         sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]
                         var_list = [str(x) for x in js.postproc[str(dom_id)] if not str(x) in sat_list]

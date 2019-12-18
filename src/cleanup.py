@@ -44,14 +44,17 @@ def remote_rmdir(s,dirname):
 
 def local_rmdir(dirname):
     work_dir = osp.abspath(osp.join(cfg['workspace_path'], dirname))
-    logging.info('Deleting directory %s' % work_dir)
-    try:
-        shutil.rmtree(work_dir)
-        logging.info('Deleted directory %s' % work_dir)
-        return 0
-    except:
-        logging.error('Deleting directory %s failed' % work_dir)
-        return 'Error'
+    if osp.exists(dirname):
+        logging.info('Deleting directory %s' % work_dir)
+        try:
+            shutil.rmtree(work_dir)
+            logging.info('Deleted directory %s' % work_dir)
+            return 0
+        except:
+            logging.error('Deleting directory %s failed' % work_dir)
+            return 'Error'
+    logging.info('Directory %s does not exist' % work_dir)
+    return 0
 
 def cancel_job(job_num,qsys):
         if job_num is not None:
