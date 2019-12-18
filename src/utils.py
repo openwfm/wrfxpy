@@ -201,7 +201,11 @@ def append2file(addl,base):
     """
     Append a file to another
     """
+<<<<<<< HEAD
     logging.info("appending file %s to %s" % (addl,base))
+=======
+    logging.info("appending file %s to %s" % (addl,base)) 
+>>>>>>> fmda
     with open(base,'a') as base_file:
         with open(addl,'r') as addl_file:
             base_file.write(addl_file.read())
@@ -567,6 +571,7 @@ def get_ip_address():
     s.connect(("8.8.8.8", 80))
     return s.getsockname()[0]
 
+<<<<<<< HEAD
 def json_join(path,json_list):
     """
     Join local jsons in a singular json and remove the previous jsons
@@ -620,6 +625,8 @@ def serial_json(obj):
         return utc_to_esmf(obj)
     raise TypeError("Type %s not serializable" % type(obj))
 
+=======
+>>>>>>> fmda
 def inq(x):
     """
     Inquire numpy array for shape min max
@@ -632,3 +639,7 @@ def inq(x):
         s=str(x)
     return s
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> fmda

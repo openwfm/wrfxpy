@@ -69,7 +69,11 @@
     },
     "end_utc": "2018-07-07_20:00:00",
     "grib_source": "CFSR",
+<<<<<<< HEAD
     "num_nodes": 1,
+=======
+    "num_nodes": 2,
+>>>>>>> fmda
     "start_utc": "2018-07-06_20:00:00",
     "fmda_geogrid_path": "wksp_fmda/GBCC/201906/fmda-GBCC-20190618-01.geo"
 }
