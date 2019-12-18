@@ -567,7 +567,6 @@ def get_ip_address():
     s.connect(("8.8.8.8", 80))
     return s.getsockname()[0]
 
-<<<<<<< HEAD
 def json_join(path,json_list):
     """
     Join local jsons in a singular json and remove the previous jsons
