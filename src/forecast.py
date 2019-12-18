@@ -714,6 +714,7 @@ def process_output(job_id):
         local_rmdir(osp.join(js.job_id,'products'))
     else:
         delete_visualization(js.job_id)
+
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
     make_clean_dir(js.pp_dir)
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
@@ -924,6 +925,7 @@ def process_sat_output(job_id):
         local_rmdir(osp.join(js.job_id,'products'))
     else:
         delete_visualization(js.job_id)
+
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
     make_clean_dir(js.pp_dir)
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
