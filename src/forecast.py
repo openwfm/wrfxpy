@@ -710,7 +710,10 @@ def process_output(job_id):
         return
 
     # set up postprocessing
-    delete_visualization(js.job_id)
+    if js.postproc.get('shuttle', None) is None:
+        local_rmdir(osp.join(js.job_id,'products'))
+    else:
+        delete_visualization(js.job_id)
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
     make_clean_dir(js.pp_dir)
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
@@ -917,7 +920,10 @@ def process_sat_output(job_id):
 
     pp = None
     already_sent_files = []
-    delete_visualization(js.job_id)
+    if js.postproc.get('shuttle', None) is None:
+        local_rmdir(osp.join(js.job_id,'products'))
+    else:
+        delete_visualization(js.job_id)
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
     make_clean_dir(js.pp_dir)
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
