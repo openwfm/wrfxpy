@@ -61,7 +61,7 @@ from email.mime.text import MIMEText
 
 import traceback
 import pprint
-from cleanup import parallel_job_running, delete_visualization
+from cleanup import parallel_job_running, delete_visualization, local_rmdir
 
 
 
