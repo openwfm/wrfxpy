@@ -26,11 +26,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
                   make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
-<<<<<<< HEAD
                   json_join, number_minutes, serial_json, link2copy, append2file
-=======
-                  link2copy, append2file
->>>>>>> fmda
 from write_geogrid import write_table
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
@@ -419,30 +415,18 @@ def fmda_add_to_geogrid(js):
     lat,lon = js['domains'][str(ndomains)]['center_latlon']
     bbox = (np.min(lats), np.min(lons), np.max(lats), np.max(lons))
     logging.info('fmda_add_to_geogrid: fmda bounding box is %s %s %s %s' % bbox)
-<<<<<<< HEAD
-    i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)
-=======
     i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)  
->>>>>>> fmda
     if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
         logging.error('fmda_add_to_geogrid: WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
         sys.exit(1)
     """
     for varname,varindex in index.iteritems():
-<<<<<<< HEAD
-        # update index
-=======
         # update index 
->>>>>>> fmda
         varindex['known_y']=float(i)
         varindex['known_x']=float(j)
         varindex['known_lat']=lats[i-1,j-1]
         varindex['known_lon']=lons[i-1,j-1]
-<<<<<<< HEAD
-        logging.info('fmda_add_to_geogrid: updating index known_x=%s known_y=%s known_lat=%s known_lon=%s' %
-=======
         logging.info('fmda_add_to_geogrid: updating index known_x=%s known_y=%s known_lat=%s known_lon=%s' % 
->>>>>>> fmda
            (varindex['known_x'],varindex['known_y'],varindex['known_lat'],varindex['known_lon']))
         varindex_path=osp.join(fmda_geogrid_path,varname,'index')
         write_table(varindex_path,varindex)
@@ -451,20 +435,13 @@ def fmda_add_to_geogrid(js):
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
     geogrid_tbl_json_path = osp.join(fmda_geogrid_path,'geogrid_tbl.json')
-<<<<<<< HEAD
-    logging.info('fmda_add_to_geogrid: updating GEOGRID.TBL at %s from %s' %
-=======
     logging.info('fmda_add_to_geogrid: updating GEOGRID.TBL at %s from %s' % 
->>>>>>> fmda
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in geogrid_tbl_json.iteritems():
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
-<<<<<<< HEAD
 
-=======
     
->>>>>>> fmda
 def execute(args,job_args):
     """
     Executes a weather/fire simulation.
@@ -542,14 +519,9 @@ def execute(args,job_args):
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
-<<<<<<< HEAD
+    fmda_add_to_geogrid(js) 
     # do steps 2 & 3 & 4 in parallel (three execution streams)
     #  -> Satellite retrieval ->
-=======
-    fmda_add_to_geogrid(js) 
-
-    # do steps 2 & 3 & 4 in parallel (two execution streams)
->>>>>>> fmda
     #  -> GEOGRID ->
     #  -> GRIB2 download ->  UNGRIB ->
 
