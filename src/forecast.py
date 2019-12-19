@@ -814,6 +814,7 @@ def process_output(job_id):
             break
 
         if "Timing for Writing wrfout" in line:
+            time.sleep(5)
             wait_wrfout = 0
             esmf_time,domain_str = re.match(r'.*wrfout_d.._([0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
             wrfout_path,domain_str = re.match(r'.*(wrfout_d.._[0-9_\-:]{19}) for domain\ +(\d+):' ,line).groups()
