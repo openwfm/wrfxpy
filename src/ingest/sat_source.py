@@ -169,7 +169,7 @@ class SatSource(object):
 				return {'url': url,'local_path': sat_path,'downloaded': datetime.datetime.now}
 			except DownloadError as e:
 				logging.error('%s cannot download satellite file %s' % (self.prefix, url))
-				logging.warning('Pleae check %s for %s' % (self.info_url, self.info))
+				logging.warning('Please check %s for %s' % (self.info_url, self.info))
 				return {}
 				raise SatError('SatSource: failed to download file %s' % url)
 
@@ -243,7 +243,8 @@ class SatSource(object):
 			else:
 				logging.error('retrieve_data_sat: no fire data in the manifest')
 				continue
-			r = Dict({
+			try:
+			        r = Dict({
 					'time_start_iso' : manifest[geok]['time_start'],
 					'time_end_iso' : manifest[geok]['time_end'],
 					'geo_url' : manifest[geok]['url'],
@@ -253,7 +254,10 @@ class SatSource(object):
 					'fire_local_path' : manifest[firek]['local_path'],
 					'fire_description' : manifest[firek]['dataset_id']
 				})
-			result.update({k: r})
+			        result.update({k: r})
+			except Exception as e:
+				logging.error('retrieve_data_sat: when creating manifest with error %s' % str(e))
+				continue
 		return result
 
 

@@ -141,7 +141,7 @@ class GribSource(object):
             download_url(url, grib_path)
         except DownloadError as e:
             logging.error('%s cannot download grib file %s' % (self.id, url))
-            logging.warning('Pleae check %s for %s' % (self.info_url, self.info))
+            logging.warning('Please check %s for %s' % (self.info_url, self.info))
             raise GribError('GribSource: failed to download file %s' % url)
 
     

@@ -83,7 +83,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             download_url(url, local_path, max_retries = max_retries-1)
         return
 
-    logging.info('down load_url %s as %s' % (url,local_path))
+    logging.info('download_url %s as %s' % (url,local_path))
     remove(local_path)
     command=[wget,'-O',ensure_dir(local_path),url]
     for opt in wget_options:
@@ -112,7 +112,6 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             return  # success
         else:
             os.remove(local_path)
-            os.remove(info_path)
             raise DownloadError('failed to download file %s' % url)
 
     # dump the correct file size to an info file next to the grib file

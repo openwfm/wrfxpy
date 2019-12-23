@@ -14,7 +14,6 @@ class MODIS(SatSource):
 
 	# instance variables
 	url='https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/6'
-	version='6'
 
 class Terra(MODIS):
 	"""
