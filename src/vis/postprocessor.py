@@ -849,6 +849,7 @@ class Postprocessor(object):
             # extract ESMF string times and identify timestamp of interest
             times = [''.join(x) for x in d.variables['Times'][:]]
             if ts_esmf in times:
+                logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
                 break
             else:
                 if k == max_retries-1:
@@ -858,8 +859,8 @@ class Postprocessor(object):
                 else:
                     logging.warning('process_vars: cannot find time %s in %s in retry %s of %s' % (ts_esmf,wrfout_path,str(k+1),str(max_retries)))
                     logging.info('process_vars: Available times: %s' % times)
-                    logging.info('process_vars: waiting for next retrieval...')
-                    time.sleep(5)
+                    logging.info('process_vars: waiting for next retry...')
+                    time.sleep(3)
 
         tndx = times.index(ts_esmf)
 
