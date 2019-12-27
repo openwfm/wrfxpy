@@ -840,15 +840,26 @@ class Postprocessor(object):
         traceargs()
 
         logging.info('process_vars: looking for time %s in %s' % (ts_esmf,wrfout_path))
-        # open the netCDF dataset
-        d = nc4.Dataset(wrfout_path)
+        max_retries = 5
+        for k in range(max_retries):
+            # open the netCDF dataset
+            d = nc4.Dataset(wrfout_path)
 
-        # extract ESMF string times and identify timestamp of interest
-        times = [''.join(x) for x in d.variables['Times'][:]]
-        if ts_esmf not in times:
-            logging.error('process_vars: cannot find time %s in %s' % (ts_esmf,wrfout_path))
-            logging.info('process_vars: Available times: %s' % times)
-            raise PostprocError("process_vars: Time %s not in %s" % (ts_esmf,osp.basename(wrfout_path)))
+            # extract ESMF string times and identify timestamp of interest
+            times = [''.join(x) for x in d.variables['Times'][:]]
+            if ts_esmf in times:
+                break
+            else:
+                if k == max_retries-1:
+                    logging.error('process_vars: cannot find time %s in %s' % (ts_esmf,wrfout_path))
+                    logging.info('process_vars: Available times: %s' % times)
+                    raise PostprocError("process_vars: Time %s not in %s" % (ts_esmf,osp.basename(wrfout_path)))
+                else:
+                    logging.warning('process_vars: cannot find time %s in %s in retry %s of %s' % (ts_esmf,wrfout_path,str(k+1),str(max_retries)))
+                    logging.info('process_vars: Available times: %s' % times)
+                    logging.info('process_vars: waiting for next retrieval...')
+                    time.sleep(5)
+
         tndx = times.index(ts_esmf)
 
         # build an output file per variable
