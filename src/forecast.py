@@ -396,6 +396,10 @@ def fmda_add_to_geogrid(js):
     if 'fmda_geogrid_path' in js:
         fmda_geogrid_path = osp.abspath(js['fmda_geogrid_path'])
         logging.info('fmda_geogrid_path is %s' % fmda_geogrid_path)
+        fmda_geogrid_basename = osp.basename(fmda_geogrid_path)
+        sym_fmda_geogrid_path = osp.join(js.wps_dir,fmda_geogrid_basename)
+        symlink_unless_exists(fmda_geogrid_path,sym_fmda_geogrid_path)
+        logging.info('fmda_geogrid_path is linked to %s' % sym_fmda_geogrid_path)
     else:
         return
         logging.info('fmda_geogrid_path not given')
@@ -439,6 +443,8 @@ def fmda_add_to_geogrid(js):
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in geogrid_tbl_json.iteritems():
+        vartable['abs_path'] = osp.join(fmda_geogrid_basename,osp.basename(vartable['abs_path']))
+        logging.info('new GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
 
     

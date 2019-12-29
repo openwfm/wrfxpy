@@ -174,7 +174,7 @@ def symlink_unless_exists(link_tgt, link_loc):
     """
 
     logging.info('Linking %s -> %s' % (link_loc, link_tgt))
-    if osp.isfile(link_tgt):
+    if osp.isfile(link_tgt) or osp.isdir(link_tgt):
         if not osp.lexists(link_loc):
             os.symlink(link_tgt, link_loc)
         else:
