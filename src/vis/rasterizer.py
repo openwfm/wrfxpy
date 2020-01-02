@@ -26,9 +26,13 @@ import numpy as np
 import netCDF4 as nc4
 import sys
 import os
-import StringIO
 import logging
-
+try:
+    # python 2
+    import StringIO
+except ImportError:
+    # python 3
+    from io import StringIO
 
 def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     """
@@ -129,6 +133,8 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
     # longitude/latitude extent
     lons = (np.amin(lon), np.amax(lon))
     lats = (np.amin(lat), np.amax(lat))
+
+    logging.info('basemap_raster_mercator: bounding box %s %s %s %s' % (lons + lats))
 
     # construct spherical mercator projection for region of interest
     m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],

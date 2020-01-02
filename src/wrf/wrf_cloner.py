@@ -104,6 +104,6 @@ def test_cloner():
     import shutil
     if os.path.exists('test_wps'): shutil.rmtree('test_wps')
     if os.path.exists('test_wrf'): shutil.rmtree('test_wrf')
-    w.clone_wps('test_wps', {'geogrid_vtable': 'geogrid/GEOGRID.TBL.HRRR'}, ['namelist.wps'])
+    w.clone_wps('test_wps', {'geogrid_vtable': 'geogrid/GEOGRID.TBL'}, ['namelist.wps'])
     w.clone_wrf('test_wrf', [])
     return w

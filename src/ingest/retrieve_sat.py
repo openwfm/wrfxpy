@@ -11,7 +11,7 @@ import logging, sys, json
 if __name__ == '__main__':
 	if len(sys.argv) != 2:
 		print('Usage: %s input.json' % sys.argv[0])
-		print('		supported satellite sources: Terra, Aqua, S-NPP')
+		print('		supported satellite sources: Terra, Aqua, S-NPP, S-NPP_HR')
 		sys.exit(-1)
 
 	# load input JSON
@@ -58,6 +58,7 @@ if __name__ == '__main__':
 		snpphr=SNPPHR(sys_cfg)
 		# retrieve granules
 		m_snpphr=snpphr.retrieve_data_sat(bounds, from_utc, to_utc)
+		print m_snpphr
 	if 'NOAA-20' in sat_sources:
 		logging.info('> NOAA-20 VIIRS')
 		noaa20=NOAA20(sys_cfg)

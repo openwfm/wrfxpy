@@ -51,7 +51,7 @@ def get_dList(url):
         listing.append(l.split()[-1])
     return listing
 
-def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def):
+def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def, appkey=None):
     """
     Download a remote URL to the location local_path with retries.
 
@@ -88,6 +88,8 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     command=[wget,'-O',ensure_dir(local_path),url]
     for opt in wget_options:
         command.insert(1,opt)
+    if appkey:
+        command.insert(1,'--header=\'Authorization: Bearer %s\'' % appkey)
     logging.info(' '.join(command))
     subprocess.call(command)
 

@@ -37,6 +37,10 @@ import os.path as osp
 from datetime import datetime, timedelta
 import pytz
 
+# setup environment
+sys_cfg = Dict(json.load(open('etc/conf.json')))
+cfg = Dict(json.load(open('etc/rtma_cycler.json')))
+meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
 def postprocess_cycle(cycle, region_cfg, wksp_path):
     """
@@ -164,7 +168,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     return postproc_path
 
 
-def compute_model_path(cycle, region_code, wksp_path):
+def compute_model_path(cycle, region_code, wksp_path, ext='nc'):
     """
     Construct a relative path to the fuel moisture model file
     for the region code and cycle.
@@ -175,7 +179,7 @@ def compute_model_path(cycle, region_code, wksp_path):
     :return: a relative path (w.r.t. workspace and region) of the fuel model file
     """
     year_month = '%04d%02d' % (cycle.year, cycle.month)
-    filename = 'fmda-%s-%04d%02d%02d-%02d.nc' %  (region_code, cycle.year, cycle.month, cycle.day, cycle.hour)
+    filename = 'fmda-%s-%04d%02d%02d-%02d.%s' %  (region_code, cycle.year, cycle.month, cycle.day, cycle.hour, ext)
     return osp.join(wksp_path,region_code,year_month,filename) 
 
 
@@ -283,6 +287,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     :param meso_token: the mesowest API access token
     :return: the model advanced and assimilated at the current cycle
     """
+    logging.info("rtma_cycler.fmda_advance_region: %s" % str(cycle))
     model = None
     prev_cycle = cycle - timedelta(hours=1)
     prev_model_path = compute_model_path(prev_cycle, cfg.code, wksp_path)
@@ -365,15 +370,23 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     
     # run the data assimilation step
     covs = [np.ones(dom_shape), hgt / 2000.0]
+    covs_names = ['const','hgt/2000']
     if np.any(rain > 0.01):
         covs.append(rain)
-    execute_da_step(model, cycle, covs, fm10)
+        covs_names.append('rain')
+    execute_da_step(model, cycle, covs, covs_names, fm10)
     
+    # make geogrid files for WPS; datasets and lines to add to GEOGRID.TBL
+    geo_path = compute_model_path(cycle, cfg.code, wksp_path,ext="geo")
+    index = rtma.geogrid_index()
+    print 'index',index
+    model.to_geogrid(geo_path,index,lats,lons)
+
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path)
     logging.info('CYCLER writing model variables to:  %s.' % model_path)
     model.to_netcdf(ensure_dir(model_path),
-        {'EQUILd FM':Ed,'EQUILw FM':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
+        {'EQUILd FM':Ed,'EQUILw FM':Ew,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
     
     return model
     
@@ -396,10 +409,6 @@ if __name__ == '__main__':
     
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    # setup environment
-    sys_cfg = Dict(json.load(open('etc/conf.json')))
-    cfg = Dict(json.load(open('etc/rtma_cycler.json')))
- 
     if len(sys.argv) == 2:
         pass
     elif len(sys.argv) == 5:
@@ -429,7 +438,6 @@ if __name__ == '__main__':
     logging.info('regions: %s' % json.dumps(cfg.regions))
     #logging.info('regions: %s' % json.dumps(cfg.regions, indent=1, separators=(',',':')))
 
-    meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
     # current time
     now = datetime.now(pytz.UTC)

@@ -69,7 +69,7 @@ def traceargs():
     frame = inspect.currentframe()
     args, _, _, values = inspect.getargvalues(frame)
     for i in args:
-        print "    %s:\n%s" % (i, pprint.pformat(values[i]))
+        print("    %s:\n%s" % (i, pprint.pformat(values[i])))
 
 def dump(obj,title):
     frame = inspect.currentframe()
@@ -187,8 +187,36 @@ def remove(tgt):
     os.remove wrapper
     """
     if osp.isfile(tgt):
-        logging.warning('remove: file %s exists, removing' % tgt)
+        logging.info('remove: file %s exists, removing' % tgt)
         os.remove(tgt)
+
+def force_copy(src,tgt):
+    """
+    remove target if exists and copy there, making directories as needed
+    """
+    remove(tgt)
+    shutil.copy(src,ensure_dir(tgt))
+
+def append2file(addl,base):
+    """
+    Append a file to another
+    """
+    logging.info("appending file %s to %s" % (addl,base)) 
+    with open(base,'a') as base_file:
+        with open(addl,'r') as addl_file:
+            base_file.write(addl_file.read())
+
+def link2copy(src):
+    """
+    replace link by a copy of the target file
+    """
+    try:
+        link_target = os.readlink(src)
+    except OSError as e:
+        return
+    logging.info("replacing soft link %s -> %s by a copy" % (src,link_target))
+    os.remove(src)
+    shutil.copy(link_target,src)
 
 def move(src,tgt):
     """
@@ -197,7 +225,6 @@ def move(src,tgt):
     logging.info('moving %s to %s' % (src, tgt))
     remove(tgt)
     shutil.move(src,tgt)
-
 
 def cache_file(path, cache_dir):
     """
@@ -471,9 +498,16 @@ def load_sys_cfg():
         import sys
         logging.critical('Cannot find system configuration, have you created etc/conf.json?')
         sys.exit(2)
+    
+    # load tokens if etc/tokens.json exists
+    try:
+        sys_cfg.update(json.load(open('etc/tokens.json')))
+    except:
+        logging.warning('Any etc/tokens.json specified, any token is going to be used.')
+        pass
 
     # set defaults
-    sys = sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
+    sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
     # configuration defaults + make directories if they do not exist
     sys_cfg.workspace_path = make_dir(osp.abspath(sys_cfg.get('workspace_path','wksp')))
     sys_cfg.ingest_path = make_dir(osp.abspath(sys_cfg.get('ingest_path','ingest')))
@@ -488,14 +522,16 @@ class response_object(object):
         self.status_code = status_code
 
 
-def readhead(url):
-    logging.info('reading http head of %s ' % url)
+def readhead(url,msg_level=1):
+    if msg_level > 0:
+        logging.info('reading http head of %s ' % url)
     try:
         ret=requests.head(url)
         ret.raise_for_status()
     #except (requests.RequestException, requests.exceptions.Timeout, requests.exceptions.TooManyRedirects, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
     except Exception as e:
-        logging.error(e)
+        if msg_level > 0:
+            logging.error(e)
         ret = response_object(-1)
     return ret
 
@@ -534,34 +570,34 @@ def get_ip_address():
 def json_join(path,json_list):
     """
     Join local jsons in a singular json and remove the previous jsons
-	
+
     :param path: local path to the jsons
     :param json_list: list of json names to join
     """
     manifest = Dict({})
     for jj in json_list:
-	json_path = osp.join(path,str(jj)+'.json')
-	try:
-		f = json.load(open(json_path), 'ascii')
-		manifest.update({jj: f})
-	except:
-		logging.warning('no satellite data for source %s in manifest json file %s' % (jj,json_path))
-		manifest.update({jj: {}})
-		pass
-	remove(json_path)
+        json_path = osp.join(path,str(jj)+'.json')
+        try:
+            f = json.load(open(json_path), 'ascii')
+            manifest.update({jj: f})
+        except:
+            logging.warning('no satellite data for source %s in manifest json file %s' % (jj,json_path))
+            manifest.update({jj: {}})
+            pass
+        remove(json_path)
     return manifest
 
 def duplicates(replist):
     """
     Give dictionary of repeated elements (keys) and their indexes (array in values)
 
-    :param replist: list to look for repetitions	
+    :param replist: list to look for repetitions
     """
     counter=collections.Counter(replist)
     dups=[i for i in counter if counter[i]!=1]
     result={}
     for item in dups:
-	result[item]=[i for i,j in enumerate(replist) if j==item]
+        result[item]=[i for i,j in enumerate(replist) if j==item]
     return result
 
 def number_minutes(t_int,t_fin,dt):
@@ -581,6 +617,18 @@ def serial_json(obj):
     :param obj: object
     """
     if isinstance(obj, datetime):
-	return utc_to_esmf(obj)
+        return utc_to_esmf(obj)
     raise TypeError("Type %s not serializable" % type(obj))
+
+def inq(x):
+    """
+    Inquire numpy array for shape min max
+    :param x: object
+    :return string:
+    """
+    try:
+        s= 'size %s min %g max %g' % (str(x.shape), np.min(x), np.max(x))
+    except:
+        s=str(x)
+    return s
 

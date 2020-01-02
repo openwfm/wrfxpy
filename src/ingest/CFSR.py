@@ -81,10 +81,12 @@ class CFSR_P(CFSR):
         :param utc_time: the UTC time
         :return: the relative URL
         """
-        path_tmpl = '%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.pgrbh00.grib2'
-        
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
-        return path_tmpl % (year, year, mon, year, mon, day, hour)
+
+        path_tmpls = ['%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.pgrbh00.grib2' % (year, year, mon, year, mon, day, hour),
+                    '%04d/%04d%02d/%04d%02d%02d/%04d%02d%02dcdas1.t%02dz.pgrbh00.grib2' % (year, year, mon, year, mon, day, year, mon, day, hour)]
+
+        return self.available_online(path_tmpls)
 
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_pgbh'
@@ -128,13 +130,16 @@ class CFSR_S(CFSR):
         :param utc_time: the UTC time
         :return: the relative URL
         """
-        path_tmpl = '%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.sfluxgrbf00.grib2'
-
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
-        return path_tmpl % (year, year, mon, year, mon, day, hour)
+
+        path_tmpls = ['%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.sfluxgrbf00.grib2' % (year, year, mon, year, mon, day, hour),
+                    '%04d/%04d%02d/%04d%02d%02d/%04d%02d%02dcdas1.t%02dz.sfluxgrbf00.grib2' % (year, year, mon, year, mon, day, year, mon, day, hour)]
+
+        return self.available_online(path_tmpls)
+
     # instance variables
     remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_flxf'
     id = "CFSR_S"
     prefix = 'COLMET_S'
 
-	
+

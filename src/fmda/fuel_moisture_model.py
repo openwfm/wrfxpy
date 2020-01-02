@@ -20,7 +20,10 @@
 
 import numpy as np
 import sys
-
+import logging
+from utils import inq, ensure_dir
+from ingest.rtma_source import RTMA
+from write_geogrid import write_geogrid_var, addquotes
 
 class FuelMoistureModel:
     """
@@ -35,6 +38,7 @@ class FuelMoistureModel:
         :param Tk: drying/wetting time constants of simulated fuels (one per fuel), default [1 10 100 1000]
         :param P0: initial state error covariance
         """
+        logging.info('FuelMoistureModel.__init__ m0 %s, Tk %s, P0 %s' % (inq(m0),inq(Tk), inq(P0)))
         self.Tk = np.array([1.0, 10.0, 100.0]) * 3600    # nominal fuel delays
         self.r0 = 0.05                                   # threshold rainfall [mm/h]
         self.rk = 8.0                                    # saturation rain intensity [mm/h]
@@ -84,6 +88,8 @@ class FuelMoistureModel:
         :param dt: integration step in seconds
         :param mQ: the proess noise matrix [shape dim x dim, common across grid points]
         """
+
+        logging.info('fuel_moisture_model: advance_model')
         Tk = self.Tk
         k = Tk.shape[0]                 # number of fuel classes
         m_ext = self.m_ext
@@ -106,7 +112,7 @@ class FuelMoistureModel:
 
         dS = m_ext[:, :, k + 1]
 
-        #print('GMM: EdA (%g,%g,%g)  EwA (%g,%g,%g)' % (np.amin(EdA),np.mean(EdA),np.amax(EdA), np.amin(EwA),np.mean(EdA),np.amax(EdA)))
+        logging.info('GMM: (min, mean, max) EdA (%g,%g,%g)  EwA (%g,%g,%g)' % (np.amin(EdA),np.mean(EdA),np.amax(EdA), np.amin(EwA),np.mean(EdA),np.amax(EdA)))
 
         assert np.all(EdA >= EwA)
 
@@ -360,10 +366,11 @@ class FuelMoistureModel:
         using standard tools and loosely follows the WRF 'standard'.
         
         :param path: the path where to store the model
-        :param data_vars: dictionary of additional variables to store
+        :param data_vars: dictionary of additional variables to store for visualization
         """
         import netCDF4
         
+
         d = netCDF4.Dataset(path, 'w', format='NETCDF4')
         
         d0, d1, k = self.m_ext.shape
@@ -373,6 +380,7 @@ class FuelMoistureModel:
         d.createDimension('west_east', d1)
         ncfmc = d.createVariable('FMC_GC', 'f4', ('south_north', 'west_east','fuel_moisture_classes_stag'))
         ncfmc[:,:,:] = self.m_ext
+        logging.info('fuel_moisture_model.to_netcdf: writing extended state as FMC_GC %s covariance as FMC_COV %s' % (inq(self.m_ext),inq(self.P)))
         ncfmc_cov = d.createVariable('FMC_COV', 'f4', ('south_north', 'west_east','fuel_moisture_classes_stag', 'fuel_moisture_classes_stag'))
         ncfmc_cov[:,:,:,:] = self.P
         for v in data_vars:
@@ -380,7 +388,37 @@ class FuelMoistureModel:
        
         
         d.close()
+
+    def to_geogrid(self, path, index, lats, lons):
+        """
+        Store model to geogrid files
+        """
+        test_latslons=True
+
+        logging.info("fmda.fuel_moisture_model.to_geogrid path=%s lats %s lons %s" % (path, inq(lats), inq(lons)))
+        logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid_index="+str(index))
+        ensure_dir(path)
+        xsize, ysize, n = self.m_ext.shape
+        if n != 5:
+            logging.error('wrong number of extended state fields, expecting 5')
+        x=1
+        y=1
+        x=int(xsize*0.5)
+        y=int(ysize*0.5)
+        index.update({'known_x':float(y),'known_y':float(x),'known_lat':lats[x-1,y-1],'known_lon':lons[x-1,y-1]})
+        logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid updated="+str(index))
+
+        FMC_GC = np.zeros((xsize, ysize, 5))
+        FMC_GC[:,:,:3] = self.m_ext[:,:,:3]
+        if test_latslons:
+            logging.info("fmda.fuel_moisture_model.to_geogrid: storing lons lats to FMC_GC(:,:,4:5) to test in WRF against XLONG and XLAT")
+            FMC_GC[:,:,3] = lons
+            FMC_GC[:,:,4] = lats
+        FMEP = self.m_ext[:,:,3:]
+        index['units']=addquotes('1')
         
+        write_geogrid_var(path,'FMC_GC',FMC_GC,'1h, 10h, 100h fuel moisture',index,bits=32)
+        write_geogrid_var(path,'FMEP',FMEP,'fuel moisture drying/wetting and rain equilibrium adjustments',index,bits=32)
         
     @classmethod
     def from_netcdf(cls, path):
@@ -391,13 +429,14 @@ class FuelMoistureModel:
         """
         import netCDF4
 
-        print "reading from netCDF file", path
+        logging.info("reading from netCDF file " + path)
         d = netCDF4.Dataset(path)
         ncfmc = d.variables['FMC_GC'][:,:,:]
-        print "FuelMoistureModel.from_netcdf: reading FMC_GC shape",ncfmc.shape
 
         d0, d1, k = ncfmc.shape
         P = d.variables['FMC_COV'][:,:,:,:]
+
+        logging.info('fuel_moisture_model.from_netcdf: reading FMC_GC %s FMC_COV %s' % (inq(ncfmc),inq(P)))
         
         Tk = np.array([1.0, 10.0, 100.0]) * 3600
         
@@ -405,5 +444,9 @@ class FuelMoistureModel:
         
         fm.m_ext[:,:,k-2:] = ncfmc[:,:,k-2:]
         fm.P[:,:,:,:] = P
+
+        logging.info('fuel_moisture_model.from_netcdf: err %s' % np.max(np.abs(ncfmc[:,:,:k-2]-fm.m_ext[:,:,:k-2])))
+        logging.info('fuel_moisture_model.from_netcdf: extended state fmc %d fields + 2 parameters' % (k - 2))
+
         return fm
         

@@ -33,6 +33,7 @@ class SatSource(object):
 		self.ingest_dir=osp.abspath(osp.join(js.get('ingest_path','ingest'),self.prefix))
 		self.cache_dir=osp.abspath(js.get('cache_path','cache'))
 		self.sys_dir=osp.abspath(js.get('sys_install_path',None))
+		self.appkey=js.get('appkey',None)
 
 	def available_locally_sat(self, path):
 		"""
@@ -112,6 +113,7 @@ class SatSource(object):
 					g.links=[{'href': u+'/'+g.name}]
 					g.time_start=geo_metas[ar]['time_start']
 					g.time_end=geo_metas[ar]['time_end']
+					g.dataset_id='Archive downloaded: unknown dataset id'
 					g.producer_granule_id=j['name']
 					metas.append(g)
 		logging.info('Archive: %s gets %s hits in this range' % (self.prefix+prod,len(metas)))
@@ -163,7 +165,7 @@ class SatSource(object):
 			return {'url': url,'local_path': sat_path}
 		else:
 			try:
-				download_url(url, sat_path)
+				download_url(url, sat_path, appkey=self.appkey)
 				return {'url': url,'local_path': sat_path,'downloaded': datetime.datetime.now}
 			except DownloadError as e:
 				logging.error('%s cannot download satellite file %s' % (self.prefix, url))
@@ -196,9 +198,9 @@ class SatSource(object):
 				url = m['links'][0]['href']
 				m.update(self.download_sat(url))
 				manifest.update({id: m})
-		
-		group_manifest = self.group_files_sat(manifest)	
-	
+
+		group_manifest = self.group_files_sat(manifest)
+
 		return group_manifest
 
 	def group_files_sat(self, manifest):
@@ -207,7 +209,7 @@ class SatSource(object):
 
                 :param manifest: satellite manifest from retrieving
 		:return result: groupped and cleanned manifest
-                """	
+                """
 		if not manifest:
 			return manifest
 		result = Dict({})
@@ -216,7 +218,7 @@ class SatSource(object):
 		firere = re.compile(r'%s' % self.fire_prefix)
 		keys = np.array(manifest.keys())
 		labels = np.array([''.join(k.split('.')[1:3]) for k in keys])
-		indexes = duplicates(labels)	
+		indexes = duplicates(labels)
 		for k,ind in indexes.items():
 			lenind = len(ind)
 			if lenind != 2:
@@ -232,7 +234,7 @@ class SatSource(object):
 					geok = pregeo[0]
 				else:
 					logging.error('retrieve_data_sat: no geo data in the manifest')
-					continue				
+					continue
 			else:
 				geok = geo[0]
 
