@@ -434,10 +434,20 @@ _var_wisdom = {
        'colorbar' : 'mm',
        'colormap' : 'jet_r',
        'scale' : 'original',
+       'transparent_values' : [-np.inf, 1],
        'retrieve_as' : lambda d,t: d.variables['RAINNC'][t,:,:],
        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'SNOWH' : {
+       'name' : 'snow depth',
+       'native_unit' : 'm',
+       'transparent_values' : [-np.inf, 0.01],
+       'colorbar' : 'mm',
+       'colormap' : 'tab20b_r',
+       'scale' : 'original',
+       'retrieve_as' : lambda d,t: d.variables['SNOWH'][t,:,:],
+       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     }
-
 }
 
 # contains functions to transform values from one unit to another in a simple format.
@@ -451,7 +461,8 @@ _units_wisdom = {
     ('ft/s','m/s') : lambda x: x / 3.2808399,
     ('ft',  'm') : lambda x: x / 3.2808399,
     ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x,
-    ('uug/kg', 'ug/kg') : lambda x:  x / 10.0
+    ('uug/kg', 'ug/kg') : lambda x:  x / 10.0,
+    ('m', 'mm') : lambda x:  x * 1000.0
 }
 
 

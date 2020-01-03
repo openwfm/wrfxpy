@@ -193,7 +193,7 @@ name = HGT_M
         interp_option =     10m:four_pt
         interp_option = default:four_pt
         interp_option =     .3s:average_16pt
-        smooth_option = smth-desmth_special; smooth_passes=10
+        smooth_option = smth-desmth_special; smooth_passes=5
         rel_path=     30s:topo_30s/
         rel_path=      2m:topo_2m/
         rel_path=      5m:topo_5m/
@@ -211,7 +211,7 @@ name = HGT_U
         interp_option =     10m:four_pt
         interp_option = default:four_pt
         interp_option =     .3s:average_16pt
-        smooth_option = smth-desmth_special; smooth_passes=10
+        smooth_option = smth-desmth_special; smooth_passes=5
         fill_missing=0.
         rel_path=     30s:topo_30s/
         rel_path=      2m:topo_2m/
@@ -230,7 +230,7 @@ name = HGT_V
         interp_option =     10m:four_pt
         interp_option = default:four_pt
         interp_option =     .3s:average_16pt
-        smooth_option = smth-desmth_special; smooth_passes=10
+        smooth_option = smth-desmth_special; smooth_passes=5
         fill_missing=0.
         rel_path=     30s:topo_30s/
         rel_path=      2m:topo_2m/
