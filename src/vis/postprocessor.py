@@ -841,7 +841,7 @@ class Postprocessor(object):
         traceargs()
 
         logging.info('process_vars: looking for time %s in %s' % (ts_esmf,wrfout_path))
-        max_retries = 5
+        max_retries = 10
         for k in range(max_retries):
             # open the netCDF dataset
             d = nc4.Dataset(wrfout_path)
@@ -860,7 +860,7 @@ class Postprocessor(object):
                     logging.warning('process_vars: cannot find time %s in %s in retry %s of %s' % (ts_esmf,wrfout_path,str(k+1),str(max_retries)))
                     logging.info('process_vars: Available times: %s' % times)
                     logging.info('process_vars: waiting for next retry...')
-                    time.sleep(3)
+                    time.sleep(5)
 
         tndx = times.index(ts_esmf)
 
