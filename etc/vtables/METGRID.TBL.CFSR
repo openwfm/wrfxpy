@@ -583,3 +583,13 @@ name=T0
         missing_value=200.
         fill_missing=-20.
 ========================================
+name=NDWI
+        priority = 1
+        interp_option=four_pt+average_4pt+search
+        masked=land
+        interp_mask=landmask(1)
+        missing_value=0.
+        fill_missing=0.99
+        halt_on_missing = no
+        rel_path=default:islope/
+========================================
