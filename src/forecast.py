@@ -1085,6 +1085,13 @@ def process_arguments(job_args,sys_cfg):
                 args['postproc'][str(max_dom)].append(satprod)
                 args['satprod_satsource'].update({satprod: sat})
 
+    # load tokens if etc/tokens.json exists
+    try:
+        tokens = json.load(open('etc/tokens.json'))
+        args.update(tokens)
+    except:
+        logging.warning('Any etc/tokens.json specified, any token is going to be used.')
+
     # defaults
     if args['ref_utc'] is not None:
         args['ref_utc'] = timespec_to_utc(args['ref_utc'], args['start_utc'])
