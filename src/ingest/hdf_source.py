@@ -3,8 +3,9 @@
 #
 
 
+from __future__ import absolute_import
 from utils import ensure_dir, symlink_unless_exists
-from downloader import download_url, DownloadError
+from .downloader import download_url, DownloadError
 
 from datetime import datetime, timedelta
 import pytz
@@ -13,6 +14,7 @@ import os
 import os.path as osp
 import sys
 import logging
+from six.moves import zip
 
 class HDFError(Exception):
     """
@@ -92,7 +94,7 @@ class HDFSource(object):
         info_path = path + '.size'
         if osp.exists(path) and osp.exists(info_path):
             content_size = int(open(info_path).read())
-            return osp.getsize(path) = content_size
+            return osp.getsize(path) == content_size
         else:
             return False
 
@@ -170,7 +172,7 @@ class MODIS_TERRA(HDFSource):
 
             # Add url for both firedata and geolocation data
             # 'allData/6/MOD[DATA]/[YEAR]/[DAY]/MOD[DATA].A[YEAR][DAY].[HOUR][MINUTE].006.*.hdf'
-            hdfManifest.append(filepath % (03, year, days, 03, year, days, hour, minute))
+            hdfManifest.append(filepath % (0o3, year, days, 0o3, year, days, hour, minute))
             hdfManifest.append(filepath % (14, year, days, 14, year, days, hour, minute))
 
             current = current + datetime.timedelta(minutes=5)

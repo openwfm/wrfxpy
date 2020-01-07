@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from osgeo import gdal, osr
 import pyproj
 
@@ -9,6 +10,7 @@ import netCDF4 as nc4
 from vis.postprocessor import Postprocessor
 from utils import load_sys_cfg, Dict, make_clean_dir
 from vis.var_wisdom import get_wisdom, is_windvec, is_fire_var
+from six.moves import range
 
 def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999.0):
     '''

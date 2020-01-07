@@ -2,14 +2,17 @@
 # Dalton Burke, CU Denver
 #
 
+from __future__ import absolute_import
 from utils import ensure_dir, symlink_unless_exists
-from downloader import download_url, DownloadError, get_dList
+from .downloader import download_url, DownloadError, get_dList
 
 from datetime import datetime, timedelta
 import sys
 import logging
 import os.path as osp
 from bisect import bisect
+from six.moves import map
+from six.moves import range
 
 
 
@@ -120,17 +123,17 @@ def get_gran_wisdom(var_name):
 
 def get_gran_wisdom_variables():
     """Return the variables for which wisdom is available."""
-    return _gran_wisdom.keys()
+    return list(_gran_wisdom.keys())
 
 
 def laads_retr_manifest(ingest_dir, manifest):
       ingest_dir = osp.abspath(osp.expanduser(ingest_dir))
 
-      nonlocals = filter(lambda x: not available_locally(osp.join(ingest_dir, x)), manifest)
+      nonlocals = [x for x in manifest if not available_locally(osp.join(ingest_dir, x))]
 
       logging.info('Retrieving data from laadsweb...')
 
-      map(lambda x: download_file(ingest_dir, laads_file_to_url(x), x), nonlocals)
+      list(map(lambda x: download_file(ingest_dir, laads_file_to_url(x), x), nonlocals))
 
       return manifest
 
@@ -151,10 +154,8 @@ def laads_geo_from_geoMeta(ingest_dir, satellite, from_utc, to_utc, lonlat):
       # each line in the file has southbounding coord in pos 5, north bound in pos 8, west bound in 7, east bound in 6.
       # using these to determine if the particular file intersects the lonlat range
       # we select the file name (in position 0) using list comprehension method
-      geo_manifest = [item[0] for item in filter(\
-            lambda x:\
-            lonlat_intersect(lonlat, [float(x[5]), float(x[8]), float(x[7]), float(x[6])])\
-            and (x[1] > str(from_utc) and x[1] < str(to_utc)), geoMeta)]
+      geo_manifest = [item[0] for item in [x for x in geoMeta if lonlat_intersect(lonlat, [float(x[5]), float(x[8]), float(x[7]), float(x[6])])\
+            and (x[1] > str(from_utc) and x[1] < str(to_utc))]]
       return geo_manifest
 
 def laads_range_manifest(gran, from_utc, to_utc):
@@ -209,7 +210,7 @@ def laads_list_manifest(gran, gran_list):
                 file_list.extend(get_dList(url % (prefix[i+2:i+6], prefix[i+6:i+9])))
 
       search_string = gran['name'] + '%s.9999999999999.hdf'
-      manifest = map(lambda x: file_list[bisect(file_list, search_string % x[i:(i+18)])-1], gran_list)
+      manifest = [file_list[bisect(file_list, search_string % x[i:(i+18)])-1] for x in gran_list]
       return manifest
 
 def laads_file_to_url(filename):
@@ -241,7 +242,7 @@ def get_source_wisdom(source_name):
       return _source_wisdom[source_name]
 
 def get_source_wisdom_variables():
-      return _source_wisdom.keys()
+      return list(_source_wisdom.keys())
 
 _satellite_wisdom = {
       # Geolocation granule should come first here
@@ -254,7 +255,7 @@ def get_sat_wisdom(satellite_name):
       return _satellite_wisdom[satellite_name]
 
 def get_sat_wisdom_variables():
-      return _satellite_wisdom.keys()
+      return list(_satellite_wisdom.keys())
 
 
 def retr_sat(ingest_dir, satellite, from_utc, to_utc, lonlat = []):
@@ -263,7 +264,7 @@ def retr_sat(ingest_dir, satellite, from_utc, to_utc, lonlat = []):
       """
       ingest_dir = osp.abspath(osp.expanduser(ingest_dir))
       sat_gran_names = get_sat_wisdom(satellite)
-      sat_gran_wis = map(lambda x: get_gran_wisdom(x), sat_gran_names)
+      sat_gran_wis = [get_gran_wisdom(x) for x in sat_gran_names]
 
       if lonlat != []:
             for gran in sat_gran_wis:
@@ -366,11 +367,11 @@ def retrieve_geoMeta(ingest_dir, satellite, from_utc, to_utc):
 
       manifest = geoMeta_manifest(from_utc, to_utc, satellite)
 
-      nonlocals = filter(lambda x: not available_locally(osp.join(ingest_dir, 'geoMeta/' + x.split('/')[-1])), manifest)
+      nonlocals = [x for x in manifest if not available_locally(osp.join(ingest_dir, 'geoMeta/' + x.split('/')[-1]))]
 
       logging.info('Retrieving geolocation data from %s' % ('ftp://ladsweb.nascom.nasa.gov/geoMeta/6/' + satellite))
 
-      map(lambda x: download_file(ingest_dir, x, osp.join(ingest_dir, 'geoMeta/' + x.split('/')[-1])), nonlocals)
+      list(map(lambda x: download_file(ingest_dir, x, osp.join(ingest_dir, 'geoMeta/' + x.split('/')[-1])), nonlocals))
 
       return [(osp.join(ingest_dir, 'geoMeta/' + x.split('/')[-1])) for x in manifest]
 

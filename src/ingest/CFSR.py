@@ -1,5 +1,6 @@
+from __future__ import absolute_import
 from ingest.grib_source import GribError
-from grib_reanalysis import GribReanalysis
+from .grib_reanalysis import GribReanalysis
 from datetime import datetime, timedelta
 import pytz
 import logging

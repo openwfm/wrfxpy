@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+from __future__ import print_function
 from forecast import make_job_file, JobState, process_arguments, load_sys_cfg
 import json
 import logging
@@ -9,7 +11,7 @@ catalog_path = osp.join(simulations_path,'catalog.json')
 try:
     catalog = json.load(open(catalog_path,'r'))
 except:
-    print('Cannot open catalog at %s, creating new.' % catalog_path)
+    print(('Cannot open catalog at %s, creating new.' % catalog_path))
     catalog={}
 
 if __name__ == '__main__':
@@ -43,13 +45,13 @@ if __name__ == '__main__':
         #print json.dumps(js, indent=4, separators=(',', ': '))
         jsb=osp.basename(js_path)
         m=glob.glob(osp.join(simulations_path,'*','wfc-'+jsb))
-        print('%s simulations found for %s file %s' % 
-            (len(m), description, js_path))
+        print(('%s simulations found for %s file %s' % 
+            (len(m), description, js_path)))
         for mf in m: 
             #print mf
             manifest=osp.basename(mf)
             job_id=osp.basename(osp.split(mf)[0])
-            print '%s found in %s' % (manifest, job_id)
+            print('%s found in %s' % (manifest, job_id))
             manifest_js=json.load(open(mf,'r'))
             from_utc = '999-99-99_99:99:99'
             to_utc = '0000-00-00_00:00:00'
@@ -66,20 +68,20 @@ if __name__ == '__main__':
                     print('Catalog entry already exists, no change.')
                     state[job_id] = 'No change'
                 else:
-                    print('Replacing catalog entry %s' % job_id)
-                    print('Old value:\n%s' % 
-                        json.dumps(catalog[job_id], indent=4, separators=(',', ': ')))
-                    print('New value:\n%s' % 
-                        json.dumps(new, indent=4, separators=(',', ': ')))
+                    print(('Replacing catalog entry %s' % job_id))
+                    print(('Old value:\n%s' % 
+                        json.dumps(catalog[job_id], indent=4, separators=(',', ': '))))
+                    print(('New value:\n%s' % 
+                        json.dumps(new, indent=4, separators=(',', ': '))))
                     state[job_id] = 'Replaced'
             else:
-                    print('Creating catalog entry %s' % job_id)
-                    print('New value:\n%s' % 
-                        json.dumps(new, indent=4, separators=(',', ': ')))
+                    print(('Creating catalog entry %s' % job_id))
+                    print(('New value:\n%s' % 
+                        json.dumps(new, indent=4, separators=(',', ': '))))
                     state[job_id] = 'Recovered'
             catalog[job_id]=new
             desc[job_id] = catalog[job_id]['description'] 
-    print 'Writing catalog at %s' % catalog_path
+    print('Writing catalog at %s' % catalog_path)
     json.dump(catalog, open(catalog_path,'w'), indent=4, separators=(',', ': '))
     for job_id in sorted(state):
-        print '%s: %s: %s' % (job_id, desc[job_id], state[job_id])
+        print('%s: %s: %s' % (job_id, desc[job_id], state[job_id]))

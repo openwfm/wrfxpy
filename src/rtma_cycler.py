@@ -17,6 +17,8 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
+from __future__ import print_function
 from fmda.fuel_moisture_da import execute_da_step, retrieve_mesowest_observations
 from fmda.fuel_moisture_model import FuelMoistureModel
 from ingest.grib_file import GribFile, GribMessage
@@ -36,6 +38,7 @@ import os.path as osp
 
 from datetime import datetime, timedelta
 import pytz
+import six
 
 # setup environment
 sys_cfg = Dict(json.load(open('etc/conf.json')))
@@ -235,10 +238,10 @@ def load_rtma_data(rtma_data, bbox):
     # bbox format: minlat, minlon, maxlat, maxlon
     i1, i2, j1, j2 = find_region_indices(lats, lons, bbox[0], bbox[2], bbox[1], bbox[3])
     
-    t2 = gf.values()[i1:i2,j1:j2] # temperature at 2m in K
-    td = GribFile(rtma_data['td'])[1].values()[i1:i2,j1:j2] # dew point in K
-    precipa = GribFile(rtma_data['precipa'])[1].values()[i1:i2,j1:j2] # precipitation
-    hgt = GribFile('static/ds.terrainh.bin')[1].values()[i1:i2,j1:j2]
+    t2 = list(gf.values())[i1:i2,j1:j2] # temperature at 2m in K
+    td = list(GribFile(rtma_data['td'])[1].values())[i1:i2,j1:j2] # dew point in K
+    precipa = list(GribFile(rtma_data['precipa'])[1].values())[i1:i2,j1:j2] # precipitation
+    hgt = list(GribFile('static/ds.terrainh.bin')[1].values())[i1:i2,j1:j2]
     logging.info('t2 min %s max %s' % (np.min(t2),np.max(t2)))
     logging.info('td min %s max %s' % (np.min(td),np.max(td)))
     logging.info('precipa min %s max %s' % (np.min(precipa),np.max(precipa)))
@@ -379,7 +382,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # make geogrid files for WPS; datasets and lines to add to GEOGRID.TBL
     geo_path = compute_model_path(cycle, cfg.code, wksp_path,ext="geo")
     index = rtma.geogrid_index()
-    print 'index',index
+    print('index',index)
     model.to_geogrid(geo_path,index,lats,lons)
 
     # store the new model  
@@ -428,11 +431,11 @@ if __name__ == '__main__':
         except Exception as e:
             logging.warning(e)
     else:
-	print 'Usage: to use domains configured in etc/rtma_cycler.json:'
-        print './rtma_cycler.sh anything'
-        print 'To use a custom domain named FIRE by giving a bounding box:'
-        print './rtma_cycler.sh lat1 lon1 lat2 lon2'
-        print 'Example: ./rtma_cycler.sh 42, -124.6, 49, -116.4'
+	print('Usage: to use domains configured in etc/rtma_cycler.json:')
+        print('./rtma_cycler.sh anything')
+        print('To use a custom domain named FIRE by giving a bounding box:')
+        print('./rtma_cycler.sh lat1 lon1 lat2 lon2')
+        print('Example: ./rtma_cycler.sh 42, -124.6, 49, -116.4')
         exit(1) 
 
     logging.info('regions: %s' % json.dumps(cfg.regions))
@@ -464,7 +467,7 @@ if __name__ == '__main__':
     logging.info('Have RTMA data for cycle %s.' % str(cycle))
       
     # check for each region, if we are up to date w.r.t. RTMA data available
-    for region_id,region_cfg in cfg.regions.iteritems():
+    for region_id,region_cfg in six.iteritems(cfg.regions):
         wrapped_cfg = Dict(region_cfg)
         #if 1:   # to run every time for debugging
         if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):

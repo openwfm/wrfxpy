@@ -2,6 +2,8 @@
 # Angel Farguell, CU Denver
 #
 
+from __future__ import absolute_import
+from __future__ import print_function
 from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP, SNPPHR, NOAA20
 from wrf.wps_domains import WPSDomainConf
@@ -10,7 +12,7 @@ import logging, sys, json
 
 if __name__ == '__main__':
 	if len(sys.argv) != 2:
-		print('Usage: %s input.json' % sys.argv[0])
+		print(('Usage: %s input.json' % sys.argv[0]))
 		print('		supported satellite sources: Terra, Aqua, S-NPP, S-NPP_HR')
 		sys.exit(-1)
 
@@ -58,7 +60,7 @@ if __name__ == '__main__':
 		snpphr=SNPPHR(sys_cfg)
 		# retrieve granules
 		m_snpphr=snpphr.retrieve_data_sat(bounds, from_utc, to_utc)
-		print m_snpphr
+		print(m_snpphr)
 	if 'NOAA-20' in sat_sources:
 		logging.info('> NOAA-20 VIIRS')
 		noaa20=NOAA20(sys_cfg)

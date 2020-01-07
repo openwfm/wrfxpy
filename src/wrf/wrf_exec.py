@@ -17,6 +17,8 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
+from __future__ import print_function
 from subprocess import check_call, check_output
 import os
 import os.path as osp
@@ -109,8 +111,8 @@ class Geogrid(Executor):
             raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
 
         if 'Successful completion of geogrid.' not in open(output_path).read():
-            print "Execution of %s was not successful." % self.exec_name
-            print "Examine %s for details." % output_path
+            print("Execution of %s was not successful." % self.exec_name)
+            print("Examine %s for details." % output_path)
             raise OutputCheckFailed()
 
 class Ungrib(Executor):
@@ -135,9 +137,9 @@ class Ungrib(Executor):
         """
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of ungrib.' not in open(output_path).read():
-            print open(osp.join(self.work_dir, self.exec_name + '.stderr')).read()
-            print 'Execution of %s was not successful.' % self.exec_name
-            print 'Examine %s for details.' % output_path
+            print(open(osp.join(self.work_dir, self.exec_name + '.stderr')).read())
+            print('Execution of %s was not successful.' % self.exec_name)
+            print('Examine %s for details.' % output_path)
             raise OutputCheckFailed()
 
 
@@ -163,9 +165,9 @@ class Metgrid(Executor):
         """
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of metgrid.' not in open(output_path).read():
-            print open(osp.join(self.work_dir, self.exec_name + '.stderr')).read()
-            print "Execution of %s was not successful." % self.exec_name
-            print "Examine %s for details." % output_path
+            print(open(osp.join(self.work_dir, self.exec_name + '.stderr')).read())
+            print("Execution of %s was not successful." % self.exec_name)
+            print("Examine %s for details." % output_path)
             raise OutputCheckFailed()
 
 
@@ -222,8 +224,8 @@ class Real(Executor):
             raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
 
         if 'SUCCESS COMPLETE REAL_EM INIT' not in open(output_path).read():
-            print "Execution of %s was not successful." % self.exec_name
-            print "Examine %s for details." % output_path
+            print("Execution of %s was not successful." % self.exec_name)
+            print("Examine %s for details." % output_path)
             raise OutputCheckFailed()
 
 
@@ -242,7 +244,7 @@ class Submitter(object):
         self.qsys_infos = json.load(open('etc/clusters.json'))
         self.work_dir = work_dir
         if qsys_id not in self.qsys_infos:
-            raise ValueError('Invalid queue system, must be one of %s' % repr(self.qsys_infos.keys()))
+            raise ValueError('Invalid queue system, must be one of %s' % repr(list(self.qsys_infos.keys())))
         self.qsys_id = qsys_id
 
 

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from forecast import make_job_file, JobState, process_arguments, load_sys_cfg
 import json
 import logging

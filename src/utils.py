@@ -18,6 +18,8 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
+from __future__ import absolute_import
+from __future__ import print_function
 from datetime import datetime, timedelta
 import pytz
 import os
@@ -36,6 +38,9 @@ import psutil
 import requests
 import socket
 import collections
+import six
+from six.moves import map
+from six.moves import zip
 
 
 class Dict(dict):
@@ -69,7 +74,7 @@ def traceargs():
     frame = inspect.currentframe()
     args, _, _, values = inspect.getargvalues(frame)
     for i in args:
-        print("    %s:\n%s" % (i, pprint.pformat(values[i])))
+        print(("    %s:\n%s" % (i, pprint.pformat(values[i]))))
 
 def dump(obj,title):
     frame = inspect.currentframe()
@@ -328,7 +333,7 @@ def symlink_matching_files(tgt_dir, src_dir, glob_pattern):
     :param glob_pattern: the shell glob pattern (ls style) to match against files
     """
     files = glob.glob(osp.join(src_dir, glob_pattern))
-    map(lambda f: symlink_unless_exists(f, osp.join(tgt_dir, osp.basename(f))), files)
+    list(map(lambda f: symlink_unless_exists(f, osp.join(tgt_dir, osp.basename(f))), files))
 
 
 def update_time_keys(time_utc, which, num_domains):
@@ -344,7 +349,7 @@ def update_time_keys(time_utc, which, num_domains):
     res = {}
     year, mon, day = time_utc.year, time_utc.month, time_utc.day
     hour, minute, sec = time_utc.hour, time_utc.minute, time_utc.second
-    key_seq = map(lambda x: which + x, ['_year', '_month', '_day', '_hour', '_minute', '_second'])
+    key_seq = [which + x for x in ['_year', '_month', '_day', '_hour', '_minute', '_second']]
     return {key: [value] * num_domains for (key, value) in zip(key_seq, [year, mon, day, hour, minute, sec])}
 
 
@@ -384,7 +389,7 @@ def update_namelist(nml, with_keys):
     :param nml: the namelist to update
     :param with_keys: the nested dictionary with update instructions
     """
-    for section, section_dict in with_keys.iteritems():
+    for section, section_dict in six.iteritems(with_keys):
         nml[section].update(section_dict)
 
 
@@ -415,7 +420,7 @@ def render_ignitions(js, max_dom):
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
                  'fire_viscosity' : [0] * max_dom }
 
-    for dom_str, dom_igns in ign_specs.iteritems():
+    for dom_str, dom_igns in six.iteritems(ign_specs):
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
         nml_fire['ifire'][dom_id-1] = 2
@@ -435,7 +440,7 @@ def render_ignitions(js, max_dom):
             radius = ign.get('radius',200)
             ros = ign.get('ros',1)
             vals = [ lat, lat, lon, lon, start, start+dur, radius, ros]
-            kv = dict(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals]))
+            kv = dict(list(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals])))
             nml_fire.update(kv)
 
     return { 'fire' : nml_fire }

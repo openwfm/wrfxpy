@@ -17,11 +17,13 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
+from __future__ import print_function
 from wrf.wrf_data import WRFModelData
-from trend_surface_model import fit_tsm
+from .trend_surface_model import fit_tsm
 from utils import great_circle_distance, find_closest_grid_point
-from fuel_moisture_model import FuelMoistureModel
-from fm10_observation import FM10Observation
+from .fuel_moisture_model import FuelMoistureModel
+from .fm10_observation import FM10Observation
 from utils import find_closest_grid_point
 
 import sys
@@ -34,6 +36,8 @@ import logging
 import json
 from MesoPy import Meso
 from utils import inq
+from six.moves import range
+from six.moves import zip
 
 def check_overlap(wrf_path,ts_now):
   """
@@ -135,7 +139,7 @@ def execute_da_step(model, model_time, covariates, covariates_names, fm10):
         logging.info('FMDA is using %d covariates: %s' % (Xd3,','.join(['fmc_gc[:,:,1]']+covariates_names)))
         X = np.zeros((dom_shape[0], dom_shape[1], Xd3))
         X[:,:,0] = fmc_gc[:,:,1]
-        for i,c in zip(range(Xd3-1),covariates):
+        for i,c in zip(list(range(Xd3-1)),covariates):
             X[:,:,i+1] = covariates[i]
 
         # run the trend surface model (clamp output to [0.0 - 2.5] to be safe)
@@ -264,7 +268,7 @@ def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
 if __name__ == '__main__':
 
     if len(sys.argv) != 2:
-        print('usage: %s <wrf-file>' % sys.argv[0])
+        print(('usage: %s <wrf-file>' % sys.argv[0]))
         sys.exit(1)
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

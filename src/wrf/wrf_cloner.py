@@ -17,10 +17,12 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
 from utils import ensure_dir, make_dir, symlink_unless_exists
 
 import os
 import os.path as osp
+from six.moves import map
 
 
 class WRFCloner(object):
@@ -63,7 +65,7 @@ class WRFCloner(object):
         make_dir(tgt)
 
         # clone all WPS executables
-        map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks)
+        list(map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks))
 
     def clone_wrf(self, tgt, with_files):
         """
@@ -83,7 +85,7 @@ class WRFCloner(object):
         make_dir(tgt)
 
         # symlink all at once
-        map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks)
+        list(map(lambda x: symlink_unless_exists(osp.join(src, x), osp.join(tgt, x)), symlinks))
 
     # list of executable file that must be symlinked in WPS directory
     wps_exec_files = ['geogrid.exe', 'metgrid.exe', 'ungrib.exe']

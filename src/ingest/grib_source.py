@@ -17,8 +17,9 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
 from utils import ensure_dir, symlink_unless_exists, timedelta_hours, readhead, Dict
-from downloader import download_url, DownloadError
+from .downloader import download_url, DownloadError
 from datetime import datetime, timedelta
 import pytz
 import requests
@@ -26,6 +27,8 @@ import os
 import os.path as osp
 import sys
 import logging
+import six
+from six.moves import zip
 
 class GribError(Exception):
     """
@@ -103,7 +106,7 @@ class GribSource(object):
         # vtables: a dictionary with keys from list ['geogrid_vtable', 'ungrib_vtable', 'metgrid_vtable'],
         #               which contain paths of the variable tables relative to 'etc/vtables'
 
-        for vtable_id, vtable_path in vtables.iteritems():
+        for vtable_id, vtable_path in six.iteritems(vtables):
             # build path to link location
             symlink_path = osp.join(tgt, vtable_locs[vtable_id])
 
@@ -197,7 +200,7 @@ class GribSource(object):
         """
 
         logging.info('GribSource: Looking for grib links available online')
-        available = filter(lambda x: readhead(self.remote_url + '/' + x, msg_level=0).status_code == 200, links)
+        available = [x for x in links if readhead(self.remote_url + '/' + x, msg_level=0).status_code == 200]
         if len(available) > 0:
             return available[0]
         else:

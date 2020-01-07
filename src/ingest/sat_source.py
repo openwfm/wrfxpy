@@ -2,13 +2,16 @@
 # Angel Farguell, CU Denver
 #
 
+from __future__ import absolute_import
 import glob, re, datetime, logging, requests
 import os.path as osp
 import numpy as np
-from urllib import urlopen
+from six.moves.urllib.request import urlopen
 from cmr import GranuleQuery
 from utils import Dict, utc_to_utcf, duplicates
-from downloader import download_url, DownloadError
+from .downloader import download_url, DownloadError
+from six.moves import filter
+from six.moves import range
 
 class SatError(Exception):
 	"""
@@ -216,7 +219,7 @@ class SatSource(object):
 		geore = re.compile(r'%s' % self.geo_prefix)
 		pregeore = re.compile(r'%s' % self.pre_geo_prefix)
 		firere = re.compile(r'%s' % self.fire_prefix)
-		keys = np.array(manifest.keys())
+		keys = np.array(list(manifest.keys()))
 		labels = np.array([''.join(k.split('.')[1:3]) for k in keys])
 		indexes = duplicates(labels)
 		for k,ind in indexes.items():
@@ -226,9 +229,9 @@ class SatSource(object):
 				if lenind < 2:
 					logging.error('retrieve_data_sat: geo or fire file is missing, number of granules %d different than 2' % lenind)
 					continue
-			geo = filter(geore.search,keys[ind])
-			pregeo = filter(pregeore.search,keys[ind])
-			fire = filter(firere.search,keys[ind])
+			geo = list(filter(geore.search,keys[ind]))
+			pregeo = list(filter(pregeore.search,keys[ind]))
+			fire = list(filter(firere.search,keys[ind]))
 			if not geo:
 				if pregeo:
 					geok = pregeo[0]

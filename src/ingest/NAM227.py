@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from ingest.grib_source import GribError
 from ingest.grib_forecast import GribForecast
 from datetime import datetime, timedelta

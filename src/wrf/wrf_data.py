@@ -17,12 +17,14 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
 import netCDF4
 import pytz
 from datetime import datetime, timedelta
 import numpy as np
 import sys
 import logging
+from six.moves import range
 
 class WRFModelData:
     """

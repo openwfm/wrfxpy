@@ -1,10 +1,13 @@
 # write_geogrid.py
 # Jan Mandel, June 2019
 
+from __future__ import absolute_import
+from __future__ import print_function
 import os.path as osp
 import numpy as np
 import sys, os, logging, json
 from utils import inq
+import six
 
 def write_divide(file,divide='=',count=25):
     """
@@ -21,7 +24,7 @@ def write_table(file,lines_dict,mode='w',divider_char='=',divider_count=25,divid
     f=open(file,mode)
     if divider_before:
         f.write(divider_char * divider_count + '\n')
-    for key,value in lines_dict.iteritems():
+    for key,value in six.iteritems(lines_dict):
         f.write("%s = %s\n" % (key,value))
     if divider_after:
         f.write(divider_char * divider_count + '\n')
@@ -100,7 +103,7 @@ def write_geogrid(path,array,index,bits=32):
     elif bits == 16:
         aa = np.int16(aa) 
     else:
-        print 'unsupported word size'
+        print('unsupported word size')
         sys.exit(1) 
     a = aa.transpose(2,0,1)
     zsize, ysize, xsize = a.shape
@@ -128,5 +131,5 @@ def addquotes(s):
 
 if __name__ == '__main__':
     test_name = 'test_geo'
-    print 'testing write_geogrid to',test_name
+    print('testing write_geogrid to',test_name)
     write_geogrid(test_name,[[1.0,2.0],[-1.0,-2.0]],{'name':addquotes(test_name)},bits=32)

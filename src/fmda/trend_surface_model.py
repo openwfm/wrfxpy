@@ -18,8 +18,11 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
+from __future__ import absolute_import
 import numpy as np
 import logging
+from six.moves import range
+from six.moves import zip
 
 
 def numerical_solve_bisect(e2, eps2, k):
@@ -95,7 +98,7 @@ def fit_tsm(obs_data, X):
     obs_var = np.zeros((Nobs,))
 
     # fill out matrix/vector structures
-    for (obs,i) in zip(obs_data, range(Nobs)):
+    for (obs,i) in zip(obs_data, list(range(Nobs))):
         p = obs.get_nearest_grid_point()
         y[i,0] = obs.get_value()
         Xobs[i,:] = X[p[0], p[1], :Nallcov]

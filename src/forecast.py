@@ -18,6 +18,8 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
+from __future__ import absolute_import
+from __future__ import print_function
 from wrf.wrf_cloner import WRFCloner
 from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
 from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
@@ -62,6 +64,8 @@ from email.mime.text import MIMEText
 import traceback
 import pprint
 from cleanup import parallel_job_running, delete_visualization, local_rmdir
+import six
+from six.moves import range
 
 
 
@@ -223,7 +227,7 @@ def retrieve_satellite(js, sat_source, q):
     try:
         logging.info("retrieving satellite files from %s" % sat_source.id)
         # retrieve satellite granules intersecting the last domain
-        max_dom = max([int(x) for x in filter(lambda x: len(x) == 1, js.bounds.keys())])
+        max_dom = max([int(x) for x in [x for x in list(js.bounds.keys()) if len(x) == 1]])
         manifest = sat_source.retrieve_data_sat(js.bounds[str(max_dom)], js.start_utc, js.end_utc)
         # write a json file with satellite information
         sat_file = sat_source.id+'.json'
@@ -288,12 +292,12 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             grib_source.clone_vtables(grib_dir)
             symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
 
-            print(grib_dir + ':')
+            print((grib_dir + ':'))
             os.system('ls -l %s' % grib_dir)
 
             Ungrib(grib_dir).execute().check_output()
 
-            print(grib_dir + ':')
+            print((grib_dir + ':'))
             os.system('ls -l %s' % grib_dir)
 
             if cache_colmet:
@@ -442,7 +446,7 @@ def fmda_add_to_geogrid(js):
     logging.info('fmda_add_to_geogrid: updating GEOGRID.TBL at %s from %s' % 
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
-    for varname,vartable in geogrid_tbl_json.iteritems():
+    for varname,vartable in six.iteritems(geogrid_tbl_json):
         vartable['abs_path'] = osp.join(fmda_geogrid_basename,osp.basename(vartable['abs_path']))
         logging.info('new GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
@@ -601,7 +605,7 @@ def execute(args,job_args):
         sat_manifest.sat_interval = Dict({})
         for k in args['domains'].keys():
             sat_manifest.dt[k] = args['domains'][k]['history_interval']
-            if 'sat_interval' in args['domains'][k].keys():
+            if 'sat_interval' in list(args['domains'][k].keys()):
                 sat_manifest.sat_interval[k] = args['domains'][k]['sat_interval']
             else:
                 sat_manifest.sat_interval[k] = (args['domains'][k]['history_interval'], args['domains'][k]['history_interval'])
@@ -760,7 +764,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
                         failures += 1
@@ -849,7 +853,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
         else:
@@ -936,7 +940,7 @@ def process_sat_output(job_id):
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
-    domains = sorted([int(x) for x in filter(lambda x: len(x) == 1, js.postproc)])
+    domains = sorted([int(x) for x in [x for x in js.postproc if len(x) == 1]])
     for dom_id in domains:
         logging.info('Processing domain %s' % str(dom_id))
         dt = timedelta(minutes=jsat.dt[str(dom_id)])
@@ -959,7 +963,7 @@ def process_sat_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = filter(lambda x: not x.endswith('json'), already_sent_files + sent_files_1)
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
 
@@ -1030,7 +1034,7 @@ def verify_inputs(args,sys_cfg):
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
-      for key,path in args['precomputed'].iteritems():
+      for key,path in six.iteritems(args['precomputed']):
           if not osp.exists(path):
               raise OSError('Precomputed entry %s points to non-existent file %s' % (key,path))
 
@@ -1038,7 +1042,7 @@ def verify_inputs(args,sys_cfg):
     wvs = get_wisdom_variables()
     failing = False
     if 'postproc' in args:
-        for dom in filter(lambda x: len(x) == 1, args['postproc'].keys()):
+        for dom in [x for x in list(args['postproc'].keys()) if len(x) == 1]:
             for vname in args['postproc'][dom]:
                 if vname not in wvs:
                     logging.error('unrecognized variable %s in postproc key for domain %s.' % (vname, dom))
@@ -1059,7 +1063,7 @@ def process_arguments(job_args,sys_cfg):
     # note: the execution flow allows us to override anything in the etc/conf.json file
     # dump(sys_cfg,'sys_cfg')
     args = sys_cfg
-    keys = job_args.keys()
+    keys = list(job_args.keys())
     for key in keys:
         if job_args[key] is None:
             logging.warning('Job argument %s=None, ignoring' % key)
@@ -1078,7 +1082,7 @@ def process_arguments(job_args,sys_cfg):
     # add postprocess satellite data
     if 'satellite_source' in args:
         if 'postproc' in args:
-            max_dom = max([int(x) for x in filter(lambda x: len(x) == 1, args['postproc'])])
+            max_dom = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
             sats = args['satellite_source']
             for sat in sats:
                 satprod = sat.upper()+'_AF'
@@ -1089,8 +1093,8 @@ def process_arguments(job_args,sys_cfg):
     if args['ref_utc'] is not None:
         args['ref_utc'] = timespec_to_utc(args['ref_utc'], args['start_utc'])
 
-    for k, v in args.iteritems():
-        if type(v) == unicode:
+    for k, v in six.iteritems(args):
+        if type(v) == six.text_type:
             args[k] = v.encode('ascii')
 
     # sanity check, also that nothing in etc/conf got overrident

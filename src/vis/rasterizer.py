@@ -18,6 +18,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
+from __future__ import absolute_import
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import simplekml as kml
@@ -27,6 +28,7 @@ import netCDF4 as nc4
 import sys
 import os
 import logging
+from six.moves import range
 try:
     # python 2
     import StringIO
@@ -98,7 +100,7 @@ def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=2
     kwargs = { 'norm': mpl.colors.Normalize(-.5,N-.5),
 	       'orientation': orientation,
                'spacing': 'proportional',
-	       'ticks': range(0,N),
+	       'ticks': list(range(0,N)),
                'cmap': cmap}
 
     # build figure according to requested orientation

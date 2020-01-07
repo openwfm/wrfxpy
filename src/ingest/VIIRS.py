@@ -2,6 +2,7 @@
 # Angel Farguell, CU Denver
 #
 
+from __future__ import absolute_import
 from ingest.sat_source import SatSource
 
 class VIIRS(SatSource):
