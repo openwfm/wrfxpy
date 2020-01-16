@@ -197,7 +197,8 @@ class SatSource(object):
 				id = osp.splitext(m['producer_granule_id'])[0]
 				url = m['links'][0]['href']
 				m.update(self.download_sat(url))
-				manifest.update({id: m})
+				if m:
+				    manifest.update({id: m})
 
 		group_manifest = self.group_files_sat(manifest)
 
@@ -222,9 +223,9 @@ class SatSource(object):
 		for k,ind in indexes.items():
 			lenind = len(ind)
 			if lenind != 2:
-				logging.warning('retrieve_data_sat: number of geo and fire granules %d different than 2' % lenind)
+				logging.warning('group_files_sat: number of geo and fire granules %d different than 2' % lenind)
 				if lenind < 2:
-					logging.error('retrieve_data_sat: geo or fire file is missing, number of granules %d different than 2' % lenind)
+					logging.error('group_files_sat: geo or fire file is missing, number of granules %d different than 2' % lenind)
 					continue
 			geo = filter(geore.search,keys[ind])
 			pregeo = filter(pregeore.search,keys[ind])
@@ -233,7 +234,7 @@ class SatSource(object):
 				if pregeo:
 					geok = pregeo[0]
 				else:
-					logging.error('retrieve_data_sat: no geo data in the manifest')
+					logging.error('group_files_sat: no geo data in the manifest')
 					continue
 			else:
 				geok = geo[0]
@@ -241,8 +242,10 @@ class SatSource(object):
 			if fire:
 				firek = fire[0]
 			else:
-				logging.error('retrieve_data_sat: no fire data in the manifest')
+				logging.error('group_files_sat: no fire data in the manifest')
 				continue
+
+			logging.info('group_files_sat: %s - geo %s and fire %s' % (k,geok,firek))
 			try:
 			        r = Dict({
 					'time_start_iso' : manifest[geok]['time_start'],
@@ -256,7 +259,7 @@ class SatSource(object):
 				})
 			        result.update({k: r})
 			except Exception as e:
-				logging.error('retrieve_data_sat: when creating manifest with error %s' % str(e))
+				logging.error('group_files_sat: when creating manifest with error %s' % str(e))
 				continue
 		return result
 
