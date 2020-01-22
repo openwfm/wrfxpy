@@ -1,4 +1,6 @@
 from __future__ import absolute_import
+from __future__ import unicode_literals
+from builtins import str
 from osgeo import gdal, osr
 import pyproj
 
@@ -195,7 +197,7 @@ def process_outputs_tiff(job_id):
         dom_id = int(domain_str)
         d = nc4.Dataset(wrfout_path)
         # extract ESMF string times
-        times = [''.join(x.astype(str)) for x in d.variables['Times'][:]]
+        times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
         if js.postproc is not None and str(dom_id) in js.postproc:
             if available_sats:
                 sat_list = [sat for sat in available_sats if sat in js.postproc[str(dom_id)]]

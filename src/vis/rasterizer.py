@@ -31,10 +31,10 @@ import logging
 from six.moves import range
 try:
     # python 2
-    import StringIO
+    from StringIO import StringIO
 except ImportError:
     # python 3
-    from io import StringIO
+    from io import BytesIO as StringIO
 
 def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     """
@@ -73,7 +73,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
         tick_lbl.set_fontsize(8)
 
     # save png to a StringIO
-    str_io = StringIO.StringIO()
+    str_io = StringIO()
     fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
     plt.close()
 
@@ -123,7 +123,7 @@ def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=2
         tick_lbl.set_fontsize(5)
 
     # save png to a StringIO
-    str_io = StringIO.StringIO()
+    str_io = StringIO()
     fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
     plt.close()
 
@@ -150,7 +150,7 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
     cmap = mpl.cm.get_cmap(cmap_name)
     m.pcolormesh(lon,lat,masked_grid,latlon=True,cmap=cmap,vmin=cmin,vmax=cmax)
 
-    str_io = StringIO.StringIO()
+    str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
     plt.close()
 
@@ -174,7 +174,7 @@ def basemap_barbs_mercator(u,v,lat,lon):
     plt.axis('off')
     m.quiver(lon,lat,u,v,latlon=True)
 
-    str_io = StringIO.StringIO()
+    str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
     plt.close()
 
@@ -197,7 +197,7 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
     	m.scatter(lon[i],lat[i],60,c=val[i],latlon=True,marker='.',cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
 
     # save png to a StringIO
-    str_io = StringIO.StringIO()
+    str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
     plt.close()
 

@@ -172,13 +172,13 @@ class GribForecast(GribSource):
         g=self.grib_forecast_hours_periods
         fc_seq = [] 
         for i in range(0, len(g)):
-	        fc_seq += list(range(max(fc_start, 0 if i is 0 else g[i-1]['hours'] + g[i]['period']), 
+	        fc_seq += list(range(max(int(fc_start), 0 if i is 0 else g[i-1]['hours'] + g[i]['period']), 
 	        g[i]['hours'] + g[i]['period'], g[i]['period']))
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
         fc_list.append(fc_seq[len(fc_list)])
 
-        colmet_files_utc = [cycle_start + timedelta(hours = x) for x in range(fc_start, fc_list[-1] +1, self.period_hours)]
+        colmet_files_utc = [cycle_start + timedelta(hours = x) for x in range(int(fc_start), fc_list[-1] +1, self.period_hours)]
   
         return fc_list, colmet_files_utc
 

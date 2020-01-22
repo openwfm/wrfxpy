@@ -20,6 +20,8 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import str
 import paramiko
 import os
 import os.path as osp
@@ -192,8 +194,8 @@ class SSHShuttle(object):
         """
         stdin, stdout, stderr = self.ssh.exec_command(command)
         stdin.flush()
-        print(stdout.read())
-        print(stderr.read())
+        print(stdout.read().decode())
+        print(stderr.read().decode())
 
     def retrieve_catalog(self):
         """ 

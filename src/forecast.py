@@ -20,6 +20,8 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import str
 from wrf.wrf_cloner import WRFCloner
 from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
 from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
@@ -94,7 +96,7 @@ class JobState(Dict):
             self.job_id = args['job_id']
         else:
             logging.warning('job_id not given, creating.')
-            self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(self.fc_hrs)
+            self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(int(self.fc_hrs))
         if 'restart' in args:
             logging.info('restart %s given in the job description' % args['restart'])
             self.restart = args['restart']
@@ -356,7 +358,7 @@ def find_wrfout(path, dom_id, esmf_time):
     :return: the path to the fresh (latest) wrfout
     """
     logging.info('find_wrfout: looking for the first wrfout for domain %s time %s' % (dom_id,esmf_time))
-    wrfouts = sorted(glob.glob(osp.join(path, 'wrfout_d%02d*' % dom_id)),None,None,True) # reverse order
+    wrfouts = sorted(glob.glob(osp.join(path, 'wrfout_d%02d*' % dom_id)),reverse=True) # reverse order
     wrfouts
     for wrfout in wrfouts:
         wrfout_time = re.match(r'.*wrfout_d.._([0-9_\-:]{19})' ,wrfout).groups()[0]
@@ -741,7 +743,7 @@ def process_output(job_id):
             dom_id = int(domain_str)
             d = nc4.Dataset(wrfout_path)
             # extract ESMF string times
-            times = [''.join(x) for x in d.variables['Times'][:]]
+            times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
             d.close()
             for esmf_time in sorted(times):
                 logging.info("Processing domain %d for time %s." % (dom_id, esmf_time))
@@ -1093,10 +1095,6 @@ def process_arguments(job_args,sys_cfg):
     if args['ref_utc'] is not None:
         args['ref_utc'] = timespec_to_utc(args['ref_utc'], args['start_utc'])
 
-    for k, v in six.iteritems(args):
-        if type(v) == six.text_type:
-            args[k] = v.encode('ascii')
-
     # sanity check, also that nothing in etc/conf got overrident
     verify_inputs(args,sys_cfg)
 
@@ -1113,7 +1111,7 @@ if __name__ == '__main__':
     # logging.info('sys_cfg = %s' % json.dumps(sys_cfg, indent=4, separators=(',', ': ')))
 
     # load job JSON
-    job_args = json.load(open(sys.argv[1]), 'ascii')
+    job_args = json.load(open(sys.argv[1]))
     # logging.info('job_args = %s' % json.dumps(job_args, indent=4, separators=(',', ': ')))
 
     # process arguments

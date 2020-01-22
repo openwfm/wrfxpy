@@ -2,6 +2,8 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import str
 import matplotlib as mpl
 from six.moves import range
 from six.moves import zip
@@ -397,14 +399,14 @@ class Postprocessor(object):
         # write raster file
         raster_path = out_path + "-raster.png"
         logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
-        with open(raster_path, 'w') as f:
+        with open(raster_path, 'wb') as f:
             f.write(raster_png_data)
 
         # write colorbar file
         colorbar_path = None
         if cb_png_data is not None:
             colorbar_path = out_path + "-cb.png"
-            with open(colorbar_path, "w") as f:
+            with open(colorbar_path, "wb") as f:
                 f.write(cb_png_data)
 
         return raster_path, colorbar_path, corner_coords
@@ -424,7 +426,7 @@ class Postprocessor(object):
         raster_png_data, corner_coords = self._vector2raster(d, var, tndx)
 
         raster_path = out_path + '-raster.png'
-        with open(raster_path, 'w') as f:
+        with open(raster_path, 'wb') as f:
             f.write(raster_png_data)
 
         return raster_path, corner_coords
@@ -447,14 +449,14 @@ class Postprocessor(object):
         raster_path = out_path + '-raster.png'
         logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
 
-        with open(raster_path, 'w') as f:
+        with open(raster_path, 'wb') as f:
                 f.write(raster_png_data)
 
         # write colorbar file
         colorbar_path = None
         if cb_png_data is not None:
             colorbar_path = out_path + "-cb.png"
-            with open(colorbar_path, "w") as f:
+            with open(colorbar_path, "wb") as f:
                 f.write(cb_png_data)
 
         return raster_path, colorbar_path, corner_coords
@@ -475,14 +477,14 @@ class Postprocessor(object):
         raster_path = out_path + '-raster.png'
         logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
 
-        with open(raster_path, 'w') as f:
+        with open(raster_path, 'wb') as f:
                 f.write(raster_png_data)
 
         # write colorbar file
         colorbar_path = None
         if cb_png_data is not None:
             colorbar_path = out_path + "-cb.png"
-            with open(colorbar_path, "w") as f:
+            with open(colorbar_path, "wb") as f:
                 f.write(cb_png_data)
 
         return raster_path, colorbar_path, corner_coords
@@ -780,7 +782,7 @@ class Postprocessor(object):
                         egs.append(eg)
                         efs.append(ef)
                     except Exception as e:
-                        logging.warning("Exception %s while evaluating granule %s from product %s for time %s" % (e.message, gran, sat, ts_esmf))
+                        logging.warning("Exception %s while evaluating granule %s from product %s for time %s" % (e, gran, sat, ts_esmf))
                         logging.warning(traceback.print_exc())
             if not dgs:
                 logging.info('process_sats: any granule %s in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
@@ -809,7 +811,7 @@ class Postprocessor(object):
                     logging.info("updating manifest for variable %s at time %s with manifest %s" % (sat, ts_esmf, mf_upd))
                     self._update_manifest(dom_id, ts_esmf, sat, mf_upd)
                 except Exception as e:
-                    logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
+                    logging.warning("Exception %s while postprocessing %s for time %s" % (e, sat, ts_esmf))
                     logging.warning(traceback.print_exc())
             else:
                 logging.info('process_sats: some granule %s is in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
@@ -828,7 +830,7 @@ class Postprocessor(object):
                         self.close_file(dgs[i],egs[i])
                         self.close_file(dfs[i],efs[i])
                 except Exception as e:
-                    logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, sat, ts_esmf))
+                    logging.warning("Exception %s while postprocessing %s for time %s" % (e, sat, ts_esmf))
                     logging.warning(traceback.print_exc())
 
 
@@ -851,7 +853,7 @@ class Postprocessor(object):
             d = nc4.Dataset(wrfout_path)
 
             # extract ESMF string times and identify timestamp of interest
-            times = [''.join(x) for x in d.variables['Times'][:]]
+            times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
             if ts_esmf in times:
                 logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
                 break
@@ -886,7 +888,7 @@ class Postprocessor(object):
                 mf_upd['coords'] = coords
                 self._update_manifest(dom_id, ts_esmf, var, mf_upd)
             except Exception as e:
-                logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
+                logging.warning("Exception %s while postprocessing %s for time %s" % (e, var, ts_esmf))
                 logging.warning(traceback.print_exc())
 
         d.close()
@@ -905,7 +907,7 @@ class Postprocessor(object):
         d = nc4.Dataset(wrfout_path)
 
         # extract ESMF string times and identify timestamp of interest
-        times = [''.join(x) for x in d.variables['Times'][:]]
+        times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
         if ts_esmf not in times:
             raise PostprocError("vars2kmz: Invalid timestamp %s" % ts_esmf)
         tndx = times.index(ts_esmf)
@@ -924,7 +926,7 @@ class Postprocessor(object):
 
 
             except Exception as e:
-                logging.warning("Exception %s while postprocessing %s for time %s into KMZ" % (e.message, var, ts_esmf))
+                logging.warning("Exception %s while postprocessing %s for time %s into KMZ" % (e, var, ts_esmf))
                 logging.warning(traceback.print_exc())
 
 
@@ -941,7 +943,7 @@ class Postprocessor(object):
         d = nc4.Dataset(wrfout_path)
 
         # extract ESMF string times and identify timestamp of interest
-        times = [''.join(x) for x in d.variables['Times'][:]]
+        times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
         if ts_esmf not in times:
             raise PostprocError("vars2png: Invalid timestamp %s" % ts_esmf)
         tndx = times.index(ts_esmf)
@@ -961,7 +963,7 @@ class Postprocessor(object):
                         mf_upd['colorbar'] = osp.basename(cb_path)
                     self._update_manifest(dom_id, ts_esmf, var, mf_upd)
             except Exception as e:
-                logging.warning("Exception %s while postprocessing %s for time %s into PNG" % (e.message, var, ts_esmf))
+                logging.warning("Exception %s while postprocessing %s for time %s into PNG" % (e, var, ts_esmf))
                 logging.warning(traceback.print_exc())
 
     def process_file(self, wrfout_path, var_list, skip=1):
@@ -978,7 +980,7 @@ class Postprocessor(object):
         d = nc4.Dataset(wrfout_path)
 
         # extract ESMF string times and identify timestamp of interest
-        times = [''.join(x) for x in d.variables['Times'][:]]
+        times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
 
         # build one KMZ per variable
         fixed_colorbars = {}
@@ -1011,7 +1013,7 @@ class Postprocessor(object):
                                 mf_upd['colorbar'] = osp.basename(cb_path)
                         self._update_manifest(dom_id, ts_esmf, var, mf_upd)
                 except Exception as e:
-                    logging.warning("Exception %s while postprocessing %s for time %s" % (e.message, var, ts_esmf))
+                    logging.warning("Exception %s while postprocessing %s for time %s" % (e, var, ts_esmf))
                     logging.warning(traceback.print_exc())
 
 

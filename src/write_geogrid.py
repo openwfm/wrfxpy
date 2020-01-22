@@ -115,7 +115,7 @@ def write_geogrid(path,array,index,bits=32):
     index.update({'type':'continuous',
                  'signed':'yes',
                  'scale_factor':scale,
-                 'wordsize':bits/8,
+                 'wordsize':bits // 8,
                  'tile_x':xsize,
                  'tile_y':ysize,
                  'tile_z':zsize,

@@ -21,7 +21,7 @@ lat2, lon2 = get_latlon('dom_test/geo_em.d02.nc')
 
 pari, parj = d2.parent_start[0]-1, d2.parent_start[1]-1
 pcsr = d2.parent_cell_size_ratio
-delta = (pcsr - 1) / 2
+delta = (pcsr - 1) // 2
 
 print(('Child domain starts at %d, %d pcsr=%d delta=%d' % (pari, parj, pcsr, delta)))
 

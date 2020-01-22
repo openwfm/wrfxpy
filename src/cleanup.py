@@ -19,6 +19,8 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import str
 from ssh_shuttle import SSHShuttle, send_product_to_server
 import json
 import os
@@ -63,7 +65,7 @@ def cancel_job(job_num,qsys):
             logging.info('Deleting parallel job %s on %s.' % (job_num, qsys))
             cluster = load_cluster_file(qsys)
             try:
-                ret = subprocess.check_output([cluster['qdel_cmd'], job_num])
+                ret = subprocess.check_output([cluster['qdel_cmd'], job_num]).decode(sys.stdout.encoding)
                 logging.info(ret)
             except:
                 logging.error('Deleting parallel job %s failed.' % job_num)
@@ -112,7 +114,7 @@ def parallel_job_running(js):
     qstat_arg = cluster['qstat_arg']
     if re.search('%s',qstat_arg):
         try:
-            ret = subprocess.check_output([qstat_cmd,qstat_arg % js.job_num],stderr=subprocess.STDOUT)
+            ret = subprocess.check_output([qstat_cmd,qstat_arg % js.job_num],stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
             logging.info('Job %s exists in the queue system' % js.job_num)
         except subprocess.CalledProcessError as e:
             logging.info('%s %s returned status %s' % (qstat_cmd,qstat_arg,e.returncode))
@@ -122,9 +124,9 @@ def parallel_job_running(js):
             else:
                 logging.error(e.output)
     elif not qstat_arg:
-        ret = subprocess.check_output([qstat_cmd],stderr=subprocess.STDOUT)
+        ret = subprocess.check_output([qstat_cmd],stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
     else:
-        ret = subprocess.check_output([qstat_cmd,qstat_arg],stderr=subprocess.STDOUT)
+        ret = subprocess.check_output([qstat_cmd,qstat_arg],stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
     for line in ret.split('\n'):
         ls=line.split()
         if len(ls) >0 and ls[0] == str(js.job_num):
@@ -276,7 +278,7 @@ if __name__ == '__main__':
         print('delete <job_id> : cancel, and delete all files')
         print('workspace       : delete jobs that are not on the visulalization server')
         print('update <job_id> : check if the job is running and update its job state file')
-	print('send <job_id>   : send local simulation to the server')
+        print('send <job_id>   : send local simulation to the server')
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -317,6 +319,7 @@ if __name__ == '__main__':
         update(job_id)
 
     if cmd == 'send':
-	send_products_to_server(job_id)
+        send_products_to_server(job_id)
 		
+
 

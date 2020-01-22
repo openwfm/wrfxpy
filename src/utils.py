@@ -20,6 +20,8 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import str
 from datetime import datetime, timedelta
 import pytz
 import os
@@ -308,7 +310,7 @@ def round_time_to_hour(utc, up=False, period_hours=1):
         return None
     tm = utc + timedelta(hours=1, seconds=-1) if up else utc
     tm = tm.replace(minute=0, second=0)
-    h = period_hours * ((tm.hour + period_hours - 1 if up else tm.hour) / period_hours)
+    h = period_hours * ((tm.hour + period_hours - 1 if up else tm.hour) // period_hours)
     tm = tm + timedelta(hours=h-tm.hour) if h > tm.hour else tm - timedelta(hours=tm.hour - h)
     return tm
 
@@ -321,7 +323,7 @@ def timedelta_hours(timedelta_utc, up = True):
     :param up: round up if True, down in False
     :return: number of hours rounded to whole hour
     """
-    return int(timedelta_utc.total_seconds() + ((3600 - 0.001)if up else 0 ))/ 3600
+    return int(timedelta_utc.total_seconds() + ((3600 - 0.001)if up else 0 )) // 3600
 
 
 def symlink_matching_files(tgt_dir, src_dir, glob_pattern):

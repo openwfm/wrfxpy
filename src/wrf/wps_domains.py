@@ -64,7 +64,7 @@ class WPSDomainLCC(object):
             self.cell_size = tuple(cfg['cell_size'])
             self.ref_latlon = tuple(cfg['center_latlon'])
             self.domain_size = tuple(cfg['domain_size'])
-            self.time_step = cfg.get('time_step', int(max(6*min(self.domain_size)/1000, 1)))
+            self.time_step = cfg.get('time_step', int(max(6*min(self.domain_size) // 1000, 1)))
             self.parent_start = (1,1)
             if 'truelats' in cfg:
                 self.truelats = cfg['truelats']
@@ -135,7 +135,7 @@ class WPSDomainLCC(object):
             self.ref_latlon = (float(d.getncattr('CEN_LAT')),float(d.getncattr('CEN_LON')))
             self.truelats = (float(d.getncattr('TRUELAT1')), float(d.getncattr('TRUELAT2')))
             self.stand_lon = float(d.getncattr('STAND_LON'))
-            self.time_step = cfg.get('time_step', max(1, int(6*min(self.cell_size)/1000)))
+            self.time_step = cfg.get('time_step', max(1, int(6*min(self.cell_size) // 1000)))
             self.parent_start = (1, 1)
             self.parent_time_step_ratio = 1
             self._init_projection()
@@ -202,7 +202,7 @@ class WPSDomainLCC(object):
         else:
             pi, pj = self.parent.latlon_to_ij(lat, lon)
             pcsr, ps = self.parent_cell_size_ratio, self.parent_start
-            delta = (pcsr - 1) / 2
+            delta = (pcsr - 1) // 2
             return ((pi - ps[0] + 1.) * pcsr + delta,
                     (pj - ps[1] + 1.) * pcsr + delta)
 
@@ -215,8 +215,8 @@ class WPSDomainLCC(object):
             return lat, lon
         else:
             pcsr, ps = self.parent_cell_size_ratio, self.parent_start
-            delta = (pcsr - 1) / 2
-            return self.parent.ij_to_latlon((i-delta)/pcsr+ps[0]-1., (j-delta)/pcsr+ps[1]-1.) 
+            delta = (pcsr - 1) // 2
+            return self.parent.ij_to_latlon((i-delta)//pcsr+ps[0]-1., (j-delta)//pcsr+ps[1]-1.) 
 
     
     def update_wpsnl(self, nml):

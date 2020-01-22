@@ -188,7 +188,7 @@ def questionnaire():
         'truelats' : (ign_latlon[0], ign_latlon[0]),
         'stand_lon' : ign_latlon[1],
         'history_interval' : history_interval,
-        'time_step' : max(1, 5 * cell_size / 1000)
+        'time_step' : max(1, 5 * cell_size // 1000)
         }
     }
 

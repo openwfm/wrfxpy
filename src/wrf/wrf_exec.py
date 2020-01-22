@@ -19,10 +19,12 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import str
 from subprocess import check_call, check_output
 import os
 import os.path as osp
-import re
+import re, sys
 import json
 import logging
 
@@ -273,11 +275,11 @@ class Submitter(object):
         logging.info('submitting to batch queue system %s' % self.qsys_id)
         logging.info('%s %s' % (qsub, script_path))
 
-        ret = check_output([qsub, script_path], cwd=self.work_dir)
+        ret = check_output([qsub, script_path], cwd=self.work_dir).decode(sys.stdout.encoding)
         logging.info(ret)
         job_num = ret.split(' ')[qsys['qsub_job_num_index']].rstrip()
         logging.info('job number %s submitted' % job_num)
-	return job_num
+        return job_num
 
 
 class WRF(Submitter):
