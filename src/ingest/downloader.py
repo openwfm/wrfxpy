@@ -92,7 +92,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     if appkey:
         command.insert(1,'--header=\'Authorization: Bearer %s\'' % appkey)
     logging.info(' '.join(command))
-    subprocess.call(command)
+    subprocess.call(' '.join(command),shell=True)
 
     file_size = osp.getsize(local_path)
 
@@ -109,7 +109,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             # and overwrite previously downloaded data
             logging.info('download_url sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
-            download_url(url, local_path, max_retries = max_retries-1)
+            download_url(url, local_path, max_retries = max_retries-1, appkey = appkey)
             return  # success
         else:
             os.remove(local_path)

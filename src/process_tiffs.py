@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
-from builtins import str
 from osgeo import gdal, osr
 import pyproj
 

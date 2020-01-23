@@ -11,7 +11,7 @@ if __name__ == '__main__':
     # load configuration JSON
     sys_cfg = load_sys_cfg()
     # note: the execution flow allows us to override anything in the etc/conf.json file
-    job_args = json.load(open(sys.argv[1]), 'ascii')
+    job_args = json.load(open(sys.argv[1]))
     args = sys_cfg 
     args.update(job_args)
     process_arguments(args)

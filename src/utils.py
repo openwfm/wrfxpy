@@ -21,7 +21,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
-from builtins import str
 from datetime import datetime, timedelta
 import pytz
 import os
@@ -578,7 +577,7 @@ def json_join(path,json_list):
     for jj in json_list:
         json_path = osp.join(path,str(jj)+'.json')
         try:
-            f = json.load(open(json_path), 'ascii')
+            f = json.load(open(json_path))
             manifest.update({jj: f})
         except:
             logging.warning('no satellite data for source %s in manifest json file %s' % (jj,json_path))

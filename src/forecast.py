@@ -21,7 +21,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
-from builtins import str
 from wrf.wrf_cloner import WRFCloner
 from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
 from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
@@ -547,8 +546,8 @@ def execute(args,job_args):
             bounds = (latloni[1],latlonf[1],latloni[0],latlonf[0])
             js.bounds[str(k+1)] = bounds
         sat_proc = {}
-    for satellite_source in js.satellite_source:
-        sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
+        for satellite_source in js.satellite_source:
+            sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
 
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
 
@@ -582,9 +581,10 @@ def execute(args,job_args):
         for satellite_source in js.satellite_source:
             sat_proc[satellite_source.id].join()
 
-    for satellite_source in js.satellite_source:
-        if proc_q.get() != 'SUCCESS':
-            return
+    if js.satellite_source:
+        for satellite_source in js.satellite_source:
+            if proc_q.get() != 'SUCCESS':
+                return
 
     for grib_source in js.grib_source:
         if proc_q.get() != 'SUCCESS':
