@@ -148,18 +148,18 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
             raster_name = 'fmda-%s-raster.png' % name
             cb_name = 'fmda-%s-raster-cb.png' % name
-            with open(osp.join(postproc_path, raster_name), 'w') as f:
+            with open(osp.join(postproc_path, raster_name), 'wb') as f:
                 f.write(raster_png)
-            with open(osp.join(postproc_path, cb_name), 'w') as f:
+            with open(osp.join(postproc_path, cb_name), 'wb') as f:
                 f.write(cb_png) 
             mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
         for name in show:
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
             raster_name = 'fmda-%s-raster.png' % name
             cb_name = 'fmda-%s-raster-cb.png' % name
-            with open(osp.join(postproc_path, raster_name), 'w') as f:
+            with open(osp.join(postproc_path, raster_name), 'wb') as f:
                 f.write(raster_png)
-            with open(osp.join(postproc_path, cb_name), 'w') as f:
+            with open(osp.join(postproc_path, cb_name), 'wb') as f:
                 f.write(cb_png) 
             mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
 
@@ -238,10 +238,10 @@ def load_rtma_data(rtma_data, bbox):
     # bbox format: minlat, minlon, maxlat, maxlon
     i1, i2, j1, j2 = find_region_indices(lats, lons, bbox[0], bbox[2], bbox[1], bbox[3])
     
-    t2 = list(gf.values())[i1:i2,j1:j2] # temperature at 2m in K
-    td = list(GribFile(rtma_data['td'])[1].values())[i1:i2,j1:j2] # dew point in K
-    precipa = list(GribFile(rtma_data['precipa'])[1].values())[i1:i2,j1:j2] # precipitation
-    hgt = list(GribFile('static/ds.terrainh.bin')[1].values())[i1:i2,j1:j2]
+    t2 = np.ma.array(gf.values())[i1:i2,j1:j2] # temperature at 2m in K
+    td = np.ma.array(GribFile(rtma_data['td'])[1].values())[i1:i2,j1:j2] # dew point in K
+    precipa = np.ma.array(GribFile(rtma_data['precipa'])[1].values())[i1:i2,j1:j2] # precipitation
+    hgt = np.ma.array(GribFile('static/ds.terrainh.bin')[1].values())[i1:i2,j1:j2]
     logging.info('t2 min %s max %s' % (np.min(t2),np.max(t2)))
     logging.info('td min %s max %s' % (np.min(td),np.max(td)))
     logging.info('precipa min %s max %s' % (np.min(precipa),np.max(precipa)))
@@ -431,7 +431,7 @@ if __name__ == '__main__':
         except Exception as e:
             logging.warning(e)
     else:
-	print('Usage: to use domains configured in etc/rtma_cycler.json:')
+        print('Usage: to use domains configured in etc/rtma_cycler.json:')
         print('./rtma_cycler.sh anything')
         print('To use a custom domain named FIRE by giving a bounding box:')
         print('./rtma_cycler.sh lat1 lon1 lat2 lon2')
