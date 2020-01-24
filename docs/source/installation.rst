@@ -23,27 +23,28 @@ into its workspace.
 
 Python and packages
 -------------------
-Download and install the Python 2 `Anaconda Python <https://www.continuum.io/downloads>`_ distribution for your platform.  We recommend an installation into the users home directory.
-
-::
-  wget https://repo.continuum.io/archive/Anaconda2-5.3.0-Linux-x86_64.sh
-  chmod +x Anaconda2-5.3.0-Linux-x86_64.sh
-  ./Anaconda2-5.3.0-Linux-x86_64.sh
-
-Install pre-requisites: 
+Download and install the Python 3 `Anaconda Python <https://www.continuum.io/downloads>`_ distribution for your platform.  We recommend an installation into the users home directory.
 
 ::
 
-  conda install basemap netcdf4 pyproj paramiko dill numpy
-  conda install -c conda-forge simplekml pygrib f90nml pyhdf
+  wget https://repo.continuum.io/archive/Anaconda3-2019.10-Linux-x86_64.sh
+  chmod +x Anaconda3-2019.10-Linux-x86_64.sh
+  ./Anaconda3-2019.10-Linux-x86_64.sh
+
+We recomend the creation of an environtment. Install pre-requisites: 
+
+::
+
+  conda create -n wrfxpy python=3 netcdf4 pyproj paramiko dill scikit-learn scikit-image h5py psutil proj4
+  conda activate wrfxpy
+  conda install -c conda-forge simplekml pygrib f90nml pyhdf xmltodict basemap
   pip install MesoPy
   pip install python-cmr
 
-
 Add your environment (~/.custom.csh) the following line
-  setenv PROJ_LIB "$HOME/anaconda2/share/proj"
+  setenv PROJ_LIB "$HOME/anaconda3/share/proj"
 or if you are using bash to ~/.profile or ~/.bashrc
-  export PROJ_LIB="$HOME/anaconda2/share/proj"
+  export PROJ_LIB="$HOME/anaconda3/share/proj"
 
 Note that ``conda`` and ``pip`` are package managers available in the Anaconda Python distribution.
 
@@ -125,14 +126,23 @@ Custom installation
 
 If Anaconda python is not practical, a different python distribution can be used.  Below is a list of packages the system requires:
 
-* `Python 2.7+ <https://www.python.org/download/releases/2.7/>`_
+* `Python 3.5+ <https://www.python.org/downloads/>`_
 * `Basemap <http://matplotlib.org/basemap/>`_  to render the rasters
 * `simplekml <https://simplekml.readthedocs.org/en/latest/>`_ to build KMZ files
-* `f90nml <https://pypi.python.org/pypi/f90nml>`_ to manipulate Fortran namelists
-* `pyproj <https://pypi.python.org/pypi/pyproj>`_ to place domains dynamically in LCC projection
-* `paramiko <https://pypi.python.org/pypi/paramiko>`_ to communicate over SSH with remote hosts
-* `netCDF4 <https://pypi.python.org/pypi/netCDF4>`_ to manipulate WPS and WRF files
-* `MesoPy <https://pypi.python.org/pypi/MesoPy>`_ to retrieve fuel moisture observations from Mesowest
+* `psutil <https://pypi.org/project/psutil/>`_ to retrieve processes and system information
+* `dill <https://pypi.org/project/dill/>`_ to serialize python objects 
+* `xmltodict <https://pypi.org/project/xmltodict/>`_ to parse XML files 
+* `f90nml <https://pypi.python.org/project/f90nml/>`_ to manipulate Fortran namelists
+* `pyproj <https://pypi.python.org/project/pyproj/>`_ to place domains dynamically in LCC projection
+* `proj4 <https://proj.org/>`_ to create and manipulate projections
+* `paramiko <https://pypi.python.org/project/paramiko/>`_ to communicate over SSH with remote hosts
+* `netCDF4 <https://pypi.python.org/project/netCDF4/>`_ to manipulate WPS and WRF files
+* `pygrib <https://pypi.python.org/project/pygrib/>`_ to read and manipulate GRIB files
+* `MesoPy <https://pypi.python.org/project/MesoPy/>`_ to retrieve fuel moisture observations from Mesowest
+* `python-cmr <https://pypi.org/project/python-cmr/>`_ to search satellite data in the CMR search engine
+* `pyhdf <https://pypi.python.org/project/pyhdf/>`_ to read and manipulate HDF files
+* `h5py <https://pypi.python.org/project/h5py/>`_ to read and manipulate HDF5 files
+* `scikit-learn <https://pypi.org/project/scikit-learn/>`_ to run machine learning
 
 *wrfxpy* is installed by cloning a GitHub repository
 
