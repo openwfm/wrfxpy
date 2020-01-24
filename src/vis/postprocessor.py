@@ -850,9 +850,10 @@ class Postprocessor(object):
         for k in range(max_retries):
             # open the netCDF dataset
             d = nc4.Dataset(wrfout_path)
-
             # extract ESMF string times and identify timestamp of interest
             times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
+            # close the netCDF dataset
+            d.close()
             if ts_esmf in times:
                 logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
                 break
@@ -867,6 +868,8 @@ class Postprocessor(object):
                     logging.info('process_vars: waiting for next retry...')
                     time.sleep(5)
 
+        time.sleep(5)
+        d = nc4.Dataset(wrfout_path)
         tndx = times.index(ts_esmf)
 
         # build an output file per variable

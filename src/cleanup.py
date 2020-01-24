@@ -64,7 +64,7 @@ def cancel_job(job_num,qsys):
             logging.info('Deleting parallel job %s on %s.' % (job_num, qsys))
             cluster = load_cluster_file(qsys)
             try:
-                ret = subprocess.check_output([cluster['qdel_cmd'], job_num]).decode(sys.stdout.encoding)
+                ret = subprocess.check_output([cluster['qdel_cmd'], job_num]).decode()
                 logging.info(ret)
             except:
                 logging.error('Deleting parallel job %s failed.' % job_num)
@@ -113,7 +113,7 @@ def parallel_job_running(js):
     qstat_arg = cluster['qstat_arg']
     if re.search('%s',qstat_arg):
         try:
-            ret = subprocess.check_output([qstat_cmd,qstat_arg % js.job_num],stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+            ret = subprocess.check_output([qstat_cmd,qstat_arg % js.job_num],stderr=subprocess.STDOUT).decode()
             logging.info('Job %s exists in the queue system' % js.job_num)
         except subprocess.CalledProcessError as e:
             logging.info('%s %s returned status %s' % (qstat_cmd,qstat_arg,e.returncode))
@@ -123,9 +123,9 @@ def parallel_job_running(js):
             else:
                 logging.error(e.output)
     elif not qstat_arg:
-        ret = subprocess.check_output([qstat_cmd],stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+        ret = subprocess.check_output([qstat_cmd],stderr=subprocess.STDOUT).decode()
     else:
-        ret = subprocess.check_output([qstat_cmd,qstat_arg],stderr=subprocess.STDOUT).decode(sys.stdout.encoding)
+        ret = subprocess.check_output([qstat_cmd,qstat_arg],stderr=subprocess.STDOUT).decode()
     for line in ret.split('\n'):
         ls=line.split()
         if len(ls) >0 and ls[0] == str(js.job_num):
