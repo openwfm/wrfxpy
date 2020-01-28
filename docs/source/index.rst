@@ -14,10 +14,12 @@ In particular, the modules herein can:
 * manipulate wps/input/fire namelists
 * place and setup domains dynamically 
 * download GRIB files from various GRIB sources
+* download L2 Active Fires satellite data from different sources
 * execute geogrid, ungrib, metgrid, real, WRF
 * monitor WRF execution
 * perform fuel moisture data assimilation using RAWS observations from the Mesowest network
-* postprocess `netCDF files <http://www.unidata.ucar.edu/software/netcdf/>`_ to generate raster images or KMZ raster files
+* postprocess `netCDF files <http://www.unidata.ucar.edu/software/netcdf/>`_ to generate raster images, KMZ raster files, and GeoTIFF files
+* postprocess satellite data files to generate raster images, KMZ raster files, and GeoTIFF files
 * assemble simulation outputs into coherent packages for visualization and synchronize them with a remote *wrfxweb* server
 
 
