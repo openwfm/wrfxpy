@@ -117,6 +117,8 @@ tokens
 -------------
 
 When running wrfxpy, sometimes the data needs to be accessed and downloaded using a specific token created for the user. For instance, in the case of running the Fuel Moisture Model, one needs a token from a valid MesoWest user to download data automatically. Also, when downloading satellite data, one needs a token from earthdata user. All of these can be specified with the creation of the file etc/tokens.json containing:
+
+::
  
   {
     "mesowest" : "token-from-mesowest",
