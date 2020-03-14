@@ -116,7 +116,7 @@ The script template should be derived from a working submission script.
 tokens
 -------------
 
-When running wrfxpy, sometimes the data needs to be accessed and downloaded using a specific token created for the user. For instance, in the case of running the Fuel Moisture Model, one needs a token from a valid MesoWest user to download data automatically. Also, when downloading satellite data, one needs a token from earthdata user. All of these can be specified with the creation of the file etc/tokens.json containing:
+When running wrfxpy, sometimes the data needs to be accessed and downloaded using a specific token created for the user. For instance, in the case of running the Fuel Moisture Model, one needs a token from a valid `MesoWest <https://simplekml.readthedocs.org/en/latest/>` user to download data automatically. Also, when downloading satellite data, one needs a token from `Earthdata <https://earthdata.nasa.gov/` user. All of these can be specified with the creation of the file etc/tokens.json containing:
 
 ::
  
