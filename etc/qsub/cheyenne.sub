@@ -1,0 +1,19 @@
+#!/bin/tcsh
+#PBS -N WRFX
+#PBS -A UCUD0004
+#PBS -l walltime=%(wall_time_hrs)02d:00:00
+#PBS -q regular
+#PBS -j oe
+#PBS -m abe
+#PBS -M example@gmail.com
+#PBS -l select=%(nodes)d:ncpus=36:mpiprocs=%(np)d
+
+### Set TMPDIR as recommended
+setenv TMPDIR /glade/scratch/$USER/temp
+mkdir -p $TMPDIR
+
+### Load modules
+module load intel
+
+### Run the executable
+mpiexec_mpt ./wrf.exe > wrf.log
