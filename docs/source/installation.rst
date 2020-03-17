@@ -113,10 +113,12 @@ Note that not all keys need to be used, as shown in the ``speedy`` example::
 
 The script template should be derived from a working submission script.
 
+Note: wrfxpy has already configuration for colibri, gross, kingspeak, and cheyenne.
+
 tokens
 -------------
 
-When running wrfxpy, sometimes the data needs to be accessed and downloaded using a specific token created for the user. For instance, in the case of running the Fuel Moisture Model, one needs a token from a valid `MesoWest <https://simplekml.readthedocs.org/en/latest/>`_ user to download data automatically. Also, when downloading satellite data, one needs a token from `Earthdata <https://earthdata.nasa.gov/>`_ user. All of these can be specified with the creation of the file etc/tokens.json containing:
+When running wrfxpy, sometimes the data needs to be accessed and downloaded using a specific token created for the user. For instance, in the case of running the Fuel Moisture Model, one needs a token from a valid `MesoWest <https://simplekml.readthedocs.org/en/latest/>`_ user to download data automatically. Also, when downloading satellite data, one needs a token from an `Earthdata <https://earthdata.nasa.gov/>`_ user. All of these can be specified with the creation of the file etc/tokens.json from the template etc/tokens.json.initial containing:
 
 ::
  
@@ -124,6 +126,14 @@ When running wrfxpy, sometimes the data needs to be accessed and downloaded usin
     "mesowest" : "token-from-mesowest",
     "appkey" : "token-from-earthdata"
   }
+
+So, if any of the previous capabilities are required, create a token from the specific page, do
+
+::
+ 
+ cp etc/tokens.json.initial etc/tokens.json
+
+and include your previously created token.
 
 .. attention::
   You are now ready for your first fire simulation, continue with :doc:`quickstart`.
