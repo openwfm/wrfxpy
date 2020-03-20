@@ -26,6 +26,7 @@ import os.path as osp
 import re, sys
 import json
 import logging
+from utils import load_sys_cfg
 
 
 class OutputCheckFailed(Exception):
@@ -185,6 +186,8 @@ class Real(Executor):
         :return:
         """
         super(Real, self).__init__(work_dir, './real.exe')
+        self.stdout_path = osp.join(self.work_dir, self.exec_name + '.stdout')
+        self.stderr_path = osp.join(self.work_dir, self.exec_name + '.stderr')
 
     def execute(self):
         """
@@ -196,8 +199,16 @@ class Real(Executor):
 
         NOTE: on some machines it is OK to run real.exe from command line, but generally mpirun is required!
 
+        If cfg.wrf_serial_install_path is not None, run real.exe as serial,
+        This is to support systems that do not allow executing mpi binary from command line.
+        We do not run real.exe by mpirun because mpirun on head node may not be allowed.
+
         :return: raises OutputCheckFailed if return code is non-zero
         """
+        exec_name = self.exec_name
+        stdout_path = self.stdout_path
+        stderr_path = self.stderr_path
+
         # first verify if we have already done our job
         try:
             self.check_output()
@@ -205,11 +216,17 @@ class Real(Executor):
         except OutputCheckFailed:
             pass
 
-        exec_name = self.exec_name
-        wdir = self.work_dir
-        check_call(exec_name, cwd=self.work_dir)
-        os.rename(osp.join(wdir, "rsl.out.0000"), osp.join(wdir, "real.exe.stdout"))
-        os.rename(osp.join(wdir, "rsl.error.0000"), osp.join(wdir, "real.exe.stderr"))
+        cfg = load_sys_cfg()
+        if "wrf_serial_install_path" in cfg:
+            logging.info("Executing serial %s" %exec_name )
+            stdout_file = open(stdout_path, 'w')
+            stderr_file = open(stderr_path, 'w')
+            check_call(exec_name, cwd=self.work_dir, stdout=stdout_file, stderr=stderr_file)
+        else:
+            logging_info("Executing MPI %s directly without mpirun" %exec_name )
+            check_call(exec_name, cwd=self.work_dir)
+            os.rename(osp.join(wdir, "rsl.out.0000"), stdout_path)
+            os.rename(osp.join(wdir, "rsl.error.0000"), stderr_path)
 
         return self
 
@@ -219,7 +236,7 @@ class Real(Executor):
 
         :return: raises OutputCheckFailed
         """
-        output_path = osp.join(self.work_dir, "real.exe.stderr")
+        output_path = self.stdout_path
 
         if not osp.exists(output_path):
             raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
@@ -273,10 +290,10 @@ class Submitter(object):
 
         logging.info('submitting to batch queue system %s' % self.qsys_id)
         logging.info('%s %s' % (qsub, script_path))
-
         ret = check_output([qsub, script_path], cwd=self.work_dir).decode()
         logging.info(ret)
-        job_num = ret.split(' ')[qsys['qsub_job_num_index']].rstrip()
+
+        job_num = ret.split(qsys.get('qsub_delimiter',' '))[qsys['qsub_job_num_index']].rstrip()
         logging.info('job number %s submitted' % job_num)
         return job_num
 
