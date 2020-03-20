@@ -36,7 +36,7 @@ class WRFCloner(object):
         """
         Initialize with WRF/WPS installation directories from which clones will be built.
 
-        #param args: a dictionary of arguments containing the following keys
+        :param args: a dictionary of arguments containing the following keys
                 sys_install_path: installation directory of the current system
                 wrf_install_path: WRF installation directory
                 wps_install_path: WPS installation directory
@@ -84,7 +84,7 @@ class WRFCloner(object):
         symlinks.extend(with_files)
 
         if self.wrf_serial_idir is None:
-            symlinks.extend(wrf_serial_files)
+            symlinks.extend(self.wrf_serial_files)
 
         # create target directory (and all intermediate subdirs if necessary)
         make_dir(tgt)
