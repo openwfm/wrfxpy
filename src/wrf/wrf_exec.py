@@ -225,8 +225,8 @@ class Real(Executor):
         else:
             logging.info("Executing MPI %s directly without mpirun" %exec_name )
             check_call(exec_name, cwd=self.work_dir)
-            os.rename(osp.join(wdir, "rsl.out.0000"), stdout_path)
-            os.rename(osp.join(wdir, "rsl.error.0000"), stderr_path)
+            os.rename(osp.join(self.work_dir, "rsl.out.0000"), stdout_path)
+            os.rename(osp.join(self.work_dir, "rsl.error.0000"), stderr_path)
 
         return self
 
