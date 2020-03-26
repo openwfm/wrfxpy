@@ -78,13 +78,15 @@ def write_geogrid_var(path_dir,varname,array,description,index,bits=32):
     json.dump(geogrid_tbl,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
 
     
-def write_geogrid(path,array,index,bits=32):
+def write_geogrid(path,array,index,bits=32,scale=None,data_type='continuous'):
     """
     Write geogrid dataset 
     :param path: the directory where the dataset is to be stored
     :param array: numpy array of real values, 2d or 3d
     :param index: json with geogrid index, with geolocation and description already set 
     :param bits: 16 or 32 (default)
+    :param data_type: 'categorical' or 'continuous' (default)
+    :param scale: numeric scale or None (default)
     """
 
     logging.info('write_geogrid_var path=%s array=%s index=%s' % (path, inq(array), str(index)))
@@ -95,8 +97,10 @@ def write_geogrid(path,array,index,bits=32):
     dims=a.shape
     if len(dims) < 3:
         dims = dims + (1,)
+        a = np.reshape(a,dims)
     xsize, ysize, zsize = dims
-    scale = 2**(np.ceil(np.log2(np.max(np.abs(a))))-bits+1)
+    if scale is None:
+        scale = 2**(np.ceil(np.log2(np.max(np.abs(a))))-bits+1)
     aa = np.round(a/scale)
     if bits == 32:
         aa = np.int32(aa) 
@@ -112,7 +116,7 @@ def write_geogrid(path,array,index,bits=32):
     a.flatten().tofile(data_path)
     
     # write index
-    index.update({'type':'continuous',
+    index.update({'type': data_type,
                  'signed':'yes',
                  'scale_factor':scale,
                  'wordsize':bits // 8,
