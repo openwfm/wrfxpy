@@ -128,12 +128,13 @@ def parallel_job_running(js):
         ret = subprocess.check_output([qstat_cmd,qstat_arg],stderr=subprocess.STDOUT).decode()
     for line in ret.split('\n'):
         ls=line.split()
-        if len(ls) >0 and ls[0] == str(js.job_num):
+        if len(ls) >0 and (str(js.job_num) in ls[0]):
+             logging.info(ls)
              if len(ls) >4:
                  status = ls[4]
              else:
                  status = '??'
-                 print(ret)
+                 logging.warning(ret)
              logging.info('WRF job %s status is %s' % (js.job_num, status))
              return True
     logging.info('WRF job %s is not running.' % js.job_num)
