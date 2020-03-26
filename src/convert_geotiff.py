@@ -117,11 +117,15 @@ def geotiff2geogrid(path_out,path_file,var):
         write_geogrid(path_out,array,index,bits=16,scale=1.,)
 
 if __name__ == '__main__':
-    option = 'fuel' # only fuel or elevation
-    case = {'elevation': 
-                ['./elevation','./elevation.tif','ZSF'],
-            'fuel':
-                ['./fuel','./fuel.tif','NFUEL_CAT']}
-    path,file,var = case[option]
-    print('Generating geogrid folder %s from GeoTIFF file %s' % (path,file))
-    geotiff2geogrid(path,file,var)
+    option = 'all' # only fuel, elevation, or all
+    dcase = {'fuel':
+                [['./fuel','./fuel.tif','NFUEL_CAT']],
+            'elevation': 
+                [['./elevation','./elevation.tif','ZSF']],
+            'all':
+                [['./fuel','./fuel.tif','NFUEL_CAT'],
+                 ['./elevation','./elevation.tif','ZSF']]}
+    cases = dcase[option]
+    for path,file,var in cases:
+        print('Generating geogrid folder %s from GeoTIFF file %s' % (path,file))
+        geotiff2geogrid(path,file,var)
