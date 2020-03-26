@@ -1,7 +1,7 @@
 # convert_geotiff.py
 # Angel Farguell, March 2020
 
-import gdal,osr,pyproj
+import gdal,osr,pyproj,rasterio
 from utils import Dict
 from write_geogrid import write_geogrid,addquotes
 
@@ -15,14 +15,14 @@ proj4_to_projwrf = {
     'stere': 'polar_wgs84'
 }
 
-def get_proj_str(pyproj_obj):
+def get_proj_str(rasterio_obj):
     """
     Get projection string for WPS from pyproj object
 
-    :param pyproj_obj: pyproj object (projection information)
+    :param rasterio_obj: rasterio object (projection information)
     :return proj_str: WRF project string 
     """
-    proj = pyproj_obj.crs.to_dict().get('proj')
+    proj = rasterio_obj.to_dict()['proj']
     proj_str = proj4_to_projwrf.get(proj,None)
     return proj_str
 
@@ -43,6 +43,8 @@ def create_index(ds,var):
     gt = ds.GetGeoTransform()
     # get proj4 string
     proj4 = crs.ExportToProj4()
+    # get rasterio object 
+    rast_proj = rasterio.crs.CRS.from_proj4(proj4)
     # get pyproj element for tif file
     tif_proj = pyproj.Proj(proj4)
     # get pyproj element for WGS84
@@ -50,7 +52,7 @@ def create_index(ds,var):
     # define index dictionary
     index = Dict({})
     # projection string <- get_proj_str
-    index.projection = get_proj_str(tif_proj)
+    index.projection = get_proj_str(rast_proj)
     # truelat1 <- standard_parallel_1
     index.truelat1 = crs.GetProjParm("standard_parallel_1")
     # truelat2 <- standard_parallel_2
