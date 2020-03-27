@@ -1,7 +1,9 @@
 # convert_geotiff.py
 # Angel Farguell, March 2020
 
+from __future__ import absolute_import
 import gdal,osr,pyproj,rasterio
+import logging,sys
 from utils import Dict
 from write_geogrid import write_geogrid,addquotes
 
@@ -116,18 +118,16 @@ def geotiff2geogrid(path_out,path_file,var):
     if var == 'NFUEL_CAT':
         write_geogrid(path_out,array,index,bits=16,scale=1.,data_type='categorical')
     elif var == 'ZSF':
-        write_geogrid(path_out,array,index,bits=16,scale=1.,)
+        write_geogrid(path_out,array,index,bits=16,scale=1.)
 
 if __name__ == '__main__':
-    option = 'all' # only fuel, elevation, or all
-    dcase = {'fuel':
-                [['./fuel','./fuel.tif','NFUEL_CAT']],
-            'elevation': 
-                [['./elevation','./elevation.tif','ZSF']],
-            'all':
-                [['./fuel','./fuel.tif','NFUEL_CAT'],
-                 ['./elevation','./elevation.tif','ZSF']]}
-    cases = dcase[option]
-    for path,file,var in cases:
-        print('Generating geogrid folder %s from GeoTIFF file %s' % (path,file))
-        geotiff2geogrid(path,file,var)
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    
+    if len(sys.argv) != 4:
+        print('Usage: %s geotiff_file geogrid_folder var_name' % sys.argv[0])
+        print('Example: %s ./fuel.tif ./fuel NFUEL_CAT' % sys.argv[0])
+        exit(1)
+
+    _,file,path,var = sys.argv
+    print('Generating geogrid folder %s from GeoTIFF file %s' % (path,file))
+    geotiff2geogrid(path,file,var)

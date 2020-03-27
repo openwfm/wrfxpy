@@ -5,5 +5,5 @@ if [ $# -eq 0 ]
      exit 1
 fi
 cd $(dirname "$0")
-PYTHONPATH=src
+export PYTHONPATH=src
 python src/forecast.py $1
