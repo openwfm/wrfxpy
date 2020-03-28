@@ -631,4 +631,8 @@ def inq(x):
         s=str(x)
     return s
 
-
+def addquotes(s):
+    """
+    add quotes to string
+    """
+    return '"'+s+'"'
