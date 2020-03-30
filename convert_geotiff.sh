@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-if [ $# -ne 3 ]
-  then
-    echo usage: $0 geotiff_file geogrid_folder var_name
-    echo example: $0 ./fuel.tif ./fuel NFUEL_CAT
-    exit 1
-fi
 cd $(dirname "$0")
 file=$1
 dir=$2
