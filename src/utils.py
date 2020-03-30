@@ -129,6 +129,15 @@ def process_create_time(pid):
         except:
             return None
 
+def file_exists(path):
+    """
+    Ensure a file in a path exists and is readable.
+
+    :param path: path to an existent file
+    :return: boolean if the file exists and is readable
+    """
+    return (os.path.exists(path) and os.access(path,os.R_OK))
+
 def ensure_dir(path):
     """
     Ensure all directories in path if a file exist, for convenience return path itself.

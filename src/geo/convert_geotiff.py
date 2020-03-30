@@ -4,15 +4,8 @@
 from __future__ import absolute_import
 from geo.geotiff import GeoTIFF
 from geo.var_wisdom import get_wisdom_variables
+from utils import file_exists
 import logging, sys, os
-
-def exists(path):
-    """
-    Return if a path to a file exist and is readable.
-    :param path: path to an existent file
-    :return: boolean if the file exists and is readable
-    """
-    return (os.path.exists(path) and os.access(path,os.R_OK))
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,7 +15,7 @@ if __name__ == '__main__':
         print('Example: %s ./fuel.tif ./geo_data NFUEL_CAT' % sys.argv[0])
         print('Available var_name options are %s' % get_wisdom_variables())
         exit(1)
-    elif not exists(sys.argv[1]):
+    elif not file_exists(sys.argv[1]):
         print('File %s does not exist or is not readable' % sys.argv[1])
         exit(1)
     elif not sys.argv[3] in get_wisdom_variables():
