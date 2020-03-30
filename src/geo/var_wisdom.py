@@ -8,10 +8,9 @@ _var_wisdom = {'NFUEL_CAT' : {
         # missing and generated from nearest neighbours
         'missing' : [99],       
         # no value filled with from fill     
-        'novalue' : range(89,99),  
+        'novalue' : range(90,99),  
         # value to fill the no value data       
         'fill_missing' : 14,
-        'tile_bdr' : 3,
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
         'bits': 16,
@@ -22,7 +21,6 @@ _var_wisdom = {'NFUEL_CAT' : {
         'description' : "National Elevation Dataset 1/3 arcsecond resolution",
         'type' : "continuous",
         'missing_value' : 0.0,
-        'tile_bdr' : 3,
         'scale': 1.,
         'signed':'yes',
         'bits': 16,

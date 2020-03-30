@@ -1,11 +1,12 @@
 # geotiff.py
 # Angel Farguell, March 2020
 
-import gdal, osr, pyproj, rasterio
+import gdal, osr, pyproj, rasterio, gdalconst
 import logging
 
 from utils import Dict
 from geo.write_geogrid import write_geogrid_var
+from geo.geo_utils import coord2str
 
 class GeoTIFF(object):
     """
@@ -20,7 +21,12 @@ class GeoTIFF(object):
         """
         self.path = path
         logging.info('Reading GeoTIFF file %s' % path)
-        self.dgdal = gdal.Open(path)
+        # open GeoTIFF file
+        self.dgdal = gdal.Open(path,gdalconst.GA_ReadOnly)
+        # raster size
+        self.nx = self.dgdal.RasterXSize
+        self.ny = self.dgdal.RasterYSize
+        # define projection objects
         self.init_proj()
 
     def close(self):
@@ -78,14 +84,20 @@ class GeoTIFF(object):
         Geolocation in a form suitable for geogrid index.
         :return: dictionary key:value 
         """
-        # known points in the center of the array
-        known_x = self.dgdal.RasterXSize//2
-        known_y = self.dgdal.RasterYSize//2
+        # known points in the center of the array (mass-staggered mesh from 1 at origin)
+        known_x = (self.nx+1)/2 
+        known_y = (self.ny+1)/2 
+        # known points in the center of the array (unstaggered mesh from 0 at origin)
+        known_x_uns = known_x-.5
+        known_y_uns = known_y-.5
         # get pyproj element for WGS84
         ref_proj = pyproj.Proj(proj='lonlat',ellps='WGS84',datum='WGS84',no_defs=True)
-        # lat/lon know points
-        posX, posY = gdal.ApplyGeoTransform(self.gt,known_x-1,known_y-1)
-        known_lon,known_lat = pyproj.transform(self.pyproj,ref_proj,posX,posY)     
+        # lat/lon known points
+        posX, posY = gdal.ApplyGeoTransform(self.gt,known_x_uns,known_y_uns)
+        known_lon,known_lat = pyproj.transform(self.pyproj,ref_proj,posX,posY) 
+        # print ceter lon-lat coordinates to check with gdalinfo
+        logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using pyproj.transform: %s' % coord2str(known_lon,known_lat)) 
+        logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using gdal.Info: %s' % gdal.Info(self.path).split('Center')[1].split(') (')[1].split(')')[0])  
         # row order depending on sign of dy
         if self.gt[5] > 0:
             row_order = 'bottom_top'
