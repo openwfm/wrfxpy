@@ -21,6 +21,7 @@ _var_wisdom = {'NFUEL_CAT' : {
         'units' : "meters",
         'description' : "National Elevation Dataset 1/3 arcsecond resolution",
         'type' : "continuous",
+        'missing_value' : 0.0,
         'tile_bdr' : 3,
         'scale': 1.,
         'signed':'yes',

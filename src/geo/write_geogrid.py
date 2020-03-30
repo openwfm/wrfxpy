@@ -58,7 +58,7 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32):
         index['category_max'] = wisdom['category_range'][1]
     if 'missing_value' in wisdom:
         index['missing_value'] = wisdom['missing_value']
-    if 'title_bdr' in wisdom:
+    if 'tile_bdr' in wisdom:
         index['tile_bdr'] = wisdom['tile_bdr']
 
     write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale)
