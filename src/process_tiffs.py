@@ -251,14 +251,17 @@ def ncwrfmeta(d):
         ny = d.dimensions['south_north_subgrid'].size
         srx = int(nx/(nx_atm+1))
         sry = int(ny/(ny_atm+1))
-        nx_fire = nx - srx
-        ny_fire = ny - sry
-        dx_fire = dx_atm/srx
-        dy_fire = dy_atm/sry
-        x0_fire = -nx_fire / 2. * dx_fire + e
-        y1_fire = (ny_fire / 2. + sry) * dy_fire + n
-        geotransform_fire = (x0_fire,dx_fire,0,y1_fire,0,-dy_fire)
-        logging.info('geotransform_fire: (%g,%g,%g,%g,%g,%g)' % geotransform_fire)
+        if srx > 0 and sry > 0:
+            nx_fire = nx - srx
+            ny_fire = ny - sry
+            dx_fire = dx_atm/srx
+            dy_fire = dy_atm/sry
+            x0_fire = -nx_fire / 2. * dx_fire + e
+            y1_fire = (ny_fire / 2. + sry) * dy_fire + n
+            geotransform_fire = (x0_fire,dx_fire,0,y1_fire,0,-dy_fire)
+            logging.info('geotransform_fire: (%g,%g,%g,%g,%g,%g)' % geotransform_fire)
+        else:
+            geotransform_fire = None
     else:
         geotransform_fire = None
 
