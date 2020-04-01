@@ -1,4 +1,4 @@
-# geotiff.py
+# geodriver.py
 # Angel Farguell, March 2020
 
 import gdal, osr, pyproj, rasterio, gdalconst
@@ -9,46 +9,43 @@ import numpy as np
 from geo.write_geogrid import write_geogrid_var
 from geo.geo_utils import coord2str
 
-class GeoTIFF(object):
+class GeoDriver(object):
     """
-    Represents the content of one GeoTIFF file.
+    Represents the content of one GeoDriver file.
     """
 
-    def __init__(self, path):
+    def __init__(self, gdal_ds):
         """
         Initializes metadata information.
 
-        :param path: path to the file
+        :param gdal_ds: gdal dataset object
         """
-        self.path = path
-        logging.info('Reading GeoTIFF file %s' % path)
-        # open GeoTIFF file
-        self.dgdal = gdal.Open(path,gdalconst.GA_ReadOnly)
+        self.ds = gdal_ds
         # raster size and spacing
-        self.nx = self.dgdal.RasterXSize
-        self.ny = self.dgdal.RasterYSize
+        self.nx = self.ds.RasterXSize
+        self.ny = self.ds.RasterYSize
         # define projection objects
         self.init_proj()
         # initialize resample indexes to None
-        self.resample_indexes = None
+        self.resample_indxs = None
 
     def close(self):
         """
         Close the current file.
         """
-        del self.dgdal
+        self.ds = None
 
     def init_proj(self):
         """
         Get all necessary projection information.
         """
         # get WKT string projection
-        self.wkt = self.dgdal.GetProjectionRef()
+        self.wkt = self.ds.GetProjectionRef()
         # get Spatial Reference (projection)
         self.crs = osr.SpatialReference()
         self.crs.ImportFromWkt(self.wkt)
         # get Geo Transform
-        self.gt = self.dgdal.GetGeoTransform()
+        self.gt = self.ds.GetGeoTransform()
         # get proj4 string
         self.proj4 = self.crs.ExportToProj4()
         # get rasterio object 
@@ -81,7 +78,7 @@ class GeoTIFF(object):
         if resample:
             return self.resample_bbox(resample)
         else:
-            return self.dgdal.ReadAsArray()
+            return self.ds.ReadAsArray()
 
     def get_coord(self):
         """
@@ -91,8 +88,8 @@ class GeoTIFF(object):
         xx = np.arange(x0,x0+dx*self.nx,dx)
         yy = np.arange(y0,y0+dy*self.ny,dy)
         X,Y = np.meshgrid(xx,yy)
-        if self.resample_indexes:
-            i_min,i_max,j_min,j_max = self.resample_indexes
+        if self.resample_indxs:
+            i_min,i_max,j_min,j_max = self.resample_indxs
             return X[i_min:i_max,j_min:j_max],Y[i_min:i_max,j_min:j_max]
         else:
             return X,Y
@@ -128,11 +125,11 @@ class GeoTIFF(object):
             j_max = j_mins.max()
             j_min = j_maxs.min()
         # save resample indexes
-        self.resample_indexes = (i_min,i_max,j_min,j_max)
+        self.resample_indxs = (i_min,i_max,j_min,j_max)
         # resample coordinates
         X_r,Y_r = X[i_min:i_max,j_min:j_max],Y[i_min:i_max,j_min:j_max]
         # get array
-        a = self.dgdal.ReadAsArray()
+        a = self.ds.ReadAsArray()
         # resample array
         a_r = a[i_min:i_max,j_min:j_max]
         # update other elements
@@ -148,8 +145,8 @@ class GeoTIFF(object):
         # spacing
         dx,dy = self.gt[1],self.gt[5]
         # known points in the center of the array (mass-staggered mesh from 1 at origin)
-        known_x = (self.nx+1)/2 
-        known_y = (self.ny+1)/2 
+        known_x = (self.nx+1)/2. 
+        known_y = (self.ny+1)/2. 
         # known points in the center of the array (unstaggered mesh from 0 at origin)
         known_x_uns = known_x-.5
         known_y_uns = known_y-.5
@@ -160,16 +157,13 @@ class GeoTIFF(object):
         known_lon,known_lat = pyproj.transform(self.pyproj,ref_proj,posX,posY) 
         # print ceter lon-lat coordinates to check with gdalinfo
         logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using pyproj.transform: %s' % coord2str(known_lon,known_lat)) 
-        logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using gdal.Info: %s' % gdal.Info(self.path).split('Center')[1].split(') (')[1].split(')')[0])  
-        # row order depending on sign of dy
-        if dy > 0:
-            row_order = 'bottom_top'
-        else:
-            row_order = 'top_bottom'
+        logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using gdal.Info: %s' % gdal.Info(self.ds).split('Center')[1].split(') (')[1].split(')')[0])  
+        # row order
+        row_order = 'bottom_top'
         # write geogrid index
         return Dict({'projection' : self.projwrf,
             'dx' : dx,
-            'dy' : abs(dy),
+            'dy' : dy,
             'truelat1' : self.crs.GetProjParm("standard_parallel_1"),
             'truelat2' : self.crs.GetProjParm("standard_parallel_2"),
             'stdlon' : self.crs.GetProjParm("longitude_of_center"),
@@ -193,10 +187,58 @@ class GeoTIFF(object):
         logging.info('GeoTIFF.to_geogrid() - writting geogrid')
         write_geogrid_var(path,var,array,index)
 
+    def to_geotiff(self,path,bbox=None):
+        """
+        Transform to geotiff file
+        :param path: path to write the geotiff file
+        """
+        logging.info('GeoTIFF.to_geogrid() - getting array')
+        array = self.get_array(bbox)
+        logging.info('GeoTIFF.to_geotiff() - writting geotiff')
+        ds = gdal.GetDriverByName('GTiff').Create(path,self.nx,self.ny,1,gdal.GDT_Float32)
+        ds.SetGeoTransform(self.gt)
+        ds.SetProjection(self.crs.ExportToWkt())
+        ds.GetRasterBand(1).WriteArray(array)
+        ds = None
+
     def __str__(self):
         """
         Returns a string representation of the message as provided by gdal.
         
         :return: descriptive string
         """
-        return str(self.dgdal)
+        return str(self.ds)
+
+    @classmethod
+    def from_file(cls, path):
+        """
+        Construct a GeoDriver from file.
+        
+        :param path: the path to the file
+        """
+        logging.info('Reading file %s' % path)
+        # open GeoTIFF file
+        ds = gdal.Open(path)
+        if ds:
+            gd = cls(ds)
+            gd.path = path
+        else:
+            gd = None
+        return gd
+
+    @classmethod
+    def from_elements(cls, data, crs, gt):
+        """
+        Construct a GeoDriver from file.
+        
+        :param data: data array 
+        :oaran crs: spatial reference
+        :param gt: geotransform tuple
+        """
+        rows, cols = data.shape
+        ds = gdal.GetDriverByName('MEM').Create('',cols,rows,1,gdal.GDT_Float32)
+        ds.SetProjection(crs.ExportToWkt())
+        ds.SetGeoTransform(gt)
+        ds.GetRasterBand(1).WriteArray(data)
+        gd = cls(ds)
+        return gd

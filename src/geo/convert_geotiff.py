@@ -2,7 +2,7 @@
 # Angel Farguell, March 2020
 
 from __future__ import absolute_import
-from geo.geotiff import GeoTIFF
+from geo.geodriver import GeoDriver
 from geo.var_wisdom import get_wisdom_variables
 from utils import file_exists
 import logging, sys, os
@@ -12,7 +12,7 @@ if __name__ == '__main__':
     
     if len(sys.argv) != 4:
         print('Usage: ./convert_geotiff.sh geotiff_file geogrid_folder var_name')
-        print('Example: %s ./fuel.tif ./geo_data NFUEL_CAT' % sys.argv[0])
+        print('Example: ./convert_geotiff.sh ./fuel.tif ./geo_data NFUEL_CAT')
         print('Available var_name options are %s' % get_wisdom_variables())
         exit(1)
     elif not file_exists(sys.argv[1]):
@@ -24,5 +24,4 @@ if __name__ == '__main__':
 
     _,file,path,var = sys.argv
     print('Generating geogrid folder %s from GeoTIFF file %s as variable %s' % (path,file,var))
-    tif = GeoTIFF(file)
-    tif.to_geogrid(path,var)
+    GeoDriver.from_file(file).to_geogrid(path,var)
