@@ -29,6 +29,7 @@ import logging
 import time
 import subprocess
 import random
+import json
 
 from utils import ensure_dir, load_sys_cfg, remove
 
@@ -65,6 +66,13 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     :param max_retries: how many times we may retry to download the file
     """
     logging.info('download_url %s as %s' % (url, local_path))
+    if appkey is None:
+        # load tokens if etc/tokens.json exists
+        try:
+            tokens = json.load(open('etc/tokens.json'))
+            appkey = tokens.get('appkey',None)
+        except:
+            pass
 
     logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
     sec = random.random() * download_sleep_seconds
