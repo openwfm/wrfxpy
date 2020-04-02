@@ -50,7 +50,7 @@ if __name__ == '__main__':
 		aqua=Aqua(sys_cfg)
 		# retrieve granules
 		m_aqua=aqua.retrieve_data_sat(bounds, from_utc, to_utc)
-	if 'S-NPP' in sat_sources:
+	if 'SNPP' in sat_sources:
 		logging.info('> S-NPP VIIRS')
 		snpp=SNPP(sys_cfg)
 		# retrieve granules
