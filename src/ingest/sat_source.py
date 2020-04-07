@@ -300,4 +300,6 @@ class SatSource(object):
 	ref_prefix=None
 	platform=None
 	version=None
+	geo_appkey=None
+	fire_appkey=None
 

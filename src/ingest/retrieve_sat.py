@@ -39,7 +39,7 @@ if __name__ == '__main__':
 	to_utc = esmf_to_utc(js_input["end_utc"])
 
 	# create satellite classes
-	logging.info('Retrieving all the satellite data for:')
+	logging.info('Retrieving all the satellite data in bounding box (%s,%s,%s,%s) and time interval (%s,%s)' % (bounds + (from_utc, to_utc)))
 	if 'Terra' in sat_sources:
 		logging.info('> MODIS Terra')
 		terra=Terra(sys_cfg)
