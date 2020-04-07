@@ -92,7 +92,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     command=[wget,'-O',ensure_dir(local_path),url]
     for opt in wget_options:
         command.insert(1,opt)
-    if not content_size and appkey:
+    if appkey:
         command.insert(1,'--header=\'Authorization: Bearer %s\'' % appkey)
     logging.info(' '.join(command))
     subprocess.call(' '.join(command),shell=True)
