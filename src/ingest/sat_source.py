@@ -37,7 +37,7 @@ class SatSource(object):
 		self.cache_dir=osp.abspath(js.get('cache_path','cache'))
 		self.sys_dir=osp.abspath(js.get('sys_install_path',None))
 		self.appkey=js.get('appkey',None)
-		if not appkey:
+		if not self.appkey:
 			try:
 				tokens = json.load(open('etc/tokens.json'))
 				self.appkey = tokens.get('appkey',None)
