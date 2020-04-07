@@ -3,7 +3,7 @@
 #
 
 from __future__ import absolute_import
-import glob, re, datetime, logging, requests
+import glob, re, datetime, logging, requests, json
 import os.path as osp
 import numpy as np
 from six.moves.urllib.request import urlopen
@@ -305,7 +305,7 @@ class SatSource(object):
 		return {'LAADS': self.appkey,
 				'LPDAAC_ECS': None,
 				'LANCEMODIS': self.appkey
-			}.get(dataset_id)
+			}.get(data_center,None)
 
 	# instance variables
 	id=None
