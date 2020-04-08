@@ -163,7 +163,7 @@ class GeoDriver(object):
         # write geogrid index
         return Dict({'projection' : self.projwrf,
             'dx' : dx,
-            'dy' : dy,
+            'dy' : abs(dy),
             'truelat1' : self.crs.GetProjParm("standard_parallel_1"),
             'truelat2' : self.crs.GetProjParm("standard_parallel_2"),
             'stdlon' : self.crs.GetProjParm("longitude_of_center"),
