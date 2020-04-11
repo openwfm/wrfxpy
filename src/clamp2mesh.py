@@ -11,6 +11,9 @@ import os
 import netCDF4 as nc4
 import numpy as np
 
+def array_filled(array):
+    return bool(np.array(array).sum())
+
 def interpolate_coords(lons,lats,srx,sry):
     """
     Return the closes node on the mesh 
@@ -77,7 +80,7 @@ def clamp2mesh(nc_path,x,y):
         srx = int(d.dimensions['west_east_subgrid'].size/(d.dimensions['west_east'].size+1))
         sry = int(d.dimensions['south_north_subgrid'].size/(d.dimensions['south_north'].size+1))
 
-    if 'FXLONG' in varis and 'FXLAT' in varis and np.array(d.variables['FXLONG'][0]).sum():
+    if 'FXLONG' in varis and 'FXLAT' in varis and array_filled(d.variables['FXLONG']) and array_filled(d.variables['FXLAT']):
         print('> fxlong and fxlat exist')
         lons = np.array(d.variables['FXLONG'][0])
         lats = np.array(d.variables['FXLAT'][0])
