@@ -69,35 +69,40 @@ def clamp2mesh(nc_path,x,y):
     d=nc4.Dataset(nc_path) 
     varis = d.variables
     attrs = d.ncattrs()
-    if 'FXLONG' in varis and 'FXLAT' in varis:
+
+    if 'sr_x' in attrs and 'sr_y' in attrs:
+        srx = d.getncattr('sr_x')
+        sry = d.getncattr('sr_y')
+    else:
+        srx = int(d.dimensions['west_east_subgrid'].size/(d.dimensions['west_east'].size+1))
+        sry = int(d.dimensions['south_north_subgrid'].size/(d.dimensions['south_north'].size+1))
+
+    if 'FXLONG' in varis and 'FXLAT' in varis and np.array(d.variables['FXLONG'][0]).sum():
         print('> fxlong and fxlat exist')
         lons = np.array(d.variables['FXLONG'][0])
         lats = np.array(d.variables['FXLAT'][0])
-    elif 'XLONG_M' in varis and 'XLAT_M' in varis and 'sr_x' in attrs and 'sr_y' in attrs:
+    elif 'XLONG_M' in varis and 'XLAT_M' in varis:
         print('> fxlong and fxlat does not exist')
         lons_atm = np.array(d.variables['XLONG_M'][0])
         lats_atm = np.array(d.variables['XLAT_M'][0])
-        srx = d.getncattr('sr_x')
-        sry = d.getncattr('sr_y')
-        print('> interpolating xlong to fxlong and xlat to fxlat...')
+        print('> interpolating xlong_m to fxlong and xlat_m to fxlat...')
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
-    elif 'XLONG' in varis and 'XLAT' in varis and 'sr_x' in attrs and 'sr_y' in attrs:
+    elif 'XLONG' in varis and 'XLAT' in varis:
         print('> fxlong and fxlat does not exist')
         lons_atm = np.array(d.variables['XLONG'][0])
         lats_atm = np.array(d.variables['XLAT'][0])
-        srx = d.getncattr('sr_x')
-        sry = d.getncattr('sr_y')
         print('> interpolating xlong to fxlong and xlat to fxlat...')
-        lats,lons = interpolate_coords(lons_atm,lats_atm,srx,sry)
+        lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
     else:
-        print('Error: %s NetCDF file specifiedc has not coordinates specified')
+        print('Error: %s NetCDF file specifiedc has not coordinates specified' % nc_path)
+        sys.exit(1)
 
     lons = lons.flatten()
     lats = lats.flatten()
     xd = lons - x
     yd = lats - y
     idx = (xd*xd + yd*yd).argmin()
-    return lats[idx], lons[idx] 
+    return lons[idx], lats[idx] 
     
 
 if __name__ == '__main__':
