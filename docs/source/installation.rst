@@ -135,7 +135,9 @@ So, if any of the previous capabilities are required, create a token from the sp
 
 and include your previously created token.
 
-For satellite data, the creation of an earthdata account is required `here <https://urs.earthdata.nasa.gov/users/new>`_. Then, there are some data centers that need to be accessed using the $HOME/.netrc file. Therefore, creating the $HOME/.netrc file is recommended as follows
+For running fuel moisture model, a new MesoWest user can be created in `MesoWest New User <https://mesowest.utah.edu/cgi-bin/droman/my_join.cgi?came_from=http://mesowest.utah.edu>`_. Then, the token can be adquiered and replaced in the etc/tokens.json file.
+
+For adquiring satellite data, a new Earthdata user can be created in `Earthdata New User <https://urs.earthdata.nasa.gov/users/new>`_. Then, the token can be adquiered and replaced in the etc/tokens.json file. There are some data centers that need to be accessed using the $HOME/.netrc file. Therefore, creating the $HOME/.netrc file is recommended as follows
 
 ::
 
