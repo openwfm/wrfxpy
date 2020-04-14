@@ -135,11 +135,17 @@ So, if any of the previous capabilities are required, create a token from the sp
 
 and include your previously created token.
 
+For satellite data, the creation of an earthdata account is required `here https://urs.earthdata.nasa.gov/users/new>`. Then, there are some data centers that need to be accessed using the $HOME/.netrc file. Therefore, creating the $HOME/.netrc file is recommended as follows
+
+::
+
+ machine urs.earthdata.nasa.gov
+ login your_earthdata_id
+ password your_earthdata_password
+ 
+
 .. attention::
-  You are now ready for your first fire simulation, continue with :doc:`quickstart`.
-
-
-  
+  You are now ready for your first fire simulation, continue with :doc:`quickstart`.  
 
 
 Custom installation
