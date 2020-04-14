@@ -24,40 +24,39 @@ def interpolate_coords(lons,lats,srx,sry):
     # compute mesh ratios
     rx = 1./srx
     ry = 1./sry
-    # coarse indices
-    isc,iec,jsc,jec = 0,lons.shape[1]-1,0,lons.shape[0]-1
-    # fine indices
-    isf,ief,jsf,jef = isc,(iec-isc+2)*srx-1,jsc,(jec-jsc+2)*sry-1
-    # both meshes lined up by lower left corner of domain
-    ripc,rjpc,ripf,rjpf = float(isc),float(jsc),isc+(srx-1)*.5,jsc+(sry-1)*.5
-    # boundary lenghts
-    ih = int(np.ceil(ripf))
-    jh = int(np.ceil(rjpf))
-    # initialize fire mesh
-    lonsr = np.zeros((jef+1,ief+1))
-    latsr = np.zeros((jef+1,ief+1))
-
-    # bilinear interpolation in the inside
-    for j_c in range(jsc,jec):
-        rjo = rjpf+sry*(j_c-rjpc)
-        j_s = max(jsf,int(np.ceil(rjo)))
-        j_e = min(jef,int(np.floor(rjo)+sry))
-        for i_c in range(isc,iec):
-            rio = ripf+srx*(i_c-ripc)
-            i_s = max(isf,int(np.ceil(rio)))
-            i_e = min(ief,int(np.floor(rio)+srx))
-            for j_f in range(j_s,j_e+1):
-                ty = (j_f-rjo)*ry
-                for i_f in range(i_s,i_e+1):
-                    tx = (i_f-rio)*rx
-                    lonsr[j_f,i_f] = (1-tx)*(1-ty)*lons[j_c,i_c]+ \
-                                    (1-tx)*ty*lons[j_c+1,i_c]+ \
-                                    tx*(1-ty)*lons[j_c,i_c+1]+ \
-                                    tx*ty*lons[j_c+1,i_c+1]
-                    latsr[j_f,i_f] = (1-tx)*(1-ty)*lats[j_c,i_c]+ \
-                                    (1-tx)*ty*lats[j_c+1,i_c]+ \
-                                    tx*(1-ty)*lats[j_c,i_c+1]+ \
-                                    tx*ty*lats[j_c+1,i_c+1]
+    # coarse sizes 
+    nyc,nxc = lons.shape 
+    # refined sizes
+    nyr,nxr = (nyc+1)*sry,(nxc+1)*srx
+    # real index of fire mesh of first atmosphere point
+    i0 = (srx-1)*.5
+    j0 = (sry-1)*.5
+    # first fire index
+    i0f = int(np.ceil(i0))
+    j0f = int(np.ceil(j0))
+    # initialize refined grid
+    lonsr = np.zeros((nyr,nxr))
+    latsr = np.zeros((nyr,nxr))
+    # create bilinear coefficients
+    tx,ty = np.meshgrid(np.arange(i0f-i0,srx,1)*rx,np.arange(j0f-j0,sry,1)*ry)
+    t0 = np.multiply((1-tx),(1-ty))
+    t1 = np.multiply((1-tx),ty)
+    t2 = np.multiply(tx,(1-ty))
+    t3 = np.multiply(tx,ty)
+    # create bilinear function components
+    lon0 = lons[:-1,:-1]
+    lon1 = lons[1:,:-1]
+    lon2 = lons[:-1,1:]
+    lon3 = lons[1:,1:]
+    lat0 = lats[:-1,:-1]
+    lat1 = lats[1:,:-1]
+    lat2 = lats[:-1,1:]
+    lat3 = lats[1:,1:]
+    # loop over refined position
+    for y in range(t0.shape[0]):
+        for x in range(t0.shape[1]):
+            lonsr[j0f+y:nyr-2*sry+y:sry,i0f+x:nxr-2*srx+x:srx] = t0[y,x]*lon0+t1[y,x]*lon1+t2[y,x]*lon2+t3[y,x]*lon3
+            latsr[j0f+y:nyr-2*sry+y:sry,i0f+x:nxr-2*srx+x:srx] = t0[y,x]*lat0+t1[y,x]*lat1+t2[y,x]*lat2+t3[y,x]*lat3
 
     return lonsr,latsr
 
