@@ -166,7 +166,7 @@ class GeoDriver(object):
             'dy' : abs(dy),
             'truelat1' : self.crs.GetProjParm("standard_parallel_1"),
             'truelat2' : self.crs.GetProjParm("standard_parallel_2"),
-            'stdlon' : self.crs.GetProjParm("longitude_of_center"),
+            'stdlon' : self.crs.GetProjParm("longitude_of_center",self.crs.GetProjParm("central_meridian",self.crs.GetProjParm("longitude_of_origin"))),
             'known_x' : known_x,
             'known_y' : known_y,
             'known_lon' : known_lon,
