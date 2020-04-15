@@ -150,8 +150,8 @@ class GeoDriver(object):
         # known points in the center of the array (unstaggered mesh from 0 at origin)
         known_x_uns = known_x-.5
         known_y_uns = known_y-.5
-        # get pyproj element for WGS84
-        ref_proj = pyproj.Proj(proj='lonlat',ellps='WGS84',datum='WGS84',no_defs=True)
+        # get pyproj element for reference lat-long coordinates
+        ref_proj = self.pyproj.to_latlong()
         # lat/lon known points
         posX, posY = gdal.ApplyGeoTransform(self.gt,known_x_uns,known_y_uns)
         known_lon,known_lat = pyproj.transform(self.pyproj,ref_proj,posX,posY) 
