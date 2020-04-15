@@ -192,6 +192,9 @@ class SatSource(object):
 		:param time: time interval (init_time_iso,final_time_iso)
 		:return data: dictonary with all the data
 		"""
+		if not osp.exists(osp.join(osp.expanduser('~'),'.netrc')):
+			logging.warning('satellite acquisition can fail because some data centers require to have $HOME/.netrc specified from an existent Earthdata account')
+		
 		lonmin,lonmax,latmin,latmax = bounds
 		bbox = [(lonmin,latmax),(lonmin,latmin),(lonmax,latmin),(lonmax,latmax),(lonmin,latmax)]
 		time = (from_utc, to_utc)
