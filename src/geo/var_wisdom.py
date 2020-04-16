@@ -42,6 +42,26 @@ _var_wisdom = {'NFUEL_CAT' : {
         'tile_bdr' : 0,
         'signed': 'yes',
         'interp_option' : 'default:average_gcell(4.0)+four_pt+average_4pt'
+    },
+    'XLONG' : {
+        'units' : "degrees",
+        'description' : "Longitude in the domain",
+        'type' : "continuous",
+        'missing_value' : 0.0,
+        'signed':'yes',
+        'bits': 16,
+        'interp_option' : 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'smooth_option' : 'smth-desmth_special; smooth_passes=1'
+    },
+    'XLAT' : {
+        'units' : "degrees",
+        'description' : "Latitude in the domain",
+        'type' : "continuous",
+        'missing_value' : 0.0,
+        'signed':'yes',
+        'bits': 16,
+        'interp_option' : 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'smooth_option' : 'smth-desmth_special; smooth_passes=1'
     }
 }
 
