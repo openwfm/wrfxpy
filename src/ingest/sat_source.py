@@ -3,7 +3,7 @@
 #
 
 from __future__ import absolute_import
-import glob, re, datetime, logging, requests
+import glob, re, datetime, logging, requests, json
 import os.path as osp
 import numpy as np
 from six.moves.urllib.request import urlopen
@@ -37,6 +37,13 @@ class SatSource(object):
 		self.cache_dir=osp.abspath(js.get('cache_path','cache'))
 		self.sys_dir=osp.abspath(js.get('sys_install_path',None))
 		self.appkey=js.get('appkey',None)
+		if not self.appkey:
+			try:
+				tokens = json.load(open('etc/tokens.json'))
+				self.appkey = tokens.get('appkey',None)
+			except:
+				logging.warning('Any etc/tokens.json specified, any token is going to be used.')
+
 
 	def available_locally_sat(self, path):
 		"""
@@ -154,11 +161,12 @@ class SatSource(object):
 				metas.ref=self.search_archive_sat(self.ref_prefix,time,metas.geo)
 		return metas
 
-	def download_sat(self, url):
+	def download_sat(self, url, appkey):
 		"""
 		Download a satellite file from a satellite service
 
 		:param url: the URL of the file
+		:param appkey: key to use for the download or None if not
 		"""
 		logging.info('downloading %s satellite data from %s' % (self.prefix, url))
 		sat_name = osp.basename(url)
@@ -168,7 +176,7 @@ class SatSource(object):
 			return {'url': url,'local_path': sat_path}
 		else:
 			try:
-				download_url(url, sat_path, appkey=self.appkey)
+				download_url(url, sat_path, appkey=appkey)
 				return {'url': url,'local_path': sat_path,'downloaded': datetime.datetime.now}
 			except DownloadError as e:
 				logging.error('%s cannot download satellite file %s' % (self.prefix, url))
@@ -184,6 +192,9 @@ class SatSource(object):
 		:param time: time interval (init_time_iso,final_time_iso)
 		:return data: dictonary with all the data
 		"""
+		if not osp.exists(osp.join(osp.expanduser('~'),'.netrc')):
+			logging.warning('satellite acquisition can fail because some data centers require to have $HOME/.netrc specified from an existent Earthdata account')
+		
 		lonmin,lonmax,latmin,latmax = bounds
 		bbox = [(lonmin,latmax),(lonmin,latmin),(lonmax,latmin),(lonmax,latmax),(lonmin,latmax)]
 		time = (from_utc, to_utc)
@@ -199,7 +210,8 @@ class SatSource(object):
 			for m in meta:
 				id = osp.splitext(m['producer_granule_id'])[0]
 				url = m['links'][0]['href']
-				m.update(self.download_sat(url))
+				dc = m['data_center']
+				m.update(self.download_sat(url,self.datacenter_to_appkey(dc)))
 				if m:
 				    manifest.update({id: m})
 
@@ -287,6 +299,16 @@ class SatSource(object):
 		"""
 		pass
 
+	def datacenter_to_appkey(self,data_center):
+		"""
+		From data center to appkey to use for that data center
+
+		:param data_center: string with the data center information
+		"""
+		return {'LAADS': self.appkey,
+				'LPDAAC_ECS': None,
+				'LANCEMODIS': self.appkey
+			}.get(data_center,None)
 
 	# instance variables
 	id=None
