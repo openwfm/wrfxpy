@@ -33,6 +33,43 @@ def coord2str(lon_deg,lat_deg):
 
 #def fill_novalues(array,,fill_value):
 
+def degree_diffs(lon1,lon2,lat1,lat2,plot=False):
+    """
+    Compute degree differences and plot them
+    
+    :param lon1,lat1: lon-lat coordinates to compute distance from
+    :param lon2,lat2: lon-lat coordinates to compute distance to
+    :param plot: optional, visualize great circle distance in meters
+    :return: degree differences
+    """
+    # Compute degree differences
+    diff_lon = np.array(lon2)-np.array(lon1)
+    diff_lat = np.array(lat2)-np.array(lat1)
+    print('XLONG vs XLONG_M --> min_error=%f -- max_error=%f -- max_abs_error=%f' % (diff_lon.min(),diff_lon.max(),abs(diff_lon).max()))
+    print('XLAT vs XLAT_M --> min_error=%f -- max_error=%f -- max_abs_error=%f' % (diff_lat.min(),diff_lat.max(),abs(diff_lat).max()))
+    
+    if plot:
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import axes3d
+        from matplotlib import cm
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        fig.suptitle("Longitude degree differences")
+        ax.plot_surface(lon1,lat1,diff_lon,cmap=cm.coolwarm)
+        ax.set_xlabel("Longitude")
+        ax.set_ylabel("Latitude")
+        ax.set_zlabel("Differences")
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        fig.suptitle("Latitude degree differences")
+        ax.plot_surface(lon1,lat1,diff_lat,cmap=cm.coolwarm)
+        ax.set_xlabel("Longitude")
+        ax.set_ylabel("Latitude")
+        ax.set_zlabel("Differences")
+        plt.show()
+
+    return diff_lon,diff_lat
+
 def wrf_gc_distance(lon1,lon2,lat1,lat2,plot=False):
     """
     Compute great circle distance in meters from lon-lat coordinates
@@ -71,7 +108,7 @@ def wrf_gc_distance(lon1,lon2,lat1,lat2,plot=False):
         ax.plot_surface(lon1,lat1,diff,cmap=cm.coolwarm)
         ax.set_xlabel("Longitude")
         ax.set_ylabel("Latitude")
-        ax.set_zlabel("Difference")
+        ax.set_zlabel("Differences")
         plt.show()
 
     return diff 
