@@ -4,7 +4,7 @@ _var_wisdom = {'NFUEL_CAT' : {
         'description' : "Anderson 13 fire behavior categories",
         'type' : "categorical", 
         'category_range' : [0,99],
-        'missing_value' : 99, 
+        'missing_value' : 100, 
         # missing and generated from nearest neighbours
         'missing' : [99],       
         # no value filled with from fill     
@@ -49,7 +49,6 @@ _var_wisdom = {'NFUEL_CAT' : {
         'type' : "continuous",
         'missing_value' : 0.0,
         'signed':'yes',
-        'bits': 16,
         'interp_option' : 'default:average_gcell(4.0)+four_pt+average_4pt',
         'smooth_option' : 'smth-desmth_special; smooth_passes=1'
     },
@@ -59,7 +58,6 @@ _var_wisdom = {'NFUEL_CAT' : {
         'type' : "continuous",
         'missing_value' : 0.0,
         'signed':'yes',
-        'bits': 16,
         'interp_option' : 'default:average_gcell(4.0)+four_pt+average_4pt',
         'smooth_option' : 'smth-desmth_special; smooth_passes=1'
     }

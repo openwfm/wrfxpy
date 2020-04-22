@@ -133,6 +133,7 @@ def write_geogrid(path,array,index,bits=32,scale=None):
         print('unsupported word size')
         sys.exit(1) 
     a = aa.transpose(2,0,1)
+    logging.info('write_geogrid array min=%f max=%f avg=%f' % (a.min(), a.max(), a.mean()))
     zsize, ysize, xsize = a.shape
     data_file = "00001-%05i.00001-%05i" % (xsize, ysize)
     data_path = osp.join(path,data_file)
