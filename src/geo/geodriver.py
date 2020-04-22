@@ -9,6 +9,12 @@ import numpy as np
 from geo.write_geogrid import write_geogrid_var
 from geo.geo_utils import coord2str
 
+class GeoDriverError(Exception):
+    """
+    Raised when a GeoDriver failed.
+    """
+    pass
+
 class GeoDriver(object):
     """
     Represents the content of one GeoDriver file.
@@ -20,6 +26,8 @@ class GeoDriver(object):
 
         :param gdal_ds: gdal dataset object
         """
+        if not isinstance(gdal_ds,gdal.Dataset):
+            raise GeoDriverError('GeoDriver: need a gdal.Dataset object instead of %s.\nTry using: GeoDriver.from_file or GeoDriver.from_elements' % type(gdal_ds))
         self.ds = gdal_ds
         # raster size and spacing
         self.nx = self.ds.RasterXSize
