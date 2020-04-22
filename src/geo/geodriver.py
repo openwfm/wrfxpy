@@ -158,12 +158,15 @@ class GeoDriver(object):
         # print ceter lon-lat coordinates to check with gdalinfo
         logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using pyproj.transform: %s' % coord2str(known_lon,known_lat)) 
         logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using gdal.Info: %s' % gdal.Info(self.ds).split('Center')[1].split(') (')[1].split(')')[0])  
-        # row order
-        row_order = 'top_bottom'
+        # row order depends on dy
+        if dy < 0:
+            row_order = 'bottom_top'
+        else:
+            row_order = 'top_bottom'
         # write geogrid index
         return Dict({'projection' : self.projwrf,
             'dx' : dx,
-            'dy' : dy,
+            'dy' : abs(dy),
             'truelat1' : self.crs.GetProjParm("standard_parallel_1"),
             'truelat2' : self.crs.GetProjParm("standard_parallel_2"),
             'stdlon' : self.crs.GetProjParm("longitude_of_center",self.crs.GetProjParm("central_meridian",self.crs.GetProjParm("longitude_of_origin"))),
