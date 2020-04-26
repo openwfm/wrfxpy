@@ -21,11 +21,12 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
-from . import HRRR
-from . import NARR
-from . import NAM218
-from . import NAM227
-from .CFSR import CFSR_P, CFSR_S
+from ingest.HRRR import HRRR
+from ingest.NARR import NARR
+from ingest.NAM218 import NAM218
+from ingest.NAM227 import NAM227
+from ingest.CFSR import CFSR_P, CFSR_S
+from ingest.GFS import GFS
 from utils import esmf_to_utc, load_sys_cfg
 
 import logging
@@ -63,6 +64,8 @@ if __name__ == '__main__':
         grib_src = CFSR_S(js)
     elif grib_src_name == 'NARR':
         grib_src = NARR(js)
+    elif grib_src_name == 'GFS':
+        grib_src = GFS(js)
     else:
         raise ValueError('Invalid GRIB source %s' % grib_src_name)
 

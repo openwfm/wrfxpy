@@ -45,7 +45,7 @@ class GFS(GribReanalysis):
         :param utc_time: the UTC time
         :return: the relative URL
         """
-        path_tmpl = '%04d%02d/%04d%02d%02d/gfsanl_3_%04d%02d%02d_%02d00_000.grb2'
+        path_tmpl = '%04d%02d/%04d%02d%02d/gfsanl_4_%04d%02d%02d_%02d00_000.grb2'
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
         return path_tmpl % (year, mon, year, mon, day, year, mon, day, hour)
 
