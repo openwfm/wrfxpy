@@ -38,7 +38,7 @@ class GribForecast(GribSource):
             'colmet_files_utc': list of datetimes for the colmet files, 
             'colmet_prefix': string as colmet file prefix, 
             'colmet_files': list of all colmet files, 
-     s      'colmet_missing': list of colmet files that need to be created
+            'colmet_missing': list of colmet files that need to be created
         """
         # ensure minutes and seconds are zero, simplifies arithmetic later
         from_utc = from_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)

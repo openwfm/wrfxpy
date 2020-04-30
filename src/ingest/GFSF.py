@@ -4,6 +4,7 @@ from ingest.grib_forecast import GribForecast
 from datetime import datetime
 import pytz
 
+
 class GFSF(GribForecast):
     """
     The GFS (Global Forecast System) grib source as provided by NOMADS.
@@ -13,11 +14,14 @@ class GFSF(GribForecast):
     Grids include forecast time steps at a hourly interval from 0 to 120, and a 3 hourly interval from 120 to 384. 
     """
 
+
     def __init__(self, arg):
         super(GFSF, self).__init__(arg)
 
+
     def vtables(self):
         return None
+
 
     def namelist_keys(self):
         """
@@ -29,8 +33,10 @@ class GFSF(GribForecast):
                                'num_metgrid_soil_levels' : 4,
                                'p_top_requested' : 10000 }}
 
+
     def file_names(self, cycle_start, fc_list):
         return None
+
 
     # instance variables
     id = "GFSF"
@@ -46,6 +52,7 @@ class GFSF(GribForecast):
     # more information: https://www.nco.ncep.noaa.gov/pmb/products/gfs/nomads/
 
 
+
 class GFSF_P(GFSF):
     """
     The GFS (Global Forecast System) grib source as provided by NOMADS. Pressure fields.
@@ -55,8 +62,10 @@ class GFSF_P(GFSF):
     Grids include forecast time steps at a hourly interval from 0 to 120, and a 3 hourly interval from 120 to 384. 
     """
 
+
     def __init__(self, js):
         super(GFSF_P, self).__init__(js)
+
 
     def vtables(self):
         """
@@ -68,6 +77,7 @@ class GFSF_P(GFSF):
                 'ungrib_vtable': 'Vtable.GFS_pgrb2',
                 'metgrid_vtable': 'METGRID.TBL.GFS'}
 
+
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.wps with GFS_P
@@ -76,6 +86,7 @@ class GFSF_P(GFSF):
         return { 'ungrib' : {'prefix': 'COLMET_P'},
                  'metgrid': {'fg_name': ['COLMET_S','COLMET_P']} 
                }
+
 
     def file_names(self, cycle_start, fc_list):
         """
@@ -91,9 +102,11 @@ class GFSF_P(GFSF):
 
         return grib_files
 
+
     # instance variables
     id = "GFSF_P"
     prefix = 'COLMET_P'
+
 
 
 class GFSF_S(GFSF):
@@ -105,8 +118,10 @@ class GFSF_S(GFSF):
     Grids include forecast time steps at a hourly interval from 0 to 120, and a 3 hourly interval from 120 to 384. 
     """
 
+
     def __init__(self, js):
         super(GFSF_S, self).__init__(js)
+
 
     def vtables(self):
         """
@@ -118,6 +133,7 @@ class GFSF_S(GFSF):
                 'ungrib_vtable': 'Vtable.GFS_sfluxgrb',
                 'metgrid_vtable': 'METGRID.TBL.GFS'}
 
+
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.wps with GFS_S
@@ -126,6 +142,7 @@ class GFSF_S(GFSF):
         return { 'ungrib' : {'prefix': 'COLMET_S'},
                  'metgrid': {'fg_name': ['COLMET_S','COLMET_P']} 
                }
+
 
     def file_names(self, cycle_start, fc_list):
         """
@@ -140,6 +157,7 @@ class GFSF_S(GFSF):
         grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, cycle_start.hour, x) for x in fc_list]
 
         return grib_files
+
 
     # instance variables
     id = "GFSF_S"
