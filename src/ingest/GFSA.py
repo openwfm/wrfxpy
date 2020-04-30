@@ -4,16 +4,17 @@ from ingest.grib_reanalysis import GribReanalysis
 from datetime import datetime
 import pytz
 
-class GFS(GribReanalysis):
+class GFSA(GribReanalysis):
     """
     The GFS (Global Forecast System) grib source as provided by NOMADS.
-
-    GFS a reanalysis product computed with a large delay (18 months at this time) and
-    the conditions are encoded every 3 hours [0, 3, 6, 9, ..., 21] every day.
+    
+    The NCEP operational Global Forecast System analysis grids are on a 0.5 global latitude longitude grid.
+    Model analysis runs occur at 00, 06, 12, and 18 UTC daily. 
+    Grids include forecast time steps at a 3 hourly interval from 0 to 6.
     """
 
     def __init__(self, arg):
-        super(GFS, self).__init__(arg)
+        super(GFSA, self).__init__(arg)
 
 
     def vtables(self):
@@ -51,10 +52,10 @@ class GFS(GribReanalysis):
 
     # instance variables
     info_url = 'https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00634'
-    info = "Global Forecast System (GFS)"
+    info = "Global Forecast System (GFS) Analysis"
     remote_url = 'https://nomads.ncdc.noaa.gov/data/gfsanl'
     period_hours = 6
-    id = "GFS"
+    id = "GFSA"
     available_from_utc = datetime(2004,3,1,tzinfo=pytz.UTC)
     available_to_utc = datetime.now(pytz.UTC)
 

@@ -26,7 +26,8 @@ from ingest.NARR import NARR
 from ingest.NAM218 import NAM218
 from ingest.NAM227 import NAM227
 from ingest.CFSR import CFSR_P, CFSR_S
-from ingest.GFS import GFS
+from ingest.GFSA import GFSA
+from ingest.GFSF import GFSF_P, GFSF_S
 from utils import esmf_to_utc, load_sys_cfg
 
 import logging
@@ -37,7 +38,7 @@ import os.path as osp
 if __name__ == '__main__':
     if len(sys.argv) != 5:
         print(('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
-        print('       supported GRIB sources: HRRR, NAM, CFSR_P, CFSR_S, NARR')
+        print('       supported GRIB sources: HRRR, NAM, CFSR_P, CFSR_S, NARR, GFSA, GFSF_P, GFSF_S')
         sys.exit(-1)
 
 
@@ -64,8 +65,12 @@ if __name__ == '__main__':
         grib_src = CFSR_S(js)
     elif grib_src_name == 'NARR':
         grib_src = NARR(js)
-    elif grib_src_name == 'GFS':
-        grib_src = GFS(js)
+    elif grib_src_name == 'GFSA':
+        grib_src = GFSA(js)
+    elif grib_src_name == 'GFSF_P':
+        grib_src = GFSF_P(js)
+    elif grib_src_name == 'GFSF_S':
+        grib_src = GFSF_S(js)
     else:
         raise ValueError('Invalid GRIB source %s' % grib_src_name)
 

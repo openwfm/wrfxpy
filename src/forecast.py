@@ -39,7 +39,8 @@ from ingest.HRRR import HRRR
 from ingest.NAM227 import NAM227
 from ingest.CFSR import CFSR_P, CFSR_S
 from ingest.NARR import NARR
-from ingest.GFS import GFS
+from ingest.GFSA import GFSA
+from ingest.GFSF import GFSF_P, GFSF_S
 
 from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP
@@ -135,8 +136,10 @@ class JobState(Dict):
             return [NARR(js)]
         elif gs_name == 'CFSR':
             return [CFSR_P(js),CFSR_S(js)]
-        elif gs_name == 'GFS':
-            return [GFS(js)]
+        elif gs_name == 'GFSA':
+            return [GFSA(js)]
+        elif gs_name == 'GFSF':
+            return [GFSF_P(js),GFSF_S(js)]
         else:
             raise ValueError('Unrecognized grib_source %s' % gs_name)
 
@@ -1028,8 +1031,8 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
-    if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR','GFS']:
-        raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR, GFS' % args['grib_source'])
+    if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR','GFSA','GFSF']:
+        raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
 
     # check for valid satellite source
     if 'satellite_source' in args:

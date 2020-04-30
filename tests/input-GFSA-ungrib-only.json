@@ -5,9 +5,9 @@
         "template": "profiles/3d_555m_NAM227.json",
         "title": "Three domains, 5km/1.6km/0.55km cell size, 28m fire grid., NAM218 5km forcing"
     },
-    "job_id": "testing-GFS-ungrib-only",
+    "job_id": "testing-GFSA-ungrib-only",
     "wall_time_hrs": 3,
-    "grib_source": "GFS",
+    "grib_source": "GFSA",
     "start_utc": "2019-11-03_00:00:00",
     "end_utc": "2019-11-09_00:00:00",
     "ungrib_only": true,
