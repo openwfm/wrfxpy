@@ -9,7 +9,7 @@
     "wall_time_hrs": 3,
     "grib_source": "GFSF",
     "start_utc": "T-2880",
-    "end_utc": "T-1440",
+    "end_utc": "T+1440",
     "ungrib_only": true,
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
@@ -114,7 +114,7 @@
     "ignitions": {
         "3": [
             {
-                "time_utc": "T-2000",
+                "time_utc": "T+720",
                 "latlon": [
                     40.0699,
                     -108.2909

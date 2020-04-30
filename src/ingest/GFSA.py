@@ -4,6 +4,7 @@ from ingest.grib_reanalysis import GribReanalysis
 from datetime import datetime
 import pytz
 
+
 class GFSA(GribReanalysis):
     """
     The GFS (Global Forecast System) grib source as provided by NOMADS.
