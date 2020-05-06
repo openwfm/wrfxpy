@@ -61,12 +61,12 @@ class GeoDriver(object):
         # get pyproj element for tif file
         self.pyproj = pyproj.Proj(self.proj4)
         # projection short string
-        self.projstr = self.rasterio.to_dict()['proj']
+        self.projstr = self.rasterio.to_dict().get('proj','longlat')
         # WPS projections from proj4 attribute +proj
         self.projwrf = {'lcc': 'lambert',
             'stere': 'polar',
             'merc': 'mercator',
-            'latlong': 'regular_ll',
+            'longlat': 'regular_ll',
             'aea': 'albers_nad83',
             'stere': 'polar_wgs84'
         }.get(self.projstr,None)
@@ -109,7 +109,7 @@ class GeoDriver(object):
         # spacing
         dx,dy = self.gt[1],self.gt[5]
         # get pyproj element for WGS84
-        ref_proj = pyproj.Proj(proj='lonlat',ellps='WGS84',datum='WGS84',no_defs=True)
+        ref_proj = pyproj.Proj(proj='longlat',ellps='WGS84',datum='WGS84',no_defs=True)
         # get bounding box in projection of the GeoTIFF
         x_min,y_min = pyproj.transform(ref_proj,self.pyproj,bbox[0],bbox[2])
         x_max,y_max = pyproj.transform(ref_proj,self.pyproj,bbox[1],bbox[3])
