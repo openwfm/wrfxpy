@@ -60,6 +60,24 @@ _var_wisdom = {'NFUEL_CAT' : {
         'signed':'yes',
         'interp_option' : 'default:average_gcell(4.0)+four_pt+average_4pt',
         'smooth_option' : 'smth-desmth_special; smooth_passes=1'
+    },
+    'XI' : {
+        'units' : "1",
+        'description' : "Indexes x-direction for testing WPS",
+        'type' : "continuous",
+        'missing_value' : 0.0,
+        'scale': 1.,
+        'signed':'yes',
+        'interp_option' : 'default:average_gcell(4.0)+four_pt+average_4pt'
+    },
+    'YI' : {
+        'units' : "1",
+        'description' : "Indexes y-direction for testing WPS",
+        'type' : "continuous",
+        'missing_value' : 0.0,
+        'scale': 1.,
+        'signed':'yes',
+        'interp_option' : 'default:average_gcell(4.0)+four_pt+average_4pt'
     }
 }
 
