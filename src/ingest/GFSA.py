@@ -36,9 +36,9 @@ class GFSA(GribReanalysis):
         """
 
         #GFS requires that ''num_metgrid_soil_levels'' is set to 4.
-        return { 'domains' : { 'num_metgrid_levels' : 49,
-                               'num_metgrid_soil_levels' : 4,
-                               'p_top_requested' : 10000 }}
+        return { 'domains' : { 'num_metgrid_levels' : 34,
+                               'num_metgrid_soil_levels': 4,
+                               'p_top_requested': 10000 }}
 
     def make_relative_url(self, utc_time):
         """
