@@ -106,14 +106,18 @@ class GeoDriver(object):
         """
         Resample using lon-lat bounding box.
         """
-        logging.info('GeoTIFF.resample_bbox - resampling GeoDriver into bounding box: %s' % bbox)  
+        logging.info('GeoTIFF.resample_bbox - resampling GeoDriver into bounding box: %s' % list(bbox))  
         # spacing
         dx,dy = self.gt[1],self.gt[5]
         # get pyproj element for WGS84
         ref_proj = pyproj.Proj(proj='longlat',ellps='WGS84',datum='WGS84',no_defs=True)
         # get bounding box in projection of the GeoTIFF
-        x_min,y_min = pyproj.transform(ref_proj,self.pyproj,bbox[0],bbox[2])
-        x_max,y_max = pyproj.transform(ref_proj,self.pyproj,bbox[1],bbox[3])
+        ref_corners = ((bbox[0],bbox[2]),(bbox[0],bbox[3]),(bbox[1],bbox[3]),(bbox[1],bbox[2]))
+        proj_corners = [pyproj.transform(ref_proj,self.pyproj,c[0],c[1]) for c in ref_corners]
+        x_min = min([c[0] for c in proj_corners])
+        x_max = max([c[0] for c in proj_corners])
+        y_min = min([c[1] for c in proj_corners])
+        y_max = max([c[1] for c in proj_corners])
         # get coordinates
         X,Y = self.get_coord()
         # find resample indexes
@@ -136,11 +140,11 @@ class GeoDriver(object):
         # save resample indexes
         self.resample_indxs = (i_min,i_max,j_min,j_max)
         # resample coordinates
-        X_r,Y_r = X[i_min:i_max,j_min:j_max],Y[i_min:i_max,j_min:j_max]
+        X_r,Y_r = X[j_min:j_max,i_min:i_max],Y[j_min:j_max,i_min:i_max]
         # get array
         a = self.ds.ReadAsArray()
         # resample array
-        a_r = a[i_min:i_max,j_min:j_max]
+        a_r = a[j_min:j_max,i_min:i_max]
         # update other elements
         self.gt = (X_r[0,0],dx,0,Y_r[0,0],0,dy)
         self.ny,self.nx = X_r.shape
