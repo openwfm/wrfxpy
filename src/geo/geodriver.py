@@ -79,12 +79,12 @@ class GeoDriver(object):
         else:
             self.reproj = False
 
-    def get_array(self,resample=None):
+    def get_array(self,bbox=None):
         """
         Get array information.
         """
-        if resample:
-            return self.resample_bbox(resample)
+        if isinstance(bbox,(tuple,list,np.ndarray)):
+            return self.resample_bbox(bbox)
         else:
             return self.ds.ReadAsArray()
 
@@ -106,6 +106,7 @@ class GeoDriver(object):
         """
         Resample using lon-lat bounding box.
         """
+        logging.info('GeoTIFF.resample_bbox - resampling GeoDriver into bounding box: %s' % bbox)  
         # spacing
         dx,dy = self.gt[1],self.gt[5]
         # get pyproj element for WGS84

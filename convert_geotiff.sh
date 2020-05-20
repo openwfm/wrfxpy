@@ -9,4 +9,4 @@ if [ "${dir:0:1}" != "/" ]; then
     dir=$(pwd)/$2
 fi
 export PYTHONPATH=src
-python src/geo/convert_geotiff.py $file $dir $3
+python src/geo/convert_geotiff.py $file $dir $3 $4
