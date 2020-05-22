@@ -14,7 +14,7 @@ if __name__ == '__main__':
         print('Usage: ./convert_geotiff.sh geotiff_file geogrid_folder var_name [bbox]')
         print('             bbox - min_lon,max_lon,min_lat,max_lat')
         print('Example: ./convert_geotiff.sh ./fuel.tif ./geo_data NFUEL_CAT')
-        print('         ./convert_geotiff.sh ./fuel.tif ./geo_data NFUEL_CAT ')
+        print('         ./convert_geotiff.sh ./fuel.tif ./geo_data NFUEL_CAT -112.8115,-112.1661,39.4820,39.9750')
         print('Available var_name options are %s' % get_wisdom_variables())
         exit(1)
     elif not file_exists(sys.argv[1]):

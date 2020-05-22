@@ -116,23 +116,24 @@ def write_geogrid(path,array,index,bits=32,scale=None):
     if not osp.exists(path):
         os.makedirs(path)
     # write binary data file
-    a=np.array(array)
-    dims=a.shape
+    a = np.array(array)
+    dims = a.shape
     if len(dims) < 3:
         dims = dims + (1,)
         a = np.reshape(a,dims)
     xsize, ysize, zsize = dims
     if scale is None:
         scale = 2**(np.ceil(np.log2(np.max(np.abs(a))))-bits+1)
-    aa = np.round(a/scale)
+    elif scale != 1.:
+        a = np.round(a/scale)
     if bits == 32:
-        aa = np.int32(aa) 
+        a = np.int32(a) 
     elif bits == 16:
-        aa = np.int16(aa) 
+        a = np.int16(a) 
     else:
         print('unsupported word size')
         sys.exit(1) 
-    a = aa.transpose(2,0,1)
+    a = a.transpose(2,0,1)
     logging.info('write_geogrid array min=%f max=%f avg=%f' % (a.min(), a.max(), a.mean()))
     zsize, ysize, xsize = a.shape
     data_file = "00001-%05i.00001-%05i" % (xsize, ysize)

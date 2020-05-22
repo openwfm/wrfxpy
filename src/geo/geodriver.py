@@ -208,7 +208,7 @@ class GeoDriver(object):
         Transform to geotiff file
         :param path: path to write the geotiff file
         """
-        logging.info('GeoTIFF.to_geogrid() - getting array')
+        logging.info('GeoTIFF.to_geotiff() - getting array')
         array = self.get_array(bbox)
         logging.info('GeoTIFF.to_geotiff() - writting geotiff')
         ds = gdal.GetDriverByName('GTiff').Create(path,self.nx,self.ny,1,gdal.GDT_Float32)

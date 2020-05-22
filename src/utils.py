@@ -62,6 +62,28 @@ class Dict(dict):
     def __setattr__(self, item, value):
         self[item] = value
 
+    def __getitem__(self, item):
+        if item in self:
+            return super().__getitem__(item)
+        else:
+            for key in self:
+                if isinstance(key,range) and item in key:
+                    return super().__getitem__(key)
+            raise KeyError(item)
+
+    def keys(self):
+        if any([isinstance(key,range) for key in self]):
+            keys = []
+            for key in self:
+                if isinstance(key,range):
+                    for k in key:
+                        keys.append(k)
+                else:
+                    keys.append(key)
+            return keys
+        else:
+            return super().keys()
+
 def save(obj, file):
     with open(file,'wb') as output:
         dill.dump(obj, output )
