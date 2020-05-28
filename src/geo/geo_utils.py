@@ -1,5 +1,27 @@
 from scipy import spatial
 import numpy as np
+import logging
+
+def replace_fill(array,fill):
+    for k in fill.keys():
+        if k == 'missing':
+            logging.info('interpolating missing categories %s' % fill[k])
+            mask = np.zeros(array.shape)
+            for cats in fill[k]:
+                if isinstance(cats,range):
+                    for cat in cats:
+                        mask = np.logical_or(mask,array==int(cat))
+                else:
+                    mask = np.logical_or(mask,array==int(cats))
+            array = np.ma.array(array,mask=mask)
+            x,y = np.mgrid[0:array.shape[0],0:array.shape[1]]
+            xygood = np.array((x[~array.mask],y[~array.mask])).T
+            xybad = np.array((x[array.mask],y[array.mask])).T
+            array[array.mask] = array[~array.mask][spatial.cKDTree(xygood).query(xybad)[1]]
+        else:
+            logging.info('replacing categories %s -> %s' % (k,fill[k]))
+            array[array==int(k)]=fill[k]
+    return array
 
 def deg2str(deg,islat):
     """
@@ -30,8 +52,6 @@ def coord2str(lon_deg,lat_deg):
     # compute latitude
     lat_str = deg2str(lat_deg,True)
     return '%s, %s' % (lon_str,lat_str)
-
-#def fill_novalues(array,,fill_value):
 
 def degree_diffs(lon1,lon2,lat1,lat2,plot=False):
     """

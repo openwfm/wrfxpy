@@ -8,6 +8,7 @@ import numpy as np
 import sys, os, logging, json
 from utils import inq, addquotes
 from geo.var_wisdom import get_wisdom
+from geo.geo_utils import replace_fill
 import six
 
 def write_divide(file,divide='=',count=25):
@@ -60,6 +61,12 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32):
         index['missing_value'] = wisdom['missing_value']
     if 'tile_bdr' in wisdom:
         index['tile_bdr'] = wisdom['tile_bdr']
+
+    # categorical substitution and interpolation
+    if index['type'] == 'categorical':
+        fill = wisdom.get('fill',None)
+        if fill:
+            array = replace_fill(array,fill)
 
     write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale)
  
