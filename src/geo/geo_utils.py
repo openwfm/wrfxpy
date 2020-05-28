@@ -3,6 +3,13 @@ import numpy as np
 import logging
 
 def replace_fill(array,fill):
+    """
+    Replace categorical labels and interpolate missing categories depending on a custom dictionary
+    
+    :param array: array of a categorical variable
+    :param fill: dictionary with category replacements and missing caregories
+    :return: array with categories replaced and interpolated missing categories using nearest neighbour
+    """
     for k in fill.keys():
         if k == 'missing':
             logging.info('interpolating missing categories %s' % fill[k])

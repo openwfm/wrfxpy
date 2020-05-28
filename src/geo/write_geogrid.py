@@ -64,9 +64,8 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32):
 
     # categorical substitution and interpolation
     if index['type'] == 'categorical':
-        fill = wisdom.get('fill',None)
-        if fill:
-            array = replace_fill(array,fill)
+        fill = wisdom.get('fill',{})
+        array = replace_fill(array,fill)
 
     write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale)
  

@@ -1,9 +1,8 @@
 # geodriver.py
 # Angel Farguell, March 2020
 
-import gdal, osr, pyproj, rasterio, gdalconst
+import gdal, osr, pyproj, rasterio
 import logging
-
 from utils import Dict
 import numpy as np
 from geo.write_geogrid import write_geogrid_var
@@ -34,8 +33,6 @@ class GeoDriver(object):
         self.ny = self.ds.RasterYSize
         # define projection objects
         self.init_proj()
-        # initialize resample indexes to None
-        self.resample_indxs = None
 
     def close(self):
         """
@@ -82,6 +79,8 @@ class GeoDriver(object):
     def get_array(self,bbox=None):
         """
         Get array information.
+
+        :param bbox: optional, WGS84 bounding box (min_lon,max_lon,min_lat,max_lat)
         """
         if isinstance(bbox,(tuple,list,np.ndarray)):
             return self.resample_bbox(bbox)
@@ -95,16 +94,13 @@ class GeoDriver(object):
         x0,dx,_,y0,_,dy = self.gt
         xx = np.arange(x0,x0+dx*self.nx,dx)
         yy = np.arange(y0,y0+dy*self.ny,dy)
-        X,Y = np.meshgrid(xx,yy)
-        if self.resample_indxs:
-            i_min,i_max,j_min,j_max = self.resample_indxs
-            return X[i_min:i_max,j_min:j_max],Y[i_min:i_max,j_min:j_max]
-        else:
-            return X,Y
+        return np.meshgrid(xx,yy)
 
     def resample_bbox(self,bbox):
         """
         Resample using lon-lat bounding box.
+
+        :param bbox: optional, WGS84 bounding box (min_lon,max_lon,min_lat,max_lat)
         """
         logging.info('GeoTIFF.resample_bbox - resampling GeoDriver into bounding box: %s' % list(bbox))  
         # spacing
@@ -153,6 +149,7 @@ class GeoDriver(object):
     def geogrid_index(self):
         """
         Geolocation in a form suitable for geogrid index.
+
         :return: dictionary key:value 
         """
         # spacing
@@ -193,8 +190,10 @@ class GeoDriver(object):
     def to_geogrid(self,path,var,bbox=None):
         """
         Transform to geogrid files
+
         :param path: path to write the geogrid files
         :param var: variable name for WPS (available options in src/geo/var_wisdom.py)
+        :param bbox: optional, WGS84 bounding box (min_lon,max_lon,min_lat,max_lat)
         """
         logging.info('GeoTIFF.to_geogrid() - getting array')
         array = self.get_array(bbox)
@@ -206,7 +205,9 @@ class GeoDriver(object):
     def to_geotiff(self,path,bbox=None):
         """
         Transform to geotiff file
+
         :param path: path to write the geotiff file
+        :param bbox: optional, WGS84 bounding box (min_lon,max_lon,min_lat,max_lat)
         """
         logging.info('GeoTIFF.to_geotiff() - getting array')
         array = self.get_array(bbox)
