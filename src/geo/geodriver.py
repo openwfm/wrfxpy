@@ -103,8 +103,10 @@ class GeoDriver(object):
         :param bbox: optional, WGS84 bounding box (min_lon,max_lon,min_lat,max_lat)
         """
         logging.info('GeoTIFF.resample_bbox - resampling GeoDriver into bounding box: %s' % list(bbox))  
-        # spacing
-        dx,dy = self.gt[1],self.gt[5]
+        # geotransform
+        x0,dx,_,y0,_,dy = self.gt
+        xx = np.arange(x0,x0+dx*self.nx,dx)
+        yy = np.arange(y0,y0+dy*self.ny,dy)
         # get pyproj element for WGS84
         ref_proj = pyproj.Proj(proj='longlat',ellps='WGS84',datum='WGS84',no_defs=True)
         # get bounding box in projection of the GeoTIFF
@@ -114,19 +116,17 @@ class GeoDriver(object):
         x_max = max([c[0] for c in proj_corners])
         y_min = min([c[1] for c in proj_corners])
         y_max = max([c[1] for c in proj_corners])
-        # get coordinates
-        X,Y = self.get_coord()
         # find resample indexes
-        i_mins = np.where(x_min <= X[0])[0]
-        i_maxs = np.where(X[0] <= x_max)[0]
+        i_mins = np.where(x_min <= xx)[0]
+        i_maxs = np.where(xx <= x_max)[0]
         if dx > 0:
             i_min = i_mins.min()
             i_max = i_maxs.max()
         else:
             i_max = i_mins.max()
             i_min = i_maxs.min()
-        j_mins = np.where(y_min <= Y[:,0])[0]
-        j_maxs = np.where(Y[:,0] <= y_max)[0]
+        j_mins = np.where(y_min <= yy)[0]
+        j_maxs = np.where(yy <= y_max)[0]
         if dy > 0:
             j_min = j_mins.min()
             j_max = j_maxs.max()
@@ -135,15 +135,17 @@ class GeoDriver(object):
             j_min = j_maxs.min()
         # save resample indexes
         self.resample_indxs = (i_min,i_max,j_min,j_max)
-        # resample coordinates
-        X_r,Y_r = X[j_min:j_max,i_min:i_max],Y[j_min:j_max,i_min:i_max]
-        # get array
-        a = self.ds.ReadAsArray()
-        # resample array
-        a_r = a[j_min:j_max,i_min:i_max]
+        # only working on Linux
+        try:
+            # get array and resample
+            a_r = self.ds.GetVirtualMemArray()[j_min:j_max,i_min:i_max]
+        except:
+            logging.warning('GeoTIFF.resample_bbox - had to generate whole array')
+            # get array and resample
+            a_r = self.ds.ReadAsArray()[j_min:j_max,i_min:i_max]
         # update other elements
-        self.gt = (X_r[0,0],dx,0,Y_r[0,0],0,dy)
-        self.ny,self.nx = X_r.shape
+        self.gt = (xx[i_min],dx,0,yy[j_min],0,dy)
+        self.ny,self.nx = a_r.shape
         return a_r
 
     def geogrid_index(self):
