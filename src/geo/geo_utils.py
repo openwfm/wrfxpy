@@ -2,32 +2,36 @@ from scipy import spatial
 import numpy as np
 import logging
 
-def replace_fill(array,fill):
+def fill_categories(array,fill,coord=None):
     """
     Replace categorical labels and interpolate missing categories depending on a custom dictionary
     
     :param array: array of a categorical variable
     :param fill: dictionary with category replacements and missing caregories
+    :param coord: optional, coordinates (x,y)
     :return: array with categories replaced and interpolated missing categories using nearest neighbour
     """
+    # replace categories
     for k in fill.keys():
-        if k == 'missing':
-            logging.info('interpolating missing categories %s' % fill[k])
-            mask = np.zeros(array.shape)
-            for cats in fill[k]:
-                if isinstance(cats,range):
-                    for cat in cats:
-                        mask = np.logical_or(mask,array==int(cat))
-                else:
-                    mask = np.logical_or(mask,array==int(cats))
-            array = np.ma.array(array,mask=mask)
-            x,y = np.mgrid[0:array.shape[0],0:array.shape[1]]
-            xygood = np.array((x[~array.mask],y[~array.mask])).T
-            xybad = np.array((x[array.mask],y[array.mask])).T
-            array[array.mask] = array[~array.mask][spatial.cKDTree(xygood).query(xybad)[1]]
-        else:
-            logging.info('replacing categories %s -> %s' % (k,fill[k]))
+        if fill[k] != 'nearest':
+            logging.info('geo_utils.fill_categories() - replacing categories %s -> %s' % (k,fill[k]))
             array[array==int(k)]=fill[k]
+    # interpolate missing values
+    missing = [k for k in fill.keys() if fill[k] == 'nearest']
+    if len(missing):
+        logging.info('geo_utils.fill_categories() - interpolating missing categories %s' % missing)
+        mask = np.zeros(array.shape)
+        for cm in missing:
+            mask = np.logical_or(mask,array==int(cm))
+        array = np.ma.array(array,mask=mask)
+        if coord:
+            x,y = coord
+        else:
+            x,y = np.mgrid[0:array.shape[0],0:array.shape[1]]
+        xy_known = np.array((x[~array.mask],y[~array.mask])).T
+        xy_unknown = np.array((x[array.mask],y[array.mask])).T
+        array[array.mask] = array[~array.mask][spatial.cKDTree(xy_known).query(xy_unknown)[1]]
+                
     return array
 
 def deg2str(deg,islat):

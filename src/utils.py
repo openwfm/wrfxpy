@@ -67,15 +67,15 @@ class Dict(dict):
             return super().__getitem__(item)
         else:
             for key in self:
-                if isinstance(key,range) and item in key:
+                if isinstance(key,(range,tuple)) and item in key:
                     return super().__getitem__(key)
             raise KeyError(item)
 
     def keys(self):
-        if any([isinstance(key,range) for key in self]):
+        if any([isinstance(key,(range,tuple)) for key in self]):
             keys = []
             for key in self:
-                if isinstance(key,range):
+                if isinstance(key,(range,tuple)):
                     for k in key:
                         keys.append(k)
                 else:

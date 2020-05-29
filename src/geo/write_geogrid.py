@@ -8,7 +8,7 @@ import numpy as np
 import sys, os, logging, json
 from utils import inq, addquotes
 from geo.var_wisdom import get_wisdom
-from geo.geo_utils import replace_fill
+from geo.geo_utils import fill_categories
 import six
 
 def write_divide(file,divide='=',count=25):
@@ -32,7 +32,7 @@ def write_table(file,lines_dict,mode='w',divider_char='=',divider_count=25,divid
         f.write(divider_char * divider_count + '\n')
     f.close()
 
-def write_geogrid_var(path_dir,varname,array,index,bits=32):
+def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
     """
     write geogrid dataset and index 
     """
@@ -65,7 +65,7 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32):
     # categorical substitution and interpolation
     if index['type'] == 'categorical':
         fill = wisdom.get('fill',{})
-        array = replace_fill(array,fill)
+        array = fill_categories(array,fill,coord)
 
     write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale)
  

@@ -4,12 +4,11 @@ _var_wisdom = {'NFUEL_CAT' : {
         'units': "fuel category",
         'description': "Anderson 13 fire behavior categories",
         'type': "categorical", 
-        'category_range': [0,99],
+        'category_range': [0,14],
         'missing_value': 99,       
         'fill' : Dict({
-                    range(90,99): 14, 
-                    'missing': [99]
-                    }),
+                    range(90,100): 14
+                }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
         'bits': 16,
