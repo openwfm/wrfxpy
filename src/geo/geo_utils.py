@@ -23,14 +23,15 @@ def fill_categories(array,fill,coord=None):
         mask = np.zeros(array.shape)
         for cm in missing:
             mask = np.logical_or(mask,array==int(cm))
-        array = np.ma.array(array,mask=mask)
-        if coord:
-            x,y = coord
-        else:
-            x,y = np.mgrid[0:array.shape[0],0:array.shape[1]]
-        xy_known = np.array((x[~array.mask],y[~array.mask])).T
-        xy_unknown = np.array((x[array.mask],y[array.mask])).T
-        array[array.mask] = array[~array.mask][spatial.cKDTree(xy_known).query(xy_unknown)[1]]
+        if mask.any():
+            array = np.ma.array(array,mask=mask)
+            if coord:
+                x,y = coord
+            else:
+                x,y = np.mgrid[0:array.shape[0],0:array.shape[1]]
+            xy_known = np.array((x[~array.mask],y[~array.mask])).T
+            xy_unknown = np.array((x[array.mask],y[array.mask])).T
+            array[array.mask] = array[~array.mask][spatial.cKDTree(xy_known).query(xy_unknown)[1]]
                 
     return array
 

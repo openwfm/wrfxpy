@@ -137,10 +137,10 @@ class GeoDriver(object):
         self.resample_indxs = (i_min,i_max,j_min,j_max)
         # only working on Linux
         try:
-            # get array and resample
-            a_r = self.ds.GetVirtualMemArray()[j_min:j_max,i_min:i_max]
+            # get virtual array and resample
+            a_r = self.ds.GetVirtualMemArray()[j_min:j_max,i_min:i_max].copy()
         except:
-            logging.warning('GeoTIFF.resample_bbox - had to generate whole array')
+            logging.warning('GeoTIFF.resample_bbox - reading the whole array and sampling after')
             # get array and resample
             a_r = self.ds.ReadAsArray()[j_min:j_max,i_min:i_max]
         # update other elements
