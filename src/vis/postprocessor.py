@@ -848,9 +848,13 @@ class Postprocessor(object):
         logging.info('process_vars: looking for time %s in %s' % (ts_esmf,wrfout_path))
         max_retries = 10
         for k in range(max_retries):
-            # open the netCDF dataset
             try:
+                # open the netCDF dataset
                 d = nc4.Dataset(wrfout_path)
+                # extract ESMF string times and identify timestamp of interest
+                times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
+                # close the netCDF dataset
+                d.close()
             except:
                 if k == max_retries-1:
                     logging.error('process_vars: cannot open file %s' % wrfout_path)
@@ -859,10 +863,7 @@ class Postprocessor(object):
                     logging.warning('process_vars: cannot open file in retry %s of %s' % (wrfout_path,str(k+1),str(max_retries)))
                     logging.info('process_vars: waiting for next retry...')
                     time.sleep(5)
-            # extract ESMF string times and identify timestamp of interest
-            times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
-            # close the netCDF dataset
-            d.close()
+                    continue
             # make sure time step is processed on file
             if ts_esmf in times:
                 logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
