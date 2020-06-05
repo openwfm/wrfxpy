@@ -92,8 +92,8 @@ class GeoDriver(object):
         Get coordinate arrays for the whole GeoTIFF file using initial projection.
         """
         x0,dx,_,y0,_,dy = self.gt
-        xx = np.arange(x0,x0+dx*self.nx,dx)
-        yy = np.arange(y0,y0+dy*self.ny,dy)
+        xx = np.linspace(x0,x0+dx*self.nx,self.nx)
+        yy = np.linspace(y0,y0+dy*self.ny,self.ny)
         return np.meshgrid(xx,yy)
 
     def resample_bbox(self,bbox):

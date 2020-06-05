@@ -5,26 +5,35 @@ _var_wisdom = {'NFUEL_CAT' : {
         'description': "Anderson 13 fire behavior categories",
         'type': "categorical", 
         'category_range': [0,14],
-        'missing_value': 99,       
+        'fill_missing': 14,       
         'fill' : Dict({
+                    0: 14,
                     range(90,100): 14,
                     100: 'nearest'
                 }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
         'bits': 16,
-        'interp_option': 'default:nearest_neighbor+average_16pt+search'             
+        'interp_option': 'default:nearest_neighbor+average_16pt+search',
+        'subgrid': 'yes',
+        'add_opts': {'dominant_only': 'NFUEL_CAT',
+                    'z_dim_name': 'fuel_cat',
+                    'halt_on_missing': 'no'}             
     },
     'ZSF' : {
         'units': "meters",
         'description': "National Elevation Dataset 1/3 arcsecond resolution",
         'type': "continuous",
-        'missing_value': 0.0,
+        'fill_missing': 0,
         'scale': 1.,
         'signed': 'yes',
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
-        'smooth_option': 'smth-desmth_special; smooth_passes=1'
+        'smooth_option': 'smth-desmth_special; smooth_passes=1',
+        'subgrid': 'yes',
+        'add_opts': {'df_dx': 'DZDXF',
+                    'df_dy': 'DZDYF',
+                    'halt_on_missing': 'no'}
     },
     'FMC_GC' : {
         'units': "1",
@@ -32,6 +41,7 @@ _var_wisdom = {'NFUEL_CAT' : {
         'type': "continuous",
         'tile_bdr': 0,
         'signed': 'yes',
+        'subgrid': 'yes',
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
     },
     'FMEP' : {
@@ -40,43 +50,48 @@ _var_wisdom = {'NFUEL_CAT' : {
         'type': "continuous",
         'tile_bdr': 0,
         'signed': 'yes',
+        'subgrid': 'yes',
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
     },
     'XLONG' : {
         'units': "degrees",
         'description': "Longitude in the domain",
         'type': "continuous",
-        'missing_value': 0.0,
+        'fill_missing': 0.0,
         'signed': 'yes',
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
-        'smooth_option': 'smth-desmth_special; smooth_passes=1'
+        'smooth_option': 'smth-desmth_special; smooth_passes=1',
+        'subgrid': 'no'
     },
     'XLAT' : {
         'units': "degrees",
         'description': "Latitude in the domain",
         'type': "continuous",
-        'missing_value': 0.0,
+        'fill_missing': 0.0,
         'signed': 'yes',
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
-        'smooth_option': 'smth-desmth_special; smooth_passes=1'
+        'smooth_option': 'smth-desmth_special; smooth_passes=1',
+        'subgrid': 'no'
     },
     'XI' : {
         'units': "1",
         'description': "Indexes x-direction for testing WPS",
         'type': "continuous",
-        'missing_value': 0.0,
+        'fill_missing': 0.0,
         'scale': 1.,
         'signed': 'yes',
-        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes'
     },
     'YI' : {
         'units' : "1",
         'description': "Indexes y-direction for testing WPS",
         'type': "continuous",
-        'missing_value': 0.0,
+        'fill_missing': 0.0,
         'scale': 1.,
         'signed': 'yes',
-        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes'
     }
 }
 

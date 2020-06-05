@@ -89,6 +89,11 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
         geogrid_tbl_var['fill_missing'] = wisdom['fill_missing']
     if 'smooth_option' in wisdom:
         geogrid_tbl_var['smooth_option'] = wisdom['smooth_option']
+    if 'subgrid' in wisdom:
+        geogrid_tbl_var['subgrid'] = wisdom['subgrid']
+    if 'add_opts' in wisdom:
+        for key in wisdom['add_opts'].keys():
+            geogrid_tbl_var[key] = wisdom['add_opts'][key]
 
     # write a segment of GEOGRID.TBL
     geogrid_tbl_path=osp.join(path_dir,'GEOGRID.TBL')
