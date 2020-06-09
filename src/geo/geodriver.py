@@ -199,6 +199,9 @@ class GeoDriver(object):
         """
         logging.info('GeoTIFF.to_geogrid() - getting array')
         array = self.get_array(bbox)
+        # WPS is generating regular lat-lon arrays upside down
+        if self.projwrf == 'regular_ll':
+            array = np.flip(array)
         logging.info('GeoTIFF.to_geogrid() - creating index')
         index = self.geogrid_index()
         logging.info('GeoTIFF.to_geogrid() - writting geogrid')
