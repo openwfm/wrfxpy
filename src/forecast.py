@@ -364,7 +364,6 @@ def find_wrfout(path, dom_id, esmf_time):
     """
     logging.info('find_wrfout: looking for the first wrfout for domain %s time %s' % (dom_id,esmf_time))
     wrfouts = sorted(glob.glob(osp.join(path, 'wrfout_d%02d*' % dom_id)),reverse=True) # reverse order
-    wrfouts
     for wrfout in wrfouts:
         wrfout_time = re.match(r'.*wrfout_d.._([0-9_\-:]{19})' ,wrfout).groups()[0]
         if esmf_time >= wrfout_time:
