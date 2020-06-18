@@ -20,11 +20,19 @@ class CFSR(GribReanalysis):
     def __init__(self, js):
         super(CFSR, self).__init__(js)
 
-    def vtables(self):
-        return None
-
     def namelist_wps_keys(self):
         return None
+
+    def vtables(self):
+        """
+        Returns the variable tables that must be linked in for use with the CFSRv2 data source.
+
+        :return: a dictionary of variable tables
+        """
+        return {'geogrid_vtable': 'GEOGRID.TBL',
+                'ungrib_vtable': 'Vtable.CFSR',
+                'metgrid_vtable': 'METGRID.TBL.CFSR'}
+
 
     def namelist_keys(self):
         """
@@ -56,16 +64,6 @@ class CFSR_P(CFSR):
     def __init__(self, js):
         super(CFSR_P, self).__init__(js)
 
-    def vtables(self):
-        """
-        Returns the variable tables that must be linked in for use with the CFSRv2 data source.
-
-        :return: a dictionary of variable tables
-        """
-        return {'geogrid_vtable': 'GEOGRID.TBL',
-                'ungrib_vtable': 'Vtable.CFSR_press_pgbh06',
-                'metgrid_vtable': 'METGRID.TBL.CFSR'}
-
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.wps with CFSR_P
@@ -90,7 +88,7 @@ class CFSR_P(CFSR):
         return self.available_online(path_tmpls)
 
     # instance variables
-    remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_pgbh'
+    remote_url = 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-by-pressure'
     id = "CFSR_P"
     prefix = 'COLMET_P'
 
@@ -114,16 +112,6 @@ class CFSR_S(CFSR):
                  'metgrid': {'fg_name': ['COLMET_S','COLMET_P']} 
                }
 
-    def vtables(self):
-        """
-        Returns the variable tables that must be linked in for use with the CFSRv2 data source.
-
-        :return: a dictionary of variable tables
-        """
-        return {'geogrid_vtable': 'GEOGRID.TBL',
-                'ungrib_vtable': 'Vtable.CFSR_sfc_flxf06',
-                'metgrid_vtable': 'METGRID.TBL.CFSR'}
-
     def make_relative_url(self, utc_time):
         """
         Build the relative URL of the CFSRv2 GRIB2 file, which is based on the UTC time.
@@ -139,7 +127,8 @@ class CFSR_S(CFSR):
         return self.available_online(path_tmpls)
 
     # instance variables
-    remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_flxf'
+    #remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_flxf'
+    remote_url = 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux'
     id = "CFSR_S"
     prefix = 'COLMET_S'
 

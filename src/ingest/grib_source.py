@@ -204,7 +204,6 @@ class GribSource(object):
         if len(available) > 0:
             return available[0]
         else:
-            logging.error('Any %s available for %04d%02d%02d at %02d' % (self.id, year, mon, day, hour))
             raise GribError('GribSource: failed to find an available online file')
 
 
