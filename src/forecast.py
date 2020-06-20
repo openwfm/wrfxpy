@@ -30,7 +30,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
                   make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
                   json_join, number_minutes, serial_json, link2copy, append2file
-from write_geogrid import write_table
+from geo.write_geogrid import write_table
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 

@@ -7,9 +7,10 @@ _var_wisdom = {'NFUEL_CAT' : {
         'category_range': [0,14],
         'fill_missing': 14,       
         'fill' : Dict({
-                    0: 14,
-                    range(90,100): 14,
-                    100: 'nearest'
+		    range(15,91): 14,
+		    92: 14,
+                    range(94,100): 14,
+                    (0,91,93): 'nearest'
                 }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',

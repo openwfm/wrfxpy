@@ -147,7 +147,7 @@ class WPSDomainLCC(object):
             pstart, pend, pgr = self.parent_start, self.parent_end, self.parent_cell_size_ratio
             self.domain_size = (pgr * (pend[0] - pstart[0] + 1) + 1, pgr * (pend[1] - pstart[1] + 1) + 1)
             self.parent_time_step_ratio = cfg['parent_time_step_ratio']
-            self.cell_size = [float(x) / self.parent_cell_size_ratio for x in self.parent.cell_size]
+            self.cell_size = tuple(float(x) / self.parent_cell_size_ratio for x in self.parent.cell_size)
 
         # only used if this is a top-level domain but we read it in anyway
         d.close()
@@ -172,15 +172,15 @@ class WPSDomainLCC(object):
             lon_0=self.stand_lon,
             a=radius, b=radius, towgs84='0,0,0', no_defs=True)
 
-        grid_size_j = (self.domain_size[0] - 2) * self.cell_size[0]
-        grid_size_i = (self.domain_size[1] - 2) * self.cell_size[1]
+        grid_size_i = (self.domain_size[0] - 2) * self.cell_size[0]
+        grid_size_j = (self.domain_size[1] - 2) * self.cell_size[1]
 
-        grid_center_j, grid_center_i = pyproj.transform(
+        grid_center_i, grid_center_j = pyproj.transform(
                 self.latlon_sphere, self.lambert_grid,
                 self.ref_latlon[1], self.ref_latlon[0])
         
-        self.offset_j = grid_center_j - grid_size_j * .5
         self.offset_i = grid_center_i - grid_size_i * .5
+        self.offset_j = grid_center_j - grid_size_j * .5
 
 
     def latlon_to_ij(self, lat, lon):
@@ -195,28 +195,26 @@ class WPSDomainLCC(object):
         :return: the i, j position in grid coordinates
         """
         if self.top_level:
-            proj_j, proj_i = pyproj.transform(self.latlon_sphere, self.lambert_grid,
+            proj_i, proj_j = pyproj.transform(self.latlon_sphere, self.lambert_grid,
                     lon, lat)
             return  ((proj_i - self.offset_i) / self.cell_size[0],
                      (proj_j - self.offset_j) / self.cell_size[1])
         else:
             pi, pj = self.parent.latlon_to_ij(lat, lon)
             pcsr, ps = self.parent_cell_size_ratio, self.parent_start
-            delta = (pcsr - 1) // 2
-            return ((pi - ps[0] + 1.) * pcsr + delta,
-                    (pj - ps[1] + 1.) * pcsr + delta)
+            return ((pi - ps[0] + 1.5) * pcsr - .5,
+                    (pj - ps[1] + 1.5) * pcsr - .5)
 
     
     def ij_to_latlon(self, i, j):
         if self.top_level:
             lon, lat = pyproj.transform(self.lambert_grid, self.latlon_sphere,
-                    j * self.cell_size[1] + self.offset_j,
-                    i * self.cell_size[0] + self.offset_i)
+                    i * self.cell_size[0] + self.offset_i,
+                    j * self.cell_size[1] + self.offset_j)
             return lat, lon
         else:
             pcsr, ps = self.parent_cell_size_ratio, self.parent_start
-            delta = (pcsr - 1) // 2
-            return self.parent.ij_to_latlon((i-delta)//pcsr+ps[0]-1., (j-delta)//pcsr+ps[1]-1.) 
+            return self.parent.ij_to_latlon((i+.5)/pcsr+ps[0]-1.5, (j+.5)/pcsr+ps[1]-1.5) 
 
     
     def update_wpsnl(self, nml):
