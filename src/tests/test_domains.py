@@ -1,11 +1,15 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
-from wrf.wps_domains import WPSDomainLCC
-import json, netCDF4, os, sys, glob
+from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
+from utils import load_sys_cfg
+from forecast import process_arguments, JobState
+import json, netCDF4, os, sys, glob, json
 import numpy as np
 import os.path as osp
 from six.moves import range
+
+from_files = False
 
 if len(sys.argv) != 2:
     print('Usage: python %s path' % sys.argv[0])
@@ -14,9 +18,16 @@ if len(sys.argv) != 2:
     sys.exit(1)
 else:     
     PATH = sys.argv[1]
+    print(PATH)
     if osp.isfile(PATH) and os.access(PATH, os.R_OK):
-        pass
+        sys_cfg = load_sys_cfg()
+        job_args = json.load(open(PATH)) 
+        args = process_arguments(job_args,sys_cfg)
+        js = JobState(args)
+        domain_conf = WPSDomainConf(js.domains)
+        domains = domain_conf.domains
     else:
+        from_files = True
         files = glob.glob(osp.join(PATH,'geo_em.d0?.nc'))
         if osp.isdir(PATH) and len(files):
             files = sorted(glob.glob(osp.join(PATH,'geo_em.d0?.nc')))
@@ -39,9 +50,10 @@ def get_latlon(path):
     d.close()
     return lat, lon
 
-coords = []
-for file in files:
-    coords.append(get_latlon(file))
+if from_files:
+   coords = []
+   for file in files:
+       coords.append(get_latlon(file))
 
 err = 0
 for k,d in enumerate(domains):
@@ -53,17 +65,25 @@ for k,d in enumerate(domains):
         i = ilist[c]
         j = jlist[c]
         latlon = d.ij_to_latlon(i,j)
-        print('i={0},j={1}:  latlon=({2}, {3}) - ij_to_latlon=({4}, {5})'.format(i, j, coords[k][0][j,i], coords[k][1][j,i], latlon[0], latlon[1]))
-        err += np.sqrt((coords[k][0][j,i]-latlon[0])**2+(coords[k][1][j,i]-latlon[1])**2)
+        if from_files:
+            print('i={0},j={1}:  latlon=({2}, {3}) - ij_to_latlon=({4}, {5})'.format(i, j, coords[k][0][j,i], coords[k][1][j,i], latlon[0], latlon[1]))
+            err += np.sqrt((coords[k][0][j,i]-latlon[0])**2+(coords[k][1][j,i]-latlon[1])**2)
+        else:
+            print('i={0},j={1}:  ij_to_latlon=({2}, {3})'.format(i, j, latlon[0], latlon[1]))
     print('ll -> ij')
     for c in range(len(ilist)):
         i = ilist[c]
         j = jlist[c]
-        ij = d.latlon_to_ij(coords[k][0][j,i],coords[k][1][j,i])
-        print('i={0},j={1}:  latlon_to_ij=({2},{3})'.format(i, j, round(ij[0]), round(ij[1])))    
+        if from_files:
+            ij = d.latlon_to_ij(coords[k][0][j,i],coords[k][1][j,i])
+            print('i={0},j={1}:  latlon_to_ij=({2},{3})'.format(i, j, round(ij[0]), round(ij[1])))    
+        else:
+            ij = d.latlon_to_ij(*d.ij_to_latlon(i,j))
+            print('i={0},j={1}:  latlon_to_ij(ij_to_latlon)=({2},{3})'.format(i, j, round(ij[0]), round(ij[1])))    
 
-print('>> Summary coordinate errors <<')
-print('sum(sqrt(lon_diff**2+lat_diff**2))={}'.format(err))
+if from_files:
+    print('>> Summary coordinate errors <<')
+    print('sum(sqrt(lon_diff**2+lat_diff**2))={}'.format(err))
 
 print('>> Bounding box <<')
 for d in domains:
