@@ -2,14 +2,35 @@
 from __future__ import absolute_import
 from __future__ import print_function
 from wrf.wps_domains import WPSDomainLCC
-import json, netCDF4, sys
+import json, netCDF4, os, sys, glob
 import numpy as np
+import os.path as osp
 from six.moves import range
 
-d1 = WPSDomainLCC(1, { 'precomputed' : 'dom_test/geo_em.d01.nc', 'time_step' : 50 }, None )
-d2 = WPSDomainLCC(2, { 'precomputed' : 'dom_test/geo_em.d02.nc', 'parent_time_step_ratio' : 4 }, d1)
-d3 = WPSDomainLCC(3, { 'precomputed' : 'dom_test/geo_em.d03.nc', 'parent_time_step_ratio' : 4 }, d2)
-domains = [d1,d2,d3]
+if len(sys.argv) != 2:
+    print('Usage: python %s path' % sys.argv[0])
+    print('            path must be a folder with geo_em.d0?.nc files OR')
+    print('                           JSON file with domains information on it')
+    sys.exit(1)
+else:     
+    PATH = sys.argv[1]
+    if osp.isfile(PATH) and os.access(PATH, os.R_OK):
+        pass
+    else:
+        files = glob.glob(osp.join(PATH,'geo_em.d0?.nc'))
+        if osp.isdir(PATH) and len(files):
+            files = sorted(glob.glob(osp.join(PATH,'geo_em.d0?.nc')))
+            domains = []
+            for d,file in enumerate(files):
+                if d == 0:
+                    domains.append(WPSDomainLCC(1, { 'precomputed' : file, 'time_step' : 50 }, None ))
+                else:
+                    domains.append(WPSDomainLCC(d+1, { 'precomputed' : file, 'parent_time_step_ratio' : 4 }, domains[d-1]))
+        else:
+            print('Error: something wrong with path provided %s' % sys.argv[1])
+            print('        path must be a folder with geo_em.d0?.nc files OR')
+            print('                       JSON file with domains information on it')
+            sys.exit(1)
 
 def get_latlon(path):
     d = netCDF4.Dataset(path)
@@ -18,10 +39,9 @@ def get_latlon(path):
     d.close()
     return lat, lon
 
-lat1, lon1 = get_latlon('dom_test/geo_em.d01.nc')
-lat2, lon2 = get_latlon('dom_test/geo_em.d02.nc')
-lat3, lon3 = get_latlon('dom_test/geo_em.d03.nc')
-coords = [(lat1,lon1),(lat2,lon2),(lat3,lon3)]
+coords = []
+for file in files:
+    coords.append(get_latlon(file))
 
 err = 0
 for k,d in enumerate(domains):
@@ -51,5 +71,5 @@ for d in domains:
     lons = [b[1] for b in bbox]
     lats = [b[0] for b in bbox]
     print('{}'.format(bbox))
-    print('bbox={0},{1},{2},{3}'.format(min(lons),min(lats),max(lons),max(lats)))
+    print('bbox={0},{1},{2},{3}'.format(min(lons),max(lons),min(lats),max(lats)))
 
