@@ -205,7 +205,7 @@ class GeoDriver(object):
         logging.info('GeoTIFF.to_geogrid() - creating index')
         index = self.geogrid_index()
         logging.info('GeoTIFF.to_geogrid() - writting geogrid')
-        write_geogrid_var(path,var,array,index,self.get_coord())
+        write_geogrid_var(path,var,array,index,coord=self.get_coord())
 
     def to_geotiff(self,path,bbox=None):
         """
