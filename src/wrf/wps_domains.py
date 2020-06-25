@@ -187,7 +187,7 @@ class WPSDomainLCC(object):
         """
         Convert latitude and longitude into grid coordinates.
 
-        If this is a child domain, it asks it's parent to do the projectiona and then
+        If this is a child domain, it asks it's parent to do the projection and then
         remaps it into its own coordinate system via parent_start and cell size ratio.
 
         :param lat: latitude
@@ -207,6 +207,16 @@ class WPSDomainLCC(object):
 
     
     def ij_to_latlon(self, i, j):
+        """
+        Convert grid into latitude and longitude coordinates.
+
+        If this is a child domain, it asks it's parent to do the projection and then
+        remaps it into its own coordinate system via parent_start and cell size ratio.
+
+        :param i: x grid coordinate
+        :param j: y grid coordinate
+        :return: the latitude,longitude position in degree coordinates
+        """
         if self.top_level:
             lon, lat = pyproj.transform(self.lambert_grid, self.latlon_sphere,
                     i * self.cell_size[0] + self.offset_i,
@@ -216,6 +226,17 @@ class WPSDomainLCC(object):
             pcsr, ps = self.parent_cell_size_ratio, self.parent_start
             return self.parent.ij_to_latlon((i+.5)/pcsr+ps[0]-1.5, (j+.5)/pcsr+ps[1]-1.5) 
 
+    def bounding_box(self):
+        """
+        Generate bounding box degree coordinates for the four corners of the domain.
+
+        :return: the four latitude,longitude degree coordinates of the domain corners
+        """
+        latlon00 = self.ij_to_latlon(0,0)
+        latlon01 = self.ij_to_latlon(0,self.domain_size[1])
+        latlon11 = self.ij_to_latlon(self.domain_size[0],self.domain_size[1])
+        latlon10 = self.ij_to_latlon(self.domain_size[0],0)
+        return (latlon00,latlon01,latlon11,latlon10)
     
     def update_wpsnl(self, nml):
         """

@@ -44,3 +44,12 @@ for k,d in enumerate(domains):
 
 print('>> Summary coordinate errors <<')
 print('sum(sqrt(lon_diff**2+lat_diff**2))={}'.format(err))
+
+print('>> Bounding box <<')
+for d in domains:
+    bbox = d.bounding_box()
+    lons = [b[1] for b in bbox]
+    lats = [b[0] for b in bbox]
+    print('{}'.format(bbox))
+    print('bbox={0},{1},{2},{3}'.format(min(lons),min(lats),max(lons),max(lats)))
+
