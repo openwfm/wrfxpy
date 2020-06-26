@@ -20,6 +20,7 @@ import logging
 import os.path as osp
 import traceback
 from datetime import timedelta
+from subprocess import check_call
 from utils import dump, traceargs, esmf_to_utc, utc_to_esmf
 from vis.vis_utils import print_stats
 
@@ -849,10 +850,9 @@ class Postprocessor(object):
         max_retries = 10
         for k in range(max_retries):
             try:
-                # with the netCDF dataset opened 
-                with nc4.Dataset(wrfout_path) as d:
-                    # extract ESMF string times and identify timestamp of interest
-                    times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
+                # open the netCDF dataset
+                with open('/dev/null','w') as f:
+                    check_call(['ncdump','-h','%s' % wrfout_path],stdout=f,stderr=f)
             except:
                 if k == max_retries-1:
                     logging.error('process_vars: cannot open file %s' % wrfout_path)
@@ -862,7 +862,11 @@ class Postprocessor(object):
                     logging.info('process_vars: waiting for next retry...')
                     time.sleep(5)
                     continue
-            logging.info('process_vars: time steps found %s' % str(times))
+            else:
+                with nc4.Dataset(wrfout_path) as d:
+                    # extract ESMF string times and identify timestamp of interest
+                    times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
+                    logging.info('process_vars: time steps found %s' % str(times))
             # make sure time step is processed on file
             if ts_esmf in times:
                 logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
