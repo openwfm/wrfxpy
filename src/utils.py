@@ -18,6 +18,9 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
 from datetime import datetime, timedelta
 import pytz
 import os
@@ -36,6 +39,9 @@ import psutil
 import requests
 import socket
 import collections
+import six
+from six.moves import map
+from six.moves import zip
 
 
 class Dict(dict):
@@ -69,7 +75,7 @@ def traceargs():
     frame = inspect.currentframe()
     args, _, _, values = inspect.getargvalues(frame)
     for i in args:
-        print "    %s:\n%s" % (i, pprint.pformat(values[i]))
+        print(("    %s:\n%s" % (i, pprint.pformat(values[i]))))
 
 def dump(obj,title):
     frame = inspect.currentframe()
@@ -174,7 +180,7 @@ def symlink_unless_exists(link_tgt, link_loc):
     """
 
     logging.info('Linking %s -> %s' % (link_loc, link_tgt))
-    if osp.isfile(link_tgt):
+    if osp.isfile(link_tgt) or osp.isdir(link_tgt):
         if not osp.lexists(link_loc):
             os.symlink(link_tgt, link_loc)
         else:
@@ -187,8 +193,36 @@ def remove(tgt):
     os.remove wrapper
     """
     if osp.isfile(tgt):
-        logging.warning('remove: file %s exists, removing' % tgt)
+        logging.info('remove: file %s exists, removing' % tgt)
         os.remove(tgt)
+
+def force_copy(src,tgt):
+    """
+    remove target if exists and copy there, making directories as needed
+    """
+    remove(tgt)
+    shutil.copy(src,ensure_dir(tgt))
+
+def append2file(addl,base):
+    """
+    Append a file to another
+    """
+    logging.info("appending file %s to %s" % (addl,base)) 
+    with open(base,'a') as base_file:
+        with open(addl,'r') as addl_file:
+            base_file.write(addl_file.read())
+
+def link2copy(src):
+    """
+    replace link by a copy of the target file
+    """
+    try:
+        link_target = os.readlink(src)
+    except OSError as e:
+        return
+    logging.info("replacing soft link %s -> %s by a copy" % (src,link_target))
+    os.remove(src)
+    shutil.copy(link_target,src)
 
 def move(src,tgt):
     """
@@ -291,7 +325,7 @@ def round_time_to_hour(utc, up=False, period_hours=1):
         return None
     tm = utc + timedelta(hours=1, seconds=-1) if up else utc
     tm = tm.replace(minute=0, second=0)
-    h = period_hours * ((tm.hour + period_hours - 1 if up else tm.hour) / period_hours)
+    h = period_hours * ((tm.hour + period_hours - 1 if up else tm.hour) // period_hours)
     tm = tm + timedelta(hours=h-tm.hour) if h > tm.hour else tm - timedelta(hours=tm.hour - h)
     return tm
 
@@ -304,7 +338,7 @@ def timedelta_hours(timedelta_utc, up = True):
     :param up: round up if True, down in False
     :return: number of hours rounded to whole hour
     """
-    return int(timedelta_utc.total_seconds() + ((3600 - 0.001)if up else 0 ))/ 3600
+    return int(timedelta_utc.total_seconds() + ((3600 - 0.001)if up else 0 )) // 3600
 
 def matching_files(src_dir, glob_pattern):
     """
@@ -325,7 +359,7 @@ def symlink_matching_files(tgt_dir, src_dir, glob_pattern):
     :param glob_pattern: the shell glob pattern (ls style) to match against files
     """
     files = glob.glob(osp.join(src_dir, glob_pattern))
-    map(lambda f: symlink_unless_exists(f, osp.join(tgt_dir, osp.basename(f))), files)
+    list(map(lambda f: symlink_unless_exists(f, osp.join(tgt_dir, osp.basename(f))), files))
 
 def update_time_keys(time_utc, which, num_domains):
     """
@@ -340,7 +374,7 @@ def update_time_keys(time_utc, which, num_domains):
     res = {}
     year, mon, day = time_utc.year, time_utc.month, time_utc.day
     hour, minute, sec = time_utc.hour, time_utc.minute, time_utc.second
-    key_seq = map(lambda x: which + x, ['_year', '_month', '_day', '_hour', '_minute', '_second'])
+    key_seq = [which + x for x in ['_year', '_month', '_day', '_hour', '_minute', '_second']]
     return {key: [value] * num_domains for (key, value) in zip(key_seq, [year, mon, day, hour, minute, sec])}
 
 
@@ -380,7 +414,7 @@ def update_namelist(nml, with_keys):
     :param nml: the namelist to update
     :param with_keys: the nested dictionary with update instructions
     """
-    for section, section_dict in with_keys.iteritems():
+    for section, section_dict in six.iteritems(with_keys):
         nml[section].update(section_dict)
 
 
@@ -411,7 +445,7 @@ def render_ignitions(js, max_dom):
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
                  'fire_viscosity' : [0] * max_dom }
 
-    for dom_str, dom_igns in ign_specs.iteritems():
+    for dom_str, dom_igns in six.iteritems(ign_specs):
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
         nml_fire['ifire'][dom_id-1] = 2
@@ -431,7 +465,7 @@ def render_ignitions(js, max_dom):
             radius = ign.get('radius',200)
             ros = ign.get('ros',1)
             vals = [ lat, lat, lon, lon, start, start+dur, radius, ros]
-            kv = dict(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals]))
+            kv = dict(list(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals])))
             nml_fire.update(kv)
 
     return { 'fire' : nml_fire }
@@ -494,9 +528,9 @@ def load_sys_cfg():
         import sys
         logging.critical('Cannot find system configuration, have you created etc/conf.json?')
         sys.exit(2)
-
+    
     # set defaults
-    sys = sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
+    sys_cfg.sys_install_path = sys_cfg.get('sys_install_path',os.getcwd())
     # configuration defaults + make directories if they do not exist
     sys_cfg.workspace_path = make_dir(osp.abspath(sys_cfg.get('workspace_path','wksp')))
     sys_cfg.ingest_path = make_dir(osp.abspath(sys_cfg.get('ingest_path','ingest')))
@@ -511,14 +545,16 @@ class response_object(object):
         self.status_code = status_code
 
 
-def readhead(url):
-    logging.info('reading http head of %s ' % url)
+def readhead(url,msg_level=1):
+    if msg_level > 0:
+        logging.info('reading http head of %s ' % url)
     try:
         ret=requests.head(url)
         ret.raise_for_status()
     #except (requests.RequestException, requests.exceptions.Timeout, requests.exceptions.TooManyRedirects, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
     except Exception as e:
-        logging.error(e)
+        if msg_level > 0:
+            logging.error(e)
         ret = response_object(-1)
     return ret
 
@@ -557,34 +593,34 @@ def get_ip_address():
 def json_join(path,json_list):
     """
     Join local jsons in a singular json and remove the previous jsons
-	
+
     :param path: local path to the jsons
     :param json_list: list of json names to join
     """
     manifest = Dict({})
     for jj in json_list:
-	json_path = osp.join(path,str(jj)+'.json')
-	try:
-		f = json.load(open(json_path), 'ascii')
-		manifest.update({jj: f})
-	except:
-		logging.warning('no satellite data for source %s in manifest json file %s' % (jj,json_path))
-		manifest.update({jj: {}})
-		pass
-	remove(json_path)
+        json_path = osp.join(path,str(jj)+'.json')
+        try:
+            f = json.load(open(json_path))
+            manifest.update({jj: f})
+        except:
+            logging.warning('no satellite data for source %s in manifest json file %s' % (jj,json_path))
+            manifest.update({jj: {}})
+            pass
+        remove(json_path)
     return manifest
 
 def duplicates(replist):
     """
     Give dictionary of repeated elements (keys) and their indexes (array in values)
 
-    :param replist: list to look for repetitions	
+    :param replist: list to look for repetitions
     """
     counter=collections.Counter(replist)
     dups=[i for i in counter if counter[i]!=1]
     result={}
     for item in dups:
-	result[item]=[i for i,j in enumerate(replist) if j==item]
+        result[item]=[i for i,j in enumerate(replist) if j==item]
     return result
 
 def number_minutes(t_int,t_fin,dt):
@@ -604,6 +640,19 @@ def serial_json(obj):
     :param obj: object
     """
     if isinstance(obj, datetime):
-	return utc_to_esmf(obj)
+        return utc_to_esmf(obj)
     raise TypeError("Type %s not serializable" % type(obj))
+
+def inq(x):
+    """
+    Inquire numpy array for shape min max
+    :param x: object
+    :return string:
+    """
+    try:
+        s= 'size %s min %g max %g' % (str(x.shape), np.min(x), np.max(x))
+    except:
+        s=str(x)
+    return s
+
 

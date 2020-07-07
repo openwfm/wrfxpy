@@ -2,6 +2,8 @@
 # Dalton Burke
 #
 
+from __future__ import absolute_import
+from __future__ import print_function
 from ingest.level0_source import MODIS_TERRA, MODIS_AQUA, VIIRS_NPP
 from utils import esmf_to_utc
 
@@ -12,7 +14,7 @@ import os.path as osp
 ## Standalone script to simply download files
 if __name__ == '__main__':
     if len(sys.argv) != 5:
-        print('Usage: %s <level0_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0])
+        print(('Usage: %s <level0_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
         print('\tsupported level0 sources: MODIS_TERRA, MODIS_AQUA, VIIRS_NPP')
         sys.exit(-1)
 
@@ -41,4 +43,4 @@ if __name__ == '__main__':
     logging.info('SUCCESS, the following files are now available:')
     print('')
     for l in level0s:
-        print(osp.join(ingest_dir, l))
+        print((osp.join(ingest_dir, l)))

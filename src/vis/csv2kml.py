@@ -1,7 +1,11 @@
+from __future__ import absolute_import
+from __future__ import print_function
 import json
 import sys
 import csv
 import math
+from six.moves import range
+from six.moves import zip
 
 
 def read_csv(csv_path):
@@ -10,7 +14,7 @@ def read_csv(csv_path):
     Return file contents as json {1:{header1:value1,...},2:}
     """
 
-    print('Reading file %s\n' % csv_path)
+    print(('Reading file %s\n' % csv_path))
     with open(csv_path,'rU') as csv_file:
         reader = csv.reader(csv_file, delimiter=',', quotechar='"')
         row_num=0
@@ -100,15 +104,15 @@ def json2kml(s,kml_path):
                 kml.write('<Polygon>\n<outerBoundaryIs>\n<LinearRing>\n<coordinates>\n')
     
     	        km_lon=km_lat/math.cos(latitude*math.pi/180)  # 1 km in longitude
-                print km_lat
+                print(km_lat)
 
-                if 'track' in s[p].keys():
+                if 'track' in list(s[p].keys()):
                     sq_track_size_km=float(s[p]['track'])
                     sq2_lat=km_lat * sq_track_size_km/2
                 else:
                     sq2_lat=km_lat * sq_size_km/2
 
-                if 'scan' in s[p].keys():
+                if 'scan' in list(s[p].keys()):
                     sq_scan_size_km=float(s[p]['scan'])
                     sq2_lon=km_lon * sq_scan_size_km/2
                 else:
@@ -126,7 +130,7 @@ def json2kml(s,kml_path):
 
         kml.write('</Document>\n</kml>\n')
     
-    print('Created file %s\n' % kml_path)
+    print(('Created file %s\n' % kml_path))
             
 if __name__ == '__main__':
 

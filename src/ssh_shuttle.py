@@ -18,6 +18,9 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
 import paramiko
 import os
 import os.path as osp
@@ -190,8 +193,8 @@ class SSHShuttle(object):
         """
         stdin, stdout, stderr = self.ssh.exec_command(command)
         stdin.flush()
-        print stdout.read()
-        print stderr.read()
+        print(stdout.read().decode())
+        print(stderr.read().decode())
 
     def retrieve_catalog(self):
         """ 
@@ -250,7 +253,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
         k=[]
         for i in mf.keys():
             dom = mf[i]
-            k = k + dom.keys()
+            k = k + list(dom.keys())
         times = sorted(k)
         logging.info('SHUTTLE detected local start/end UTC times as %s - %s' % (times[0], times[-1]))
     
@@ -283,7 +286,7 @@ def ssh_command(command):
 if __name__ == '__main__':
 
     if len(sys.argv) != 4:
-        print('usage: %s <local-dir> <remote-relative-dir> <sim-name>' % sys.argv[0])
+        print(('usage: %s <local-dir> <remote-relative-dir> <sim-name>' % sys.argv[0]))
         sys.exit(1)
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

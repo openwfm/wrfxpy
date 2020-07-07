@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from forecast import make_kmz
 import logging
 import sys

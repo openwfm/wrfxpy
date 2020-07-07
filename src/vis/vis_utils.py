@@ -1,5 +1,7 @@
+from __future__ import absolute_import
 import numpy as np
 import logging
+from six.moves import range
 
 def print_stats(varname,v,unit):
       """

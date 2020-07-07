@@ -17,12 +17,15 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
+from __future__ import unicode_literals
 import netCDF4
 import pytz
 from datetime import datetime, timedelta
 import numpy as np
 import sys
 import logging
+from six.moves import range
 
 class WRFModelData:
     """
@@ -62,7 +65,7 @@ class WRFModelData:
 
         # time is always loaded and encoded as a list of python datetime objects
         gmt_tz = pytz.timezone('GMT')
-        tm = d.variables['Times'][:,...]
+        tm = d.variables['Times'][:,...].astype(str)
         tp = []
         for t in tm:
             dt = datetime.strptime(''.join(t), '%Y-%m-%d_%H:%M:%S')

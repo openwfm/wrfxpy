@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from ingest.grib_source import GribError
 from ingest.grib_forecast import GribForecast
 from datetime import datetime, timedelta
@@ -51,7 +52,7 @@ class NAM227(GribForecast):
     # instance variables
     remote_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod'
     id = "NAM227"
-    info_url="http://www.nco.ncep.noaa.gov/pmb/products/nam"
+    info_url="https://www.nco.ncep.noaa.gov/pmb/products/nam"
     info_text="NAM NEST over CONUS (5 km Resolution - Grid 227)"
     #    NAM227 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
     #    every 3 hours, starting with 39 and ending with 60.

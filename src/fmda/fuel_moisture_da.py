@@ -17,11 +17,13 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
+from __future__ import print_function
 from wrf.wrf_data import WRFModelData
-from trend_surface_model import fit_tsm
+from .trend_surface_model import fit_tsm
 from utils import great_circle_distance, find_closest_grid_point
-from fuel_moisture_model import FuelMoistureModel
-from fm10_observation import FM10Observation
+from .fuel_moisture_model import FuelMoistureModel
+from .fm10_observation import FM10Observation
 from utils import find_closest_grid_point
 
 import sys
@@ -33,6 +35,9 @@ import netCDF4
 import logging
 import json
 from MesoPy import Meso
+from utils import inq
+from six.moves import range
+from six.moves import zip
 
 def check_overlap(wrf_path,ts_now):
   """
@@ -103,7 +108,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
     return obs_data
 
 
-def execute_da_step(model, model_time, covariates, fm10):
+def execute_da_step(model, model_time, covariates, covariates_names, fm10):
     """
     Execute a single DA step from the current state/extended parameters and covariance matrix using
     the <covariates> and observations <fm10>.  Assimilation time window is fixed at 60 mins.
@@ -111,6 +116,7 @@ def execute_da_step(model, model_time, covariates, fm10):
     :param model: a FuelMoistureModel
     :param model_time: the current model time
     :param covariates: the covariate fields to take into account to model the spatial structure of the FM field
+    :param covariates_names: strings with the names of the covariates
     :param fm10: the 10-hr fuel moisture observations
     """
     valid_times = [z for z in fm10.keys() if abs((z - model_time).total_seconds()) < 1800]
@@ -127,12 +133,13 @@ def execute_da_step(model, model_time, covariates, fm10):
         fmc_gc = model.get_state()
         dom_shape = fmc_gc.shape[:2]
 
+        logging.info('execute_da_step: model state fmc_gc %s' % inq(fmc_gc))
         # construct covariate storage
         Xd3 = min(len(covariates) + 1, len(obs_valid_now))
-        logging.info('FMDA is using %d covariates' % Xd3)
+        logging.info('FMDA is using %d covariates: %s' % (Xd3,','.join(['fmc_gc[:,:,1]']+covariates_names)))
         X = np.zeros((dom_shape[0], dom_shape[1], Xd3))
         X[:,:,0] = fmc_gc[:,:,1]
-        for i,c in zip(range(Xd3-1),covariates):
+        for i,c in zip(list(range(Xd3-1)),covariates):
             X[:,:,i+1] = covariates[i]
 
         # run the trend surface model (clamp output to [0.0 - 2.5] to be safe)
@@ -205,14 +212,16 @@ def run_data_assimilation(wrf_model, fm10, wrf_model_prev = None):
         cov_psfc = PSFC[i,:,:]
         cov_rain = np.log(rain[i,:,:] + 1.0)
         covariates = [cov_t2, cov_psfc,cov_lon,cov_lat,cov_hgt,cov_t2,cov_q2,cov_const]
+        covariates_names = ['t2', 'psfc','lon','lat','hgt','t2','q2','const']
         if np.any(rain > 0.0):
             covariates.append(rain)
+            covariates_names.append('rain')
 
         if i > 0:
             model.advance_model(Ed[i,:,:], Ew[i,:,:], rain[i,:,:], (ts - tss[i-1]).seconds, Q)
 
         logging.info('FMDA calling execute_da_step with %d covariates' % len(covariates))
-        execute_da_step(model, ts, covariates, fm10)
+        execute_da_step(model, ts, covariates, covariates_names, fm10)
 
         # overwrite the WRF model variables for this time step
         d = netCDF4.Dataset(wrf_model.path, 'r+')
@@ -259,7 +268,7 @@ def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
 if __name__ == '__main__':
 
     if len(sys.argv) != 2:
-        print('usage: %s <wrf-file>' % sys.argv[0])
+        print(('usage: %s <wrf-file>' % sys.argv[0]))
         sys.exit(1)
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

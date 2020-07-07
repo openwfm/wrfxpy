@@ -1,0 +1,73 @@
+{
+    "wall_time_hrs": 2,
+    "postproc": {
+        "1": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "FIRE_AREA",
+            "FGRNHFX",
+            "FLINEINT",
+            "SMOKE_INT",
+            "AQUA_AF",
+            "TERRA_AF",
+            "SNPP_AF"
+        ],
+        "shuttle": "incremental",
+        "description": "default simple forecast satellite"
+    },
+    "wps_geog_path": "/uufs/chpc.utah.edu/common/home/u6015690/Projects/mvejmelka/WPS-GEOG",
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "start_utc": "T-720",
+    "grid_code": "default_simple_forecast_satellite",
+    "ppn": 28,
+    "ignitions": {
+        "1": [
+            {
+                "time_utc": "T+0",
+                "latlon": [
+                    39.1,
+                    -104.3
+                ],
+                "duration_s": 240
+            }
+        ]
+    },
+    "num_nodes": 4,
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "domains": {
+        "1": {
+            "cell_size": [
+                1000,
+                1000
+            ],
+            "truelats": [
+                39.1,
+                39.1
+            ],
+            "domain_size": [
+                61,
+                61
+            ],
+            "subgrid_ratio": [
+                40,
+                40
+            ],
+            "center_latlon": [
+                39.1,
+                -104.3
+            ],
+            "history_interval": 15,
+            "geog_res": ".3s",
+            "time_step": 5,
+            "stand_lon": -104.3
+        }
+    },
+    "end_utc": "T+720",
+    "qsys": "kingspeak",
+    "grib_source": "NAM",
+    "satellite_source": ["Aqua","Terra","SNPP"]
+}

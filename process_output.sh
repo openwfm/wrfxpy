@@ -7,4 +7,3 @@ if [ $# -eq 0 ]
      exit 1
 fi
 python src/process_output.py $1
-./make_kmz.sh $1

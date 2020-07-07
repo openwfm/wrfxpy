@@ -2,6 +2,7 @@
 # Angel Farguell, CU Denver
 #
 
+from __future__ import absolute_import
 from ingest.sat_source import SatSource
 
 class MODIS(SatSource):
@@ -14,7 +15,6 @@ class MODIS(SatSource):
 
 	# instance variables
 	url='https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/6'
-	version='6'
 
 class Terra(MODIS):
 	"""

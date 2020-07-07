@@ -17,6 +17,8 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
+from __future__ import print_function
 from fmda.fuel_moisture_da import execute_da_step, retrieve_mesowest_observations
 from fmda.fuel_moisture_model import FuelMoistureModel
 from ingest.grib_file import GribFile, GribMessage
@@ -36,7 +38,12 @@ import os.path as osp
 
 from datetime import datetime, timedelta
 import pytz
+import six
 
+# setup environment
+sys_cfg = Dict(json.load(open('etc/conf.json')))
+cfg = Dict(json.load(open('etc/rtma_cycler.json')))
+meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
 def postprocess_cycle(cycle, region_cfg, wksp_path):
     """
@@ -141,18 +148,18 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
             raster_name = 'fmda-%s-raster.png' % name
             cb_name = 'fmda-%s-raster-cb.png' % name
-            with open(osp.join(postproc_path, raster_name), 'w') as f:
+            with open(osp.join(postproc_path, raster_name), 'wb') as f:
                 f.write(raster_png)
-            with open(osp.join(postproc_path, cb_name), 'w') as f:
+            with open(osp.join(postproc_path, cb_name), 'wb') as f:
                 f.write(cb_png) 
             mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
         for name in show:
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
             raster_name = 'fmda-%s-raster.png' % name
             cb_name = 'fmda-%s-raster-cb.png' % name
-            with open(osp.join(postproc_path, raster_name), 'w') as f:
+            with open(osp.join(postproc_path, raster_name), 'wb') as f:
                 f.write(raster_png)
-            with open(osp.join(postproc_path, cb_name), 'w') as f:
+            with open(osp.join(postproc_path, cb_name), 'wb') as f:
                 f.write(cb_png) 
             mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
 
@@ -164,7 +171,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     return postproc_path
 
 
-def compute_model_path(cycle, region_code, wksp_path):
+def compute_model_path(cycle, region_code, wksp_path, ext='nc'):
     """
     Construct a relative path to the fuel moisture model file
     for the region code and cycle.
@@ -175,7 +182,7 @@ def compute_model_path(cycle, region_code, wksp_path):
     :return: a relative path (w.r.t. workspace and region) of the fuel model file
     """
     year_month = '%04d%02d' % (cycle.year, cycle.month)
-    filename = 'fmda-%s-%04d%02d%02d-%02d.nc' %  (region_code, cycle.year, cycle.month, cycle.day, cycle.hour)
+    filename = 'fmda-%s-%04d%02d%02d-%02d.%s' %  (region_code, cycle.year, cycle.month, cycle.day, cycle.hour, ext)
     return osp.join(wksp_path,region_code,year_month,filename) 
 
 
@@ -231,10 +238,10 @@ def load_rtma_data(rtma_data, bbox):
     # bbox format: minlat, minlon, maxlat, maxlon
     i1, i2, j1, j2 = find_region_indices(lats, lons, bbox[0], bbox[2], bbox[1], bbox[3])
     
-    t2 = gf.values()[i1:i2,j1:j2] # temperature at 2m in K
-    td = GribFile(rtma_data['td'])[1].values()[i1:i2,j1:j2] # dew point in K
-    precipa = GribFile(rtma_data['precipa'])[1].values()[i1:i2,j1:j2] # precipitation
-    hgt = GribFile('static/ds.terrainh.bin')[1].values()[i1:i2,j1:j2]
+    t2 = np.ma.array(gf.values())[i1:i2,j1:j2] # temperature at 2m in K
+    td = np.ma.array(GribFile(rtma_data['td'])[1].values())[i1:i2,j1:j2] # dew point in K
+    precipa = np.ma.array(GribFile(rtma_data['precipa'])[1].values())[i1:i2,j1:j2] # precipitation
+    hgt = np.ma.array(GribFile('static/ds.terrainh.bin')[1].values())[i1:i2,j1:j2]
     logging.info('t2 min %s max %s' % (np.min(t2),np.max(t2)))
     logging.info('td min %s max %s' % (np.min(td),np.max(td)))
     logging.info('precipa min %s max %s' % (np.min(precipa),np.max(precipa)))
@@ -283,6 +290,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     :param meso_token: the mesowest API access token
     :return: the model advanced and assimilated at the current cycle
     """
+    logging.info("rtma_cycler.fmda_advance_region: %s" % str(cycle))
     model = None
     prev_cycle = cycle - timedelta(hours=1)
     prev_model_path = compute_model_path(prev_cycle, cfg.code, wksp_path)
@@ -365,15 +373,23 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     
     # run the data assimilation step
     covs = [np.ones(dom_shape), hgt / 2000.0]
+    covs_names = ['const','hgt/2000']
     if np.any(rain > 0.01):
         covs.append(rain)
-    execute_da_step(model, cycle, covs, fm10)
+        covs_names.append('rain')
+    execute_da_step(model, cycle, covs, covs_names, fm10)
     
+    # make geogrid files for WPS; datasets and lines to add to GEOGRID.TBL
+    geo_path = compute_model_path(cycle, cfg.code, wksp_path,ext="geo")
+    index = rtma.geogrid_index()
+    print('index',index)
+    model.to_geogrid(geo_path,index,lats,lons)
+
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path)
     logging.info('CYCLER writing model variables to:  %s.' % model_path)
     model.to_netcdf(ensure_dir(model_path),
-        {'EQUILd FM':Ed,'EQUILw FM':Ew,'ED':Ed,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
+        {'EQUILd FM':Ed,'EQUILw FM':Ew,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
     
     return model
     
@@ -396,10 +412,6 @@ if __name__ == '__main__':
     
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    # setup environment
-    sys_cfg = Dict(json.load(open('etc/conf.json')))
-    cfg = Dict(json.load(open('etc/rtma_cycler.json')))
- 
     if len(sys.argv) == 2:
         pass
     elif len(sys.argv) == 5:
@@ -419,17 +431,16 @@ if __name__ == '__main__':
         except Exception as e:
             logging.warning(e)
     else:
-	print 'Usage: to use domains configured in etc/rtma_cycler.json:'
-        print './rtma_cycler.sh anything'
-        print 'To use a custom domain named FIRE by giving a bounding box:'
-        print './rtma_cycler.sh lat1 lon1 lat2 lon2'
-        print 'Example: ./rtma_cycler.sh 42, -124.6, 49, -116.4'
+        print('Usage: to use domains configured in etc/rtma_cycler.json:')
+        print('./rtma_cycler.sh anything')
+        print('To use a custom domain named FIRE by giving a bounding box:')
+        print('./rtma_cycler.sh lat1 lon1 lat2 lon2')
+        print('Example: ./rtma_cycler.sh 42, -124.6, 49, -116.4')
         exit(1) 
 
     logging.info('regions: %s' % json.dumps(cfg.regions))
     #logging.info('regions: %s' % json.dumps(cfg.regions, indent=1, separators=(',',':')))
 
-    meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
     # current time
     now = datetime.now(pytz.UTC)
@@ -456,7 +467,7 @@ if __name__ == '__main__':
     logging.info('Have RTMA data for cycle %s.' % str(cycle))
       
     # check for each region, if we are up to date w.r.t. RTMA data available
-    for region_id,region_cfg in cfg.regions.iteritems():
+    for region_id,region_cfg in six.iteritems(cfg.regions):
         wrapped_cfg = Dict(region_cfg)
         #if 1:   # to run every time for debugging
         if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):

@@ -1,4 +1,13 @@
 {
+  "cheyenne" : {
+    "qsub_cmd" : "qsub",
+    "qdel_cmd" : "qdel",
+    "qstat_cmd" : "qstat",
+    "qstat_arg" : "",
+    "qsub_delimiter" : ".",
+    "qsub_job_num_index" : 0,
+    "qsub_script" : "etc/qsub/cheyenne.sub"
+  },
   "gross" : {
     "qsub_cmd" : "qsub",
     "qdel_cmd" : "qdel",
@@ -6,7 +15,6 @@
     "qstat_arg" : "",
     "qsub_job_num_index" : 2,
     "qsub_script" : "etc/qsub/gross.sub"
-
   },
   "colibri" : {
     "qsub_cmd" : "qsub",

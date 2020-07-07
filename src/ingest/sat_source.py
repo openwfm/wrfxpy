@@ -2,13 +2,16 @@
 # Angel Farguell, CU Denver
 #
 
-import glob, re, datetime, logging, requests
+from __future__ import absolute_import
+import glob, re, datetime, logging, requests, json
 import os.path as osp
 import numpy as np
-from urllib import urlopen
+from six.moves.urllib.request import urlopen
 from cmr import GranuleQuery
 from utils import Dict, utc_to_utcf, duplicates
-from downloader import download_url, DownloadError
+from .downloader import download_url, DownloadError
+from six.moves import filter
+from six.moves import range
 
 class SatError(Exception):
 	"""
@@ -33,6 +36,14 @@ class SatSource(object):
 		self.ingest_dir=osp.abspath(osp.join(js.get('ingest_path','ingest'),self.prefix))
 		self.cache_dir=osp.abspath(js.get('cache_path','cache'))
 		self.sys_dir=osp.abspath(js.get('sys_install_path',None))
+		self.appkey=js.get('appkey',None)
+		if not self.appkey:
+			try:
+				tokens = json.load(open('etc/tokens.json'))
+				self.appkey = tokens.get('appkey',None)
+			except:
+				logging.warning('Any etc/tokens.json specified, any token is going to be used.')
+
 
 	def available_locally_sat(self, path):
 		"""
@@ -112,6 +123,7 @@ class SatSource(object):
 					g.links=[{'href': u+'/'+g.name}]
 					g.time_start=geo_metas[ar]['time_start']
 					g.time_end=geo_metas[ar]['time_end']
+					g.dataset_id='Archive downloaded: unknown dataset id'
 					g.producer_granule_id=j['name']
 					metas.append(g)
 		logging.info('Archive: %s gets %s hits in this range' % (self.prefix+prod,len(metas)))
@@ -149,11 +161,12 @@ class SatSource(object):
 				metas.ref=self.search_archive_sat(self.ref_prefix,time,metas.geo)
 		return metas
 
-	def download_sat(self, url):
+	def download_sat(self, url, appkey):
 		"""
 		Download a satellite file from a satellite service
 
 		:param url: the URL of the file
+		:param appkey: key to use for the download or None if not
 		"""
 		logging.info('downloading %s satellite data from %s' % (self.prefix, url))
 		sat_name = osp.basename(url)
@@ -163,11 +176,11 @@ class SatSource(object):
 			return {'url': url,'local_path': sat_path}
 		else:
 			try:
-				download_url(url, sat_path)
+				download_url(url, sat_path, appkey=appkey)
 				return {'url': url,'local_path': sat_path,'downloaded': datetime.datetime.now}
 			except DownloadError as e:
 				logging.error('%s cannot download satellite file %s' % (self.prefix, url))
-				logging.warning('Pleae check %s for %s' % (self.info_url, self.info))
+				logging.warning('Please check %s for %s' % (self.info_url, self.info))
 				return {}
 				raise SatError('SatSource: failed to download file %s' % url)
 
@@ -179,6 +192,9 @@ class SatSource(object):
 		:param time: time interval (init_time_iso,final_time_iso)
 		:return data: dictonary with all the data
 		"""
+		if not osp.exists(osp.join(osp.expanduser('~'),'.netrc')):
+			logging.warning('satellite acquisition can fail because some data centers require to have $HOME/.netrc specified from an existent Earthdata account')
+		
 		lonmin,lonmax,latmin,latmax = bounds
 		bbox = [(lonmin,latmax),(lonmin,latmin),(lonmax,latmin),(lonmax,latmax),(lonmin,latmax)]
 		time = (from_utc, to_utc)
@@ -194,11 +210,13 @@ class SatSource(object):
 			for m in meta:
 				id = osp.splitext(m['producer_granule_id'])[0]
 				url = m['links'][0]['href']
-				m.update(self.download_sat(url))
-				manifest.update({id: m})
-		
-		group_manifest = self.group_files_sat(manifest)	
-	
+				dc = m['data_center']
+				m.update(self.download_sat(url,self.datacenter_to_appkey(dc)))
+				if m:
+				    manifest.update({id: m})
+
+		group_manifest = self.group_files_sat(manifest)
+
 		return group_manifest
 
 	def group_files_sat(self, manifest):
@@ -207,41 +225,44 @@ class SatSource(object):
 
                 :param manifest: satellite manifest from retrieving
 		:return result: groupped and cleanned manifest
-                """	
+                """
 		if not manifest:
 			return manifest
 		result = Dict({})
 		geore = re.compile(r'%s' % self.geo_prefix)
 		pregeore = re.compile(r'%s' % self.pre_geo_prefix)
 		firere = re.compile(r'%s' % self.fire_prefix)
-		keys = np.array(manifest.keys())
+		keys = np.array(list(manifest.keys()))
 		labels = np.array([''.join(k.split('.')[1:3]) for k in keys])
-		indexes = duplicates(labels)	
+		indexes = duplicates(labels)
 		for k,ind in indexes.items():
 			lenind = len(ind)
 			if lenind != 2:
-				logging.warning('retrieve_data_sat: number of geo and fire granules %d different than 2' % lenind)
+				logging.warning('group_files_sat: number of geo and fire granules %d different than 2' % lenind)
 				if lenind < 2:
-					logging.error('retrieve_data_sat: geo or fire file is missing, number of granules %d different than 2' % lenind)
+					logging.error('group_files_sat: geo or fire file is missing, number of granules %d different than 2' % lenind)
 					continue
-			geo = filter(geore.search,keys[ind])
-			pregeo = filter(pregeore.search,keys[ind])
-			fire = filter(firere.search,keys[ind])
+			geo = list(filter(geore.search,keys[ind]))
+			pregeo = list(filter(pregeore.search,keys[ind]))
+			fire = list(filter(firere.search,keys[ind]))
 			if not geo:
 				if pregeo:
 					geok = pregeo[0]
 				else:
-					logging.error('retrieve_data_sat: no geo data in the manifest')
-					continue				
+					logging.error('group_files_sat: no geo data in the manifest')
+					continue
 			else:
 				geok = geo[0]
 
 			if fire:
 				firek = fire[0]
 			else:
-				logging.error('retrieve_data_sat: no fire data in the manifest')
+				logging.error('group_files_sat: no fire data in the manifest')
 				continue
-			r = Dict({
+
+			logging.info('group_files_sat: %s - geo %s and fire %s' % (k,geok,firek))
+			try:
+			        r = Dict({
 					'time_start_iso' : manifest[geok]['time_start'],
 					'time_end_iso' : manifest[geok]['time_end'],
 					'geo_url' : manifest[geok]['url'],
@@ -251,7 +272,10 @@ class SatSource(object):
 					'fire_local_path' : manifest[firek]['local_path'],
 					'fire_description' : manifest[firek]['dataset_id']
 				})
-			result.update({k: r})
+			        result.update({k: r})
+			except Exception as e:
+				logging.error('group_files_sat: when creating manifest with error %s' % str(e))
+				continue
 		return result
 
 
@@ -275,6 +299,16 @@ class SatSource(object):
 		"""
 		pass
 
+	def datacenter_to_appkey(self,data_center):
+		"""
+		From data center to appkey to use for that data center
+
+		:param data_center: string with the data center information
+		"""
+		return {'LAADS': self.appkey,
+				'LPDAAC_ECS': None,
+				'LANCEMODIS': self.appkey
+			}.get(data_center,None)
 
 	# instance variables
 	id=None

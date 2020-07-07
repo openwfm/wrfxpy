@@ -1,14 +1,16 @@
+from __future__ import absolute_import
 import numpy as np
 import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
       u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
       smoke_concentration
+from six.moves import range
 
 smoke_threshold_int = 300
 smoke_threshold = 100
 smoke_integrated_unit = 'g/m^2'
-smoke_integrated_transparent = 1e-2 
+smoke_integrated_transparent = 1e-2
 smoke_concentration_scale = 400
 smoke_concentration_transparent=10
 
@@ -25,7 +27,7 @@ def plume_center(d,t):
       """
       tr = d.variables['tr17_1'][t,:,:,:]
       smoke_int = np.sum(tr, axis = 0)
-      z = height8p(d,t) 
+      z = height8p(d,t)
       h = np.sum(z * tr, axis = 0)
       h[smoke_int <= smoke_threshold_int] = 0
       smoke_int[smoke_int <= smoke_threshold_int] = 1
@@ -33,7 +35,7 @@ def plume_center(d,t):
 
 def plume_height(d,t):
       """
-      Compute plume height 
+      Compute plume height
       :param d: open NetCDF4 dataset
       :param t: number of timestep
       """
@@ -58,21 +60,24 @@ def smoke_at_height_terrain(varname,d,t,level):
       s = interpolate2height_terrain(d,t,smoke_concentration(d,t),level)
       print_stats(varname,s,'ug/m^3')
       return s
-      
+
 def u8p_m(d,t,level):
        return interpolate2height(u8p(d,t),height8p_terrain(d,t),level)
- 
+
 def v8p_m(d,t,level):
        return interpolate2height(v8p(d,t),height8p_terrain(d,t),level)
- 
+
 def u8p_ft(d,t,level_ft):
        return u8p_m(d,t,convert_value('ft','m',level_ft))
- 
+
 def v8p_ft(d,t,level_ft):
        return v8p_m(d,t,convert_value('ft','m',level_ft))
 
 def is_windvec(name):
        return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC']
+
+def is_fire_var(name):
+       return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FIRE_HFX','F_ROS','F_INT','NFUEL_CAT','ZSF','FMC_G']
 
 _var_wisdom = {
      'CLOUDTO700HPA' : {
@@ -270,7 +275,16 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
-
+     'PM25_SFC_CHEM' : {
+        'name' : 'surface PM2.5 from WRF-CHEM',
+        'native_unit' : smoke_integrated_unit,
+        'colorbar' : 'ug/m^2',
+        'colormap' : 'rainbow',
+        'transparent_values' : [-np.inf, 10],
+        'scale' : [20, 90],
+        'retrieve_as' : lambda d,t: d.variables['PM2_5_DRY'][t,0,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
     'T2' : {
         'name' : 'temperature at 2m',
         'native_unit' : 'K',
@@ -444,24 +458,24 @@ _var_wisdom = {
        'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
     },
     'AQUA_AF' : {
-	'name' : 'MODIS Aqua Active Fires satellite data',
-       	'source' : 'Aqua',	
+        'name' : 'MODIS Aqua Active Fires satellite data',
+       	'source' : 'Aqua',
         'native_unit' : '-',
-	'colorbar' : '-',
-	'colormap' : 'discrete',
-	'scale' : 'discrete',
-	'retrieve_as' : lambda d : d.select('fire mask').get(),
-	'grid' : lambda d : (d.select('Latitude').get(), d.select('Longitude').get())
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'retrieve_as' : lambda d : d.select('fire mask').get(),
+        'grid' : lambda d : (d.select('Latitude').get(), d.select('Longitude').get())
     },
     'SNPP_AF' : {
-	'name' : 'VIIRS S-NPP Active Fires satellite data',
-       	'source' : 'SNPP',	
-	'native_unit' : '-',
-	'colorbar' : '-',
-	'colormap' : 'discrete',
-	'scale' : 'discrete',
-	'retrieve_as' : lambda d : d.variables['fire mask'][:],
-	'grid' : lambda d : (d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'])
+        'name' : 'VIIRS S-NPP Active Fires satellite data',
+       	'source' : 'SNPP',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'])
     }
 }
 
@@ -486,7 +500,7 @@ def get_wisdom(var_name):
 
 def get_wisdom_variables():
     """Return the variables for which wisdom is available."""
-    return _var_wisdom.keys()
+    return list(_var_wisdom.keys())
 
 def convert_value(unit_from, unit_to, value):
     # handle the simple case
@@ -495,7 +509,7 @@ def convert_value(unit_from, unit_to, value):
 
     func = _units_wisdom.get((unit_from, unit_to))
     if func is None:
-        return value 
+        return value
     else:
         return func(value)
 

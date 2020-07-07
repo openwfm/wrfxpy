@@ -1,0 +1,75 @@
+{
+    "profile": {
+        "info": "One domain, 42x42km, 2km resolution with 50m fire grid.",
+        "identifier": "1d-2km-NAM218",
+        "template": "profiles/1d_2km_NAM218.json",
+        "title": "Single domain, 2km cell size, 25m fire grid, NAM218 12km forcing"
+    },
+    "wall_time_hrs": 12,
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "postproc": {
+        "1": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "FIRE_AREA",
+            "FGRNHFX",
+            "SMOKE_INT"
+        ],
+        "shuttle": "incremental",
+        "description": "fmda_geogrid"
+    },
+    "ppn": 28,
+    "job_id": "fmda_geogrid",
+    "grid_code": "from-web-2018-07-06_20-49-57",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "template": "/uufs/chpc.utah.edu/common/home/u6015690/Projects/wrfxctrl/profiles/1d_2km_NAM218.json",
+    "domains": {
+        "1": {
+            "cell_size": [
+                2000,
+                2000
+            ],
+            "truelats": [
+                40.3883,
+                40.3883
+            ],
+            "stand_lon": -112.6748,
+            "center_latlon": [
+                40.3883,
+                -112.6748
+            ],
+            "history_interval": 15,
+            "geog_res": "0.3s",
+            "domain_size": [
+                21,
+                21
+            ],
+            "subgrid_ratio": [
+                25,
+                25
+            ],
+            "time_step": 10
+        }
+    },
+    "ignitions": {
+        "1": [
+            {
+                "time_utc": "2018-07-06_20:47:00",
+                "latlon": [
+                    40.3883,
+                    -112.6748
+                ],
+                "duration_s": 240
+            }
+        ]
+    },
+    "end_utc": "2018-07-07_20:00:00",
+    "grib_source": "CFSR",
+    "num_nodes": 2,
+    "start_utc": "2018-07-06_20:00:00",
+    "fmda_geogrid_path": "wksp_fmda/GBCC/201906/fmda-GBCC-20190618-01.geo"
+}

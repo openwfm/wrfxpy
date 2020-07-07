@@ -3,7 +3,9 @@
 #
 
 #from utils import ensure_dir, symlink_unless_exists
-from downloader import download_url, DownloadError, get_dList
+from __future__ import absolute_import
+from __future__ import print_function
+from .downloader import download_url, DownloadError, get_dList
 
 from datetime import datetime, timedelta
 
@@ -11,12 +13,13 @@ import os
 import os.path as osp
 import sys
 import logging
+from six.moves import range
 
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print 'Downloads the latest firms MODIS and VIIRS data from US and Alaska zones'
-        print 'Usage: %s <target_directory>' % sys.argv[0]
+        print('Downloads the latest firms MODIS and VIIRS data from US and Alaska zones')
+        print('Usage: %s <target_directory>' % sys.argv[0])
         sys.exit(-1)
 
     # configure the basic logger
@@ -46,4 +49,4 @@ if __name__ == '__main__':
 
     print('')
     for f in filenames:
-        print(osp.join(ingest_dir, f))
+        print((osp.join(ingest_dir, f)))

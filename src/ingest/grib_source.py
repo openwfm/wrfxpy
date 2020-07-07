@@ -17,8 +17,9 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
 from utils import ensure_dir, symlink_unless_exists, timedelta_hours, readhead, Dict
-from downloader import download_url, DownloadError
+from .downloader import download_url, DownloadError
 from datetime import datetime, timedelta
 import pytz
 import requests
@@ -26,6 +27,8 @@ import os
 import os.path as osp
 import sys
 import logging
+import six
+from six.moves import zip
 
 class GribError(Exception):
     """
@@ -103,7 +106,7 @@ class GribSource(object):
         # vtables: a dictionary with keys from list ['geogrid_vtable', 'ungrib_vtable', 'metgrid_vtable'],
         #               which contain paths of the variable tables relative to 'etc/vtables'
 
-        for vtable_id, vtable_path in vtables.iteritems():
+        for vtable_id, vtable_path in six.iteritems(vtables):
             # build path to link location
             symlink_path = osp.join(tgt, vtable_locs[vtable_id])
 
@@ -141,7 +144,7 @@ class GribSource(object):
             download_url(url, grib_path)
         except DownloadError as e:
             logging.error('%s cannot download grib file %s' % (self.id, url))
-            logging.warning('Pleae check %s for %s' % (self.info_url, self.info))
+            logging.warning('Please check %s for %s' % (self.info_url, self.info))
             raise GribError('GribSource: failed to download file %s' % url)
 
     
@@ -188,6 +191,21 @@ class GribSource(object):
         for f in  colmet_missing:
             logging.info('Missing in cache ' +f)
         return colmet_missing
+
+    def available_online(self,links):
+        """
+        Make link available online from a list of links
+        :param links: list of links
+        :return: link available online, '' otherwise
+        """
+
+        logging.info('GribSource: Looking for grib links available online')
+        available = [x for x in links if readhead(self.remote_url + '/' + x, msg_level=0).status_code == 200]
+        if len(available) > 0:
+            return available[0]
+        else:
+            logging.error('Any %s available for %04d%02d%02d at %02d' % (self.id, year, mon, day, hour))
+            raise GribError('GribSource: failed to find an available online file')
 
 
     # instance variables  

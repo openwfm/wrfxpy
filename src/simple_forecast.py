@@ -18,24 +18,27 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+from __future__ import absolute_import
+from __future__ import print_function
 import json
 import sys
 import utils
 from datetime import timedelta, datetime
 import pytz
 import socket
+from six.moves import map
 
 
 def print_header(header):
-    print('\033[31m** %s **\033[0m' % header)
+    print(('\033[31m** %s **\033[0m' % header))
 
 
 def print_question(question):
-    print('\033[95m%s\033[0m' % question)
+    print(('\033[95m%s\033[0m' % question))
 
 
 def print_answer(ans):
-    print('\033[94m-> %s\033[0m\n\n' % ans)
+    print(('\033[94m-> %s\033[0m\n\n' % ans))
 
 
 def read_string(default):
@@ -77,7 +80,7 @@ def read_boolean(default):
 
 
 def queuing_systems():
-    return map(str, json.load(open('etc/clusters.json')).keys())
+    return list(map(str, list(json.load(open('etc/clusters.json')).keys())))
 
 
 def questionnaire():
@@ -124,7 +127,7 @@ def questionnaire():
         start_utc = utils.round_time_to_hour(start_utc)
         if start_utc < ign_utc:
             break
-        print('Simulation start must be before ignition time %s' % utils.utc_to_esmf(ign_utc))
+        print(('Simulation start must be before ignition time %s' % utils.utc_to_esmf(ign_utc)))
     cfg['start_utc'] = utils.utc_to_esmf(start_utc)
     print_answer('Simulation will start at %s.' % cfg['start_utc'])
 
@@ -135,7 +138,7 @@ def questionnaire():
         end_utc = utils.round_time_to_hour(end_utc, True)
         if end_utc > ign_utc:
             break
-        print('Simulation end must be after ignition time %s' % utils.utc_to_esmf(ign_utc))
+        print(('Simulation end must be after ignition time %s' % utils.utc_to_esmf(ign_utc)))
     cfg['end_utc'] = utils.utc_to_esmf(end_utc)
     print_answer('Simulation will end at %s.' % cfg['end_utc'])
 
@@ -185,7 +188,7 @@ def questionnaire():
         'truelats' : (ign_latlon[0], ign_latlon[0]),
         'stand_lon' : ign_latlon[1],
         'history_interval' : history_interval,
-        'time_step' : max(1, 5 * cell_size / 1000)
+        'time_step' : max(1, 5 * cell_size // 1000)
         }
     }
 
@@ -210,7 +213,7 @@ def questionnaire():
     qsys_opts = queuing_systems()
     while True:
         def_qsys = socket.gethostname().split('.')[0]
-        print('Enter queuing system [choices are %s, default is %s]' % (qsys_opts, def_qsys))
+        print(('Enter queuing system [choices are %s, default is %s]' % (qsys_opts, def_qsys)))
         cfg['qsys'] = read_string(def_qsys)
         if cfg['qsys'] in qsys_opts:
             break
@@ -255,5 +258,5 @@ if __name__ == '__main__':
 
     newline()
 
-    print('INT to start the simulation, execute ./forecast.sh %s' % filename)
+    print(('INT to start the simulation, execute ./forecast.sh %s' % filename))
 
