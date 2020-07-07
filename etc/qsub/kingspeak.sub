@@ -1,14 +1,8 @@
 #!/bin/bash
 #SBATCH --time=%(wall_time_hrs)02d:00:00 # walltime, abbreviated by -t
-<<<<<<< HEAD
-#SBATCH --nodes=4     # number of cluster nodes, abbreviated by -N
-##SBATCH -o  # name of the stdout
-#SBATCH --ntasks=112   # number of MPI tasks, abbreviated by -n
-=======
 #SBATCH --nodes=%(nodes)d     # number of cluster nodes, abbreviated by -N
 ##SBATCH -o  # name of the stdout
 #SBATCH --ntasks=%(np)d   # number of MPI tasks, abbreviated by -n
->>>>>>> master
 # additional information for allocated clusters
 #SBATCH --account=kochanski-kp     # account - abbreviated by -A
 #SBATCH --partition=strong-kp  # partition, abbreviated by -p

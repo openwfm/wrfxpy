@@ -361,6 +361,7 @@ def symlink_matching_files(tgt_dir, src_dir, glob_pattern):
     files = glob.glob(osp.join(src_dir, glob_pattern))
     list(map(lambda f: symlink_unless_exists(f, osp.join(tgt_dir, osp.basename(f))), files))
 
+
 def update_time_keys(time_utc, which, num_domains):
     """
     Returns a dict that can be use to set the start_xxxx or end_xxxx keys in time_control.
