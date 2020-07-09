@@ -232,10 +232,10 @@ class WPSDomainLCC(object):
 
         :return: the four latitude,longitude degree coordinates of the domain corners
         """
-        latlon00 = self.ij_to_latlon(0,0)
-        latlon01 = self.ij_to_latlon(0,self.domain_size[1])
-        latlon11 = self.ij_to_latlon(self.domain_size[0],self.domain_size[1])
-        latlon10 = self.ij_to_latlon(self.domain_size[0],0)
+        latlon00 = self.ij_to_latlon(-1,-1)
+        latlon01 = self.ij_to_latlon(-1,self.domain_size[1]+1)
+        latlon11 = self.ij_to_latlon(self.domain_size[0]+1,self.domain_size[1]+1)
+        latlon10 = self.ij_to_latlon(self.domain_size[0]+1,-1)
         return (latlon00,latlon01,latlon11,latlon10)
     
     def update_wpsnl(self, nml):

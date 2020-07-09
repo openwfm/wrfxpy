@@ -31,6 +31,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
                   make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
                   json_join, number_minutes, serial_json, link2copy, append2file
 from geo.write_geogrid import write_table
+from geo.geodriver import GeoDriver
 from vis.postprocessor import Postprocessor
 from vis.var_wisdom import get_wisdom_variables
 
@@ -234,8 +235,7 @@ def retrieve_satellite(js, sat_source, q):
     try:
         logging.info("retrieving satellite files from %s" % sat_source.id)
         # retrieve satellite granules intersecting the last domain
-        max_dom = max([int(x) for x in [x for x in list(js.bounds.keys()) if len(x) == 1]])
-        manifest = sat_source.retrieve_data_sat(js.bounds[str(max_dom)], js.start_utc, js.end_utc)
+        manifest = sat_source.retrieve_data_sat(js.bounds[str(js.max_dom)], js.start_utc, js.end_utc)
         # write a json file with satellite information
         sat_file = sat_source.id+'.json'
         json.dump(manifest, open(osp.join(js.jobdir,sat_file),'w'), indent=4, separators=(',', ': '))
@@ -413,9 +413,11 @@ def vars_add_to_geogrid(js):
         sys.exit(2)
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
-    for var,file in geo_vars:
+    for var,tif_file in six.iteritems(geo_vars):
+        bbox = js.bounds[str(js.max_dom)]
+        logging.critical('vars_add_to_geogrid - processing variable %s from file %s and bounding box %s' % (var,tif_file,bbox))
         try:
-            GeoDriver.from_file(file).to_geogrid(geo_data_path,var,js.bounds[-1])
+            GeoDriver.from_file(tif_file).to_geogrid(geo_data_path,var,bbox)
         except Exception as e:
             if var in ['NFUEL_CAT', 'ZSF']:
                 logging.critical('vars_add_to_geogrid - cannot process variable %s' % var)
@@ -427,7 +429,7 @@ def vars_add_to_geogrid(js):
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
-    geogrid_tbl_json_path = osp.join(geo_vars_path, 'geogrid_tbl.json')
+    geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
     logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at %s from %s' % 
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
@@ -1123,16 +1125,16 @@ def process_arguments(job_args,sys_cfg):
     args['start_utc'] = round_time_to_hour(start_utc)
     args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
     args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
+    args['max_dom'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
     args['satprod_satsource'] = Dict({})
 
     # add postprocess satellite data
     if 'satellite_source' in args:
         if 'postproc' in args:
-            max_dom = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
             sats = args['satellite_source']
             for sat in sats:
                 satprod = sat.upper()+'_AF'
-                args['postproc'][str(max_dom)].append(satprod)
+                args['postproc'][str(args[max_dom])].append(satprod)
                 args['satprod_satsource'].update({satprod: sat})
 
     # load tokens if etc/tokens.json exists
