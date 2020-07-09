@@ -6,7 +6,9 @@ from __future__ import print_function
 import os.path as osp
 import numpy as np
 import sys, os, logging, json
-from utils import inq
+from utils import inq, addquotes
+from geo.var_wisdom import get_wisdom
+from geo.geo_utils import fill_categories
 import six
 
 def write_divide(file,divide='=',count=25):
@@ -30,7 +32,7 @@ def write_table(file,lines_dict,mode='w',divider_char='=',divider_count=25,divid
         f.write(divider_char * divider_count + '\n')
     f.close()
 
-def write_geogrid_var(path_dir,varname,array,description,index,bits=32):
+def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
     """
     write geogrid dataset and index 
     """
@@ -39,12 +41,33 @@ def write_geogrid_var(path_dir,varname,array,description,index,bits=32):
     if not osp.exists(path_dir):
         os.makedirs(path_dir)
 
+    # get information from src/geo/var_wisdom.py
+    wisdom = get_wisdom(varname).copy()
+
     # write geogrid dataset
     geogrid_ds_path = osp.join(path_dir,varname)
-    index['description']=addquotes(description)
-    index['tile_bdr']=0
+    index['description'] = addquotes(wisdom.get('description',''))
+    index['units'] = addquotes(wisdom.get('units',''))
+    index['type'] = wisdom.get('type','continuous')
+    index['signed'] = wisdom.get('signed','yes')
+    bits = wisdom.get('bits',bits)
+    scale = wisdom.get('scale',None)
 
-    write_geogrid(geogrid_ds_path,array,index,bits=bits)
+    # some adds to index
+    if 'category_range' in wisdom:
+        index['category_min'] = wisdom['category_range'][0]
+        index['category_max'] = wisdom['category_range'][1]
+    if 'missing_value' in wisdom:
+        index['missing_value'] = wisdom['missing_value']
+    if 'tile_bdr' in wisdom:
+        index['tile_bdr'] = wisdom['tile_bdr']
+
+    # categorical substitution and interpolation
+    if index['type'] == 'categorical':
+        fill = wisdom.get('fill',{})
+        array = fill_categories(array,fill,coord)
+
+    write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale)
  
     # write also the index as json entry to modify later
     index_json_path = osp.join(path_dir,'index.json')
@@ -55,11 +78,22 @@ def write_geogrid_var(path_dir,varname,array,description,index,bits=32):
     index_json[varname]=index
     json.dump(index_json,open(index_json_path,'w'), indent=4, separators=(',', ': ')) 
 
-    geogrid_tbl_var = {'name':varname,
-                   'dest_type':'continuous',
-                   'interp_option':'default:average_gcell(4.0)+four_pt+average_4pt',
-                   'abs_path':geogrid_ds_path,
-                   'priority':1}
+    geogrid_tbl_var = {'name': varname,
+                   'dest_type': wisdom.get('type','continuous'),
+                   'interp_option': wisdom.get('interp_option','default:average_gcell(4.0)+four_pt+average_4pt'),
+                   'abs_path': geogrid_ds_path,
+                   'priority': wisdom.get('priority',1)}
+
+    # some adds to geogrid_tbl_var
+    if 'fill_missing' in wisdom:
+        geogrid_tbl_var['fill_missing'] = wisdom['fill_missing']
+    if 'smooth_option' in wisdom:
+        geogrid_tbl_var['smooth_option'] = wisdom['smooth_option']
+    if 'subgrid' in wisdom:
+        geogrid_tbl_var['subgrid'] = wisdom['subgrid']
+    if 'add_opts' in wisdom:
+        for key in wisdom['add_opts'].keys():
+            geogrid_tbl_var[key] = wisdom['add_opts'][key]
 
     # write a segment of GEOGRID.TBL
     geogrid_tbl_path=osp.join(path_dir,'GEOGRID.TBL')
@@ -78,56 +112,54 @@ def write_geogrid_var(path_dir,varname,array,description,index,bits=32):
     json.dump(geogrid_tbl,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
 
     
-def write_geogrid(path,array,index,bits=32):
+def write_geogrid(path,array,index,bits=32,scale=None):
     """
     Write geogrid dataset 
     :param path: the directory where the dataset is to be stored
     :param array: numpy array of real values, 2d or 3d
     :param index: json with geogrid index, with geolocation and description already set 
     :param bits: 16 or 32 (default)
+    :param scale: numeric scale or None (default)
+    :param data_type: 'categorical' or 'continuous' (default)
     """
 
-    logging.info('write_geogrid_var path=%s array=%s index=%s' % (path, inq(array), str(index)))
+    logging.info('write_geogrid path=%s array=%s index=%s' % (path, inq(array), str(index)))
     if not osp.exists(path):
         os.makedirs(path)
     # write binary data file
-    a=np.array(array)
-    dims=a.shape
+    a = np.array(array)
+    dims = a.shape
     if len(dims) < 3:
         dims = dims + (1,)
+        a = np.reshape(a,dims)
     xsize, ysize, zsize = dims
-    scale = 2**(np.ceil(np.log2(np.max(np.abs(a))))-bits+1)
-    aa = np.round(a/scale)
+    if scale is None:
+        scale = 2**(np.ceil(np.log2(np.max(np.abs(a))))-bits+1)
+    elif scale != 1.:
+        a = np.round(a/scale)
     if bits == 32:
-        aa = np.int32(aa) 
+        a = np.int32(a) 
     elif bits == 16:
-        aa = np.int16(aa) 
+        a = np.int16(a) 
     else:
         print('unsupported word size')
         sys.exit(1) 
-    a = aa.transpose(2,0,1)
+    a = a.transpose(2,0,1)
+    logging.info('write_geogrid array min=%f max=%f avg=%f' % (a.min(), a.max(), a.mean()))
     zsize, ysize, xsize = a.shape
     data_file = "00001-%05i.00001-%05i" % (xsize, ysize)
     data_path = osp.join(path,data_file)
     a.flatten().tofile(data_path)
     
     # write index
-    index.update({'type':'continuous',
-                 'signed':'yes',
-                 'scale_factor':scale,
-                 'wordsize':bits // 8,
-                 'tile_x':xsize,
-                 'tile_y':ysize,
-                 'tile_z':zsize,
-                 'endian':sys.byteorder})
+    index.update({'scale_factor': scale,
+                 'wordsize': bits // 8,
+                 'tile_x': xsize,
+                 'tile_y': ysize,
+                 'tile_z': zsize,
+                 'endian': sys.byteorder})
     index_path = osp.join(path,'index')
     write_table(index_path,index)
-
-def addquotes(s):
-    """
-    add quotes to string
-    """
-    return '"'+s+'"'
 
 if __name__ == '__main__':
     test_name = 'test_geo'

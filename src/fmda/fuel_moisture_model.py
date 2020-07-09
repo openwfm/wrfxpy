@@ -25,7 +25,8 @@ import sys
 import logging
 from utils import inq, ensure_dir
 from ingest.rtma_source import RTMA
-from write_geogrid import write_geogrid_var, addquotes
+from geo.write_geogrid import write_geogrid_var
+from geo.var_wisdom import get_wisdom
 from six.moves import range
 
 class FuelMoistureModel:
@@ -404,8 +405,7 @@ class FuelMoistureModel:
         xsize, ysize, n = self.m_ext.shape
         if n != 5:
             logging.error('wrong number of extended state fields, expecting 5')
-        x=1
-        y=1
+
         x=int(xsize*0.5)
         y=int(ysize*0.5)
         index.update({'known_x':float(y),'known_y':float(x),'known_lat':lats[x-1,y-1],'known_lon':lons[x-1,y-1]})
@@ -418,10 +418,9 @@ class FuelMoistureModel:
             FMC_GC[:,:,3] = lons
             FMC_GC[:,:,4] = lats
         FMEP = self.m_ext[:,:,3:]
-        index['units']=addquotes('1')
         
-        write_geogrid_var(path,'FMC_GC',FMC_GC,'1h, 10h, 100h fuel moisture',index,bits=32)
-        write_geogrid_var(path,'FMEP',FMEP,'fuel moisture drying/wetting and rain equilibrium adjustments',index,bits=32)
+        write_geogrid_var(path,'FMC_GC',FMC_GC,index,bits=32)
+        write_geogrid_var(path,'FMEP',FMEP,index,bits=32)
         
     @classmethod
     def from_netcdf(cls, path):
@@ -443,7 +442,7 @@ class FuelMoistureModel:
         
         Tk = np.array([1.0, 10.0, 100.0]) * 3600
         
-        fm = FuelMoistureModel(ncfmc[:,:,:k-2], Tk)
+        fm = cls(ncfmc[:,:,:k-2], Tk)
         
         fm.m_ext[:,:,k-2:] = ncfmc[:,:,k-2:]
         fm.P[:,:,:,:] = P

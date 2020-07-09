@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 import logging
 from utils import esmf_to_utc, utc_to_esmf, round_time_to_hour, timedelta_hours, load_sys_cfg
-from ingest.grib_source import NAM218
+from ingest.NAM218 import NAM218
 
 # ESMF date: YYYY-MM-DD_hh:mm:ss
 
@@ -35,7 +35,8 @@ def test_time():
     print('fc_start = ', fc_start)
     print('fc_hours = ',fc_hours)
     fc_list, colmet_list_utc = g.file_times(cycle_start, fc_start, fc_hours)
-    grib_files, colmet_prefix, colmet_files = g.file_names(cycle_start, fc_list, colmet_list_utc)
+    grib_files = g.file_names(cycle_start, fc_list)
+    colmet_prefix, colmet_files = g.colmet_names(cycle_start, colmet_list_utc)
     print('fc_list = ',fc_list)
     print('colmet_list_utc = ')
     for x in colmet_list_utc:

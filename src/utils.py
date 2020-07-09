@@ -62,6 +62,28 @@ class Dict(dict):
     def __setattr__(self, item, value):
         self[item] = value
 
+    def __getitem__(self, item):
+        if item in self:
+            return super().__getitem__(item)
+        else:
+            for key in self:
+                if isinstance(key,(range,tuple)) and item in key:
+                    return super().__getitem__(key)
+            raise KeyError(item)
+
+    def keys(self):
+        if any([isinstance(key,(range,tuple)) for key in self]):
+            keys = []
+            for key in self:
+                if isinstance(key,(range,tuple)):
+                    for k in key:
+                        keys.append(k)
+                else:
+                    keys.append(key)
+            return keys
+        else:
+            return super().keys()
+
 def save(obj, file):
     with open(file,'wb') as output:
         dill.dump(obj, output )
@@ -128,6 +150,15 @@ def process_create_time(pid):
             return psutil.Process(pid).create_time()
         except:
             return None
+
+def file_exists(path):
+    """
+    Ensure a file in a path exists and is readable.
+
+    :param path: path to an existent file
+    :return: boolean if the file exists and is readable
+    """
+    return (os.path.exists(path) and os.access(path,os.R_OK))
 
 def ensure_dir(path):
     """
@@ -631,4 +662,8 @@ def inq(x):
         s=str(x)
     return s
 
-
+def addquotes(s):
+    """
+    add quotes to string
+    """
+    return '"'+s+'"'
