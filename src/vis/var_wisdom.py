@@ -14,6 +14,13 @@ smoke_integrated_transparent = 1e-2
 smoke_concentration_scale = 400
 smoke_concentration_transparent=10
 
+def strip_end(d):
+      m,n = d.variables['XLONG'][0,:,:].shape
+      fm,fn = d.variables['FXLONG'][0,:,:].shape
+      fm = int(fm-fm//(m+1))
+      fn = int(fn-fn//(n+1))
+      return fm,fn
+
 def smoke_to_height_terrain_u(var,d,t,h):
       v=convert_value('ug/m^2', smoke_integrated_unit,smoke_to_height_terrain(d,t,h))
       print_stats(var,v,smoke_integrated_unit)

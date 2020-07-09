@@ -10,7 +10,7 @@ import netCDF4 as nc4
 
 from vis.postprocessor import Postprocessor
 from utils import load_sys_cfg, Dict, make_clean_dir
-from vis.var_wisdom import get_wisdom, is_windvec, is_fire_var
+from vis.var_wisdom import get_wisdom, is_windvec, is_fire_var, strip_end
 from six.moves import range
 
 def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999.0):
@@ -23,6 +23,9 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
         rng = wisdom['transparent_values']
 
     array = wisdom['retrieve_as'](d,0)
+    if is_fire_var(var):
+        fm,fn = strip_end(d)
+        array = array[:fm,:fn]
     ysize,xsize = array.shape
     zsize = len(times)
     # write each slice of the array along the zsize
@@ -30,6 +33,9 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
     for i in range(zsize):
         # get array
         array = wisdom['retrieve_as'](d,i)
+        if is_fire_var(var):
+            fm,fn = strip_end(d)
+            array = array[:fm,:fn]
         # mask transparent values
         if 'transparent_values' in wisdom:
             array = np.ma.masked_array(array,np.logical_and(array >= rng[0], array <= rng[1]))
@@ -72,6 +78,9 @@ def vector2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
     '''
     w,uw,vw = wisdom
     array = uw['retrieve_as'](d, 0)
+    if is_fire_var(var):
+        fm,fn = strip_end(d)
+        array = array[:fm,:fn]
     ysize,xsize = array.shape
     zsize = len(times)
     # write each slice of the array along the zsize
@@ -79,6 +88,10 @@ def vector2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
     for i in range(zsize):
         uarray = uw['retrieve_as'](d, i)
         varray = vw['retrieve_as'](d, i)
+        if is_fire_var(var):
+            fm,fn = strip_end(d)
+            uarray = uarray[:fm,:fn]
+            varray = varray[:fm,:fn]
         # set nans to the original No Data Value
         uarray[np.isnan(uarray)] = ndv
         varray[np.isnan(varray)] = ndv

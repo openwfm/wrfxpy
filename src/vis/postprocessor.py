@@ -25,7 +25,7 @@ from utils import dump, traceargs, esmf_to_utc, utc_to_esmf
 from vis.vis_utils import print_stats
 
 from vis.rasterizer import make_colorbar, make_discrete_colorbar, basemap_raster_mercator, basemap_barbs_mercator, basemap_scatter_mercator
-from vis.var_wisdom import convert_value, get_wisdom, is_windvec
+from vis.var_wisdom import convert_value, get_wisdom, is_windvec, is_fire_var, strip_end
 
 
 class PostprocError(Exception):
@@ -180,6 +180,11 @@ class Postprocessor(object):
         # extract variable
         fa = wisdom['retrieve_as'](d,tndx) # this calls a lambda defined to read the required 2d field
         lat, lon = wisdom['grid'](d)
+        if is_fire_var(var):
+            fm,fn = strip_end(d)
+            fa = fa[:fm,:fn]
+            lon = lon[:fm,:fn] 
+            lat = lat[:fm,:fn]
 
         if lat.shape != fa.shape:
             raise PostprocError("Variable %s size does not correspond to grid size." % var)
@@ -253,6 +258,12 @@ class Postprocessor(object):
         vw.update(self.wisdom_update.get(v_name, {}))
         u = uw['retrieve_as'](d, tndx)
         v = vw['retrieve_as'](d, tndx)
+        if is_fire_var(var):
+            fm,fn = strip_end(d)
+            u = u[:fm,:fn]
+            v = v[:fm,:fn]
+            lon = lon[:fm,:fn] 
+            lat = lat[:fm,:fn]
 
         if u.shape != lat.shape:
             raise PostprocError("Variable %s size does not correspond to grid size: var %s grid %s." % (u_name, u.shape, u_lat.shape))
