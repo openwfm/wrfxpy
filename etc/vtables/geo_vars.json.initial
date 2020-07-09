@@ -1,0 +1,4 @@
+{
+  "NFUEL_CAT": "/path/to/fuel/geotiff.tif",
+  "ZSF": "/path/to/elevation/geotiff.tif"
+}
