@@ -11,7 +11,7 @@ from geo.var_wisdom import get_wisdom
 from geo.geo_utils import fill_categories
 import six
 
-def write_divide(file,divide='=',count=25):
+def write_divide(file,divide='=',count=31):
     """
     Write a dividing line
     """
@@ -19,7 +19,7 @@ def write_divide(file,divide='=',count=25):
     f.write(divide * count + '\n')
     f.close()
     
-def write_table(file,lines_dict,mode='w',divider_char='=',divider_count=25,divider_before=False,divider_after=False):
+def write_table(file,lines_dict,mode='w',divider_char='=',divider_count=31,divider_before=False,divider_after=False):
     """
     write table 
     """
