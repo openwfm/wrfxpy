@@ -399,6 +399,42 @@ def read_namelist(path):
     logging.info('Reading namelist %s' % path)
     return f90nml.read(path)
 
+def vars_add_to_geogrid(js):
+    """
+    Add variables datasets to geogrid if specified
+    """
+    # load the variables to process
+    geo_vars_path = 'etc/vtables/geo_vars.json'
+    geo_vars = None
+    try:
+        geo_vars = Dict(json.load(open(geo_vars_path)))
+    except:
+        logging.critical('Any %s specified, GeoTIFF files for NFUEL_CAT and ZSF need to be specified.' % geo_vars_path)
+        sys.exit(2)
+
+    geo_data_path = osp.join(js.wps_dir, 'geo_data')
+    for var,file in geo_vars:
+        try:
+            GeoDriver.from_file(file).to_geogrid(geo_data_path,var,js.bounds[-1])
+        except Exception as e:
+            if var in ['NFUEL_CAT', 'ZSF']:
+                logging.critical('vars_add_to_geogrid - cannot process variable %s' % var)
+                logging.error('Exception: %s',e)
+                sys.exit(2)
+            else:
+                logging.warning('vars_add_to_geogrid - cannot process variable %s, will not be included' % var)
+    
+    # update geogrid table
+    geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
+    link2copy(geogrid_tbl_path)
+    geogrid_tbl_json_path = osp.join(geo_vars_path, 'geogrid_tbl.json')
+    logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at %s from %s' % 
+        (geogrid_tbl_path,geogrid_tbl_json_path))
+    geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
+    for varname,vartable in six.iteritems(geogrid_tbl_json):
+        logging.info('vars_add_to_geogrid - writting table for variable %s' % varname)
+        write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
+
 def fmda_add_to_geogrid(js):
     """
     Add fmda datasets to geogrid if specified
@@ -535,6 +571,15 @@ def execute(args,job_args):
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
+    js.bounds = Dict({})
+    for k,domain in enumerate(js.domain_conf.domains):
+        bbox = domain.bounding_box()
+        lons = [b[1] for b in bbox]
+        lats = [b[0] for b in bbox]
+        bounds = (min(lons),max(lons),min(lats),max(lats))
+        js.bounds[str(k+1)] = bounds
+
+    vars_add_to_geogrid(js)
     fmda_add_to_geogrid(js) 
     # do steps 2 & 3 & 4 in parallel (three execution streams)
     #  -> Satellite retrieval ->
@@ -544,12 +589,6 @@ def execute(args,job_args):
     proc_q = Queue()
 
     if js.satellite_source:
-        js.bounds = Dict({})
-        for k,domain in enumerate(js.domain_conf.domains):
-            latloni = domain.ij_to_latlon(0,0)
-            latlonf = domain.ij_to_latlon(domain.domain_size[0],domain.domain_size[1])
-            bounds = (latloni[1],latlonf[1],latloni[0],latlonf[0])
-            js.bounds[str(k+1)] = bounds
         sat_proc = {}
         for satellite_source in js.satellite_source:
             sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
