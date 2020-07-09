@@ -415,7 +415,7 @@ def vars_add_to_geogrid(js):
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     for var,tif_file in six.iteritems(geo_vars):
         bbox = js.bounds[str(js.max_dom)]
-        logging.critical('vars_add_to_geogrid - processing variable %s from file %s and bounding box %s' % (var,tif_file,bbox))
+        logging.info('vars_add_to_geogrid - processing variable %s from file %s and bounding box %s' % (var,tif_file,bbox))
         try:
             GeoDriver.from_file(tif_file).to_geogrid(geo_data_path,var,bbox)
         except Exception as e:
