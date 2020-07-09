@@ -64,7 +64,7 @@ def scalar2tiffs(output_path, d, wisdom, projection, geot, times, var, ndv=-9999
         dataset.SetGeoTransform(geot)
         dataset.SetProjection(projection.ExportToWkt())
         band = dataset.GetRasterBand(1)
-        band.WriteArray(np.flipud(array))
+        band.WriteArray(array)
         band.SetUnitType(wisdom['native_unit'])
         band.SetDescription(wisdom['name'])
         band.SetNoDataValue(ndv)
@@ -130,7 +130,7 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
 
     logging.info('process_vars_tiff: looking for file %s' % wrfout_path)
     # netCDF WRF metadata
-    projection, geotransform_atm, geotransform_fire = ncwrfmeta(d)
+    projection, gt_atm, gt_fire = ncwrfmeta(d)
 
     outpath_base = osp.join(pp.output_path, pp.product_name + ("-%02d-" % dom_id))
     # build an output file per variable
@@ -141,18 +141,18 @@ def process_vars_tiff(pp, d, wrfout_path, dom_id, times, vars):
             wisdom = get_wisdom(var).copy()
             wisdom.update(pp.wisdom_update.get(var, {}))
             if is_fire_var(var):
-                geotransform = geotransform_fire
+                gt = gt_fire
             else:
-                geotransform = geotransform_atm
+                gt = gt_atm
 
             if is_windvec(var):
                 u_name, v_name = wisdom['components']
                 uw, vw = get_wisdom(u_name), get_wisdom(v_name)
                 uw.update(pp.wisdom_update.get(u_name, {}))
                 vw.update(pp.wisdom_update.get(v_name, {}))
-                tiff_path = vector2tiffs(outpath_base, d, (wisdom,uw,vw), projection, geotransform, times, var)
+                tiff_path = vector2tiffs(outpath_base, d, (wisdom,uw,vw), projection, gt, times, var)
             else:
-                tiff_path = scalar2tiffs(outpath_base, d, wisdom, projection, geotransform, times, var)
+                tiff_path = scalar2tiffs(outpath_base, d, wisdom, projection, gt, times, var)
 
             for idx,time in enumerate(times):
                 mf_upd['tiff'] = osp.basename(tiff_path[idx])
@@ -234,34 +234,40 @@ def process_outputs_tiff(job_id):
     js.state = 'Completed'
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
-def ncwrfmeta(d):
+def ncwrfmeta(ds):
+    attrs = ds.ncattrs()
+    dims = ds.dimensions
+    get_attr = lambda attr,exc=None: ds.getncattr(attr) if attr in attrs else exc
+    get_dim = lambda dim,exc=None: dims[dim] if dim in dims else exc
     # getting metadata
-    lat1 = d.TRUELAT1
-    lat2 = d.TRUELAT2
-    lat0 = d.MOAD_CEN_LAT
-    lon0 = d.STAND_LON
-    clat = d.CEN_LAT
-    clon = d.CEN_LON
+    lat1 = get_attr('TRUELAT1')
+    lat2 = get_attr('TRUELAT2')
+    lat0 = get_attr('MOAD_CEN_LAT')
+    lon0 = get_attr('STAND_LON')
+    clat = get_attr('CEN_LAT')
+    clon = get_attr('CEN_LON')
+    # creating CSR onject
     csr = osr.SpatialReference()
     proj4 = '+proj=lcc +lat_1=%.10f +lat_2=%.10f +lat_0=%.10f +lon_0=%.10f +a=6370000.0 +b=6370000.0' % (lat1,lat2,lat0,lon0)
-    logging.info('proj4: %s' % proj4)
+    logging.info('ncwrfmeta - proj4=%s' % proj4)
     csr.ImportFromProj4(proj4)
-    ll_proj = pyproj.Proj('+proj=latlong +datum=WGS84')
     wrf_proj = pyproj.Proj(proj4)
-    # geotransform
+    ll_proj = wrf_proj.to_latlong()
+    # creating atmospheric geotransform
     e,n = pyproj.transform(ll_proj,wrf_proj,clon,clat)
-    dx_atm = d.DX
-    dy_atm = d.DY
-    nx_atm = d.dimensions['west_east'].size
-    ny_atm = d.dimensions['south_north'].size
+    dx_atm = get_attr('DX')
+    dy_atm = get_attr('DY')
+    nx_atm = get_dim('west_east').size
+    ny_atm = get_dim('south_north').size
     x0_atm = -nx_atm / 2. * dx_atm + e
-    y1_atm = ny_atm / 2. * dy_atm + n
-    geotransform_atm = (x0_atm,dx_atm,0,y1_atm,0,-dy_atm)
-    logging.info('geotransform_atm: (%g,%g,%g,%g,%g,%g)' % geotransform_atm)
+    y0_atm = -ny_atm / 2. * dy_atm + n
+    gt_atm = (x0_atm,dx_atm,0,y0_atm,0,dy_atm)
+    logging.info('ncwrfmeta - GT_atm: (%g,%g,%g,%g,%g,%g)' % gt_atm)
 
-    if 'west_east_subgrid' in d.dimensions:
-        nx = d.dimensions['west_east_subgrid'].size
-        ny = d.dimensions['south_north_subgrid'].size
+    # creating fire geotransform
+    if 'west_east_subgrid' in dims:
+        nx = get_dim('west_east_subgrid').size
+        ny = get_dim('south_north_subgrid').size
         srx = int(nx/(nx_atm+1))
         sry = int(ny/(ny_atm+1))
         if srx > 0 and sry > 0:
@@ -270,15 +276,15 @@ def ncwrfmeta(d):
             dx_fire = dx_atm/srx
             dy_fire = dy_atm/sry
             x0_fire = -nx_fire / 2. * dx_fire + e
-            y1_fire = (ny_fire / 2. + sry) * dy_fire + n
-            geotransform_fire = (x0_fire,dx_fire,0,y1_fire,0,-dy_fire)
-            logging.info('geotransform_fire: (%g,%g,%g,%g,%g,%g)' % geotransform_fire)
+            y0_fire = -ny_fire / 2. * dy_fire + n
+            gt_fire = (x0_fire,dx_fire,0,y0_fire,0,dy_fire)
+            logging.info('ncwrfmeta - GT_fire: (%g,%g,%g,%g,%g,%g)' % gt_fire)
         else:
-            geotransform_fire = None
+            gt_fire = None
     else:
-        geotransform_fire = None
+        gt_fire = None
 
-    return csr, geotransform_atm, geotransform_fire
+    return csr, gt_atm, gt_fire
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
