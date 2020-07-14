@@ -3,7 +3,7 @@ import pyproj,osr
 from netCDF4 import Dataset
 import numpy as np
 
-nc = Dataset('../WRF4/WPS-subgrid_shift/geo_em_ind/geo_em.d01_init.nc')
+nc = Dataset(sys.argv[1])
 lat1 = nc.getncattr('TRUELAT1')
 lat2 = nc.getncattr('TRUELAT2')
 lat0 = nc.getncattr('MOAD_CEN_LAT')

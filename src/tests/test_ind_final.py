@@ -8,7 +8,7 @@ import sys
 
 plot = True
 
-nc = nc4.Dataset('../WRF4/WPS-subgrid_shift/geo_em_ind/geo_em.d01_final.nc')
+nc = nc4.Dataset(sys.argv[1])
 srx = nc.getncattr('sr_x')
 sry = nc.getncattr('sr_y')
 X = np.array(nc['XI'][0])
