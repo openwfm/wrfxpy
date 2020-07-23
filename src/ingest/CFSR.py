@@ -127,7 +127,6 @@ class CFSR_S(CFSR):
         return self.available_online(path_tmpls)
 
     # instance variables
-    #remote_url = 'https://nomads.ncdc.noaa.gov/modeldata/cfsv2_analysis_flxf'
     remote_url = 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux'
     id = "CFSR_S"
     prefix = 'COLMET_S'

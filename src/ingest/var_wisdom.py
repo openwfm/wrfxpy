@@ -266,13 +266,13 @@ def retr_sat(ingest_dir, satellite, from_utc, to_utc, lonlat = []):
       sat_gran_names = get_sat_wisdom(satellite)
       sat_gran_wis = [get_gran_wisdom(x) for x in sat_gran_names]
 
+      for gran in sat_gran_wis:
+            if gran['type'] == 'geolocation':
+                  geo_gran = gran
+
+      geo_source_wis = get_source_wisdom(geo_gran['source'])
+
       if lonlat != []:
-            for gran in sat_gran_wis:
-                if gran['type'] == 'geolocation':
-                    geo_gran = gran
-
-            geo_source_wis = get_source_wisdom(geo_gran['source'])
-
             if geo_gran['name'] == 'MOD03':
                   geo_manifest = geo_source_wis['geo_from_geoMeta'](ingest_dir, 'TERRA', from_utc, to_utc, lonlat)
             elif geo_gran['name'] == 'MYD03':

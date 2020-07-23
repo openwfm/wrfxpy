@@ -20,7 +20,7 @@ class GFSA(GribReanalysis):
 
     def vtables(self):
         """
-        Returns the variable tables that must be linked in for use with the NARR data source.
+        Returns the variable tables that must be linked in for use with the GFS data source.
 
         :return: a dictionary of variable tables
         """
@@ -31,7 +31,7 @@ class GFSA(GribReanalysis):
 
     def namelist_keys(self):
         """
-        Returns the namelist keys that must be modified in namelist.input with NARR.
+        Returns the namelist keys that must be modified in namelist.input with GFS.
         :return: a list of paths to local GRIB files
         """
 

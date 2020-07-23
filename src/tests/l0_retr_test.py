@@ -14,12 +14,12 @@ import shutil
 script_path = os.path.realpath(__file__)
 
 # + 6 gets us to wrfxpy
-index = script_path.find('wrfxpy/tests') + 6
+index = script_path.find('wrfxpy/src/tests') + 6
 os.chdir(script_path[:index])
 
 
 # Path where the download files should go
-local_path = 'tests/l0_test_ingest'
+local_path = 'src/tests/l0_test_ingest'
 
 # Remove data from old tests
 shutil.rmtree(local_path, ignore_errors=True)

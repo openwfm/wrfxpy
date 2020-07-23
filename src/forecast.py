@@ -342,6 +342,7 @@ def run_geogrid(js, q):
     """
     try:
         logging.info("running GEOGRID")
+        vars_add_to_geogrid(js)
         Geogrid(js.wps_dir).execute().check_output()
         logging.info('GEOGRID complete')
 
@@ -403,6 +404,8 @@ def vars_add_to_geogrid(js):
     """
     Add variables datasets to geogrid if specified
     """
+    # add fmda datasets to geogrid if specified
+    fmda_add_to_geogrid(js)
     # load the variables to process
     geo_vars_path = 'etc/vtables/geo_vars.json'
     geo_vars = None
@@ -581,8 +584,6 @@ def execute(args,job_args):
         bounds = (min(lons),max(lons),min(lats),max(lats))
         js.bounds[str(k+1)] = bounds
 
-    vars_add_to_geogrid(js)
-    fmda_add_to_geogrid(js) 
     # do steps 2 & 3 & 4 in parallel (three execution streams)
     #  -> Satellite retrieval ->
     #  -> GEOGRID ->
@@ -1125,7 +1126,8 @@ def process_arguments(job_args,sys_cfg):
     args['start_utc'] = round_time_to_hour(start_utc)
     args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
     args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
-    args['max_dom'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
+    args['max_dom'] = max([int(x) for x in [x for x in args['domains'] if len(x) == 1]])
+    args['max_dom_pp'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
     args['satprod_satsource'] = Dict({})
 
     # add postprocess satellite data
@@ -1134,7 +1136,7 @@ def process_arguments(job_args,sys_cfg):
             sats = args['satellite_source']
             for sat in sats:
                 satprod = sat.upper()+'_AF'
-                args['postproc'][str(args[max_dom])].append(satprod)
+                args['postproc'][str(args['max_dom_pp'])].append(satprod)
                 args['satprod_satsource'].update({satprod: sat})
 
     # load tokens if etc/tokens.json exists
