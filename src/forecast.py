@@ -832,8 +832,9 @@ def process_output(job_id):
                         # in incremental mode, upload to server
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('tif'))]
+                            tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
+                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
                         failures += 1
@@ -843,7 +844,8 @@ def process_output(job_id):
             # if we are to send out the postprocessed files after completion, this is the time
             if js.postproc.get('shuttle', None) == 'on_completion':
                 desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+                tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
+                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         else:
             logging.error('All postprocessing steps failed')
@@ -921,8 +923,9 @@ def process_output(job_id):
                         # in incremental mode, upload to server
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('tif'))]
+                            tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
+                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
         else:
@@ -935,7 +938,8 @@ def process_output(job_id):
         logging.info('number of postprocessing steps is %d and number of postprocessing failures is %d' % (cases,failures))
         if js.postproc.get('shuttle', None) == 'on_completion':
             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+            tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
+            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         if js.postproc.get('shuttle', None) is not None:
             make_kmz(js.job_id)  # arguments can be added to the job id string
@@ -1031,15 +1035,17 @@ def process_sat_output(job_id):
                     try:
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('tif'))]
+                            tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
+                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
 
     # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc)
+        tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
+        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
     if js.postproc.get('shuttle', None) is not None:
         make_kmz(js.job_id)  # arguments can be added to the job id string
