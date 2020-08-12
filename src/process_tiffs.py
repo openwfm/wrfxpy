@@ -247,10 +247,10 @@ def ncwrfmeta(ds):
     clat = get_attr('CEN_LAT')
     clon = get_attr('CEN_LON')
     # creating CSR onject
-    csr = osr.SpatialReference()
+    crs = osr.SpatialReference()
     proj4 = '+proj=lcc +lat_1=%.10f +lat_2=%.10f +lat_0=%.10f +lon_0=%.10f +a=6370000.0 +b=6370000.0' % (lat1,lat2,lat0,lon0)
     logging.info('ncwrfmeta - proj4=%s' % proj4)
-    csr.ImportFromProj4(proj4)
+    crs.ImportFromProj4(proj4)
     wrf_proj = pyproj.Proj(proj4)
     ll_proj = wrf_proj.to_latlong()
     # creating atmospheric geotransform
@@ -284,7 +284,7 @@ def ncwrfmeta(ds):
     else:
         gt_fire = None
 
-    return csr, gt_atm, gt_fire
+    return crs, gt_atm, gt_fire
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:

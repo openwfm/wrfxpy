@@ -23,14 +23,13 @@ from datetime import timedelta
 from subprocess import check_call
 from utils import dump, traceargs, esmf_to_utc, utc_to_esmf
 from vis.vis_utils import print_stats
-
 from vis.rasterizer import make_colorbar, make_discrete_colorbar, basemap_raster_mercator, basemap_barbs_mercator, basemap_scatter_mercator
 from vis.var_wisdom import convert_value, get_wisdom, is_windvec, is_fire_var, strip_end
-
+from geo.geo_utils import ncwrfmeta
+from geo.geodriver import GeoDriver
 
 class PostprocError(Exception):
     pass
-
 
 
 def scalar_field_to_raster(fa, lats, lons, wisdom):
@@ -161,7 +160,7 @@ class Postprocessor(object):
             logging.info('postprocessor: manifest at %s does not exist yet' % mf_path)
 
 
-    def _scalar2raster(self, d, var, tndx):
+    def _scalar2raster(self, d, var, tndx, **tif_args):
         """
         Convert a single variable into a raster and colorbar.
 
@@ -198,11 +197,7 @@ class Postprocessor(object):
         else:
             fa=np.ma.masked_array(fa)
 
-        # create the raster & get coordinate bounds
-
         # look at mins and maxes
-        # fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
-        # look at mins and maxes, transparent don't count
         fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
 
         # determine if we will use the range in the variable or a fixed range
@@ -230,13 +225,27 @@ class Postprocessor(object):
 
         logging.info('_scalar2raster: variable %s elements %s count %s not masked %s min %s max %s'
             % (var, fa.size , fa.count(), np.count_nonzero(fa.mask == False), np.nanmin(fa),np.nanmax(fa) ))
-
+        
+        # create the raster & get coordinate bounds
         raster_png_data,corner_coords = basemap_raster_mercator(lon,lat,fa,fa_min,fa_max,cmap)
+
+        # create GeoTIFF file
+        if tif_args:
+            if 'ndv' in tif_args.keys():
+                ndv = tif_args['ndv']
+            else:
+                ndv = -9999.0
+            fa[np.isnan(fa)] = ndv
+            tif_path = tif_args.get('tif_path')
+            logging.info('_scalar2raster: writting GeoTIFF file %s'.format(tif_path))
+            crs = tif_args.get('crs')
+            geot = tif_args.get('geot')
+            GeoDriver.from_elements(fa, crs, geot).to_geotiff(tif_path, desc = wisdom['name'], unit = native_unit, ndv = ndv)
 
         return raster_png_data, corner_coords, cb_png_data
 
 
-    def _vector2raster(self, d, var, tndx):
+    def _vector2raster(self, d, var, tndx, **tif_args):
         """
         Postprocess a vector field into barbs (used for wind) and contains hacks for WRF staggered grids.
 
@@ -286,6 +295,20 @@ class Postprocessor(object):
         # create the raster & get coordinate bounds, HACK to get better quiver resolution
         s = 3
         raster_png_data,corner_coords = basemap_barbs_mercator(u[::s,::s],v[::s,::s],lat[::s,::s],lon[::s,::s])
+
+        # create GeoTIFF file
+        if tif_args:
+            if 'ndv' in tif_args.keys():
+                ndv = tif_args['ndv']
+            else:
+                ndv = -9999.0
+            u[np.isnan(u)] = ndv
+            v[np.isnan(v)] = ndv
+            tif_path = tif_args.get('tif_path')
+            logging.info('_vector2raster: writting GeoTIFF file %s'.format(tif_path))
+            crs = tif_args.get('crs')
+            gt = tif_args.get('geot')
+            GeoDriver.from_elements(np.array([u, v]), crs, gt).to_geotiff(tif_path, desc = [uw['name'], vw['name']], unit = native_unit, ndv = ndv)
 
         return raster_png_data, corner_coords
 
@@ -346,7 +369,7 @@ class Postprocessor(object):
         if wisdom['colorbar'] is not None:
             #  colorbar + add it to the KMZ as a screen overlay
             legend = ''
-            logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
+            logging.info('_sat2raster: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
             cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
 
         # create the raster & get coordinate bounds
@@ -385,7 +408,7 @@ class Postprocessor(object):
         if wisdom['colorbar'] is not None:
             #  colorbar + add it to the KMZ as a screen overlay
             legend = ''
-            logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
+            logging.info('_sat2raster_empty: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
             cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
 
         # create the raster & get coordinate bounds
@@ -394,7 +417,7 @@ class Postprocessor(object):
         return raster_png_data, corner_coords, cb_png_data
 
 
-    def _scalar2png(self, d, var, tndx, out_path):
+    def _scalar2png(self, d, var, tndx, out_path, **tif_args):
         """
         Postprocess a scalar field into a raster file and a colorbar file, both PNG.
 
@@ -405,7 +428,7 @@ class Postprocessor(object):
         :return: the path to the raster, to the colorbar and the bounding coordinates
         """
         # render the raster & colorbar
-        raster_png_data, corner_coords, cb_png_data = self._scalar2raster(d, var, tndx)
+        raster_png_data, corner_coords, cb_png_data = self._scalar2raster(d, var, tndx, **tif_args)
 
         # write raster file
         raster_path = out_path + "-raster.png"
@@ -423,7 +446,7 @@ class Postprocessor(object):
         return raster_path, colorbar_path, corner_coords
 
 
-    def _vector2png(self, d, var, tndx, out_path):
+    def _vector2png(self, d, var, tndx, out_path, **tif_args):
         """
         Postprocess a single vector variable ``var`` and stores result in a raster file.
 
@@ -434,7 +457,7 @@ class Postprocessor(object):
         :return: the path to the raster and the bounding coordinates
         """
         # render the raster & colorbar
-        raster_png_data, corner_coords = self._vector2raster(d, var, tndx)
+        raster_png_data, corner_coords = self._vector2raster(d, var, tndx, **tif_args)
 
         raster_path = out_path + '-raster.png'
         with open(raster_path, 'wb') as f:
@@ -501,7 +524,7 @@ class Postprocessor(object):
         return raster_path, colorbar_path, corner_coords
 
 
-    def _scalar2kmz(self, d, var, tndx, ts_esmf_begin, ts_esmf_end, out_path, cleanup = True):
+    def _scalar2kmz(self, d, var, tndx, ts_esmf_begin, ts_esmf_end, out_path, cleanup = True, **tif_args):
         """
         Postprocess a single raster variable ``fa`` and store result in out_path.
 
@@ -523,7 +546,7 @@ class Postprocessor(object):
             doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
 
         # generate the png files
-        raster_path, cb_path, corner_coords = self._scalar2png(d, var, tndx, out_path)
+        raster_path, cb_path, corner_coords = self._scalar2png(d, var, tndx, out_path, **tif_args)
 
         # add colorbar to KMZ
         if cb_path is not None:
@@ -555,7 +578,7 @@ class Postprocessor(object):
         return kmz_path, raster_path, cb_path, corner_coords
 
 
-    def _vector2kmz(self, d, var, tndx, ts_esmf_begin, ts_esmf_end, out_path, cleanup = True):
+    def _vector2kmz(self, d, var, tndx, ts_esmf_begin, ts_esmf_end, out_path, cleanup = True, **tif_args):
         """
         Postprocess a single vector variable ``var`` and store result in out_path.
 
@@ -578,7 +601,7 @@ class Postprocessor(object):
             doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
 
         # generate the png files
-        raster_path, corner_coords = self._vector2png(d, var, tndx, out_path)
+        raster_path, corner_coords = self._vector2png(d, var, tndx, out_path, **tif_args)
 
         # add ground overlay
         ground = doc.newgroundoverlay(name=var,color='80ffffff')
@@ -845,7 +868,7 @@ class Postprocessor(object):
                     logging.warning(traceback.print_exc())
 
 
-    def process_vars(self, wrfout_path, dom_id, ts_esmf, vars):
+    def process_vars(self, wrfout_path, dom_id, ts_esmf, vars, tif_proc = False):
         """
         Postprocess a list of scalar or vector fields at a given simulation time into PNG and KMZ
         files.
@@ -854,6 +877,7 @@ class Postprocessor(object):
         :param dom_id: the domain identifier
         :param ts_esmf: time stamp in ESMF format
         :param vars: list of variables to process
+        :param tif_proc: boolen if process tif files
         """
         traceargs()
 
@@ -896,23 +920,35 @@ class Postprocessor(object):
         time.sleep(5)
         d = nc4.Dataset(wrfout_path)
         tndx = times.index(ts_esmf)
+        if tif_proc:
+            crs,gt_a,gt_f = ncwrfmeta(d)
 
         # build an output file per variable
         for var in vars:
             logging.info('process_vars: postprocessing %s for time %s' % (var, ts_esmf))
             try:
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var)
+                if tif_proc:
+                    if is_fire_var(var):
+                        geot = gt_f
+                    else:
+                        geot = gt_a
+                    tif_args = {'crs': crs, 'geot': geot, 'tif_path': outpath_base+'.tif'}
+                else:
+                    tif_args = {}
                 kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
                 if is_windvec(var):
-                    kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False)
+                    kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False, **tif_args)
                 else:
-                    kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False)
+                    kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False, **tif_args)
                     if cb_path is not None:
                         mf_upd['colorbar'] = osp.basename(cb_path)
 
                 mf_upd['kml'] = osp.basename(kmz_path)
                 mf_upd['raster'] = osp.basename(raster_path)
                 mf_upd['coords'] = coords
+                if tif_proc:
+                    mf_upd['tif'] = osp.basename(tif_args.get('tif_path'))
                 self._update_manifest(dom_id, ts_esmf, var, mf_upd)
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s" % (e, var, ts_esmf))
