@@ -1,4 +1,5 @@
 {
+    "tif_proc": true,
     "wall_time_hrs": 2,
     "postproc": {
         "1": [

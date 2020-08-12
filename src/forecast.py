@@ -29,7 +29,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
                   make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
-                  json_join, number_minutes, serial_json, link2copy, append2file
+                  json_join, number_minutes, serial_json, link2copy, append2file, delete
 from geo.write_geogrid import write_table
 from geo.geodriver import GeoDriver
 from vis.postprocessor import Postprocessor
@@ -64,6 +64,7 @@ import numpy as np
 
 import smtplib
 from email.mime.text import MIMEText
+import hashlib
 
 import traceback
 import pprint
@@ -347,11 +348,13 @@ def run_geogrid(js, q):
         Geogrid(js.wps_dir).execute().check_output()
         logging.info('GEOGRID complete')
 
+        delete(js.geo_cache)
         send_email(js, 'geogrid', 'GEOGRID complete.')
         q.put('SUCCESS')
 
     except Exception as e:
         logging.error('GEOGRID step failed with exception %s' % repr(e))
+        delete(js.geo_cache)
         q.put('FAILURE')
 
 
@@ -402,6 +405,18 @@ def read_namelist(path):
     logging.info('Reading namelist %s' % path)
     return f90nml.read(path)
 
+def ensure_abs_path(path,js,max_char=120):
+    if len(path) > max_char:
+        hexhash = hashlib.sha224(js.job_id.encode()).hexdigest()[:6]
+        geo_path = osp.join(js.wrfxpy_dir,'cache/geo_data.{}'.format(hexhash))
+        js.geo_cache = geo_path
+        make_dir(geo_path)
+        new_path = osp.join(geo_path,osp.basename(path))
+        symlink_unless_exists(path,new_path)
+        return new_path
+    else:
+        return path
+
 def vars_add_to_geogrid(js):
     """
     Add variables datasets to geogrid if specified
@@ -414,32 +429,33 @@ def vars_add_to_geogrid(js):
     try:
         geo_vars = Dict(json.load(open(geo_vars_path)))
     except:
-        logging.critical('Any %s specified, GeoTIFF files for NFUEL_CAT and ZSF need to be specified.' % geo_vars_path)
+        logging.critical('Any {} specified, GeoTIFF files for NFUEL_CAT and ZSF need to be specified.'.format(geo_vars_path))
         sys.exit(2)
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     for var,tif_file in six.iteritems(geo_vars):
         bbox = js.bounds[str(js.max_dom)]
-        logging.info('vars_add_to_geogrid - processing variable %s from file %s and bounding box %s' % (var,tif_file,bbox))
+        logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
         try:
             GeoDriver.from_file(tif_file).to_geogrid(geo_data_path,var,bbox)
         except Exception as e:
             if var in ['NFUEL_CAT', 'ZSF']:
-                logging.critical('vars_add_to_geogrid - cannot process variable %s' % var)
+                logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
                 logging.error('Exception: %s',e)
                 sys.exit(2)
             else:
-                logging.warning('vars_add_to_geogrid - cannot process variable %s, will not be included' % var)
+                logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
     
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
     geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
-    logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at %s from %s' % 
-        (geogrid_tbl_path,geogrid_tbl_json_path))
+    logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in six.iteritems(geogrid_tbl_json):
-        logging.info('vars_add_to_geogrid - writting table for variable %s' % varname)
+        logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
+        vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
+        logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
 
 def fmda_add_to_geogrid(js):
@@ -497,7 +513,8 @@ def fmda_add_to_geogrid(js):
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in six.iteritems(geogrid_tbl_json):
         vartable['abs_path'] = osp.join(fmda_geogrid_basename,osp.basename(vartable['abs_path']))
-        logging.info('new GEOGRID abs_path=%s' % vartable['abs_path'])
+        vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
+        logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
 
     

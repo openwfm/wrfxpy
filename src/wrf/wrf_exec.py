@@ -113,8 +113,8 @@ class Geogrid(Executor):
             raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
 
         if 'Successful completion of geogrid.' not in open(output_path).read():
-            print("Execution of %s was not successful." % self.exec_name)
-            print("Examine %s for details." % output_path)
+            logging.error("Execution of %s was not successful." % self.exec_name)
+            logging.error("Examine %s for details." % output_path)
             raise OutputCheckFailed()
 
 class Ungrib(Executor):
@@ -140,8 +140,8 @@ class Ungrib(Executor):
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of ungrib.' not in open(output_path).read():
             print(open(osp.join(self.work_dir, self.exec_name + '.stderr')).read())
-            print('Execution of %s was not successful.' % self.exec_name)
-            print('Examine %s for details.' % output_path)
+            logging.error('Execution of %s was not successful.' % self.exec_name)
+            logging.error('Examine %s for details.' % output_path)
             raise OutputCheckFailed()
 
 
@@ -168,8 +168,8 @@ class Metgrid(Executor):
         output_path = osp.join(self.work_dir, self.exec_name + '.stdout')
         if 'Successful completion of metgrid.' not in open(output_path).read():
             print(open(osp.join(self.work_dir, self.exec_name + '.stderr')).read())
-            print("Execution of %s was not successful." % self.exec_name)
-            print("Examine %s for details." % output_path)
+            logging.error("Execution of %s was not successful." % self.exec_name)
+            logging.error("Examine %s for details." % output_path)
             raise OutputCheckFailed()
 
 
@@ -242,8 +242,8 @@ class Real(Executor):
             raise OutputCheckFailed("output file %s does not exist, cannot check output." % output_path)
 
         if 'SUCCESS COMPLETE REAL_EM INIT' not in open(output_path).read():
-            print("Execution of %s was not successful." % self.exec_name)
-            print("Examine %s for details." % output_path)
+            logging.error("Execution of %s was not successful." % self.exec_name)
+            logging.error("Examine %s for details." % output_path)
             raise OutputCheckFailed()
 
 
