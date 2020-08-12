@@ -1,6 +1,8 @@
 from scipy import spatial
 import numpy as np
 import logging
+from osgeo import osr
+import pyproj
 
 def fill_categories(array,fill,coord=None):
     """
@@ -144,3 +146,53 @@ def wrf_gc_distance(lon1,lon2,lat1,lat2,plot=False):
         plt.show()
 
     return diff 
+
+def ncwrfmeta(d):
+    """
+    Generate CRS and geotransform information from NetCDF file
+    :param d: open NetCDF4 dataset
+    """
+    attrs = d.ncattrs()
+    dims = d.dimensions
+    get_attr = lambda attr,exc=None: d.getncattr(attr) if attr in attrs else exc
+    get_dim = lambda dim,exc=None: dims[dim] if dim in dims else exc
+    # Getting metadata
+    lat1 = get_attr('TRUELAT1')
+    lat2 = get_attr('TRUELAT2')
+    lat0 = get_attr('MOAD_CEN_LAT')
+    lon0 = get_attr('STAND_LON')
+    clat = get_attr('CEN_LAT')
+    clon = get_attr('CEN_LON')
+    # Creating CRS object
+    crs = osr.SpatialReference()
+    proj4 = '+proj=lcc +lat_1=%.10f +lat_2=%.10f +lat_0=%.10f +lon_0=%.10f +a=6370000.0 +b=6370000.0' % (lat1,lat2,lat0,lon0)
+    logging.info('ncwrfmeta - proj4=%s' % proj4)
+    crs.ImportFromProj4(proj4)
+    wrf_proj = pyproj.Proj(proj4)
+    ll_proj = wrf_proj.to_latlong()
+    # Creating atmospheric geotransform
+    e,n = pyproj.transform(ll_proj,wrf_proj,clon,clat)
+    dx_atm = get_attr('DX')
+    dy_atm = get_attr('DY')
+    nx_atm = get_dim('west_east').size
+    ny_atm = get_dim('south_north').size
+    x0 = -nx_atm / 2. * dx_atm + e
+    y0 = -ny_atm / 2. * dy_atm + n
+    gt_atm = (x0,dx_atm,0,y0,0,dy_atm)
+    logging.info('ncwrfmeta - GT_atm: (%g,%g,%g,%g,%g,%g)' % gt_atm)
+    # Creating fire geotransform
+    gt_fire = None
+    if 'west_east_subgrid' in dims:
+        nx = get_dim('west_east_subgrid').size
+        ny = get_dim('south_north_subgrid').size
+        srx = int(nx/(nx_atm+1))
+        sry = int(ny/(ny_atm+1))
+        if srx > 0 and sry > 0:
+            nx_fire = nx - srx
+            ny_fire = ny - sry
+            dx_fire = dx_atm/srx
+            dy_fire = dy_atm/sry
+            gt_fire = (x0,dx_fire,0,y0,0,dy_fire)
+            logging.info('ncwrfmeta - GT_fire: (%g,%g,%g,%g,%g,%g)' % gt_fire)
+
+    return crs, gt_atm, gt_fire

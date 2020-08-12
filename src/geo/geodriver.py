@@ -31,6 +31,7 @@ class GeoDriver(object):
         # raster size and spacing
         self.nx = self.ds.RasterXSize
         self.ny = self.ds.RasterYSize
+        self.bands = self.ds.RasterCount
         # define projection objects
         self.init_proj()
 
@@ -207,20 +208,42 @@ class GeoDriver(object):
         logging.info('GeoTIFF.to_geogrid() - writting geogrid')
         write_geogrid_var(path,var,array,index,coord=self.get_coord())
 
-    def to_geotiff(self,path,bbox=None):
+    def to_geotiff(self,path,**kwargs):
         """
         Transform to geotiff file
 
         :param path: path to write the geotiff file
         :param bbox: optional, WGS84 bounding box (min_lon,max_lon,min_lat,max_lat)
         """
+        bbox = kwargs.get('bbox')
         logging.info('GeoTIFF.to_geotiff() - getting array')
         array = self.get_array(bbox)
+        dims = array.shape
+        if len(dims) == 2:
+            array = array.reshape((1,)+dims)
         logging.info('GeoTIFF.to_geotiff() - writting geotiff')
-        ds = gdal.GetDriverByName('GTiff').Create(path,self.nx,self.ny,1,gdal.GDT_Float32)
+        ds = gdal.GetDriverByName('GTiff').Create(path,self.nx,self.ny,self.bands,gdal.GDT_Float32)
         ds.SetGeoTransform(self.gt)
         ds.SetProjection(self.crs.ExportToWkt())
-        ds.GetRasterBand(1).WriteArray(array)
+        for b in range(self.bands):
+            band = ds.GetRasterBand(b+1)
+            band.WriteArray(array[b,:,:])
+            if 'unit' in kwargs.keys():
+                if isinstance(kwargs['unit'],(tuple,list,np.ndarray)):
+                    band.SetUnitType(kwargs['unit'][b])
+                else:
+                    band.SetUnitType(kwargs['unit'])
+            if 'desc' in kwargs.keys():
+                if isinstance(kwargs['desc'],(tuple,list,np.ndarray)):
+                    band.SetDescription(kwargs['desc'][b])
+                else:
+                    band.SetDescription(kwargs['desc'])
+            if 'ndv' in kwargs.keys():
+                if isinstance(kwargs['ndv'],(tuple,list,np.ndarray)):
+                    band.SetNoDataValue(kwargs['ndv'][b])
+                else:
+                    band.SetNoDataValue(kwargs['ndv'])
+        ds.FlushCache()
         ds = None
 
     def __str__(self):
@@ -257,10 +280,18 @@ class GeoDriver(object):
         :oaran crs: spatial reference
         :param gt: geotransform tuple
         """
-        rows, cols = data.shape
-        ds = gdal.GetDriverByName('MEM').Create('',cols,rows,1,gdal.GDT_Float32)
+        dims = data.shape
+        if len(dims) == 2:
+            data = data.reshape((1,)+dims)
+            bands,rows,cols = data.shape
+        elif len(dims) == 3:
+            bands,rows,cols = dims
+        else:
+            raise GeoDriverError('GeoDriver.from_elements - data provided must be a 2d or 3d array')
+        ds = gdal.GetDriverByName('MEM').Create('',cols,rows,bands,gdal.GDT_Float32)
         ds.SetProjection(crs.ExportToWkt())
         ds.SetGeoTransform(gt)
-        ds.GetRasterBand(1).WriteArray(data)
+        for b in range(bands):
+            ds.GetRasterBand(b+1).WriteArray(data[b,:,:])
         gd = cls(ds)
         return gd

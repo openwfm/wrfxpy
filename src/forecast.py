@@ -110,6 +110,7 @@ class JobState(Dict):
         self.ignitions = args.get('ignitions', None)
         self.fmda = self.parse_fmda(args)
         self.postproc = args['postproc']
+        self.tif_proc = args.get('tif_proc', False)
         self.wrfxpy_dir = args['sys_install_path']
         if 'clean_dir' in args:
             self.clean_dir = args['clean_dir']
@@ -390,6 +391,7 @@ def make_job_file(js):
     jsub.postproc = js.postproc
     jsub.grid_code = js.grid_code
     jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
+    jsub.tif_proc = js.tif_proc
     return jsub
 
 def make_kmz(args):
@@ -778,6 +780,7 @@ def process_output(job_id):
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
+    tif_proc = js.get('tif_proc', False)
 
     if js.postproc.get('from', None) == 'wrfout':
         logging.info('Postprocessing all wrfout files.')
@@ -807,12 +810,12 @@ def process_output(job_id):
                     try:
                         if sat_list:
                             pp.process_sats(jsat, dom_id, esmf_time, sat_list)
-                        pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
+                        pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list, tif_proc = tif_proc)
                         # in incremental mode, upload to server
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('tif'))]
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
                         failures += 1
@@ -891,7 +894,7 @@ def process_output(job_id):
                 try:
                     if sat_list:
                         pp.process_sats(jsat, dom_id, esmf_time, sat_list)
-                    pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list)
+                    pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list, tif_proc = tif_proc)
                 except Exception as e:
                     logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
                     failures += 1
@@ -901,7 +904,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('tif'))]
                     except Exception as e:
                         logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
         else:
@@ -949,14 +952,14 @@ def process_sat_output(job_id):
     args = load_sys_cfg()
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
-    logging.info('process_output: loading job description from %s' % jobfile)
+    logging.info('process_sat_output: loading job description from %s' % jobfile)
     try:
         js = Dict(json.load(open(jobfile,'r')))
     except Exception as e:
         logging.error('Cannot load the job description file %s' % jobfile)
         logging.error('%s' % e)
         sys.exit(1)
-    logging.info('process_output: loading satellite description from %s' % satfile)
+    logging.info('process_sat_output: loading satellite description from %s' % satfile)
     try:
         jsat = Dict(json.load(open(satfile,'r')))
         available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
@@ -966,8 +969,8 @@ def process_sat_output(job_id):
         available_sats = []
         not_empty_sats = []
         return
-    logging.info('process_output: available satellite data %s' % available_sats)
-    logging.info('process_output: not empty satellite data %s' % not_empty_sats)
+    logging.info('process_sat_output: available satellite data %s' % available_sats)
+    logging.info('process_sat_output: not empty satellite data %s' % not_empty_sats)
     if not not_empty_sats:
         logging.warning('Do not have satellite data to postprocess')
         return
@@ -1011,7 +1014,7 @@ def process_sat_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files)
-                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('tif'))]
                     except Exception as e:
                         logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
 
