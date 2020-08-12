@@ -73,7 +73,7 @@ class GeoDriver(object):
             self.projwrf = 'lambert'
             self.reproj = True
             # the GeoTIFF needs to be reprojected to lambert projection
-            logging.error('GeoTIFF.init_proj() with reprojection is not implemented yet')
+            raise GeoDriverError('GeoTIFF.init_proj() with reprojection is not implemented yet')
         else:
             self.reproj = False
 
@@ -139,14 +139,23 @@ class GeoDriver(object):
         # only working on Linux
         try:
             # get virtual array and resample
-            a_r = self.ds.GetVirtualMemArray()[j_min:j_max,i_min:i_max].copy()
+            if self.bands == 1:
+                a_r = self.ds.GetVirtualMemArray()[j_min:j_max,i_min:i_max].copy()
+            else:
+                a_r = self.ds.GetVirtualMemArray()[:,j_min:j_max,i_min:i_max].copy()
         except:
             logging.warning('GeoTIFF.resample_bbox - reading the whole array and sampling after')
             # get array and resample
-            a_r = self.ds.ReadAsArray()[j_min:j_max,i_min:i_max]
+            if self.bands == 1:
+                a_r = self.ds.ReadAsArray()[j_min:j_max,i_min:i_max]
+            else:
+                a_r = self.ds.ReadAsArray()[:,j_min:j_max,i_min:i_max]
         # update other elements
         self.gt = (xx[i_min],dx,0,yy[j_min],0,dy)
-        self.ny,self.nx = a_r.shape
+        if self.bands == 1:
+            self.ny,self.nx = a_r.shape
+        else:
+            _,self.ny,self.nx = a_r.shape
         return a_r
 
     def geogrid_index(self):
@@ -200,6 +209,8 @@ class GeoDriver(object):
         """
         logging.info('GeoTIFF.to_geogrid() - getting array')
         array = self.get_array(bbox)
+        if len(array.shape) > 2:
+            raise GeoDriverError('GeoTIFF.to_geogrid() - generation of 3d geogrid arrays is not supported')
         # WPS is generating regular lat-lon arrays upside down
         if self.projwrf == 'regular_ll':
             array = np.flipud(array)
