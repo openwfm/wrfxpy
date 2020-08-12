@@ -56,7 +56,7 @@ class NARR(GribReanalysis):
     # instance variables
     info_url = 'https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/north-american-regional-reanalysis-narr'
     info = "North American Regional Reanalysis (NARR)"
-    remote_url = 'https://nomads.ncdc.noaa.gov/data/narr'
+    remote_url = 'https://www.ncei.noaa.gov/data/north-american-regional-reanalysis/access/3-hourly'
     period_hours = 3
     id = "NARR"
     available_from_utc = datetime(1979,1,1,tzinfo=pytz.UTC)

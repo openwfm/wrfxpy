@@ -1,15 +1,9 @@
 {
-    "profile": {
-        "info": "A three-domain configuration with 66x66km fire domain at 555m resolution and a 28m fire grid.",
-        "identifier": "3d-555m_NAM227",
-        "template": "profiles/3d_555m_NAM227.json",
-        "title": "Three domains, 5km/1.6km/0.55km cell size, 28m fire grid., NAM218 5km forcing"
-    },
     "job_id": "testing-GFSA-ungrib-only",
-    "wall_time_hrs": 3,
+    "wall_time_hrs": 12,
     "grib_source": "GFSA",
-    "start_utc": "2019-11-03_00:00:00",
-    "end_utc": "2019-11-09_00:00:00",
+    "start_utc": "2019-11-03_12:00:00",
+    "end_utc": "2019-11-03_15:00:00",
     "ungrib_only": true,
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
@@ -38,13 +32,12 @@
             "WINDVEC",
             "SMOKE_INT"
         ],
-        "description": "new3"
+        "description": "Testing GFSA"
     },
     "ppn": 28,
-    "grid_code": "from-web-2018-05-05_19-48-08",
+    "grid_code": "testing-GFSA-ungrib-only",
     "wrf_namelist_path": "etc/nlists/default.input",
     "emissions_namelist_path": "etc/nlists/default.fire_emissions",
-    "template": "/uufs/chpc.utah.edu/common/home/u6015690/Projects/wrfxctrl/profiles/3d_555m_NAM227.json",
     "domains": {
         "1": {
             "cell_size": [
@@ -52,31 +45,32 @@
                 5000
             ],
             "truelats": [
-                40.0699,
-                40.0699
+                39.5,
+                39.9
             ],
-            "stand_lon": -108.2909,
+            "stand_lon": -112.8,
             "center_latlon": [
-                40.0699,
-                -108.2909
+                39.729,
+                -112.49
             ],
-            "history_interval": 120,
+            "history_interval": 60,
             "geog_res": "30s",
             "domain_size": [
-                101,
-                101
+                97,
+                97
             ],
             "subgrid_ratio": [
                 0,
                 0
             ],
-            "time_step": 25
+            "time_step": 25,
+            "interval_seconds": 3600
         },
         "3": {
             "parent_time_step_ratio": 3,
             "parent_start": [
-                41,
-                41
+                33,
+                33
             ],
             "history_interval": 15,
             "geog_res": ".3s",
@@ -86,18 +80,18 @@
                 20
             ],
             "parent_end": [
-                81,
-                81
+                64,
+                64
             ],
             "parent_cell_size_ratio": 3
         },
         "2": {
             "parent_time_step_ratio": 3,
             "parent_start": [
-                31,
-                31
+                33,
+                33
             ],
-            "history_interval": 60,
+            "history_interval": 30,
             "geog_res": ".3s",
             "parent_id": 1,
             "subgrid_ratio": [
@@ -105,8 +99,8 @@
                 0
             ],
             "parent_end": [
-                71,
-                71
+                64,
+                64
             ],
             "parent_cell_size_ratio": 3
         }
@@ -114,14 +108,14 @@
     "ignitions": {
         "3": [
             {
-                "time_utc": "2018-05-05_19:47:00",
+                "time_utc": "2019-11-03_12:10:00",
                 "latlon": [
-                    40.0699,
-                    -108.2909
+                    39.73,
+                    -112.493
                 ],
-                "duration_s": 240
+                "duration_s": 300
             }
         ]
     },
-    "num_nodes": 6 
+    "num_nodes": 4
 }

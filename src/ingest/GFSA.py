@@ -20,7 +20,7 @@ class GFSA(GribReanalysis):
 
     def vtables(self):
         """
-        Returns the variable tables that must be linked in for use with the NARR data source.
+        Returns the variable tables that must be linked in for use with the GFS data source.
 
         :return: a dictionary of variable tables
         """
@@ -31,7 +31,7 @@ class GFSA(GribReanalysis):
 
     def namelist_keys(self):
         """
-        Returns the namelist keys that must be modified in namelist.input with NARR.
+        Returns the namelist keys that must be modified in namelist.input with GFS.
         :return: a list of paths to local GRIB files
         """
 
@@ -54,7 +54,7 @@ class GFSA(GribReanalysis):
     # instance variables
     info_url = 'https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00634'
     info = "Global Forecast System (GFS) Analysis"
-    remote_url = 'https://nomads.ncdc.noaa.gov/data/gfsanl'
+    remote_url = 'https://www.ncei.noaa.gov/data/global-forecast-system/access/historical/analysis'
     period_hours = 6
     id = "GFSA"
     available_from_utc = datetime(2004,3,1,tzinfo=pytz.UTC)

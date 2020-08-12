@@ -1,12 +1,6 @@
 {
-    "profile": {
-        "info": "A three-domain configuration with 66x66km fire domain at 555m resolution and a 28m fire grid.",
-        "identifier": "3d-555m_NAM227",
-        "template": "profiles/3d_555m_NAM227.json",
-        "title": "Three domains, 5km/1.6km/0.55km cell size, 28m fire grid., NAM218 5km forcing"
-    },
     "job_id": "testing-HRRR",
-    "wall_time_hrs": 3,
+    "wall_time_hrs": 12,
     "grib_source": "HRRR",
     "start_utc": "2018-05-26_15:00:00",
     "end_utc": "2018-05-26_20:20:00",
@@ -39,13 +33,12 @@
             "WINDVEC",
             "SMOKE_INT"
         ],
-        "description": "new3"
+        "description": "Testing HRRR"
     },
     "ppn": 28,
-    "grid_code": "from-web-2018-05-05_19-48-08",
+    "grid_code": "testing-HRRR",
     "wrf_namelist_path": "etc/nlists/default.input",
     "emissions_namelist_path": "etc/nlists/default.fire_emissions",
-    "template": "/uufs/chpc.utah.edu/common/home/u6015690/Projects/wrfxctrl/profiles/3d_555m_NAM227.json",
     "domains": {
         "1": {
             "cell_size": [
@@ -124,5 +117,5 @@
             }
         ]
     },
-    "num_nodes": 6 
+    "num_nodes": 4 
 }

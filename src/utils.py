@@ -455,7 +455,7 @@ def render_ignitions(js, max_dom):
     for dom_str, dom_igns in six.iteritems(ign_specs):
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
-        nml_fire['ifire'][dom_id-1] = 2
+        nml_fire['ifire'][dom_id-1] = 1
         nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
         nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used

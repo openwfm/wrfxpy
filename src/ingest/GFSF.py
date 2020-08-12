@@ -18,7 +18,14 @@ class GFSF(GribForecast):
         super(GFSF, self).__init__(arg)
 
     def vtables(self):
-        return None
+        """
+        Returns the variable tables that must be linked in for use with the GFS data source.
+
+        :return: a dictionary of variable tables
+        """
+        return {'geogrid_vtable': 'GEOGRID.TBL',
+                'ungrib_vtable': 'Vtable.GFS',
+                'metgrid_vtable': 'METGRID.TBL.GFS'}
 
     def namelist_keys(self):
         """
@@ -59,16 +66,6 @@ class GFSF_P(GFSF):
     def __init__(self, js):
         super(GFSF_P, self).__init__(js)
 
-    def vtables(self):
-        """
-        Returns the variable tables that must be linked in for use with the GFS data source.
-
-        :return: a dictionary of variable tables
-        """
-        return {'geogrid_vtable': 'GEOGRID.TBL',
-                'ungrib_vtable': 'Vtable.GFS_pgrb2',
-                'metgrid_vtable': 'METGRID.TBL.GFS'}
-
     def namelist_wps_keys(self):
         """
         Returns the namelist keys that must be modified in namelist.wps with GFS_P
@@ -108,16 +105,6 @@ class GFSF_S(GFSF):
 
     def __init__(self, js):
         super(GFSF_S, self).__init__(js)
-
-    def vtables(self):
-        """
-        Returns the variable tables that must be linked in for use with the GFS data source.
-
-        :return: a dictionary of variable tables
-        """
-        return {'geogrid_vtable': 'GEOGRID.TBL',
-                'ungrib_vtable': 'Vtable.GFS_sfluxgrb',
-                'metgrid_vtable': 'METGRID.TBL.GFS'}
 
     def namelist_wps_keys(self):
         """

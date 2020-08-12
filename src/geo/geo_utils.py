@@ -147,6 +147,13 @@ def wrf_gc_distance(lon1,lon2,lat1,lat2,plot=False):
 
     return diff 
 
+def check_bbox(bbox):
+    return (bbox[0]<bbox[1] and bbox[2]<bbox[3] and 
+            bbox[0]>=-180 and bbox[0]<=180 and 
+            bbox[1]>=-180 and bbox[1]<=180 and 
+            bbox[2]>=-90 and bbox[2]<=90 and 
+            bbox[3]>=-90 and bbox[3]<=90) 
+
 def ncwrfmeta(d):
     """
     Generate CRS and geotransform information from NetCDF file

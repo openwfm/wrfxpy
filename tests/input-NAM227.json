@@ -1,11 +1,8 @@
 {
-    "profile": {
-        "info": "A two-domain configuration with 60x60km fire domain at 1km resolution and a 25m fire grid.",
-        "identifier": "2d-1km-NAM227",
-        "template": "profiles/2d_1km_NAM218.json",
-        "title": "Two domains, 3km/1km resolution with 25m fire grid, NAM218 12km forcing"
-    },
-    "wall_time_hrs": 3,
+    "job_id": "testing-NAM227",
+    "wall_time_hrs": 12,
+    "grib_source": "NAM227",
+    "start_utc": "2018-05-22_07:00:00",
     "end_utc": "2018-05-22_16:00:00",
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
@@ -27,11 +24,10 @@
             "FGRNHFX",
             "SMOKE_INT"
         ],
-        "description": "NAM227 test"
+        "description": "Testing NAM227"
     },
     "ppn": 28,
-    "template": "/uufs/chpc.utah.edu/common/home/u6015690/Projects/wrfxctrl/profiles/2d_1km_NAM218.json",
-    "grid_code": "from-web-2018-05-22_07-33-23",
+    "grid_code": "testing-NAM227",
     "emissions_namelist_path": "etc/nlists/default.fire_emissions",
     "wrf_namelist_path": "etc/nlists/default.input",
     "domains": {
@@ -94,8 +90,5 @@
             }
         ]
     },
-    "num_nodes": 6,
-    "grib_source": "NAM227",
-    "start_utc": "2018-05-22_07:00:00",
-    "job_id": "testing-NAM227"
+    "num_nodes": 4
 }

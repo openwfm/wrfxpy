@@ -5,7 +5,7 @@
 # from ingest.level0_source import MODIS_AQUA, MODIS_TERRA, VIIRS_NPP
 from __future__ import absolute_import
 from __future__ import print_function
-from . import var_wisdom as vw
+from ingest import var_wisdom as vw
 from utils import esmf_to_utc
 
 import logging
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     logging.info('sat_name: %s' % sat_name)
     logging.info('from_utc:      %s' % from_utc)
     logging.info('to_utc:        %s' % to_utc)
-    logging.info('lonlat:        %s:%s %s:%s' % tuple(lonlat))
+    logging.info('lonlat:        %s' % lonlat)
     logging.info('ingest_dir:    %s' % ingest_dir)
 
 ### Standalone script that can be used to download files
