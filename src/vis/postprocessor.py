@@ -553,7 +553,7 @@ class Postprocessor(object):
             cbo = doc.newscreenoverlay(name='colorbar')
             cbo.overlayxy = kml.OverlayXY(x=0,y=1,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
             cbo.screenxy = kml.ScreenXY(x=0.02,y=0.95,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
-            cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixel,yunits=kml.Units.pixel)
+            cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixels,yunits=kml.Units.pixels)
             cbo.color = kml.Color.rgb(255,255,255,a=150)
             cbo.visibility = 1
             #doc.addfile(cb_path)
@@ -651,7 +651,7 @@ class Postprocessor(object):
             cbo = doc.newscreenoverlay(name='colorbar')
             cbo.overlayxy = kml.OverlayXY(x=0,y=1,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
             cbo.screenxy = kml.ScreenXY(x=0.02,y=0.95,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
-            cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixel,yunits=kml.Units.pixel)
+            cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixels,yunits=kml.Units.pixels)
             cbo.color = kml.Color.rgb(255,255,255,a=150)
             cbo.visibility = 1
             cbo.icon.href=cb_path
@@ -703,7 +703,7 @@ class Postprocessor(object):
             cbo = doc.newscreenoverlay(name='colorbar')
             cbo.overlayxy = kml.OverlayXY(x=0,y=1,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
             cbo.screenxy = kml.ScreenXY(x=0.02,y=0.95,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
-            cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixel,yunits=kml.Units.pixel)
+            cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixels,yunits=kml.Units.pixels)
             cbo.color = kml.Color.rgb(255,255,255,a=150)
             cbo.visibility = 1
             cbo.icon.href=cb_path
