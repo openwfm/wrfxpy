@@ -15,7 +15,6 @@
         "shuttle": "incremental",
         "description": "default simple forecast"
     },
-    "wps_geog_path": "/uufs/chpc.utah.edu/common/home/u6015690/Projects/mvejmelka/WPS-GEOG",
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
     "start_utc": "T-30",
