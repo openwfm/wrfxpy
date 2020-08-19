@@ -343,6 +343,7 @@ def run_geogrid(js, q):
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
     try:
+        js.geo_cache = None
         logging.info("running GEOGRID")
         vars_add_to_geogrid(js)
         Geogrid(js.wps_dir).execute().check_output()
@@ -405,7 +406,7 @@ def read_namelist(path):
     logging.info('Reading namelist %s' % path)
     return f90nml.read(path)
 
-def ensure_abs_path(path,js,max_char=120):
+def ensure_abs_path(path,js,max_char=20):
     if len(path) > max_char:
         hexhash = hashlib.sha224(js.job_id.encode()).hexdigest()[:6]
         geo_path = osp.join(js.wrfxpy_dir,'cache/geo_data.{}'.format(hexhash))
@@ -429,8 +430,15 @@ def vars_add_to_geogrid(js):
     try:
         geo_vars = Dict(json.load(open(geo_vars_path)))
     except:
-        logging.critical('Any {} specified, GeoTIFF files for NFUEL_CAT and ZSF need to be specified.'.format(geo_vars_path))
-        sys.exit(2)
+        logging.info('Any {0} specified, defining default GeoTIFF files for NFUEL_CAT and ZSF from {1}.'.format(geo_vars_path,js.args['wps_geog_path']))
+        nfuel_path = osp.join(js.args['wps_geog_path'],'fuel_cat_fire','lf_data.tif')
+        topo_path = osp.join(js.args['wps_geog_path'],'topo_fire','ned_data.tif')
+        if osp.exists(nfuel_path) and osp.exists(topo_path):
+            geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
+        else:
+            logging.critical('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
+            logging.error('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
+            sys.exit(2)
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     for var,tif_file in six.iteritems(geo_vars):
@@ -512,7 +520,7 @@ def fmda_add_to_geogrid(js):
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in six.iteritems(geogrid_tbl_json):
-        vartable['abs_path'] = osp.join(fmda_geogrid_basename,osp.basename(vartable['abs_path']))
+        vartable['abs_path'] = osp.join(js.wps_dir,fmda_geogrid_basename,osp.basename(vartable['abs_path']))
         vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
         logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
