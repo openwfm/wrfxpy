@@ -201,7 +201,7 @@ class SatSource(object):
 
 		metas = self.get_metas_sat(bbox,time)
 
-		logging.info('retrieve_data_sat: saved %s metas for %s satellite service' % (sum([len(m) for m in metas.items()]),self.prefix))
+		logging.info('retrieve_data_sat: saved %s metas for %s satellite service' % (sum([len(m) for m in metas.values()]),self.prefix))
 
 		manifest = Dict({})
 

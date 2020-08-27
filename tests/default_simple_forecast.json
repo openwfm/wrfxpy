@@ -1,5 +1,4 @@
 {
-    "tif_proc": true,
     "wall_time_hrs": 2,
     "postproc": {
         "1": [
@@ -13,12 +12,12 @@
             "SMOKE_INT"
         ],
         "shuttle": "incremental",
-        "description": "default simple forecast with geotiff"
+        "description": "default simple forecast"
     },
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
     "start_utc": "T-30",
-    "grid_code": "default_simple_forecast_geotiff",
+    "grid_code": "default_simple_forecast",
     "ppn": 28,
     "ignitions": {
         "1": [

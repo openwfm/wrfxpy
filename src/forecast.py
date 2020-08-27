@@ -87,6 +87,7 @@ class JobState(Dict):
         """
         super(JobState, self).__init__(args)
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
+        self.satellite_source_list = args.get('satellite_source',[])
         self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
@@ -250,6 +251,23 @@ def retrieve_satellite(js, sat_source, q):
         logging.error('satellite retrieving step failed with exception %s' % repr(e))
         traceback.print_exc()
         q.put('FAILURE')
+
+def create_sat_manifest(js):
+    sat_manifest = Dict({})
+    sat_manifest.granules = json_join(js.jobdir, js.satellite_source_list)
+    sat_manifest.bounds = js.bounds
+    sat_manifest.time_interval = (utc_to_esmf(js.start_utc), utc_to_esmf(js.end_utc))
+    sat_manifest.dt = Dict({})
+    sat_manifest.sat_interval = Dict({})
+    for k in js.domains.keys():
+        sat_manifest.dt[k] = js.domains[k]['history_interval']
+        if 'sat_interval' in list(js.domains[k].keys()):
+            sat_manifest.sat_interval[k] = js.domains[k]['sat_interval']
+        else:
+            sat_manifest.sat_interval[k] = (js.domains[k]['history_interval'], js.domains[k]['history_interval'])
+    sat_manifest.satprod_satsource = js.satprod_satsource
+    json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
+    return sat_manifest
 
 def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     """
@@ -583,6 +601,37 @@ def execute(args,job_args):
 
     logging.info("number of domains defined is %d." % js.num_doms)
 
+    js.bounds = Dict({})
+    for k,domain in enumerate(js.domain_conf.domains):
+        bbox = domain.bounding_box()
+        lons = [b[1] for b in bbox]
+        lats = [b[0] for b in bbox]
+        bounds = (min(lons),max(lons),min(lats),max(lats))
+        js.bounds[str(k+1)] = bounds
+
+    logging.info('satellite sources %s' % [s.id for s in js.satellite_source])
+    if js.sat_only:
+        if js.satellite_source:
+            logging.info('sat_only set, skipping everything else')
+            # retrieving satellite data by source in parallel
+            proc_q = Queue()
+            sat_proc = {}
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id].start()
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id].join()
+            proc_q.close()
+            # create satellite manifest
+            sat_manifest = create_sat_manifest(js)
+            # create satellite outputst
+            process_sat_output(js.job_id)
+            return
+        else:
+            logging.error('any available sat source specified')
+            return
+
     # build directories in workspace
     js.wps_dir = osp.abspath(osp.join(js.jobdir, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.jobdir, 'wrf'))
@@ -603,14 +652,6 @@ def execute(args,job_args):
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
-    js.bounds = Dict({})
-    for k,domain in enumerate(js.domain_conf.domains):
-        bbox = domain.bounding_box()
-        lons = [b[1] for b in bbox]
-        lats = [b[0] for b in bbox]
-        bounds = (min(lons),max(lons),min(lats),max(lats))
-        js.bounds[str(k+1)] = bounds
-
     # do steps 2 & 3 & 4 in parallel (three execution streams)
     #  -> Satellite retrieval ->
     #  -> GEOGRID ->
@@ -630,7 +671,6 @@ def execute(args,job_args):
         grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
     logging.info('starting GEOGRID and GRIB2/UNGRIB')
-    logging.info('satellite sources %s' % [s.id for s in js.satellite_source])
 
     if js.ungrib_only:
         logging.info('ungrib_only set, skipping GEOGRID and SATELLITE, will exit after UNGRIB')
@@ -649,6 +689,9 @@ def execute(args,job_args):
         grib_proc[grib_source.id].join()
 
     if js.ungrib_only:
+        for grib_source in js.grib_source:
+            if proc_q.get() != 'SUCCESS':
+                return
         return
     else:
         geogrid_proc.join()
@@ -672,21 +715,8 @@ def execute(args,job_args):
     logging.info('execute: finished parallel GEOGRID, GRIB2/UNGRIB, and Satellite')
 
     if js.satellite_source:
-        # joining all satellite manifests
-        sat_manifest = Dict({})
-        sat_manifest.granules = json_join(js.jobdir, args['satellite_source'])
-        sat_manifest.bounds = js.bounds
-        sat_manifest.time_interval = (utc_to_esmf(js.start_utc), utc_to_esmf(js.end_utc))
-        sat_manifest.dt = Dict({})
-        sat_manifest.sat_interval = Dict({})
-        for k in args['domains'].keys():
-            sat_manifest.dt[k] = args['domains'][k]['history_interval']
-            if 'sat_interval' in list(args['domains'][k].keys()):
-                sat_manifest.sat_interval[k] = args['domains'][k]['sat_interval']
-            else:
-                sat_manifest.sat_interval[k] = (args['domains'][k]['history_interval'], args['domains'][k]['history_interval'])
-        sat_manifest.satprod_satsource = js.satprod_satsource
-        json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
+        # create satellite manifiest
+        sat_manifest = create_sat_manifest(js)
 
     logging.info("step 5: execute metgrid after ensuring all grids will be processed")
     update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
