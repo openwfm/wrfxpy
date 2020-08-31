@@ -7,12 +7,12 @@ from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
       smoke_concentration
 from six.moves import range
 
-smoke_threshold_int = 300
-smoke_threshold = 100
+smoke_threshold_int = 10
+smoke_threshold = 1
 smoke_integrated_unit = 'g/m^2'
-smoke_integrated_transparent = 1e-2
-smoke_concentration_scale = 400
-smoke_concentration_transparent=10
+smoke_integrated_transparent = 1
+smoke_concentration_scale = 300
+smoke_concentration_transparent = 1e-6
 
 def strip_end(d):
       m,n = d.variables['XLONG'][0,:,:].shape
@@ -282,8 +282,8 @@ _var_wisdom = {
         'native_unit' : smoke_integrated_unit,
         'colorbar' : None,
         'colormap' : 'gray_r',
-        'transparent_values' : [-np.inf, smoke_integrated_transparent],
-        'scale' : 'original',
+        'transparent_values' : [-np.inf, smoke_concentration_transparent],
+        'scale' : [0,1],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKETO10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
      },
@@ -292,8 +292,8 @@ _var_wisdom = {
         'native_unit' : smoke_integrated_unit,
         'colorbar' : smoke_integrated_unit,
         'colormap' : 'rainbow',
-        'transparent_values' : [-np.inf, smoke_integrated_transparent],
-        'scale' : [0, 5],
+        'transparent_values' : [-np.inf, 0.05],
+        'scale' : [0, 2],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
@@ -341,6 +341,7 @@ _var_wisdom = {
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'viridis_r',
+        'transparent_values' : [70, np.inf],
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['RH_FIRE'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
