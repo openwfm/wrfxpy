@@ -68,7 +68,7 @@ class SatSource(object):
 
 		:return metas: a dictionary with all the metadata for the API search
 		"""
-		maxg=100
+		maxg=500
 		time_utcf=(utc_to_utcf(time[0]),utc_to_utcf(time[1]))
 		api = GranuleQuery()
 		if not version:

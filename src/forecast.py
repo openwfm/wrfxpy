@@ -33,7 +33,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
 from geo.write_geogrid import write_table
 from geo.geodriver import GeoDriver
 from vis.postprocessor import Postprocessor
-from vis.var_wisdom import get_wisdom_variables
+from vis.var_wisdom import get_wisdom_variables,_sat_prods
 
 from ingest.NAM218 import NAM218
 from ingest.HRRR import HRRR
@@ -803,8 +803,8 @@ def process_output(job_id):
     logging.info('process_output: loading satellite description from %s' % satfile)
     try:
         jsat = Dict(json.load(open(satfile,'r')))
-        available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
-        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
+        available_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods]
+        not_empty_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods if jsat.granules[sat]]
     except:
         logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
         available_sats = []
@@ -1022,8 +1022,8 @@ def process_sat_output(job_id):
     logging.info('process_sat_output: loading satellite description from %s' % satfile)
     try:
         jsat = Dict(json.load(open(satfile,'r')))
-        available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
-        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
+        available_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods]
+        not_empty_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods if jsat.granules[sat]]
     except:
         logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
         available_sats = []
@@ -1199,9 +1199,11 @@ def process_arguments(job_args,sys_cfg):
         if 'postproc' in args:
             sats = args['satellite_source']
             for sat in sats:
-                satprod = sat.upper()+'_AF'
-                args['postproc'][str(args['max_dom_pp'])].append(satprod)
-                args['satprod_satsource'].update({satprod: sat})
+                for prod in _sat_prods:
+                    satprod = sat.upper()+prod
+                    if not satprod in args['postproc'][str(args['max_dom_pp'])]:
+                        args['postproc'][str(args['max_dom_pp'])].append(satprod)
+                    args['satprod_satsource'].update({satprod: sat})
 
     # load tokens if etc/tokens.json exists
     try:
