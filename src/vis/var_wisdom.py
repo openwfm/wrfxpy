@@ -86,6 +86,21 @@ def is_windvec(name):
 def is_fire_var(name):
        return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FIRE_HFX','F_ROS','F_INT','NFUEL_CAT','ZSF','FMC_G']
 
+_discrete_wisdom = {
+    'all' : {'values': (3,5,7,8,9),
+            'alphas': (.5,.5,.6,.7,.8),
+            'labels': ('Water','Ground','Fire low','Fire nominal','Fire high'),
+            'colors': ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))},
+    'fire' : {'values': (7,8,9),
+             'alphas': (.6,.7,.8),
+             'labels': ('Fire low','Fire nominal','Fire high'),
+             'colors': ((1,1,0),(1,.65,0),(.5,0,0))},
+    'nofire' : {'values': (3,5),
+               'alphas': (.5,.5),
+               'labels': ('Water','Ground'),
+               'colors': ((0,0,.5),(0,.5,0))}
+}
+
 _var_wisdom = {
      'CLOUDTO700HPA' : {
         'name' : 'Cloud up to 700hPa',
@@ -462,6 +477,7 @@ _var_wisdom = {
        'colorbar' : '-',
        'colormap' : 'discrete',
        'scale' : 'discrete',
+       'options' : _discrete_wisdom['fire'],
        'retrieve_as' : lambda d : d.select('fire mask').get(),
        'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
     },
@@ -472,6 +488,7 @@ _var_wisdom = {
         'colorbar' : '-',
         'colormap' : 'discrete',
         'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
         'retrieve_as' : lambda d : d.select('fire mask').get(),
         'grid' : lambda d : (d.select('Latitude').get(), d.select('Longitude').get())
     },
@@ -482,10 +499,46 @@ _var_wisdom = {
         'colorbar' : '-',
         'colormap' : 'discrete',
         'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'])
+    },
+    'TERRA_NF' : {
+       'name' : 'MODIS Terra No Fire Detections satellite data',
+       'source' : 'Terra',
+       'native_unit' : '-',
+       'colorbar' : '-',
+       'colormap' : 'discrete',
+       'scale' : 'discrete',
+       'options' : _discrete_wisdom['nofire'],
+       'retrieve_as' : lambda d : d.select('fire mask').get(),
+       'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
+    },
+    'AQUA_NF' : {
+        'name' : 'MODIS Aqua No Fire Detections satellite data',
+       	'source' : 'Aqua',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : d.select('fire mask').get(),
+        'grid' : lambda d : (d.select('Latitude').get(), d.select('Longitude').get())
+    },
+    'SNPP_NF' : {
+        'name' : 'VIIRS S-NPP No Fire Detections satellite data',
+       	'source' : 'SNPP',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
         'grid' : lambda d : (d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'])
     }
 }
+
+_sat_prods = ['_AF','_NF']
 
 # contains functions to transform values from one unit to another in a simple format.
 # it's a dictionary with keys in the form (from_unit, to_unit) and the value is a lambda
@@ -499,8 +552,6 @@ _units_wisdom = {
     ('ft',  'm') : lambda x: x / 3.2808399,
     ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x
 }
-
-
 
 def get_wisdom(var_name):
     """Return rendering wisdom for the variable <var_name>."""

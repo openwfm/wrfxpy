@@ -177,8 +177,8 @@ def process_outputs_tiff(job_id):
     logging.info('process_tiffs: loading satellite description from %s' % satfile)
     try:
         jsat = Dict(json.load(open(satfile,'r')))
-        available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
-        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
+        available_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods]
+        not_empty_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods if jsat.granules[sat]]
     except:
         logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
         available_sats = []

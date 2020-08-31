@@ -328,10 +328,10 @@ class Postprocessor(object):
         wisdom.update(self.wisdom_update.get(sat, {}))
         cmap_name = wisdom['colormap']
 
-        values = (3,5,7,8,9)
-        alphas = (.5,.5,.6,.7,.8)
-        labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
-        colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+        values = wisdom['options'].get('values',(3,5,7,8,9))
+        alphas = wisdom['options'].get('alphas',(.5,.5,.6,.7,.8))
+        labels = wisdom['options'].get('labels',('Water','Ground','Fire low','Fire nominal','Fire high'))
+        colors = wisdom['options'].get('colors',((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0)))
 
         # for each pair of files
         N = len(values)
