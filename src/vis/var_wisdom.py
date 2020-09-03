@@ -297,10 +297,39 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
+     'PM25_SFC' : {
+        'name' : 'surface PM2.5 tracer',
+        'native_unit' : 'ug/m^3',
+        'colorbar' : 'ug/m^3',
+        'colormap' : 'rainbow',
+        'norm_opt' : 'lognorm',
+        'transparent_values' : [-np.inf, smoke_concentration_transparent],
+        'scale' : [0, smoke_concentration_scale],
+        'retrieve_as' : lambda d,t: d.variables['tr17_1'][t,0,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'PM25_SFC_D' : {
+        'name' : 'surface PM2.5 tracer',
+        'native_unit' : 'ug/m^3',
+        'colorbar' : 'ug/m^3',
+        'colormap' : 'rainbow',
+        'norm_opt' : 'boundary',
+        'bounds' : [0,1,2,4,6,8,12,16,20,25,30,40,60,100,200],
+        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
+                             (107,170,213),(72,149,176),(74,167,113),
+                             (114,190,75),(203,217,88),(249,201,80),
+                             (245,137,56),(234,84,43),(217,45,43),
+                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'spacing' : 'uniform',
+        'transparent_values' : [-np.inf, smoke_concentration_transparent],
+        'scale' : [0, smoke_concentration_scale],
+        'retrieve_as' : lambda d,t: d.variables['tr17_1'][t,0,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
      'PM25_SFC_CHEM' : {
-        'name' : 'surface PM2.5 from WRF-CHEM',
-        'native_unit' : smoke_integrated_unit,
-        'colorbar' : 'ug/m^2',
+        'name' : 'surface PM2.5 WRF-CHEM',
+        'native_unit' : 'g/m^3',
+        'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf, 10],
         'scale' : [20, 90],
@@ -550,7 +579,8 @@ _units_wisdom = {
     ('m',   'ft') : lambda x: 3.2808399 * x,
     ('ft/s','m/s') : lambda x: x / 3.2808399,
     ('ft',  'm') : lambda x: x / 3.2808399,
-    ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x
+    ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x,
+    ('ug/m^3', 'g/m^3') : lambda x: 1e-6 * x
 }
 
 def get_wisdom(var_name):
