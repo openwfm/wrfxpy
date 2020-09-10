@@ -392,10 +392,14 @@ class Postprocessor(object):
         # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
+            cb_N = 5
+            cb_labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+            cb_colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+            cb_cmap = mpl.colors.LinearSegmentedColormap.from_list('cb_'+cmap_name, cb_colors, N=cb_N)
             #  colorbar + add it to the KMZ as a screen overlay
             legend = ''
-            logging.info('_sat2raster: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
-            cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
+            logging.info('_sat2raster: variable %s colorbar from %s to %s %s' % (sat, 0, cb_N, legend))
+            cb_png_data = make_discrete_colorbar(cb_labels,cb_colors,'vertical',2,cb_cmap,legend)
 
         # create the raster & get coordinate bounds
         cmin = -.5
@@ -431,10 +435,14 @@ class Postprocessor(object):
         # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
+            cb_N = 5
+            cb_labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+            cb_colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+            cb_cmap = mpl.colors.LinearSegmentedColormap.from_list('cb_'+cmap_name, cb_colors, N=cb_N)
             #  colorbar + add it to the KMZ as a screen overlay
             legend = ''
-            logging.info('_sat2raster_empty: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
-            cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
+            logging.info('_sat2raster_empty: variable %s colorbar from %s to %s %s' % (sat, 0, cb_N, legend))
+            cb_png_data = make_discrete_colorbar(cb_labels,cb_colors,'vertical',2,cb_cmap,legend)
 
         # create the raster & get coordinate bounds
         raster_png_data,corner_coords = basemap_scatter_mercator([],[],[],bounds,[],0,0,cmap)

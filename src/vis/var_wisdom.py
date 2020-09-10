@@ -530,7 +530,7 @@ _var_wisdom = {
         'scale' : 'discrete',
         'options' : _discrete_wisdom['fire'],
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
-        'grid' : lambda d : (d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'])
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
     },
     'TERRA_NF' : {
        'name' : 'MODIS Terra No Fire Detections satellite data',
@@ -563,7 +563,7 @@ _var_wisdom = {
         'scale' : 'discrete',
         'options' : _discrete_wisdom['nofire'],
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
-        'grid' : lambda d : (d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'])
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
     }
 }
 

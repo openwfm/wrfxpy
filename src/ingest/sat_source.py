@@ -6,6 +6,7 @@ from __future__ import absolute_import
 import glob, re, datetime, logging, requests, json
 import os.path as osp
 import numpy as np
+from datetime import datetime 
 from six.moves.urllib.request import urlopen
 from cmr import GranuleQuery
 from utils import Dict, esmf_to_utc, utc_to_utcf, duplicates
@@ -68,17 +69,15 @@ class SatSource(object):
 
         :return metas: a dictionary with all the metadata for the API search
         """
-        maxg=100
+        maxg=1000
         time_utcf=(utc_to_utcf(time[0]),utc_to_utcf(time[1]))
         api = GranuleQuery()
         search = api.parameters(
                 short_name=sname,
                 downloadable=True,
                 polygon=bbox,
-                temporal=time_utcf,
-                version=version)
+                temporal=time_utcf)
         sh=search.hits()
-        logging.info("CMR API: %s gets %s hits in this range" % (sname,sh))
         if sh>maxg:
             logging.warning("The number of hits %s is larger than the limit %s." % (sh,maxg))
             logging.warning("Any satellite data with prefix %s used." % self.prefix)
@@ -88,7 +87,7 @@ class SatSource(object):
             metas = api.get(sh)
         if collection:
             metas = [m for m in metas if m['collection_concept_id'] == collection]
-        logging.info('search_api - {} hits in this range'.format(len(metas)))
+        logging.info('search_api_sat - CMR API gives {0} hits for {1} of collection {2}'.format(len(metas),sname,collection))
         return metas
 
     def archive_url(self, meta, path_col, nrt=False):
@@ -104,10 +103,9 @@ class SatSource(object):
         g_id = osp.basename(meta['links'][0]['href'])
         split = g_id.split('.')
         time_str = '{0}-{1}_{2}:{3}'.format(split[1][1:5],split[1][5:8],split[2][:2],split[2][2:4])
-        tt = esmf_to_utc(time_str).timetuple()
+        tt = datetime.strptime(time_str,'%Y-%j_%H:%M').timetuple()
         folder = '{0:04d}/{1:03d}'.format(tt.tm_year,tt.tm_yday)
         url = osp.join(base_url,path_col,folder,g_id) 
-        logging.info('archive_url - {} reconstracted url from archive'.format(url))
         return url
 
     def get_metas_sat(self, bbox, time):
@@ -120,10 +118,10 @@ class SatSource(object):
         :return granules: dictionary with the metadata of all the products
         """
         metas=Dict({})
-        metas.geo=self.search_api_sat(self.geo_prefix,bbox,time,self.version)
-        metas.fire=self.search_api(self.fire_prefix,bbox,times,collection=self.fire_collection_id)
-        metas.geo_nrt=self.search_api(self.geo_nrt_prefix,bbox,times,collection=self.geo_nrt_collection_id)
-        metas.fire_nrt=self.search_api(self.fire_nrt_prefix,bbox,times,collection=self.fire_nrt_collection_id)
+        metas.geo=self.search_api_sat(self.geo_prefix,bbox,time,collection=self.geo_collection_id)
+        metas.fire=self.search_api_sat(self.fire_prefix,bbox,time,collection=self.fire_collection_id)
+        metas.geo_nrt=self.search_api_sat(self.geo_nrt_prefix,bbox,time,collection=self.geo_nrt_collection_id)
+        metas.fire_nrt=self.search_api_sat(self.fire_nrt_prefix,bbox,time,collection=self.fire_nrt_collection_id)
         return metas
 
     def group_metas(self, metas):
@@ -174,7 +172,7 @@ class SatSource(object):
 
         return gmetas
 
-    def download_sat(self, url, appkey):
+    def download_sat(self, urls, appkey):
         """
         Download a satellite file from a satellite service
 
@@ -191,14 +189,14 @@ class SatSource(object):
             else:
                 try:
                     download_url(url, sat_path, appkey=appkey)
-                    return {'url': url,'local_path': sat_path,'downloaded': datetime.datetime.now}
+                    return {'url': url,'local_path': sat_path,'downloaded': datetime.now}
                 except DownloadError as e:
                     logging.warning('download_sat - {0} cannot download satellite file {1}'.format(self.prefix, url))
 
-            logging.error('%s cannot download satellite file %s' % (self.prefix, url))
-            logging.warning('Please check %s for %s' % (self.info_url, self.info))
-            return {}
-            raise SatError('SatSource: failed to download file %s' % url)
+        logging.error('%s cannot download satellite file using %s' % (self.prefix, urls))
+        logging.warning('Please check %s for %s' % (self.info_url, self.info))
+        return {}
+        raise SatError('SatSource: failed to download file %s' % url)
 
     def retrieve_metas(self, metas):
         """
@@ -213,12 +211,12 @@ class SatSource(object):
             if g_id in metas['fire'].keys():
                 fire_meta = metas['fire'][g_id]
                 logging.info('retrieve_metas - downloading product id {}'.format(g_id))
-                urls = [geo_meta['links'][0]['href'],geo_meta.get('archive_url')]
-                m_geo = self.download_data(urls,self.datacenter_to_appkey(geo_meta['data_center']))
+                urls = [geo_meta.get('archive_url'),geo_meta['links'][0]['href']]
+                m_geo = self.download_sat(urls,self.datacenter_to_appkey(geo_meta['data_center']))
                 if m_geo:
                     geo_meta.update(m_geo)
-                    urls = [fire_meta['links'][0]['href'],fire_meta.get('archive_url')]
-                    m_fire = self.download_data(urls,self.datacenter_to_appkey(fire_meta['data_center']))
+                    urls = [fire_meta.get('archive_url'),fire_meta['links'][0]['href']]
+                    m_fire = self.download_sat(urls,self.datacenter_to_appkey(fire_meta['data_center']))
                     if m_fire:
                         fire_meta.update(m_fire)
                         manifest.update({g_id: {
