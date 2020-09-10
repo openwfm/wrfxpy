@@ -544,6 +544,7 @@ def load_sys_cfg():
     sys_cfg.cache_path = make_dir(osp.abspath(sys_cfg.get('cache_path','cache')))
     sys_cfg.ref_utc = sys_cfg.get('ref_utc',None)
     sys_cfg.ungrib_only = sys_cfg.get('ungrib_only',False)
+    sys_cfg.sat_only = sys_cfg.get('sat_only',False)
     return sys_cfg
 
 class response_object(object):
