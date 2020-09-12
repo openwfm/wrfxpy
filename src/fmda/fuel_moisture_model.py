@@ -43,7 +43,7 @@ class FuelMoistureModel:
         :param P0: initial state error covariance
         """
         logging.info('FuelMoistureModel.__init__ m0 %s, Tk %s, P0 %s' % (inq(m0),inq(Tk), inq(P0)))
-        self.Tk = np.array([1.0, 10.0, 100.0]) * 3600    # nominal fuel delays
+        self.Tk = np.array([1.0, 10.0, 100.0, 1000.0]) * 3600    # nominal fuel delays
         self.r0 = 0.05                                   # threshold rainfall [mm/h]
         self.rk = 8.0                                    # saturation rain intensity [mm/h]
         self.Trk = 14.0 * 3600                           # time constant for wetting model [s]
@@ -440,7 +440,7 @@ class FuelMoistureModel:
 
         logging.info('fuel_moisture_model.from_netcdf: reading FMC_GC %s FMC_COV %s' % (inq(ncfmc),inq(P)))
         
-        Tk = np.array([1.0, 10.0, 100.0]) * 3600
+        Tk = np.array([1.0, 10.0, 100.0, 1000.0]) * 3600
         
         fm = cls(ncfmc[:,:,:k-2], Tk)
         

@@ -142,7 +142,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     
     # read and process model variables
     with netCDF4.Dataset(model_path) as d:
-        for i,name in [(0, '1-hr FM'), (1, '10-hr FM'), (2, '100-hr FM')]:
+        for i,name in [(0, '1-hr FM'), (1, '10-hr FM'), (2, '100-hr FM'), (3, '1000-hr FM')]:
             fm_wisdom = var_wisdom['fm']
             fm_wisdom['name'] = '%s fuel moisture' % name
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
@@ -339,19 +339,19 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     
     
     # the process noise matrix
-    Q = np.diag([1e-4,5e-5,1e-5,1e-6,1e-6])
+    Q = np.diag([1e-4,5e-5,1e-5,1e-5,1e-6,1e-6])
     
     # background covariance
-    P0 = np.diag([0.01,0.01,0.01,0.001,0.001])
+    P0 = np.diag([0.01,0.01,0.01,0.01,0.001,0.001])
 
     # check if we must start from equilibrium
     if model is None:
         logging.info('CYCLER initializing from equilibrium for cycle %s.' % (str(cycle)))
         # setup model parameters    
         Nk = 3
-        Tk = np.array([1.0, 10.0, 100.0])
+        Tk = np.array([1.0, 10.0, 100.0, 1000.0])
         m0 = np.expand_dims(0.5 * (Ed + Ew), axis=2)
-        model = FuelMoistureModel(m0[:,:,[0,0,0]], Tk, P0)
+        model = FuelMoistureModel(m0[:,:,[0,0,0,0]], Tk, P0)
     else:
         logging.info('CYCLER advancing model one hour to cycle %s.' % (str(cycle)))
         dt = 3600 # always 1 hr step in RTMA
