@@ -605,19 +605,28 @@ def is_cycle_computed(cycle, cfg, wksp_path):
     
     
 if __name__ == '__main__':
+
+    # current time
+    now = datetime.now(pytz.UTC)
     
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    if len(sys.argv) == 2:
-        pass
+    err = 1
+    if len(sys.argv) == 2 :
+        try:
+            now = datetime.strptime(sys.argv[1], '%Y-%m-%dT%H:%M:%S%Z')
+            err=0
+        except Exception as e:
+            logging.warning(e)
     elif len(sys.argv) == 5:
         code = 'FIRE'
         cfg.regions = {
              "Fire domain" : {
                   "code" : code,
                   "bbox" : sys.argv[1:5]
-             }
+            }
         }
+        err=0
         try:
             os.remove(osp.join(cfg.workspace_path,code+'-geo.nc'))
         except Exception as e:
@@ -626,9 +635,13 @@ if __name__ == '__main__':
             delete(osp.join(cfg.workspace_path,code))
         except Exception as e:
             logging.warning(e)
-    else:
+
+    if err: 
         print('Usage: to use domains configured in etc/rtma_cycler.json:')
         print('./rtma_cycler.sh anything')
+        print('To use cycle at a given UTC time (rounded down to hours):')
+        print('./rtma_cycler.sh YYYY-MM-DDThh:mm:ssZ')
+        print('Example: ./rtma_cycler.sh 2020-09-12T01:00:00Z')
         print('To use a custom domain named FIRE by giving a bounding box:')
         print('./rtma_cycler.sh lat1 lon1 lat2 lon2')
         print('Example: ./rtma_cycler.sh 42, -124.6, 49, -116.4')
@@ -638,8 +651,6 @@ if __name__ == '__main__':
     #logging.info('regions: %s' % json.dumps(cfg.regions, indent=1, separators=(',',':')))
 
 
-    # current time
-    now = datetime.now(pytz.UTC)
     cycle = (now - timedelta(minutes=50)).replace(minute=0,second=0,microsecond=0)
     logging.info('CYCLER activated at %s, will attempt cycle at %s' % (str(now), str(cycle)))
     
