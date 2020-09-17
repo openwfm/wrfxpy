@@ -78,6 +78,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % appkey})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % appkey})   
         else:
             r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
+        content_size = int(r.headers.get('content-length',0))
     except Exception as e:
         if max_retries > 0:
             # logging.error(str(e))
@@ -100,11 +101,11 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     file_size = osp.getsize(local_path)
 
     # content size may have changed during download
-    if appkey:
-        r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % appkey})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % appkey})
-    else:
-        r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
-    content_size = int(r.headers.get('content-length',0))
+    #if appkey:
+    #    r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % appkey})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % appkey})
+    #else:
+    #    r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
+    #content_size = int(r.headers.get('content-length',0))
 
     logging.info('local file size %d remote content size %d' % (file_size, content_size))
 

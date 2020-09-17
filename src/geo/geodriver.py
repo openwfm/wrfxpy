@@ -32,6 +32,7 @@ class GeoDriver(object):
         self.nx = self.ds.RasterXSize
         self.ny = self.ds.RasterYSize
         self.bands = self.ds.RasterCount
+        self.resampled = False
         # define projection objects
         self.init_proj()
 
@@ -156,6 +157,7 @@ class GeoDriver(object):
             self.ny,self.nx = a_r.shape
         else:
             _,self.ny,self.nx = a_r.shape
+        self.resampled = True
         return a_r
 
     def geogrid_index(self):
@@ -177,9 +179,10 @@ class GeoDriver(object):
         # lat/lon known points
         posX, posY = gdal.ApplyGeoTransform(self.gt,known_x_uns,known_y_uns)
         known_lon,known_lat = pyproj.transform(self.pyproj,ref_proj,posX,posY) 
-        # print ceter lon-lat coordinates to check with gdalinfo
-        logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using pyproj.transform: %s' % coord2str(known_lon,known_lat)) 
-        logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using gdal.Info: %s' % gdal.Info(self.ds).split('Center')[1].split(') (')[1].split(')')[0])  
+        # print center lon-lat coordinates to check with gdalinfo
+        if not self.resampled:
+            logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using pyproj.transform: %s' % coord2str(known_lon,known_lat)) 
+            logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using gdal.Info: %s' % gdal.Info(self.ds).split('Center')[1].split(') (')[1].split(')')[0])  
         # row order depends on dy
         if dy > 0:
             row_order = 'bottom_top'
@@ -224,7 +227,11 @@ class GeoDriver(object):
         Transform to geotiff file
 
         :param path: path to write the geotiff file
-        :param bbox: optional, WGS84 bounding box (min_lon,max_lon,min_lat,max_lat)
+        :param **kwargs: dictionary with optional arguments:
+               - bbox: WGS84 bounding box (min_lon,max_lon,min_lat,max_lat)
+               - unit: string with units information
+               - desc: string with description information
+               - ndv: number to define the non-data value
         """
         bbox = kwargs.get('bbox')
         logging.info('GeoTIFF.to_geotiff() - getting array')

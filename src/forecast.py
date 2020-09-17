@@ -33,7 +33,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
 from geo.write_geogrid import write_table
 from geo.geodriver import GeoDriver
 from vis.postprocessor import Postprocessor
-from vis.var_wisdom import get_wisdom_variables
+from vis.var_wisdom import get_wisdom_variables,_sat_prods
 
 from ingest.NAM218 import NAM218
 from ingest.HRRR import HRRR
@@ -87,6 +87,7 @@ class JobState(Dict):
         """
         super(JobState, self).__init__(args)
         self.grib_source = self.resolve_grib_source(self.grib_source,args)
+        self.satellite_source_list = args.get('satellite_source',[])
         self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
@@ -251,6 +252,23 @@ def retrieve_satellite(js, sat_source, q):
         traceback.print_exc()
         q.put('FAILURE')
 
+def create_sat_manifest(js):
+    sat_manifest = Dict({})
+    sat_manifest.granules = json_join(js.jobdir, js.satellite_source_list)
+    sat_manifest.bounds = js.bounds
+    sat_manifest.time_interval = (utc_to_esmf(js.start_utc), utc_to_esmf(js.end_utc))
+    sat_manifest.dt = Dict({})
+    sat_manifest.sat_interval = Dict({})
+    for k in js.domains.keys():
+        sat_manifest.dt[k] = js.domains[k]['history_interval']
+        if 'sat_interval' in list(js.domains[k].keys()):
+            sat_manifest.sat_interval[k] = js.domains[k]['sat_interval']
+        else:
+            sat_manifest.sat_interval[k] = (js.domains[k]['history_interval'], js.domains[k]['history_interval'])
+    sat_manifest.satprod_satsource = js.satprod_satsource
+    json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
+    return sat_manifest
+
 def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     """
     This function retrieves required GRIB files and runs ungrib.
@@ -343,6 +361,7 @@ def run_geogrid(js, q):
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
     try:
+        js.geo_cache = None
         logging.info("running GEOGRID")
         vars_add_to_geogrid(js)
         Geogrid(js.wps_dir).execute().check_output()
@@ -405,7 +424,7 @@ def read_namelist(path):
     logging.info('Reading namelist %s' % path)
     return f90nml.read(path)
 
-def ensure_abs_path(path,js,max_char=120):
+def ensure_abs_path(path,js,max_char=20):
     if len(path) > max_char:
         hexhash = hashlib.sha224(js.job_id.encode()).hexdigest()[:6]
         geo_path = osp.join(js.wrfxpy_dir,'cache/geo_data.{}'.format(hexhash))
@@ -429,8 +448,15 @@ def vars_add_to_geogrid(js):
     try:
         geo_vars = Dict(json.load(open(geo_vars_path)))
     except:
-        logging.critical('Any {} specified, GeoTIFF files for NFUEL_CAT and ZSF need to be specified.'.format(geo_vars_path))
-        sys.exit(2)
+        logging.info('Any {0} specified, defining default GeoTIFF files for NFUEL_CAT and ZSF from {1}.'.format(geo_vars_path,js.args['wps_geog_path']))
+        nfuel_path = osp.join(js.args['wps_geog_path'],'fuel_cat_fire','lf_data.tif')
+        topo_path = osp.join(js.args['wps_geog_path'],'topo_fire','ned_data.tif')
+        if osp.exists(nfuel_path) and osp.exists(topo_path):
+            geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
+        else:
+            logging.critical('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
+            logging.error('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
+            sys.exit(2)
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     for var,tif_file in six.iteritems(geo_vars):
@@ -512,7 +538,7 @@ def fmda_add_to_geogrid(js):
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in six.iteritems(geogrid_tbl_json):
-        vartable['abs_path'] = osp.join(fmda_geogrid_basename,osp.basename(vartable['abs_path']))
+        vartable['abs_path'] = osp.join(js.wps_dir,fmda_geogrid_basename,osp.basename(vartable['abs_path']))
         vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
         logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
@@ -575,6 +601,37 @@ def execute(args,job_args):
 
     logging.info("number of domains defined is %d." % js.num_doms)
 
+    js.bounds = Dict({})
+    for k,domain in enumerate(js.domain_conf.domains):
+        bbox = domain.bounding_box()
+        lons = [b[1] for b in bbox]
+        lats = [b[0] for b in bbox]
+        bounds = (min(lons),max(lons),min(lats),max(lats))
+        js.bounds[str(k+1)] = bounds
+
+    logging.info('satellite sources %s' % [s.id for s in js.satellite_source])
+    if js.sat_only:
+        if js.satellite_source:
+            logging.info('sat_only set, skipping everything else')
+            # retrieving satellite data by source in parallel
+            proc_q = Queue()
+            sat_proc = {}
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id].start()
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id].join()
+            proc_q.close()
+            # create satellite manifest
+            sat_manifest = create_sat_manifest(js)
+            # create satellite outputst
+            process_sat_output(js.job_id)
+            return
+        else:
+            logging.error('any available sat source specified')
+            return
+
     # build directories in workspace
     js.wps_dir = osp.abspath(osp.join(js.jobdir, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.jobdir, 'wrf'))
@@ -595,14 +652,6 @@ def execute(args,job_args):
     js.domain_conf.prepare_for_geogrid(js.wps_nml, js.wrf_nml, js.wrfxpy_dir, js.wps_dir)
     f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
-    js.bounds = Dict({})
-    for k,domain in enumerate(js.domain_conf.domains):
-        bbox = domain.bounding_box()
-        lons = [b[1] for b in bbox]
-        lats = [b[0] for b in bbox]
-        bounds = (min(lons),max(lons),min(lats),max(lats))
-        js.bounds[str(k+1)] = bounds
-
     # do steps 2 & 3 & 4 in parallel (three execution streams)
     #  -> Satellite retrieval ->
     #  -> GEOGRID ->
@@ -622,7 +671,6 @@ def execute(args,job_args):
         grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
 
     logging.info('starting GEOGRID and GRIB2/UNGRIB')
-    logging.info('satellite sources %s' % [s.id for s in js.satellite_source])
 
     if js.ungrib_only:
         logging.info('ungrib_only set, skipping GEOGRID and SATELLITE, will exit after UNGRIB')
@@ -641,6 +689,9 @@ def execute(args,job_args):
         grib_proc[grib_source.id].join()
 
     if js.ungrib_only:
+        for grib_source in js.grib_source:
+            if proc_q.get() != 'SUCCESS':
+                return
         return
     else:
         geogrid_proc.join()
@@ -664,21 +715,8 @@ def execute(args,job_args):
     logging.info('execute: finished parallel GEOGRID, GRIB2/UNGRIB, and Satellite')
 
     if js.satellite_source:
-        # joining all satellite manifests
-        sat_manifest = Dict({})
-        sat_manifest.granules = json_join(js.jobdir, args['satellite_source'])
-        sat_manifest.bounds = js.bounds
-        sat_manifest.time_interval = (utc_to_esmf(js.start_utc), utc_to_esmf(js.end_utc))
-        sat_manifest.dt = Dict({})
-        sat_manifest.sat_interval = Dict({})
-        for k in args['domains'].keys():
-            sat_manifest.dt[k] = args['domains'][k]['history_interval']
-            if 'sat_interval' in list(args['domains'][k].keys()):
-                sat_manifest.sat_interval[k] = args['domains'][k]['sat_interval']
-            else:
-                sat_manifest.sat_interval[k] = (args['domains'][k]['history_interval'], args['domains'][k]['history_interval'])
-        sat_manifest.satprod_satsource = js.satprod_satsource
-        json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
+        # create satellite manifiest
+        sat_manifest = create_sat_manifest(js)
 
     logging.info("step 5: execute metgrid after ensuring all grids will be processed")
     update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
@@ -765,8 +803,8 @@ def process_output(job_id):
     logging.info('process_output: loading satellite description from %s' % satfile)
     try:
         jsat = Dict(json.load(open(satfile,'r')))
-        available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
-        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
+        available_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods]
+        not_empty_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods if jsat.granules[sat]]
     except:
         logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
         available_sats = []
@@ -984,8 +1022,8 @@ def process_sat_output(job_id):
     logging.info('process_sat_output: loading satellite description from %s' % satfile)
     try:
         jsat = Dict(json.load(open(satfile,'r')))
-        available_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys()]
-        not_empty_sats = [sat.upper()+'_AF' for sat in jsat.granules.keys() if jsat.granules[sat]]
+        available_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods]
+        not_empty_sats = [sat.upper()+prod for sat in jsat.granules.keys() for prod in _sat_prods if jsat.granules[sat]]
     except:
         logging.warning('Cannot load the satellite data in satellite description file %s' % satfile)
         available_sats = []
@@ -1161,9 +1199,11 @@ def process_arguments(job_args,sys_cfg):
         if 'postproc' in args:
             sats = args['satellite_source']
             for sat in sats:
-                satprod = sat.upper()+'_AF'
-                args['postproc'][str(args['max_dom_pp'])].append(satprod)
-                args['satprod_satsource'].update({satprod: sat})
+                for prod in _sat_prods:
+                    satprod = sat.upper()+prod
+                    if not satprod in args['postproc'][str(args['max_dom_pp'])]:
+                        args['postproc'][str(args['max_dom_pp'])].append(satprod)
+                    args['satprod_satsource'].update({satprod: sat})
 
     # load tokens if etc/tokens.json exists
     try:

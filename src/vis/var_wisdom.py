@@ -7,12 +7,12 @@ from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
       smoke_concentration
 from six.moves import range
 
-smoke_threshold_int = 300
-smoke_threshold = 100
+smoke_threshold_int = 10
+smoke_threshold = 1
 smoke_integrated_unit = 'g/m^2'
-smoke_integrated_transparent = 1e-2
-smoke_concentration_scale = 400
-smoke_concentration_transparent=10
+smoke_integrated_transparent = 1
+smoke_concentration_scale = 300
+smoke_concentration_transparent = 1e-6
 
 def strip_end(d):
       m,n = d.variables['XLONG'][0,:,:].shape
@@ -85,6 +85,21 @@ def is_windvec(name):
 
 def is_fire_var(name):
        return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FIRE_HFX','F_ROS','F_INT','NFUEL_CAT','ZSF','FMC_G']
+
+_discrete_wisdom = {
+    'all' : {'values': (3,5,7,8,9),
+            'alphas': (.5,.5,.6,.7,.8),
+            'labels': ('Water','Ground','Fire low','Fire nominal','Fire high'),
+            'colors': ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))},
+    'fire' : {'values': (7,8,9),
+             'alphas': (.6,.7,.8),
+             'labels': ('Fire low','Fire nominal','Fire high'),
+             'colors': ((1,1,0),(1,.65,0),(.5,0,0))},
+    'nofire' : {'values': (3,5),
+               'alphas': (.5,.5),
+               'labels': ('Water','Ground'),
+               'colors': ((0,0,.5),(0,.5,0))}
+}
 
 _var_wisdom = {
      'CLOUDTO700HPA' : {
@@ -267,8 +282,8 @@ _var_wisdom = {
         'native_unit' : smoke_integrated_unit,
         'colorbar' : None,
         'colormap' : 'gray_r',
-        'transparent_values' : [-np.inf, smoke_integrated_transparent],
-        'scale' : 'original',
+        'transparent_values' : [-np.inf, smoke_concentration_transparent],
+        'scale' : [0,1],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKETO10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
      },
@@ -277,15 +292,44 @@ _var_wisdom = {
         'native_unit' : smoke_integrated_unit,
         'colorbar' : smoke_integrated_unit,
         'colormap' : 'rainbow',
-        'transparent_values' : [-np.inf, smoke_integrated_transparent],
-        'scale' : [0, 5],
+        'transparent_values' : [-np.inf, 0.05],
+        'scale' : [0, 2],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
+     'PM25_SFC' : {
+        'name' : 'surface PM2.5 tracer',
+        'native_unit' : 'ug/m^3',
+        'colorbar' : 'ug/m^3',
+        'colormap' : 'rainbow',
+        'norm_opt' : 'lognorm',
+        'transparent_values' : [-np.inf, smoke_concentration_transparent],
+        'scale' : [0, smoke_concentration_scale],
+        'retrieve_as' : lambda d,t: d.variables['tr17_1'][t,0,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'PM25_SFC_D' : {
+        'name' : 'surface PM2.5 tracer',
+        'native_unit' : 'ug/m^3',
+        'colorbar' : 'ug/m^3',
+        'colormap' : 'rainbow',
+        'norm_opt' : 'boundary',
+        'bounds' : [0,1,2,4,6,8,12,16,20,25,30,40,60,100,200],
+        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
+                             (107,170,213),(72,149,176),(74,167,113),
+                             (114,190,75),(203,217,88),(249,201,80),
+                             (245,137,56),(234,84,43),(217,45,43),
+                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'spacing' : 'uniform',
+        'transparent_values' : [-np.inf, smoke_concentration_transparent],
+        'scale' : [0, smoke_concentration_scale],
+        'retrieve_as' : lambda d,t: d.variables['tr17_1'][t,0,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
      'PM25_SFC_CHEM' : {
-        'name' : 'surface PM2.5 from WRF-CHEM',
-        'native_unit' : smoke_integrated_unit,
-        'colorbar' : 'ug/m^2',
+        'name' : 'surface PM2.5 WRF-CHEM',
+        'native_unit' : 'g/m^3',
+        'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf, 10],
         'scale' : [20, 90],
@@ -326,6 +370,7 @@ _var_wisdom = {
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'viridis_r',
+        'transparent_values' : [70, np.inf],
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['RH_FIRE'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
@@ -461,6 +506,7 @@ _var_wisdom = {
        'colorbar' : '-',
        'colormap' : 'discrete',
        'scale' : 'discrete',
+       'options' : _discrete_wisdom['fire'],
        'retrieve_as' : lambda d : d.select('fire mask').get(),
        'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
     },
@@ -471,6 +517,7 @@ _var_wisdom = {
         'colorbar' : '-',
         'colormap' : 'discrete',
         'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
         'retrieve_as' : lambda d : d.select('fire mask').get(),
         'grid' : lambda d : (d.select('Latitude').get(), d.select('Longitude').get())
     },
@@ -481,10 +528,46 @@ _var_wisdom = {
         'colorbar' : '-',
         'colormap' : 'discrete',
         'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
-        'grid' : lambda d : (d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Latitude'], d['HDFEOS']['SWATHS']['VNP_750M_GEOLOCATION']['Geolocation Fields']['Longitude'])
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'TERRA_NF' : {
+       'name' : 'MODIS Terra No Fire Detections satellite data',
+       'source' : 'Terra',
+       'native_unit' : '-',
+       'colorbar' : '-',
+       'colormap' : 'discrete',
+       'scale' : 'discrete',
+       'options' : _discrete_wisdom['nofire'],
+       'retrieve_as' : lambda d : d.select('fire mask').get(),
+       'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
+    },
+    'AQUA_NF' : {
+        'name' : 'MODIS Aqua No Fire Detections satellite data',
+       	'source' : 'Aqua',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : d.select('fire mask').get(),
+        'grid' : lambda d : (d.select('Latitude').get(), d.select('Longitude').get())
+    },
+    'SNPP_NF' : {
+        'name' : 'VIIRS S-NPP No Fire Detections satellite data',
+       	'source' : 'SNPP',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
     }
 }
+
+_sat_prods = ['_AF','_NF']
 
 # contains functions to transform values from one unit to another in a simple format.
 # it's a dictionary with keys in the form (from_unit, to_unit) and the value is a lambda
@@ -496,10 +579,9 @@ _units_wisdom = {
     ('m',   'ft') : lambda x: 3.2808399 * x,
     ('ft/s','m/s') : lambda x: x / 3.2808399,
     ('ft',  'm') : lambda x: x / 3.2808399,
-    ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x
+    ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x,
+    ('ug/m^3', 'g/m^3') : lambda x: 1e-6 * x
 }
-
-
 
 def get_wisdom(var_name):
     """Return rendering wisdom for the variable <var_name>."""

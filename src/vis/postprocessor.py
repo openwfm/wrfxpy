@@ -209,6 +209,30 @@ class Postprocessor(object):
             fa[fa > fa_max] = fa_max
             fa.mask = m                    # restore the mask
 
+        # define distribution of colormap if necessary 
+        ticks = None
+        if 'norm_opt' in wisdom: 
+            norm_opt = wisdom['norm_opt']
+            if norm_opt == 'lognorm':
+                linthresh = wisdom.get('linthresh',.01)
+                linscale = wisdom.get('linscale',.001)
+                norm = lambda xmin,xmax: mpl.colors.SymLogNorm(linthresh=linthresh,linscale=linscale,vmin=xmin,vmax=xmax,base=10) 
+            elif norm_opt == 'boundary':
+                bounds = wisdom.get('bounds',[0,1,2,4,6,8,12,16,20,25,30,40,60,100,200])
+                ticks = bounds[1:]
+                bounds = bounds + [1e10]
+                colors = wisdom.get('colors',np.array([(255,255,255),(197,234,252),(148,210,240),
+                                                       (107,170,213),(72,149,176),(74,167,113),
+                                                       (114,190,75),(203,217,88),(249,201,80),
+                                                       (245,137,56),(234,84,43),(217,45,43),
+                                                       (188,28,32),(156,22,27),(147,32,205)])/255.)
+                cmap = mpl.colors.LinearSegmentedColormap.from_list('custom',colors,N=len(colors))
+                norm = lambda xmin,xmax: mpl.colors.BoundaryNorm(boundaries=bounds,ncolors=len(bounds))
+            else:
+                norm = lambda xmin,xmax: mpl.colors.Normalize(xmin,xmax) 
+        else:
+            norm = None 
+
         # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
@@ -217,7 +241,8 @@ class Postprocessor(object):
             #  colorbar + add it to the KMZ as a screen overlay
             legend = wisdom['name'] + ' ' + cb_unit
             logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (var, cbu_min,cbu_max, legend))
-            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend)
+            spacing = wisdom.get('spacing','proportional')
+            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm)
 
         # replace masked values by nans just in case
         fa.data[fa.mask]=np.nan
@@ -227,7 +252,7 @@ class Postprocessor(object):
             % (var, fa.size , fa.count(), np.count_nonzero(fa.mask == False), np.nanmin(fa),np.nanmax(fa) ))
         
         # create the raster & get coordinate bounds
-        raster_png_data,corner_coords = basemap_raster_mercator(lon,lat,fa,fa_min,fa_max,cmap)
+        raster_png_data,corner_coords = basemap_raster_mercator(lon,lat,fa,fa_min,fa_max,cmap,norm=norm)
 
         # create GeoTIFF file
         if tif_args:
@@ -237,7 +262,7 @@ class Postprocessor(object):
                 ndv = -9999.0
             fa[np.isnan(fa)] = ndv
             tif_path = tif_args.get('tif_path')
-            logging.info('_scalar2raster: writting GeoTIFF file %s'.format(tif_path))
+            logging.info('_scalar2raster: writting GeoTIFF file {}'.format(tif_path))
             crs = tif_args.get('crs')
             geot = tif_args.get('geot')
             GeoDriver.from_elements(fa, crs, geot).to_geotiff(tif_path, desc = wisdom['name'], unit = native_unit, ndv = ndv)
@@ -305,7 +330,7 @@ class Postprocessor(object):
             u[np.isnan(u)] = ndv
             v[np.isnan(v)] = ndv
             tif_path = tif_args.get('tif_path')
-            logging.info('_vector2raster: writting GeoTIFF file %s'.format(tif_path))
+            logging.info('_vector2raster: writting GeoTIFF file {}'.format(tif_path))
             crs = tif_args.get('crs')
             gt = tif_args.get('geot')
             GeoDriver.from_elements(np.array([u, v]), crs, gt).to_geotiff(tif_path, desc = [uw['name'], vw['name']], unit = native_unit, ndv = ndv)
@@ -328,10 +353,10 @@ class Postprocessor(object):
         wisdom.update(self.wisdom_update.get(sat, {}))
         cmap_name = wisdom['colormap']
 
-        values = (3,5,7,8,9)
-        alphas = (.5,.5,.6,.7,.8)
-        labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
-        colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+        values = wisdom['options'].get('values',(3,5,7,8,9))
+        alphas = wisdom['options'].get('alphas',(.5,.5,.6,.7,.8))
+        labels = wisdom['options'].get('labels',('Water','Ground','Fire low','Fire nominal','Fire high'))
+        colors = wisdom['options'].get('colors',((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0)))
 
         # for each pair of files
         N = len(values)
@@ -367,10 +392,14 @@ class Postprocessor(object):
         # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
+            cb_N = 5
+            cb_labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+            cb_colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+            cb_cmap = mpl.colors.LinearSegmentedColormap.from_list('cb_'+cmap_name, cb_colors, N=cb_N)
             #  colorbar + add it to the KMZ as a screen overlay
             legend = ''
-            logging.info('_sat2raster: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
-            cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
+            logging.info('_sat2raster: variable %s colorbar from %s to %s %s' % (sat, 0, cb_N, legend))
+            cb_png_data = make_discrete_colorbar(cb_labels,cb_colors,'vertical',2,cb_cmap,legend)
 
         # create the raster & get coordinate bounds
         cmin = -.5
@@ -393,8 +422,8 @@ class Postprocessor(object):
         wisdom.update(self.wisdom_update.get(sat, {}))
         cmap_name = wisdom['colormap']
 
-        labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
-        colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+        labels = wisdom['options'].get('labels',('Water','Ground','Fire low','Fire nominal','Fire high'))
+        colors = wisdom['options'].get('colors',((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0)))
         N = len(labels)
 
         # create discrete colormap
@@ -406,10 +435,14 @@ class Postprocessor(object):
         # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
+            cb_N = 5
+            cb_labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+            cb_colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+            cb_cmap = mpl.colors.LinearSegmentedColormap.from_list('cb_'+cmap_name, cb_colors, N=cb_N)
             #  colorbar + add it to the KMZ as a screen overlay
             legend = ''
-            logging.info('_sat2raster_empty: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
-            cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
+            logging.info('_sat2raster_empty: variable %s colorbar from %s to %s %s' % (sat, 0, cb_N, legend))
+            cb_png_data = make_discrete_colorbar(cb_labels,cb_colors,'vertical',2,cb_cmap,legend)
 
         # create the raster & get coordinate bounds
         raster_png_data,corner_coords = basemap_scatter_mercator([],[],[],bounds,[],0,0,cmap)
