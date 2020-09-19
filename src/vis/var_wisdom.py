@@ -12,7 +12,7 @@ smoke_threshold = 1
 smoke_integrated_unit = 'g/m^2'
 smoke_integrated_transparent = 0.01
 smoke_concentration_scale = 300
-smoke_concentration_transparent = 1e-6
+smoke_concentration_transparent = 1e-5
 
 def strip_end(d):
       m,n = d.variables['XLONG'][0,:,:].shape
@@ -140,6 +140,7 @@ _var_wisdom = {
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
+        'norm_opt' : 'lognorm',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE1000FT',d,t,1000),
@@ -150,6 +151,7 @@ _var_wisdom = {
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
+        'norm_opt' : 'lognorm',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE4000FT',d,t,4000),
@@ -160,6 +162,7 @@ _var_wisdom = {
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
+        'norm_opt' : 'lognorm',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE6000FT',d,t,6000),
@@ -283,7 +286,8 @@ _var_wisdom = {
         'colorbar' : None,
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_concentration_transparent],
-        'scale' : [0,1],
+        'norm_opt' : 'lognorm',
+        'scale' : [0,100],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKETO10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
      },
