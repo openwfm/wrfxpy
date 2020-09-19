@@ -9,6 +9,7 @@ _var_wisdom = {'NFUEL_CAT' : {
         'fill' : Dict({
 		    range(15,91): 14,
 		    92: 14,
+                    -9999: 14,
                     range(94,100): 14,
                     (0,91,93): 'nearest'
                 }),
