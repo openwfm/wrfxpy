@@ -511,7 +511,7 @@ def fmda_add_to_geogrid(js):
         lats = d.variables['XLAT'][:,:]
         lons = d.variables['XLONG'][:,:]
     ndomains = len(js['domains'])
-    lat,lon = js['domains'][str(ndomains)]['center_latlon']
+    lat,lon = js['domains'][str(ndomains)]['center_latlon'] if 'center_latlon' in js['domains'][str(ndomains)] else js['domains']['1']['center_latlon']
     bbox = (np.min(lats), np.min(lons), np.max(lats), np.max(lons))
     logging.info('fmda_add_to_geogrid: fmda bounding box is %s %s %s %s' % bbox)
     i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)  
@@ -789,6 +789,36 @@ def execute(args,job_args):
 
     return jobfile
 
+def restart_execute(job_id):
+    sys_cfg = load_sys_cfg()
+    jobfile = osp.abspath(osp.join(sys_cfg.workspace_path, job_id,'input.json'))
+    logging.info('restart_execute: loading job input from %s' % jobfile)
+    job_args = json.load(open(jobfile)) 
+    args = process_arguments(job_args,sys_cfg)
+    js = JobState(args)
+    jsubfile = osp.abspath(osp.join(sys_cfg.workspace_path, job_id,'job.json'))
+    logging.info('restart_execute: loading job description from %s' % jsubfile)
+    try:
+        jsub = Dict(json.load(open(jsubfile,'r')))
+    except Exception as e:
+        logging.error('Cannot load the job description file %s' % jsubfile)
+        logging.error('%s' % e)
+        sys.exit(1)
+    
+    js.jobdir = osp.abspath(osp.join(sys_cfg.workspace_path, job_id))
+    js.wrf_dir = osp.abspath(osp.join(js.jobdir, 'wrf'))
+
+    logging.info('submitting WRF job')
+    js.task_id = "sim-" + js.grid_code + "-" + utc_to_esmf(js.start_utc)[:10]
+    jsub.job_num=WRF(js.wrf_dir, js.qsys).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
+    logging.info("WRF job %s submitted with id %s, waiting for rsl.error.0000" % (jsub.job_num, js.task_id))
+
+    json.dump(jsub, open(jsubfile,'w'), indent=4, separators=(',', ': '))
+
+    process_output(js.job_id)
+
+    return jobfile
+
 def process_output(job_id):
     args = load_sys_cfg()
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
@@ -969,6 +999,7 @@ def process_output(job_id):
         else:
             if not wait_wrfout:
                 logging.info('Waiting for wrfout')
+                time.sleep(5)
             wait_wrfout = wait_wrfout + 1
 
     # if we are to send out the postprocessed files after completion, this is the time
@@ -1147,9 +1178,9 @@ def verify_inputs(args,sys_cfg):
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
-      for key,path in six.iteritems(args['precomputed']):
-          if not osp.exists(path):
-              raise OSError('Precomputed entry %s points to non-existent file %s' % (key,path))
+        for key,path in six.iteritems(args['precomputed']):
+            if not osp.exists(path):
+                raise OSError('Precomputed entry %s points to non-existent file %s' % (key,path))
 
     # check if the postprocessor knows how to handle all variables
     wvs = get_wisdom_variables()
