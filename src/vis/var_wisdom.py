@@ -149,8 +149,6 @@ _var_wisdom = {
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'norm_opt' : 'lognorm',
-<<<<<<< HEAD
-=======
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE1000FT',d,t,1000),
@@ -169,7 +167,6 @@ _var_wisdom = {
                              (245,137,56),(234,84,43),(217,45,43),
                              (188,28,32),(156,22,27),(147,32,205)])/255.,
         'spacing' : 'uniform',
->>>>>>> cf8cafea4563be630472a17980537d1fbaf9ff3f
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE1000FT',d,t,1000),
