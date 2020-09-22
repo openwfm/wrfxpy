@@ -60,11 +60,19 @@ def plume_height(d,t):
 def smoke_at_height_terrain_ft(varname,d,t,level_ft):
       return smoke_at_height_terrain(varname,d,t,convert_value('ft','m',level_ft))
 
+def smoke_at_height_ft(varname,d,t,level_ft):
+      return smoke_at_height(varname,d,t,convert_value('ft','m',level_ft))
+
 def interpolate2height_terrain(d,t,var,level):
       return interpolate2height(var,height8p_terrain(d,t),level)
 
 def smoke_at_height_terrain(varname,d,t,level):
       s = interpolate2height_terrain(d,t,smoke_concentration(d,t),level)
+      print_stats(varname,s,'ug/m^3')
+      return s
+
+def smoke_at_height(varname,d,t,level):
+      s = interpolate2height(smoke_concentration(d,t),height8p(d,t),level)
       print_stats(varname,s,'ug/m^3')
       return s
 
@@ -135,19 +143,19 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,0) - cloud_to_level_hPa(d,t,400),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
-     'SMOKE1000FT' : {
-        'name' : 'Smoke 1000ft above terrain',
+     'SMOKE1000FT_ASL' : {
+        'name' : 'Smoke 1000ft above sea level',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'norm_opt' : 'lognorm',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE1000FT',d,t,1000),
+        'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE1000FT',d,t,1000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
-     'SMOKE1000FT_D' : {
-        'name' : 'Smoke 1000ft above terrain discrete',
+     'SMOKE1000FT_ASL_D' : {
+        'name' : 'Smoke 1000ft above sea level discrete',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -161,32 +169,50 @@ _var_wisdom = {
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE1000FT',d,t,1000),
+        'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE1000FT',d,t,1000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
-     'SMOKE4000FT' : {
-        'name' : 'Smoke 4000ft above terrain',
+     'SMOKE4000FT_ASL' : {
+        'name' : 'Smoke 4000ft above sea level',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE4000FT',d,t,4000),
+        'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE4000FT',d,t,4000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
-     'SMOKE6000FT' : {
-        'name' : 'Smoke 6000ft above terrain',
+     'SMOKE4000FT_ASL_D' : {
+        'name' : 'Smoke 4000ft above sea level',
+        'native_unit' : 'ug/m^3',
+        'colorbar' : 'ug/m^3',
+        'colormap' : 'rainbow',
+        'norm_opt' : 'boundary',
+        'bounds' : [0,1,2,4,6,8,12,16,20,25,30,40,60,100,200],
+        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
+                             (107,170,213),(72,149,176),(74,167,113),
+                             (114,190,75),(203,217,88),(249,201,80),
+                             (245,137,56),(234,84,43),(217,45,43),
+                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'spacing' : 'uniform',
+        'transparent_values' : [-np.inf,10],
+        'scale' : [0, 500],
+        'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE4000FT',d,t,4000),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'SMOKE6000FT_ASL' : {
+        'name' : 'Smoke 6000ft above sea level',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'norm_opt' : 'lognorm',
         'transparent_values' : [-np.inf,1],
         'scale' : [0, 500],
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE6000FT',d,t,6000),
+        'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE6000FT',d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
-     'SMOKE6000FT_D' : {
-        'name' : 'Smoke 6000ft above terrain discrete',
+     'SMOKE6000FT_ASL_D' : {
+        'name' : 'Smoke 6000ft above sea level discrete',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -200,7 +226,7 @@ _var_wisdom = {
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf,1],
         'scale' : [0, 500],
-        'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE6000FT',d,t,6000),
+        'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE6000FT',d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'WINDSPD1000FT' : {

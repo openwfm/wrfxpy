@@ -921,6 +921,7 @@ class Postprocessor(object):
                 # open the netCDF dataset
                 with open('/dev/null','w') as f:
                     check_call(['ncdump','-h','%s' % wrfout_path],stdout=f,stderr=f)
+                time.sleep(5)
             except:
                 if k == max_retries-1:
                     logging.error('process_vars: cannot open file %s' % wrfout_path)
@@ -950,8 +951,7 @@ class Postprocessor(object):
                     logging.info('process_vars: waiting for next retry...')
                     time.sleep(5)
 
-        time.sleep(5)
-        d = nc4.Dataset(wrfout_path)
+        d = nc4.Dataset(wrfout_path,'r')
         tndx = times.index(ts_esmf)
         if tif_proc:
             crs,gt_a,gt_f = ncwrfmeta(d)
