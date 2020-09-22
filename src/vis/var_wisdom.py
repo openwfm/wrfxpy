@@ -10,9 +10,9 @@ from six.moves import range
 smoke_threshold_int = 10
 smoke_threshold = 1
 smoke_integrated_unit = 'g/m^2'
-smoke_integrated_transparent = 1
+smoke_integrated_transparent = 0.01
 smoke_concentration_scale = 300
-smoke_concentration_transparent = 1e-6
+smoke_concentration_transparent = 1e-5
 
 def strip_end(d):
       m,n = d.variables['XLONG'][0,:,:].shape
@@ -149,6 +149,8 @@ _var_wisdom = {
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'norm_opt' : 'lognorm',
+<<<<<<< HEAD
+=======
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE1000FT',d,t,1000),
@@ -167,6 +169,7 @@ _var_wisdom = {
                              (245,137,56),(234,84,43),(217,45,43),
                              (188,28,32),(156,22,27),(147,32,205)])/255.,
         'spacing' : 'uniform',
+>>>>>>> cf8cafea4563be630472a17980537d1fbaf9ff3f
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE1000FT',d,t,1000),
@@ -177,6 +180,7 @@ _var_wisdom = {
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
+        'norm_opt' : 'lognorm',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE4000FT',d,t,4000),
@@ -307,7 +311,7 @@ _var_wisdom = {
         'colorbar' : 'm',
         'colormap' : 'jet',
         'transparent_values' : [-np.inf, 50],
-        'scale' : [0, 8000],
+        'scale' : [0, 10000],
         'retrieve_as' : lambda d,t: plume_height(d,t),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
@@ -337,7 +341,7 @@ _var_wisdom = {
         'colorbar' : None,
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_integrated_transparent],
-        'scale' : 'original',
+        'scale' : '[0,2]',
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKE_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
@@ -347,7 +351,8 @@ _var_wisdom = {
         'colorbar' : None,
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_concentration_transparent],
-        'scale' : [0,1],
+        'norm_opt' : 'lognorm',
+        'scale' : [0,100],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKETO10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
      },
