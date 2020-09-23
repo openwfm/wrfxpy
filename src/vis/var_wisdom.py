@@ -173,7 +173,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'VR10M_AGL' : {
-        'name' : 'Visibility Range 10m above ground level defined as 870/PM2.5 concentration',
+        'name' : 'Visibility Range 10m above ground level',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
         'colormap' : 'rainbow',
@@ -215,7 +215,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'VR1000FT_AGL' : {
-        'name' : 'Visibility Range 1000ft above ground level defined as 870/PM2.5 concentration',
+        'name' : 'Visibility Range 1000ft above ground level',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
         'colormap' : 'rainbow',
@@ -257,7 +257,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'VR4000FT_AGL' : {
-        'name' : 'Visibility Range 4000ft above ground level defined as 870/PM2.5 concentration',
+        'name' : 'Visibility Range 4000ft above ground level',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
         'colormap' : 'rainbow',
@@ -299,7 +299,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'VR6000FT_AGL' : {
-        'name' : 'Visibility Range 6000ft above ground level defined as 870/PM2.5 concentration',
+        'name' : 'Visibility Range 6000ft above ground level',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
         'colormap' : 'rainbow',
