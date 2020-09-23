@@ -144,7 +144,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE10M_AGL' : {
-        'name' : 'Smoke 10m above ground level',
+        'name' : 'Smoke 10m AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -155,7 +155,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE10M_AGL_D' : {
-        'name' : 'Smoke 10m above ground level discrete',
+        'name' : 'Smoke 10m AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -173,7 +173,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'VR10M_AGL' : {
-        'name' : 'Visibility Range 10m above ground level',
+        'name' : 'Visibility Range 10m AGL',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
         'colormap' : 'rainbow',
@@ -186,7 +186,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE1000FT_AGL' : {
-        'name' : 'Smoke 1000ft above ground level',
+        'name' : 'Smoke 1000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -197,7 +197,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE1000FT_AGL_D' : {
-        'name' : 'Smoke 1000ft above ground level discrete',
+        'name' : 'Smoke 1000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -215,7 +215,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'VR1000FT_AGL' : {
-        'name' : 'Visibility Range 1000ft above ground level',
+        'name' : 'Visibility Range 1000ft AGL',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
         'colormap' : 'rainbow',
@@ -228,7 +228,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE4000FT_AGL' : {
-        'name' : 'Smoke 4000ft above ground level',
+        'name' : 'Smoke 4000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -239,7 +239,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE4000FT_AGL_D' : {
-        'name' : 'Smoke 4000ft above ground level',
+        'name' : 'Smoke 4000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -257,7 +257,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'VR4000FT_AGL' : {
-        'name' : 'Visibility Range 4000ft above ground level',
+        'name' : 'Visibility Range 4000ft AGL',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
         'colormap' : 'rainbow',
@@ -270,7 +270,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE6000FT_AGL' : {
-        'name' : 'Smoke 6000ft above ground level',
+        'name' : 'Smoke 6000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -281,7 +281,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE6000FT_AGL_D' : {
-        'name' : 'Smoke 6000ft above ground level discrete',
+        'name' : 'Smoke 6000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -299,7 +299,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'VR6000FT_AGL' : {
-        'name' : 'Visibility Range 6000ft above ground level',
+        'name' : 'Visibility Range 6000ft AGL',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
         'colormap' : 'rainbow',
@@ -312,7 +312,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE1000FT_ASL' : {
-        'name' : 'Smoke 1000ft above sea level',
+        'name' : 'Smoke 1000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -323,7 +323,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE1000FT_ASL_D' : {
-        'name' : 'Smoke 1000ft above sea level discrete',
+        'name' : 'Smoke 1000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -341,7 +341,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE4000FT_ASL' : {
-        'name' : 'Smoke 4000ft above sea level',
+        'name' : 'Smoke 4000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -352,7 +352,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE4000FT_ASL_D' : {
-        'name' : 'Smoke 4000ft above sea level',
+        'name' : 'Smoke 4000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -370,7 +370,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE6000FT_ASL' : {
-        'name' : 'Smoke 6000ft above sea level',
+        'name' : 'Smoke 6000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
@@ -381,7 +381,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
      'SMOKE6000FT_ASL_D' : {
-        'name' : 'Smoke 6000ft above sea level discrete',
+        'name' : 'Smoke 6000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
