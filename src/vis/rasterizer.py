@@ -73,12 +73,12 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proport
 
     # construct the colorbar and modify properties
     cb = mpl.colorbar.ColorbarBase(ax,**kwargs)
-    cb.set_label(cb_label,color='1',fontsize=8,labelpad=-40)
+    cb.set_label(cb_label,color='0',fontsize=8,labelpad=-40)
 
     # move ticks to left side
     ax.yaxis.set_ticks_position('left')
     for tick_lbl in ax.get_yticklabels():
-        tick_lbl.set_color('1')
+        tick_lbl.set_color('0')
         tick_lbl.set_fontsize(8)
 
     # save png to a StringIO
@@ -123,12 +123,12 @@ def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=2
     cb = mpl.colorbar.ColorbarBase(ax,**kwargs)
     cb.ax.tick_params(length=0)
     cb.ax.set_yticklabels(labels)
-    cb.set_label(cb_label,color='1',fontsize=8,labelpad=-40)
+    cb.set_label(cb_label,color='0',fontsize=8,labelpad=-40)
 
     # move ticks to left side
     ax.yaxis.set_ticks_position('left')
     for tick_lbl in ax.get_yticklabels():
-        tick_lbl.set_color('1')
+        tick_lbl.set_color('0')
         tick_lbl.set_fontsize(5)
 
     # save png to a StringIO
