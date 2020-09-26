@@ -1,4 +1,4 @@
-from forecast import restart_execute
+from forecast import wrf_execute, process_output
 import logging, sys
 
 if __name__ == '__main__':
@@ -10,7 +10,9 @@ if __name__ == '__main__':
     job_id = sys.argv[1]    
 
     # execute the job
-    logging.info('calling restart_execute')
-    restart_execute(job_id)
+    logging.info('calling wrf_execute')
+    wrf_execute(job_id)
+    logging.info('calling process_output')
+    process_output(job_id)
 
-    logging.info('restart_forecast.py done')
+    logging.info('execute_wrf.py done')

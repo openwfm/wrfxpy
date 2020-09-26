@@ -920,9 +920,33 @@ class Postprocessor(object):
             try:
                 # open the netCDF dataset
                 with open('/dev/null','w') as f:
-                    check_call(['ncdump','-h','%s' % wrfout_path],stdout=f,stderr=f)
-                time.sleep(5)
-            except:
+                    check_call(['ncdump','-h','%s'%wrfout_path],stdout=f,stderr=f)
+                logging.info('process_vars: netCDF file checked, using python netCDF4')
+                d = nc4.Dataset(wrfout_path,'r')
+                # extract ESMF string times and identify timestamp of interest
+                times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
+                logging.info('process_vars: time steps found %s' % str(times))
+                # make sure time step is processed on file
+                if ts_esmf in times:
+                    logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
+                    tndx = times.index(ts_esmf)
+                    # check that some variables are in wrfout file
+                    check_vars = ['T2','U10','V10','PSFC']
+                    for var in check_vars:
+                        d.variables[var][tndx,0,0]
+                    break
+                else:
+                    if k == max_retries-1:
+                        logging.error('process_vars: cannot find time %s in %s' % (ts_esmf,wrfout_path))
+                        logging.info('process_vars: Available times: %s' % times)
+                        raise PostprocError("process_vars: Time %s not in %s" % (ts_esmf,osp.basename(wrfout_path)))
+                    else:
+                        logging.warning('process_vars: cannot find time %s in %s in retry %s of %s' % (ts_esmf,wrfout_path,str(k+1),str(max_retries)))
+                        logging.info('process_vars: Available times: %s' % times)
+                        logging.info('process_vars: waiting for next retry...')
+                        time.sleep(5)
+            except Exception as e:
+                logging.warning('Exception %s while reading wrfout file %s' % (e, wrfout_path))
                 if k == max_retries-1:
                     logging.error('process_vars: cannot open file %s' % wrfout_path)
                     raise PostprocError("process_vars: Unable to open file %s" % wrfout_path)
@@ -931,28 +955,7 @@ class Postprocessor(object):
                     logging.info('process_vars: waiting for next retry...')
                     time.sleep(5)
                     continue
-            else:
-                with nc4.Dataset(wrfout_path) as d:
-                    # extract ESMF string times and identify timestamp of interest
-                    times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
-                    logging.info('process_vars: time steps found %s' % str(times))
-            # make sure time step is processed on file
-            if ts_esmf in times:
-                logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
-                break
-            else:
-                if k == max_retries-1:
-                    logging.error('process_vars: cannot find time %s in %s' % (ts_esmf,wrfout_path))
-                    logging.info('process_vars: Available times: %s' % times)
-                    raise PostprocError("process_vars: Time %s not in %s" % (ts_esmf,osp.basename(wrfout_path)))
-                else:
-                    logging.warning('process_vars: cannot find time %s in %s in retry %s of %s' % (ts_esmf,wrfout_path,str(k+1),str(max_retries)))
-                    logging.info('process_vars: Available times: %s' % times)
-                    logging.info('process_vars: waiting for next retry...')
-                    time.sleep(5)
 
-        d = nc4.Dataset(wrfout_path,'r')
-        tndx = times.index(ts_esmf)
         if tif_proc:
             crs,gt_a,gt_f = ncwrfmeta(d)
 
@@ -1000,7 +1003,7 @@ class Postprocessor(object):
         :param vars: list of variables to process
         """
         # open the netCDF dataset
-        d = nc4.Dataset(wrfout_path)
+        d = nc4.Dataset(wrfout_path,'r')
 
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
@@ -1036,7 +1039,7 @@ class Postprocessor(object):
         :param vars: list of variables to process
         """
         # open the netCDF dataset
-        d = nc4.Dataset(wrfout_path)
+        d = nc4.Dataset(wrfout_path,'r')
 
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
@@ -1073,7 +1076,7 @@ class Postprocessor(object):
         traceargs()
 
         # open the netCDF dataset
-        d = nc4.Dataset(wrfout_path)
+        d = nc4.Dataset(wrfout_path,'r')
 
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:].astype(str)]

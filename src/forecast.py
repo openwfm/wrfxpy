@@ -118,6 +118,7 @@ class JobState(Dict):
             self.clean_dir = args['clean_dir']
         else:
             self.clean_dir = True
+        self.run_wrf = args.get('run_wrf', True)
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
 
@@ -367,13 +368,11 @@ def run_geogrid(js, q):
         Geogrid(js.wps_dir).execute().check_output()
         logging.info('GEOGRID complete')
 
-        delete(js.geo_cache)
         send_email(js, 'geogrid', 'GEOGRID complete.')
         q.put('SUCCESS')
 
     except Exception as e:
         logging.error('GEOGRID step failed with exception %s' % repr(e))
-        delete(js.geo_cache)
         q.put('FAILURE')
 
 
@@ -507,7 +506,7 @@ def fmda_add_to_geogrid(js):
         sys.exit(1)
     geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
     logging.info('fmda_add_to_geogrid reading longitudes and latitudes from NetCDF file %s' % geo_path )
-    with nc4.Dataset(geo_path) as d:
+    with nc4.Dataset(geo_path,'r') as d:
         lats = d.variables['XLAT'][:,:]
         lons = d.variables['XLONG'][:,:]
     ndomains = len(js['domains'])
@@ -772,32 +771,27 @@ def execute(args,job_args):
             logging.info('assimilate_fm10_observations for domain %s' % dom)
             assimilate_fm10_observations(osp.join(js.wrf_dir, 'wrfinput_d%02d' % int(dom)), None, js.fmda.token)
 
-    # step 8: execute wrf.exe on parallel backend
-    logging.info('submitting WRF job')
-    send_email(js, 'wrf_submit', 'Job %s - wrf job submitted.' % js.job_id)
-
-    js.task_id = "sim-" + js.grid_code + "-" + utc_to_esmf(js.start_utc)[:10]
-    jsub.job_num=WRF(js.wrf_dir, js.qsys).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
-
-    send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (js.job_id, js.task_id))
-    logging.info("WRF job %s submitted with id %s, waiting for rsl.error.0000" % (jsub.job_num, js.task_id))
-
-    jobfile = osp.abspath(osp.join(js.jobdir, 'job.json'))
-    json.dump(jsub, open(jobfile,'w'), indent=4, separators=(',', ': '))
-
-    process_output(js.job_id)
+    logging.info('step 8: execute wrf.exe on parallel backend')
+    logging.info('run_wrf = %s' % js.run_wrf)
+    if js.run_wrf:
+        # step 8: execute wrf.exe on parallel backend
+        jobfile = wrf_execute(js.job_id)    
+        # step 9: post-process results from wrf simulation
+        process_output(js.job_id)
+    else:
+        jobfile = jsub.jobfile
 
     return jobfile
 
-def restart_execute(job_id):
+def wrf_execute(job_id):
     sys_cfg = load_sys_cfg()
     jobfile = osp.abspath(osp.join(sys_cfg.workspace_path, job_id,'input.json'))
-    logging.info('restart_execute: loading job input from %s' % jobfile)
+    logging.info('wrf_execute: loading job input from %s' % jobfile)
     job_args = json.load(open(jobfile)) 
     args = process_arguments(job_args,sys_cfg)
     js = JobState(args)
     jsubfile = osp.abspath(osp.join(sys_cfg.workspace_path, job_id,'job.json'))
-    logging.info('restart_execute: loading job description from %s' % jsubfile)
+    logging.info('wrf_execute: loading job description from %s' % jsubfile)
     try:
         jsub = Dict(json.load(open(jsubfile,'r')))
     except Exception as e:
@@ -809,15 +803,15 @@ def restart_execute(job_id):
     js.wrf_dir = osp.abspath(osp.join(js.jobdir, 'wrf'))
 
     logging.info('submitting WRF job')
+    send_email(js, 'wrf_submit', 'Job %s - wrf job submitted.' % job_id)
     js.task_id = "sim-" + js.grid_code + "-" + utc_to_esmf(js.start_utc)[:10]
     jsub.job_num=WRF(js.wrf_dir, js.qsys).submit(js.task_id, js.num_nodes, js.ppn, js.wall_time_hrs)
+    send_email(js, 'wrf_exec', 'Job %s - wrf job starting now with id %s.' % (job_id, js.task_id))
     logging.info("WRF job %s submitted with id %s, waiting for rsl.error.0000" % (jsub.job_num, js.task_id))
 
     json.dump(jsub, open(jsubfile,'w'), indent=4, separators=(',', ': '))
 
-    process_output(js.job_id)
-
-    return jobfile
+    return jsubfile
 
 def process_output(job_id):
     args = load_sys_cfg()
@@ -876,7 +870,7 @@ def process_output(job_id):
             logging.info("Found %s" % wrfout_path)
             domain_str,wrfout_esmf_time = re.match(r'.*wrfout_d(0[0-9])_([0-9_\-:]{19})',wrfout_path).groups()
             dom_id = int(domain_str)
-            d = nc4.Dataset(wrfout_path)
+            d = nc4.Dataset(wrfout_path,'r')
             # extract ESMF string times
             times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
             d.close()

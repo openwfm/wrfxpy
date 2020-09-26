@@ -68,7 +68,7 @@ def clamp2mesh(nc_path,x,y):
     :return x1,x2: nearby coordinates in the mesh 
     """
 
-    d=nc4.Dataset(nc_path) 
+    d=nc4.Dataset(nc_path,'r') 
     varis = d.variables
     attrs = d.ncattrs()
 
