@@ -454,8 +454,7 @@ def vars_add_to_geogrid(js):
             geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
         else:
             logging.critical('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
-            logging.error('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
-            sys.exit(2)
+            raise OSError('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     for var,tif_file in six.iteritems(geo_vars):
@@ -467,7 +466,7 @@ def vars_add_to_geogrid(js):
             if var in ['NFUEL_CAT', 'ZSF']:
                 logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
                 logging.error('Exception: %s',e)
-                sys.exit(2)
+                raise OSError('Failed to process GeoTIFF file for variable {}'.format(var))
             else:
                 logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
     
@@ -1005,7 +1004,11 @@ def process_output(job_id):
             send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         if js.postproc.get('shuttle', None) is not None:
-            make_kmz(js.job_id)  # arguments can be added to the job id string
+            steps = ','.join(['1' for x in js.postproc.keys() if len(x) == 1])
+            args = ' '.join([js.job_id,steps,'inc'])
+            make_kmz(args)
+            args = ' '.join([js.job_id,steps,'ref'])
+            make_kmz(args)
 
         js.state = 'Completed'
 
@@ -1111,7 +1114,11 @@ def process_sat_output(job_id):
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
     if js.postproc.get('shuttle', None) is not None:
-        make_kmz(js.job_id)  # arguments can be added to the job id string
+        steps = ','.join(['1' for x in js.postproc.keys() if len(x) == 1])
+        args = ' '.join([js.job_id,steps,'inc'])
+        make_kmz(args)
+        args = ' '.join([js.job_id,steps,'ref'])
+        make_kmz(args)
 
     js.old_pid = js.pid
     js.pid = None
