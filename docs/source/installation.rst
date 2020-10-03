@@ -1,6 +1,8 @@
 Installation
 ************
 
+Please see https://www.openwfm.org/wiki/Setting_up_current_WRFx_system for up to date detailed instructions.
+
 Recommended method
 ==================
 We recommend using the `Anaconda Python <https://www.continuum.io/downloads>`_ distribution.
