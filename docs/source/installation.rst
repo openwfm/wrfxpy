@@ -5,8 +5,6 @@ Please see https://www.openwfm.org/wiki/Setting_up_current_WRFx_system for up to
 
 Recommended method
 ==================
-We recommend using the `Anaconda Python <https://www.continuum.io/downloads>`_ distribution.
-Alternative installation instructions are given at the bottom.
 
 WPS/WRF-SFIRE
 -------------
@@ -25,7 +23,7 @@ into its workspace.
 
 Python and packages
 -------------------
-Download and install the Python 3 `Anaconda Python <https://www.continuum.io/downloads>`_ distribution for your platform.  We recommend an installation into the users home directory.
+Download and install the Python 3 `Anaconda Python <https://www.anaconda.com/products/individual>`_ distribution for your platform.  URL and filenames change, so be sure to use the current ones. We recommend an installation into the users home directory. 
 
 ::
 
@@ -37,18 +35,15 @@ We recomend the creation of an environtment. Install pre-requisites:
 
 ::
 
-  conda create -n wrfxpy python=3 netcdf4 pyproj paramiko dill scikit-learn scikit-image h5py psutil proj4
-  conda activate wrfxpy
-  conda install -c conda-forge simplekml pygrib f90nml pyhdf xmltodict basemap
-  pip install MesoPy
-  pip install python-cmr
-
-Add your environment (~/.custom.csh) the following line
-  setenv PROJ_LIB "$HOME/anaconda3/share/proj"
-or if you are using bash to ~/.profile or ~/.bashrc
-  export PROJ_LIB="$HOME/anaconda3/share/proj"
+  conda update -n base -c defaults conda
+  conda create -n wrfx python=3 gdal netcdf4 pyproj paramiko dill h5py psutil proj4 pytz scipy matplotlib=3.2.2 flask
+  conda activate wrfx
+  conda install -c conda-forge simplekml pygrib f90nml pyhdf xmltodict basemap rasterio
+  pip install MesoPy python-cmr
 
 Note that ``conda`` and ``pip`` are package managers available in the Anaconda Python distribution.
+
+If you run into difficulties, please see if https://www.openwfm.org/wiki/Setting_up_current_WRFx_system#Install_necessary_packages has any further details.
 
 wrfxpy
 ------
