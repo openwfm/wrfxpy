@@ -987,11 +987,9 @@ class Postprocessor(object):
 
         if tslist is not None:
             try:
-                mf_upd = {}
                 logging.info('process_vars: postprocessing timeseries for time %s' % ts_esmf)
                 ts_paths = tslist.write_timestep(d,dom_id,tndx,ts_esmf)
-                mf_upd['ts_paths'] = ts_paths
-                self._update_manifest(dom_id, ts_esmf, 'TSLIST', mf_upd)
+                self._update_empty_manifest(dom_id, ts_esmf)
             except Exception as e:
                 logging.warning("Exception %s while postprocessing timeseries for time %s" % (e, ts_esmf))
                 logging.warning(traceback.print_exc())
@@ -1122,6 +1120,26 @@ class Postprocessor(object):
                     logging.warning(traceback.print_exc())
 
 
+    def _update_empty_manifest(self,dom_id,ts_esmf):
+        """
+        Adds empty structure to the manifest if not generated yet.
+
+        :param dom_id: the domain id (1, 2, 3, ...)
+        :param ts_esmf: ESMF time string
+        """
+        # update the manifest with the domain/ts_esmf/var info
+        dom = self.manifest.get(str(dom_id), {})
+        self.manifest[str(dom_id)] = dom
+
+        # extract timestamp
+        td = dom.get(ts_esmf, {})
+        dom[ts_esmf] = td
+
+        # synchronize the file
+        mf_path = os.path.join(self.output_path, self.product_name + '.json')
+        json.dump(self.manifest, open(mf_path, 'w'),indent=1, separators=(',',':'))
+
+
     def _update_manifest(self,dom_id,ts_esmf,var,kv):
         """
         Adds a key-value set to the dictionary storing metadata for time ts_esmf and variable var.
@@ -1135,7 +1153,7 @@ class Postprocessor(object):
         dom = self.manifest.get(str(dom_id), {})
         self.manifest[str(dom_id)] = dom
 
-    # extract timestamp
+        # extract timestamp
         td = dom.get(ts_esmf, {})
         dom[ts_esmf] = td
 
