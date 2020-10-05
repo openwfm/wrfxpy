@@ -101,15 +101,16 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     file_size = osp.getsize(local_path)
 
     # content size may have changed during download
-    #if appkey:
-    #    r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % appkey})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % appkey})
-    #else:
-    #    r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
-    #content_size = int(r.headers.get('content-length',0))
+    if appkey:
+        r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % appkey})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % appkey})
+    else:
+        r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
+    content_size = int(r.headers.get('content-length',0))
 
     logging.info('local file size %d remote content size %d' % (file_size, content_size))
 
-    if int(file_size) != int(content_size):
+    # it should be != but for some reason content_size is wrong sometimes
+    if int(file_size) < int(content_size) and int(file_size) != 0:
         logging.warning('wrong file size, download_url trying again, retries available %d' % max_retries)
         if max_retries > 0:
             # call the entire function recursively, this will attempt to redownload the entire file
@@ -126,5 +127,5 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     # when re-using the GRIB2 file, we check its file size against this record
     # to avoid using partial files
     info_path = local_path + '.size'
-    open(ensure_dir(info_path), 'w').write(str(content_size))
+    open(ensure_dir(info_path), 'w').write(str(file_size))
 
