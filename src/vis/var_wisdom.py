@@ -601,6 +601,15 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: 870/d.variables['tr17_1'][t,0,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
+    'Q2' : {
+        'name' : 'vapor mixing ratio at 2m',
+        'native_unit' : 'kg/kg',
+        'colorbar' : 'kg/kg',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d.variables['Q2'][t,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
     'T2' : {
         'name' : 'temperature at 2m',
         'native_unit' : 'K',

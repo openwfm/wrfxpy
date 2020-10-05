@@ -33,6 +33,7 @@ from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, up
 from geo.write_geogrid import write_table
 from geo.geodriver import GeoDriver
 from vis.postprocessor import Postprocessor
+from vis.timeseries import Timeseries
 from vis.var_wisdom import get_wisdom_variables,_sat_prods
 
 from ingest.NAM218 import NAM218
@@ -413,11 +414,19 @@ def make_job_file(js):
     jsub.postproc = js.postproc
     jsub.grid_code = js.grid_code
     jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
+    jsub.num_doms = js.num_doms
     jsub.tif_proc = js.tif_proc
+    if 'tslist' in js.keys():
+        jsub.tslist = js.tslist
+    else:
+        jsub.tslist = None
     return jsub
 
 def make_kmz(args):
     ssh_command('wrfxweb/make_kmz.sh ' + args)
+
+def make_zip(args):
+    ssh_command('wrfxweb/make_zip.sh ' + args)
 
 def read_namelist(path):
     logging.info('Reading namelist %s' % path)
@@ -575,6 +584,7 @@ def execute(args,job_args):
     if js.clean_dir or not osp.exists(osp.join(js.jobdir,'input.json')):
         make_clean_dir(js.jobdir)
 
+    js.num_doms = len(js.domains)
     json.dump(job_args, open(osp.join(js.jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
     jsub = make_job_file(js)
     json.dump(jsub, open(jsub.jobfile,'w'), indent=4, separators=(',', ': '))
@@ -593,8 +603,8 @@ def execute(args,job_args):
 
     # Parse and setup the domain configuration
     js.domain_conf = WPSDomainConf(js.domains)
-
     js.num_doms = len(js.domain_conf)
+
     js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds
 
     logging.info("number of domains defined is %d." % js.num_doms)
@@ -623,7 +633,7 @@ def execute(args,job_args):
             proc_q.close()
             # create satellite manifest
             sat_manifest = create_sat_manifest(js)
-            # create satellite outputst
+            # create satellite outputs
             process_sat_output(js.job_id)
             return
         else:
@@ -856,7 +866,12 @@ def process_output(job_id):
 
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
     make_clean_dir(js.pp_dir)
-    pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
+    prod_name = 'wfc-' + js.grid_code
+    pp = Postprocessor(js.pp_dir, prod_name)
+    if 'tslist' in js.keys() and js.tslist is not None:
+        ts = Timeseries(js.pp_dir, prod_name, js.tslist, js.num_doms)
+    else:
+        ts = None
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
     tif_proc = js.get('tif_proc', False)
@@ -889,13 +904,13 @@ def process_output(job_id):
                     try:
                         if sat_list:
                             pp.process_sats(jsat, dom_id, esmf_time, sat_list)
-                        pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list, tif_proc = tif_proc)
+                        pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list, tif_proc = tif_proc, tslist = ts)
                         # in incremental mode, upload to server
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
-                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
                         failures += 1
@@ -975,7 +990,7 @@ def process_output(job_id):
                 try:
                     if sat_list:
                         pp.process_sats(jsat, dom_id, esmf_time, sat_list)
-                    pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list, tif_proc = tif_proc)
+                    pp.process_vars(osp.join(js.wrf_dir,wrfout_path), dom_id, esmf_time, var_list, tif_proc = tif_proc, tslist = ts)
                 except Exception as e:
                     logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
                     failures += 1
@@ -986,7 +1001,7 @@ def process_output(job_id):
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
-                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
+                            already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
                         logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
         else:
@@ -1015,6 +1030,9 @@ def process_output(job_id):
     else:
         logging.error('All postprocessing steps failed')
         js.state = 'Postprocessing failed'
+
+    if ts is not None:
+        make_zip(js.job_id)
 
     js.old_pid = js.pid
     js.pid = None
@@ -1192,6 +1210,11 @@ def verify_inputs(args,sys_cfg):
                 if vname not in wvs:
                     logging.error('unrecognized variable %s in postproc key for domain %s.' % (vname, dom))
                     failing = True
+    if 'tslist' in args:
+        for vname in args['tslist']['vars']:
+            if vname not in wvs:
+                logging.error('unrecognized variable %s in tslist key.' % vname)
+                failing = True
     if failing:
         raise ValueError('One or more unrecognized variables in postproc.')
 

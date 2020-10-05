@@ -31,7 +31,6 @@ from geo.geodriver import GeoDriver
 class PostprocError(Exception):
     pass
 
-
 def scalar_field_to_raster(fa, lats, lons, wisdom):
     """
     Render a scalar variable into a geolocated raster and colorbar.
@@ -901,7 +900,7 @@ class Postprocessor(object):
                     logging.warning(traceback.print_exc())
 
 
-    def process_vars(self, wrfout_path, dom_id, ts_esmf, vars, tif_proc = False):
+    def process_vars(self, wrfout_path, dom_id, ts_esmf, vars, tif_proc = False, tslist = None):
         """
         Postprocess a list of scalar or vector fields at a given simulation time into PNG and KMZ
         files.
@@ -930,10 +929,6 @@ class Postprocessor(object):
                 if ts_esmf in times:
                     logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
                     tndx = times.index(ts_esmf)
-                    # check that some variables are in wrfout file
-                    check_vars = ['T2','U10','V10','PSFC']
-                    for var in check_vars:
-                        d.variables[var][tndx,0,0]
                     break
                 else:
                     if k == max_retries-1:
@@ -988,6 +983,17 @@ class Postprocessor(object):
                 self._update_manifest(dom_id, ts_esmf, var, mf_upd)
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s" % (e, var, ts_esmf))
+                logging.warning(traceback.print_exc())
+
+        if tslist is not None:
+            try:
+                mf_upd = {}
+                logging.info('process_vars: postprocessing timeseries for time %s' % ts_esmf)
+                ts_paths = tslist.write_timestep(d,dom_id,tndx,ts_esmf)
+                mf_upd['ts_paths'] = ts_paths
+                self._update_manifest(dom_id, ts_esmf, 'TSLIST', mf_upd)
+            except Exception as e:
+                logging.warning("Exception %s while postprocessing timeseries for time %s" % (e, ts_esmf))
                 logging.warning(traceback.print_exc())
 
         d.close()
