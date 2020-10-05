@@ -211,11 +211,11 @@ class SatSource(object):
             if g_id in metas['fire'].keys():
                 fire_meta = metas['fire'][g_id]
                 logging.info('retrieve_metas - downloading product id {}'.format(g_id))
-                urls = [geo_meta.get('archive_url'),geo_meta['links'][0]['href']]
+                urls = [geo_meta['links'][0]['href'],geo_meta.get('archive_url')]
                 m_geo = self.download_sat(urls,self.datacenter_to_appkey(geo_meta['data_center']))
                 if m_geo:
                     geo_meta.update(m_geo)
-                    urls = [fire_meta.get('archive_url'),fire_meta['links'][0]['href']]
+                    urls = [fire_meta['links'][0]['href'],fire_meta.get('archive_url')]
                     m_fire = self.download_sat(urls,self.datacenter_to_appkey(fire_meta['data_center']))
                     if m_fire:
                         fire_meta.update(m_fire)
