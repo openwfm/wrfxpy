@@ -55,7 +55,7 @@ class SatSource(object):
         info_path = path + '.size'
         if osp.exists(path) and osp.exists(info_path):
             content_size = int(open(info_path).read())
-            if content_size != 0:
+            if content_size > 0:
                 return osp.getsize(path) == content_size
         return False
 
