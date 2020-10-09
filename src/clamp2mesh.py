@@ -11,6 +11,14 @@ import os
 import netCDF4 as nc4
 import numpy as np
 
+def nearest_idx(lons,lats,x,y):
+    flons = lons.flatten()
+    flats = lats.flatten()
+    xd = flons - x
+    yd = flats - y
+    idx = (xd*xd + yd*yd).argmin()
+    return np.unravel_index(idx,lons.shape)
+
 def array_filled(array):
     return bool(np.array(array).sum())
 
@@ -68,7 +76,7 @@ def clamp2mesh(nc_path,x,y):
     :return x1,x2: nearby coordinates in the mesh 
     """
 
-    d=nc4.Dataset(nc_path) 
+    d=nc4.Dataset(nc_path,'r') 
     varis = d.variables
     attrs = d.ncattrs()
 
@@ -99,11 +107,7 @@ def clamp2mesh(nc_path,x,y):
         print('Error: %s NetCDF file specifiedc has not coordinates specified' % nc_path)
         sys.exit(1)
 
-    lons = lons.flatten()
-    lats = lats.flatten()
-    xd = lons - x
-    yd = lats - y
-    idx = (xd*xd + yd*yd).argmin()
+    idx = nearest_idx(lons,lats,x,y)
     return lons[idx], lats[idx] 
     
 

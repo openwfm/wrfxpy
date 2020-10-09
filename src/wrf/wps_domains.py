@@ -44,7 +44,7 @@ class WPSDomainLCC(object):
         self.subgrid_ratio = cfg.get('subgrid_ratio', (1, 1))
         self.geog_res = str(cfg.get('geog_res', '30s'))
         self.history_interval = cfg.get('history_interval', 60)
-        self.frames_per_outfile = cfg.get('frames_per_outfile', 24)
+        self.frames_per_outfile = cfg.get('frames_per_outfile', 1)
         if 'precomputed' in cfg:
             self._init_from_precomputed(cfg)
         else:

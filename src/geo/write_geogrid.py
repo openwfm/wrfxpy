@@ -135,7 +135,7 @@ def write_geogrid(path,array,index,bits=32,scale=None):
     xsize, ysize, zsize = dims
     if scale is None:
         scale = 2**(np.ceil(np.log2(np.max(np.abs(a))))-bits+1)
-    elif scale != 1.:
+    if scale != 1.:
         a = np.round(a/scale)
     if bits == 32:
         a = np.int32(a) 

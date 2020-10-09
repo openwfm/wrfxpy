@@ -1,29 +1,24 @@
 {
-    "tif_proc": true,
+    "sat_only": true,
     "wall_time_hrs": 2,
     "postproc": {
         "1": [
-            "T2",
-            "PSFC",
-            "WINDSPD",
-            "WINDVEC",
-            "FIRE_AREA",
-            "FGRNHFX",
-            "FLINEINT",
-            "SMOKE_INT"
+            "AQUA_AF",
+            "TERRA_AF",
+            "SNPP_AF"
         ],
         "shuttle": "incremental",
-        "description": "default simple forecast with geotiff"
+        "description": "default simple forecast satellite only"
     },
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
-    "start_utc": "T-30",
-    "grid_code": "default_simple_forecast_geotiff",
+    "start_utc": "T-720",
+    "grid_code": "default_simple_forecast_sat_only",
     "ppn": 28,
     "ignitions": {
         "1": [
             {
-                "time_utc": "T+30",
+                "time_utc": "T+0",
                 "latlon": [
                     39.1,
                     -104.3
@@ -63,7 +58,8 @@
             "stand_lon": -104.3
         }
     },
-    "end_utc": "T+300",
+    "end_utc": "T+720",
     "qsys": "kingspeak",
-    "grib_source": "NAM"
+    "grib_source": "NAM",
+    "satellite_source": ["Aqua","Terra","SNPP"]
 }

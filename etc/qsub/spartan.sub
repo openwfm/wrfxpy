@@ -1,0 +1,24 @@
+#!/bin/bash
+#SBATCH --time=%(wall_time_hrs)02d:00:00 # walltime, abbreviated by -t
+##SBATCH -o  # name of the stdout
+#SBATCH --ntasks=%(np)d   # number of MPI tasks, abbreviated by -n
+# additional information for allocated clusters
+#SBATCH --job-name=WRFX
+# set data and working directories
+export WORKDIR=%(cwd)s 
+cd $WORKDIR
+#
+# load appropriate modules, in this case Intel compilers, MPICHa
+module purge
+module load intel
+module load mvapich2-2.2/intel
+module load hdf5/intel 
+module load jasper/intel
+module load mkl-intel 
+module load netcdf/intel
+# for MPICH2 over Ethernet, set communication method to TCP
+# see below for network interface selection options for different MPI distributions
+#setenv MPICH_NEMESIS_NETMOD tcp
+# run the program
+# see below for ways to do this for different MPI distributions
+mpiexec -n $SLURM_NTASKS $WORKDIR/wrf.exe

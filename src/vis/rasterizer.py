@@ -36,7 +36,7 @@ except ImportError:
     # python 3
     from io import BytesIO as StringIO
 
-def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
+def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proportional',ticks=None,norm=None):
     """
     Create a colorbar to accompany a raseter image.
 
@@ -47,13 +47,22 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
     :param size_in: larger dimension in inches
     :param cmap: the colormap in use
     :param cb_label: the colorbar label
-    :param dpi: dots per inch
+    :param dpi: optional, dots per inch
+    :param spacing: optional, spacing between ticks
+    :param ticks: optional, list of ticks to show
+    :param norm: optional, scale to plot the data
     :return: a StringIO object with the colorbar as PNG data
     """
-    kwargs = { 'norm': mpl.colors.Normalize(rng[0],rng[1]),
-               'orientation':orientation,
-               'spacing':'proportional',
-               'cmap':cmap}
+    if norm:
+        norm = norm(rng[0],rng[1])
+    else:
+        norm = mpl.colors.Normalize(rng[0],rng[1])
+
+    kwargs = { 'norm': norm,
+               'orientation': orientation,
+               'spacing': spacing,
+               'cmap': cmap,
+               'ticks': ticks}
 
     # build figure according to requested orientation
     hsize, wsize = (size_in,size_in*0.5) if orientation == 'vertical' else (size_in*0.5,size_in)
@@ -64,12 +73,12 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200):
 
     # construct the colorbar and modify properties
     cb = mpl.colorbar.ColorbarBase(ax,**kwargs)
-    cb.set_label(cb_label,color='1',fontsize=8,labelpad=-40)
+    cb.set_label(cb_label,color='0',fontsize=8,labelpad=-40)
 
     # move ticks to left side
     ax.yaxis.set_ticks_position('left')
     for tick_lbl in ax.get_yticklabels():
-        tick_lbl.set_color('1')
+        tick_lbl.set_color('0')
         tick_lbl.set_fontsize(8)
 
     # save png to a StringIO
@@ -114,12 +123,12 @@ def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=2
     cb = mpl.colorbar.ColorbarBase(ax,**kwargs)
     cb.ax.tick_params(length=0)
     cb.ax.set_yticklabels(labels)
-    cb.set_label(cb_label,color='1',fontsize=8,labelpad=-40)
+    cb.set_label(cb_label,color='0',fontsize=8,labelpad=-40)
 
     # move ticks to left side
     ax.yaxis.set_ticks_position('left')
     for tick_lbl in ax.get_yticklabels():
-        tick_lbl.set_color('1')
+        tick_lbl.set_color('0')
         tick_lbl.set_fontsize(5)
 
     # save png to a StringIO
@@ -130,8 +139,10 @@ def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=2
     return str_io.getvalue()
 
 
-def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
-
+def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None):
+    if norm:
+        norm = norm(cmin,cmax)
+    
     # longitude/latitude extent
     lons = (np.amin(lon), np.amax(lon))
     lats = (np.amin(lat), np.amax(lat))
@@ -148,7 +159,7 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name):
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72)
     plt.axis('off')
     cmap = mpl.cm.get_cmap(cmap_name)
-    m.pcolormesh(lon,lat,masked_grid,latlon=True,cmap=cmap,vmin=cmin,vmax=cmax)
+    m.pcolormesh(lon,lat,masked_grid,latlon=True,norm=norm,cmap=cmap,vmin=cmin,vmax=cmax)
 
     str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
@@ -194,7 +205,7 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
     for i in range(N):
-    	m.scatter(lon[i],lat[i],60,c=val[i],latlon=True,marker='.',cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
+    	m.scatter(lon[i],lat[i],2,c=val[i],latlon=True,marker='s',cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
 
     # save png to a StringIO
     str_io = StringIO()

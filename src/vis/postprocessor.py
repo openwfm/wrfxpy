@@ -31,7 +31,6 @@ from geo.geodriver import GeoDriver
 class PostprocError(Exception):
     pass
 
-
 def scalar_field_to_raster(fa, lats, lons, wisdom):
     """
     Render a scalar variable into a geolocated raster and colorbar.
@@ -209,6 +208,30 @@ class Postprocessor(object):
             fa[fa > fa_max] = fa_max
             fa.mask = m                    # restore the mask
 
+        # define distribution of colormap if necessary 
+        ticks = None
+        if 'norm_opt' in wisdom: 
+            norm_opt = wisdom['norm_opt']
+            if norm_opt == 'lognorm':
+                linthresh = wisdom.get('linthresh',.01)
+                linscale = wisdom.get('linscale',.001)
+                norm = lambda xmin,xmax: mpl.colors.SymLogNorm(linthresh=linthresh,linscale=linscale,vmin=xmin,vmax=xmax,base=10) 
+            elif norm_opt == 'boundary':
+                bounds = wisdom.get('bounds',[0,1,2,4,6,8,12,16,20,25,30,40,60,100,200])
+                ticks = bounds[1:]
+                bounds = bounds + [1e10]
+                colors = wisdom.get('colors',np.array([(255,255,255),(197,234,252),(148,210,240),
+                                                       (107,170,213),(72,149,176),(74,167,113),
+                                                       (114,190,75),(203,217,88),(249,201,80),
+                                                       (245,137,56),(234,84,43),(217,45,43),
+                                                       (188,28,32),(156,22,27),(147,32,205)])/255.)
+                cmap = mpl.colors.LinearSegmentedColormap.from_list('custom',colors,N=len(colors))
+                norm = lambda xmin,xmax: mpl.colors.BoundaryNorm(boundaries=bounds,ncolors=len(bounds))
+            else:
+                norm = lambda xmin,xmax: mpl.colors.Normalize(xmin,xmax) 
+        else:
+            norm = None 
+
         # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
@@ -217,7 +240,8 @@ class Postprocessor(object):
             #  colorbar + add it to the KMZ as a screen overlay
             legend = wisdom['name'] + ' ' + cb_unit
             logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (var, cbu_min,cbu_max, legend))
-            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend)
+            spacing = wisdom.get('spacing','proportional')
+            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm)
 
         # replace masked values by nans just in case
         fa.data[fa.mask]=np.nan
@@ -227,7 +251,7 @@ class Postprocessor(object):
             % (var, fa.size , fa.count(), np.count_nonzero(fa.mask == False), np.nanmin(fa),np.nanmax(fa) ))
         
         # create the raster & get coordinate bounds
-        raster_png_data,corner_coords = basemap_raster_mercator(lon,lat,fa,fa_min,fa_max,cmap)
+        raster_png_data,corner_coords = basemap_raster_mercator(lon,lat,fa,fa_min,fa_max,cmap,norm=norm)
 
         # create GeoTIFF file
         if tif_args:
@@ -237,7 +261,7 @@ class Postprocessor(object):
                 ndv = -9999.0
             fa[np.isnan(fa)] = ndv
             tif_path = tif_args.get('tif_path')
-            logging.info('_scalar2raster: writting GeoTIFF file %s'.format(tif_path))
+            logging.info('_scalar2raster: writting GeoTIFF file {}'.format(tif_path))
             crs = tif_args.get('crs')
             geot = tif_args.get('geot')
             GeoDriver.from_elements(fa, crs, geot).to_geotiff(tif_path, desc = wisdom['name'], unit = native_unit, ndv = ndv)
@@ -305,7 +329,7 @@ class Postprocessor(object):
             u[np.isnan(u)] = ndv
             v[np.isnan(v)] = ndv
             tif_path = tif_args.get('tif_path')
-            logging.info('_vector2raster: writting GeoTIFF file %s'.format(tif_path))
+            logging.info('_vector2raster: writting GeoTIFF file {}'.format(tif_path))
             crs = tif_args.get('crs')
             gt = tif_args.get('geot')
             GeoDriver.from_elements(np.array([u, v]), crs, gt).to_geotiff(tif_path, desc = [uw['name'], vw['name']], unit = native_unit, ndv = ndv)
@@ -328,10 +352,10 @@ class Postprocessor(object):
         wisdom.update(self.wisdom_update.get(sat, {}))
         cmap_name = wisdom['colormap']
 
-        values = (3,5,7,8,9)
-        alphas = (.5,.5,.6,.7,.8)
-        labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
-        colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+        values = wisdom['options'].get('values',(3,5,7,8,9))
+        alphas = wisdom['options'].get('alphas',(.5,.5,.6,.7,.8))
+        labels = wisdom['options'].get('labels',('Water','Ground','Fire low','Fire nominal','Fire high'))
+        colors = wisdom['options'].get('colors',((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0)))
 
         # for each pair of files
         N = len(values)
@@ -367,10 +391,14 @@ class Postprocessor(object):
         # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
+            cb_N = 5
+            cb_labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+            cb_colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+            cb_cmap = mpl.colors.LinearSegmentedColormap.from_list('cb_'+cmap_name, cb_colors, N=cb_N)
             #  colorbar + add it to the KMZ as a screen overlay
             legend = ''
-            logging.info('_sat2raster: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
-            cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
+            logging.info('_sat2raster: variable %s colorbar from %s to %s %s' % (sat, 0, cb_N, legend))
+            cb_png_data = make_discrete_colorbar(cb_labels,cb_colors,'vertical',2,cb_cmap,legend)
 
         # create the raster & get coordinate bounds
         cmin = -.5
@@ -393,8 +421,8 @@ class Postprocessor(object):
         wisdom.update(self.wisdom_update.get(sat, {}))
         cmap_name = wisdom['colormap']
 
-        labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
-        colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+        labels = wisdom['options'].get('labels',('Water','Ground','Fire low','Fire nominal','Fire high'))
+        colors = wisdom['options'].get('colors',((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0)))
         N = len(labels)
 
         # create discrete colormap
@@ -406,10 +434,14 @@ class Postprocessor(object):
         # only create the colorbar if requested
         cb_png_data = None
         if wisdom['colorbar'] is not None:
+            cb_N = 5
+            cb_labels = ('Water','Ground','Fire low','Fire nominal','Fire high')
+            cb_colors = ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))
+            cb_cmap = mpl.colors.LinearSegmentedColormap.from_list('cb_'+cmap_name, cb_colors, N=cb_N)
             #  colorbar + add it to the KMZ as a screen overlay
             legend = ''
-            logging.info('_sat2raster_empty: variable %s colorbar from %s to %s %s' % (sat, 0, N, legend))
-            cb_png_data = make_discrete_colorbar(labels,colors,'vertical',2,cmap,legend)
+            logging.info('_sat2raster_empty: variable %s colorbar from %s to %s %s' % (sat, 0, cb_N, legend))
+            cb_png_data = make_discrete_colorbar(cb_labels,cb_colors,'vertical',2,cb_cmap,legend)
 
         # create the raster & get coordinate bounds
         raster_png_data,corner_coords = basemap_scatter_mercator([],[],[],bounds,[],0,0,cmap)
@@ -868,7 +900,7 @@ class Postprocessor(object):
                     logging.warning(traceback.print_exc())
 
 
-    def process_vars(self, wrfout_path, dom_id, ts_esmf, vars, tif_proc = False):
+    def process_vars(self, wrfout_path, dom_id, ts_esmf, vars, tif_proc = False, tslist = None):
         """
         Postprocess a list of scalar or vector fields at a given simulation time into PNG and KMZ
         files.
@@ -887,8 +919,29 @@ class Postprocessor(object):
             try:
                 # open the netCDF dataset
                 with open('/dev/null','w') as f:
-                    check_call(['ncdump','-h','%s' % wrfout_path],stdout=f,stderr=f)
-            except:
+                    check_call(['ncdump','-h','%s'%wrfout_path],stdout=f,stderr=f)
+                logging.info('process_vars: netCDF file checked, using python netCDF4')
+                d = nc4.Dataset(wrfout_path,'r')
+                # extract ESMF string times and identify timestamp of interest
+                times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
+                logging.info('process_vars: time steps found %s' % str(times))
+                # make sure time step is processed on file
+                if ts_esmf in times:
+                    logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
+                    tndx = times.index(ts_esmf)
+                    break
+                else:
+                    if k == max_retries-1:
+                        logging.error('process_vars: cannot find time %s in %s' % (ts_esmf,wrfout_path))
+                        logging.info('process_vars: Available times: %s' % times)
+                        raise PostprocError("process_vars: Time %s not in %s" % (ts_esmf,osp.basename(wrfout_path)))
+                    else:
+                        logging.warning('process_vars: cannot find time %s in %s in retry %s of %s' % (ts_esmf,wrfout_path,str(k+1),str(max_retries)))
+                        logging.info('process_vars: Available times: %s' % times)
+                        logging.info('process_vars: waiting for next retry...')
+                        time.sleep(5)
+            except Exception as e:
+                logging.warning('Exception %s while reading wrfout file %s' % (e, wrfout_path))
                 if k == max_retries-1:
                     logging.error('process_vars: cannot open file %s' % wrfout_path)
                     raise PostprocError("process_vars: Unable to open file %s" % wrfout_path)
@@ -897,29 +950,7 @@ class Postprocessor(object):
                     logging.info('process_vars: waiting for next retry...')
                     time.sleep(5)
                     continue
-            else:
-                with nc4.Dataset(wrfout_path) as d:
-                    # extract ESMF string times and identify timestamp of interest
-                    times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
-                    logging.info('process_vars: time steps found %s' % str(times))
-            # make sure time step is processed on file
-            if ts_esmf in times:
-                logging.info('process_vars: time step %s found in wrfout %s in retry %s' % (ts_esmf,wrfout_path,str(k+1)))
-                break
-            else:
-                if k == max_retries-1:
-                    logging.error('process_vars: cannot find time %s in %s' % (ts_esmf,wrfout_path))
-                    logging.info('process_vars: Available times: %s' % times)
-                    raise PostprocError("process_vars: Time %s not in %s" % (ts_esmf,osp.basename(wrfout_path)))
-                else:
-                    logging.warning('process_vars: cannot find time %s in %s in retry %s of %s' % (ts_esmf,wrfout_path,str(k+1),str(max_retries)))
-                    logging.info('process_vars: Available times: %s' % times)
-                    logging.info('process_vars: waiting for next retry...')
-                    time.sleep(5)
 
-        time.sleep(5)
-        d = nc4.Dataset(wrfout_path)
-        tndx = times.index(ts_esmf)
         if tif_proc:
             crs,gt_a,gt_f = ncwrfmeta(d)
 
@@ -954,6 +985,15 @@ class Postprocessor(object):
                 logging.warning("Exception %s while postprocessing %s for time %s" % (e, var, ts_esmf))
                 logging.warning(traceback.print_exc())
 
+        if tslist is not None:
+            try:
+                logging.info('process_vars: postprocessing timeseries for time %s' % ts_esmf)
+                ts_paths = tslist.write_timestep(d,dom_id,tndx,ts_esmf)
+                self._update_empty_manifest(dom_id, ts_esmf)
+            except Exception as e:
+                logging.warning("Exception %s while postprocessing timeseries for time %s" % (e, ts_esmf))
+                logging.warning(traceback.print_exc())
+
         d.close()
 
 
@@ -967,7 +1007,7 @@ class Postprocessor(object):
         :param vars: list of variables to process
         """
         # open the netCDF dataset
-        d = nc4.Dataset(wrfout_path)
+        d = nc4.Dataset(wrfout_path,'r')
 
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
@@ -1003,7 +1043,7 @@ class Postprocessor(object):
         :param vars: list of variables to process
         """
         # open the netCDF dataset
-        d = nc4.Dataset(wrfout_path)
+        d = nc4.Dataset(wrfout_path,'r')
 
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
@@ -1040,7 +1080,7 @@ class Postprocessor(object):
         traceargs()
 
         # open the netCDF dataset
-        d = nc4.Dataset(wrfout_path)
+        d = nc4.Dataset(wrfout_path,'r')
 
         # extract ESMF string times and identify timestamp of interest
         times = [''.join(x) for x in d.variables['Times'][:].astype(str)]
@@ -1080,6 +1120,26 @@ class Postprocessor(object):
                     logging.warning(traceback.print_exc())
 
 
+    def _update_empty_manifest(self,dom_id,ts_esmf):
+        """
+        Adds empty structure to the manifest if not generated yet.
+
+        :param dom_id: the domain id (1, 2, 3, ...)
+        :param ts_esmf: ESMF time string
+        """
+        # update the manifest with the domain/ts_esmf/var info
+        dom = self.manifest.get(str(dom_id), {})
+        self.manifest[str(dom_id)] = dom
+
+        # extract timestamp
+        td = dom.get(ts_esmf, {})
+        dom[ts_esmf] = td
+
+        # synchronize the file
+        mf_path = os.path.join(self.output_path, self.product_name + '.json')
+        json.dump(self.manifest, open(mf_path, 'w'),indent=1, separators=(',',':'))
+
+
     def _update_manifest(self,dom_id,ts_esmf,var,kv):
         """
         Adds a key-value set to the dictionary storing metadata for time ts_esmf and variable var.
@@ -1093,7 +1153,7 @@ class Postprocessor(object):
         dom = self.manifest.get(str(dom_id), {})
         self.manifest[str(dom_id)] = dom
 
-    # extract timestamp
+        # extract timestamp
         td = dom.get(ts_esmf, {})
         dom[ts_esmf] = td
 
