@@ -410,6 +410,15 @@ _var_wisdom = {
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
+     'WINDSPD1000FT_mph' : {
+        'name' : 'wind speed at 1000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
     'WINDVEC1000FT' : {
         'name' : 'wind speed at 1000ft',
         'components' : [ 'U1000FT', 'V1000FT' ],
@@ -429,6 +438,15 @@ _var_wisdom = {
         'name' : 'wind speed at 4000ft',
         'native_unit' : 'm/s',
         'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
+     'WINDSPD4000FT_mph' : {
+        'name' : 'wind speed at 4000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
         'colormap' : 'jet',
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
@@ -458,6 +476,15 @@ _var_wisdom = {
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
+     'WINDSPD6000FT_mph' : {
+        'name' : 'wind speed at 6000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
     'WINDVEC6000FT' : {
         'name' : 'wind speed at 6000ft',
         'components' : [ 'U6000FT', 'V6000FT' ],
@@ -477,6 +504,16 @@ _var_wisdom = {
         'name' : 'plume height',
         'native_unit' : 'm',
         'colorbar' : 'm',
+        'colormap' : 'jet',
+        'transparent_values' : [-np.inf, 50],
+        'scale' : [0, 10000],
+        'retrieve_as' : lambda d,t: plume_height(d,t),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'PLUME_HEIGHT_ft' : {
+        'name' : 'plume height',
+        'native_unit' : 'm',
+        'colorbar' : 'ft',
         'colormap' : 'jet',
         'transparent_values' : [-np.inf, 50],
         'scale' : [0, 10000],
@@ -619,6 +656,15 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: d.variables['T2'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
+    'T2_F' : {
+        'name' : 'temperature at 2m',
+        'native_unit' : 'K',
+        'colorbar' : 'F',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d.variables['T2'][t,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
     'FIRE_AREA' : {
         'name' : 'fire area',
         'native_unit' : '-',
@@ -678,7 +724,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
      'WINDSPD' : {
-        'name' : 'wind speed',
+        'name' : 'wind speed at 10m',
         'native_unit' : 'm/s',
         'colorbar' : 'm/s',
         'colormap' : 'jet',
@@ -686,8 +732,17 @@ _var_wisdom = {
         'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
+     'WINDSPD_mph' : {
+        'name' : 'wind speed at 10m',
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
     'WINDVEC' : {
-        'name' : 'wind speed',
+        'name' : 'wind speed at 10m',
         'components' : [ 'U10', 'V10' ],
         'native_unit' : 'm/s',
         'scale' : 'original',
@@ -850,9 +905,10 @@ _units_wisdom = {
     ('K',   'C') : lambda x: x - 273.15,
     ('K',   'F') : lambda x: 9.0 / 5.0 * (x - 273.15) + 32,
     ('m/s', 'ft/s') : lambda x: 3.2808399 * x,
+    ('m/s', 'mph') : lambda x: 2.236936292 * x,
     ('m',   'ft') : lambda x: 3.2808399 * x,
     ('km',   'miles') : lambda x: 0.621371 * x,
-    ('miles', 'km') : lambda x: 1.60934 * x,
+    ('miles', 'km') : lambda x: 1.609344 * x,
     ('ft/s','m/s') : lambda x: x / 3.2808399,
     ('ft',  'm') : lambda x: x / 3.2808399,
     ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x,
