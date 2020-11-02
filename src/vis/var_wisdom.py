@@ -12,7 +12,7 @@ smoke_threshold = 1
 smoke_integrated_unit = 'g/m^2'
 smoke_integrated_transparent = 0.01
 smoke_concentration_scale = 300
-smoke_concentration_transparent = 1e-5
+smoke_concentration_transparent = 1e-2
 
 def strip_end(d):
       m,n = d.variables['XLONG'][0,:,:].shape
@@ -150,7 +150,7 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'lognorm',
         'transparent_values' : [-np.inf,10],
-        'scale' : [0, 500],
+        'scale' : [0, 200],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain('SMOKE10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
@@ -567,7 +567,7 @@ _var_wisdom = {
         'colorbar' : smoke_integrated_unit,
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf, 0.05],
-        'scale' : [0, 2],
+        'scale' : [0, 1],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
@@ -826,6 +826,26 @@ _var_wisdom = {
        'colormap' : 'jet_r',
        'scale' : [0.0, 1.0],
        'retrieve_as' : lambda d,t: d.variables['FMC_EQUI'][t,0,:,:],
+       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'RAIN' : {
+       'name' : 'accumulated precipitation',
+       'native_unit' : 'mm',
+       'colorbar' : 'mm',
+       'colormap' : 'jet_r',
+       'scale' : 'original',
+       'transparent_values' : [-np.inf, 1],
+       'retrieve_as' : lambda d,t: d.variables['RAINNC'][t,:,:],
+       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'SNOWH' : {
+       'name' : 'snow depth',
+       'native_unit' : 'm',
+       'transparent_values' : [-np.inf, 0.01],
+       'colorbar' : 'mm',
+       'colormap' : 'tab20b_r',
+       'scale' : 'original',
+       'retrieve_as' : lambda d,t: d.variables['SNOWH'][t,:,:],
        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'TERRA_AF' : {
