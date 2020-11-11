@@ -37,6 +37,33 @@ _var_wisdom = {'NFUEL_CAT' : {
                     'df_dy': 'DZDYF',
                     'halt_on_missing': 'no'}
     },
+    'CAN_TOP' : {
+        'units': "meters",
+        'description': "Forest Canopy Height from LANDFIRE",
+        'type': "continuous",
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+    },
+    'CAN_BOT' : {
+        'units': "meters",
+        'description': "Forest Canopy Base Height from LANDFIRE",
+        'type': "continuous",
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+    },
+    'CAN_COV' : {
+        'units': "1",
+        'description': "Forest Canopy Cover from LANDFIRE",
+        'type': "continuous",
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+    },
     'FMC_GC' : {
         'units': "1",
         'description': "1h, 10h, 100h fuel moisture",
