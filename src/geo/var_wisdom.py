@@ -38,7 +38,7 @@ _var_wisdom = {'NFUEL_CAT' : {
                     'halt_on_missing': 'no'}
     },
     'CAN_TOP' : {
-        'units': "meters",
+        'units': "decimeters",
         'description': "Forest Canopy Height from LANDFIRE",
         'type': "continuous",
         'signed': 'yes',
@@ -47,7 +47,7 @@ _var_wisdom = {'NFUEL_CAT' : {
         'subgrid': 'yes',
     },
     'CAN_BOT' : {
-        'units': "meters",
+        'units': "decimeters",
         'description': "Forest Canopy Base Height from LANDFIRE",
         'type': "continuous",
         'signed': 'yes',
@@ -57,7 +57,7 @@ _var_wisdom = {'NFUEL_CAT' : {
     },
     'CAN_COV' : {
         'units': "1",
-        'description': "Forest Canopy Cover from LANDFIRE",
+        'description': "Forest Canopy Cover from LANDFIRE (%)",
         'type': "continuous",
         'signed': 'yes',
         'bits': 16,
