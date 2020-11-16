@@ -194,7 +194,7 @@ def basemap_barbs_mercator(u,v,lat,lon):
     return str_io.getvalue(), float_bounds
 
 
-def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
+def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's'):
     # number of scatter elements
     N = len(val)	
    
@@ -205,7 +205,7 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
     for i in range(N):
-    	m.scatter(lon[i],lat[i],2,c=val[i],latlon=True,marker='s',cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
+    	m.scatter(lon[i],lat[i],size,c=val[i],latlon=True,marker=marker,cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
 
     # save png to a StringIO
     str_io = StringIO()

@@ -1161,9 +1161,12 @@ def verify_inputs(args,sys_cfg):
                    % (key, sys_cfg[key], args[key]))
                raise ValueError('System configuration values may not be overwritten.')
 
-
     # we don't check if job_id is a valid path
-    required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
+    if 'sat_only' in args and args['sat_only']:
+        required_files = [('sys_install_path', 'Non-existent system installation directory %s')]
+        optional_files = []
+    else:
+        required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
                       ('workspace_path', 'Non-existent workspace directory %s'),
                       ('wps_install_path', 'Non-existent WPS installation directory %s'),
                       ('wrf_install_path', 'Non-existent WRF installation directory %s'),
@@ -1172,7 +1175,7 @@ def verify_inputs(args,sys_cfg):
                       ('fire_namelist_path', 'Non-existent fire namelist template %s'),
                       ('wps_geog_path', 'Non-existent geogrid data (WPS-GEOG) path %s')]
 
-    optional_files = [('emissions_namelist_path', 'Non-existent namelist template %s')]
+        optional_files = [('emissions_namelist_path', 'Non-existent namelist template %s')]
 
     # check each path that should exist
     for key, err in required_files:
