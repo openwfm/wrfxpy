@@ -22,6 +22,22 @@ _var_wisdom = {'NFUEL_CAT' : {
                     'z_dim_name': 'fuel_cat',
                     'halt_on_missing': 'no'}             
     },
+    'NTREE_CAT' : {
+        'units': "tree type",
+        'description': "Existing 200 vegetation type categories",
+        'type': "categorical",
+        'category_range': [0,9999],
+        'fill_missing': 0,
+        'fill' : Dict({}),
+        'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:nearest_neighbor+average_16pt+search',
+        'subgrid': 'yes',
+        'add_opts': {'dominant_only': 'NTREE_CAT',
+                    'z_dim_name': 'tree_cat',
+                    'halt_on_missing': 'no'}
+    },
     'ZSF' : {
         'units': "meters",
         'description': "National Elevation Dataset 1/3 arcsecond resolution",
