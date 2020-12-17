@@ -26,9 +26,9 @@ _var_wisdom = {'NFUEL_CAT' : {
         'units': "tree type",
         'description': "Existing 200 vegetation type categories",
         'type': "categorical",
-        'category_range': [0,9999],
+        'category_range': [0,6],
         'fill_missing': 0,
-        'fill' : Dict({}),
+        'fill' : '/uufs/chpc.utah.edu/common/home/u6015636/repos2/wrfxpy/evt_code_massman_conversion.csv',
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
         'bits': 16,

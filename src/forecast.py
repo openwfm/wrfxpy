@@ -478,6 +478,7 @@ def vars_add_to_geogrid(js):
                 raise OSError('Failed to process GeoTIFF file for variable {}'.format(var))
             else:
                 logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
+                logging.warning('Exception: %s',e)
     
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
