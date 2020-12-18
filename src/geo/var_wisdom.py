@@ -28,7 +28,7 @@ _var_wisdom = {'NFUEL_CAT' : {
         'type': "categorical",
         'category_range': [0,6],
         'fill_missing': 0,
-        'fill' : '/uufs/chpc.utah.edu/common/home/u6015636/repos2/wrfxpy/evt_code_massman_conversion.csv',
+        'fill' : 'from_file',
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
         'bits': 16,

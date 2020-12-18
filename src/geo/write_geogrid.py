@@ -6,10 +6,11 @@ from __future__ import print_function
 import os.path as osp
 import numpy as np
 import sys, os, logging, json
-from utils import inq, addquotes
+from utils import inq, addquotes, Dict
 from geo.var_wisdom import get_wisdom
 from geo.geo_utils import fill_categories
 import six
+import pandas as pd
 
 def write_divide(file,divide='=',count=31):
     """
@@ -65,6 +66,30 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
     # categorical substitution and interpolation
     if index['type'] == 'categorical':
         fill = wisdom.get('fill',{})
+        if isinstance(fill,str):
+            fill_str = fill
+            fill = {}
+            if fill_str == 'from_file':
+                fill_path = 'etc/vtables/fill.json'
+                try:
+                    fill_vars = json.load(open(fill_path,'r'))
+                except:
+                    logging.warning('write_geogrid_var fail reading fill file {}'.format(fill_path))
+                fill_file = fill_vars.get(varname,'')
+                if osp.exists(fill_file):
+                    try:
+                        df = pd.read_csv(fill_file,names=['from','to'],index_col=False)
+                        cfrom = np.array(df.loc[1:,'from'])
+                        cto = np.array(df.loc[1:,'to'])
+                        rest_val = df.loc[0,'from']
+                        unique = np.unique(array)
+                        rest_ind = np.array([u for u in unique if u not in cfrom])
+                        fill = Dict({tuple(rest_ind): rest_val})
+                        for k,key in enumerate(cfrom):
+                            fill.update({key: cto[k]})
+                    except Exception as e:
+                        logging.warning('write_geogrid_var fail reading fill CSV file {}'.format(fill_file))
+                        logging.warning('with exception {}'.format(e))
         array = fill_categories(array,fill,coord)
 
     write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale)

@@ -4,31 +4,16 @@ import logging
 from osgeo import osr
 import pyproj
 import os.path as osp
-import pandas as pd
-from utils import Dict
 
 def fill_categories(array,fill,coord=None):
     """
     Replace categorical labels and interpolate missing categories depending on a custom dictionary
     
     :param array: array of a categorical variable
-    :param fill: file path or dictionary with category replacements and missing categories
+    :param fill: dictionary with category replacements and missing categories
     :param coord: optional, coordinates (x,y)
     :return: array with categories replaced and interpolated missing categories using nearest neighbour
     """
-    if isinstance(fill,str):
-        if osp.exists(fill):
-            df = pd.read_csv(fill,names=['from','to'],index_col=False)
-            cfrom = np.array(df.loc[1:,'from'])
-            cto = np.array(df.loc[1:,'to'])
-            rest_val = df.loc[0,'from']
-            unique = np.unique(array)
-            rest_ind = np.array([u for u in unique if u not in cfrom])
-            fill = Dict({tuple(rest_ind): rest_val})
-            for k,key in enumerate(cfrom):
-                fill.update({key: cto[k]})
-        else:
-            fill = Dict({})
     # replace categories
     for k in fill.keys():
         if fill[k] != 'nearest':
