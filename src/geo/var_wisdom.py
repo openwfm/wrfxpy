@@ -29,7 +29,7 @@ _var_wisdom = {'NFUEL_CAT' : {
         'category_range': [0,6],
         'fill_missing': 0,
         'fill' : 'from_file',
-        'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
+        'scale': 10., # scale the array to be in meters (original data is in decimeters)
         'signed': 'yes',
         'bits': 16,
         'interp_option': 'default:nearest_neighbor+average_16pt+search',
