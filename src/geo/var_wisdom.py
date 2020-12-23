@@ -28,8 +28,8 @@ _var_wisdom = {'NFUEL_CAT' : {
         'type': "categorical",
         'category_range': [0,6],
         'fill_missing': 0,
+        'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'fill' : 'from_file',
-        'scale': 10., # scale the array to be in meters (original data is in decimeters)
         'signed': 'yes',
         'bits': 16,
         'interp_option': 'default:nearest_neighbor+average_16pt+search',
@@ -54,19 +54,21 @@ _var_wisdom = {'NFUEL_CAT' : {
                     'halt_on_missing': 'no'}
     },
     'CAN_TOP' : {
-        'units': "decimeters",
+        'units': "meters",
         'description': "Forest Canopy Height from LANDFIRE",
         'type': "continuous",
         'signed': 'yes',
+        'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
     },
     'CAN_BOT' : {
-        'units': "decimeters",
+        'units': "meters",
         'description': "Forest Canopy Base Height from LANDFIRE",
         'type': "continuous",
         'signed': 'yes',
+        'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',

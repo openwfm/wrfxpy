@@ -53,6 +53,7 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
     index['signed'] = wisdom.get('signed','yes')
     bits = wisdom.get('bits',bits)
     scale = wisdom.get('scale',None)
+    uscale = wisdom.get('unit_scale',None)
 
     # some adds to index
     if 'category_range' in wisdom:
@@ -92,7 +93,7 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
                         logging.warning('with exception {}'.format(e))
         array = fill_categories(array,fill,coord)
 
-    write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale)
+    write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale,uscale=uscale)
  
     # write also the index as json entry to modify later
     index_json_path = osp.join(path_dir,'index.json')
@@ -137,7 +138,7 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
     json.dump(geogrid_tbl,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
 
     
-def write_geogrid(path,array,index,bits=32,scale=None):
+def write_geogrid(path,array,index,bits=32,scale=None,uscale=None):
     """
     Write geogrid dataset 
     :param path: the directory where the dataset is to be stored
@@ -145,6 +146,7 @@ def write_geogrid(path,array,index,bits=32,scale=None):
     :param index: json with geogrid index, with geolocation and description already set 
     :param bits: 16 or 32 (default)
     :param scale: numeric scale or None (default)
+    :param uscale: numeric transform scale to change units or None (default)
     :param data_type: 'categorical' or 'continuous' (default)
     """
 
@@ -176,6 +178,8 @@ def write_geogrid(path,array,index,bits=32,scale=None):
     data_path = osp.join(path,data_file)
     a.flatten().tofile(data_path)
     
+    if uscale != None:
+        scale *= uscale
     # write index
     index.update({'scale_factor': scale,
                  'wordsize': bits // 8,
