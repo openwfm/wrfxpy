@@ -155,6 +155,8 @@ def write_geogrid(path,array,index,bits=32,scale=None,uscale=None):
         os.makedirs(path)
     # write binary data file
     a = np.array(array)
+    if uscale != None:
+        a = a*float(uscale)
     dims = a.shape
     if len(dims) < 3:
         dims = dims + (1,)
@@ -178,8 +180,6 @@ def write_geogrid(path,array,index,bits=32,scale=None,uscale=None):
     data_path = osp.join(path,data_file)
     a.flatten().tofile(data_path)
     
-    if uscale != None:
-        scale *= uscale
     # write index
     index.update({'scale_factor': scale,
                  'wordsize': bits // 8,
