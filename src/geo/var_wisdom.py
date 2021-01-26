@@ -88,7 +88,6 @@ _var_wisdom = {'NFUEL_CAT' : {
         'type': "continuous",
         'tile_bdr': 0,
         'signed': 'yes',
-        'subgrid': 'yes',
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
     },
     'FMEP' : {
@@ -97,7 +96,6 @@ _var_wisdom = {'NFUEL_CAT' : {
         'type': "continuous",
         'tile_bdr': 0,
         'signed': 'yes',
-        'subgrid': 'yes',
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
     },
     'XLONG' : {
