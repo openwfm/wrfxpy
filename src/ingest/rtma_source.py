@@ -113,7 +113,8 @@ class RTMA(object):
 
         return not_ready, ready
 
-    def geogrid_index(self):
+    @staticmethod
+    def geogrid_index():
         """
         Geolocation in a form suitable for geogrid index.
         According to the paper: https://journals.ametsoc.org/doi/pdf/10.1175/WAF-D-10-05037.1 fig 1
@@ -127,7 +128,8 @@ class RTMA(object):
                 'dy' : -2539.703,
                 'truelat1' : 25.0,
                 'truelat2' : 25.0,
-                'stdlon' : 265}
+                'stdlon' : 265,
+                'radius' : 6371200.0}
 
    
     def _local_var_path(self, ts, var):

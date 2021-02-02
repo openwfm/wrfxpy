@@ -412,7 +412,7 @@ class FuelMoistureModel:
         if not not_coord:
             x=int(xsize*0.5)
             y=int(ysize*0.5)
-            index.update({'known_x':float(y),'known_y':float(x),'known_lat':lats[x-1,y-1],'known_lon':lons[x-1,y-1]})
+            index.update({'known_x':float(y),'known_y':float(x),'known_lat':float(lats[x-1,y-1]),'known_lon':float(lons[x-1,y-1])})
             logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid updated="+str(index))
 
         FMC_GC = np.zeros((xsize, ysize, 5))
