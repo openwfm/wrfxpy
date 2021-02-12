@@ -23,8 +23,10 @@ from __future__ import print_function
 import numpy as np
 import sys
 import logging
+import os.path as osp
 from utils import inq, ensure_dir
 from ingest.rtma_source import RTMA
+from wrf.wps_format import WPSFormat
 from geo.write_geogrid import write_geogrid_var
 from geo.var_wisdom import get_wisdom
 from six.moves import range
@@ -426,6 +428,43 @@ class FuelMoistureModel:
         write_geogrid_var(path,'FMC_GC',FMC_GC,index,bits=32)
         write_geogrid_var(path,'FMEP',FMEP,index,bits=32)
         
+    def to_wps_format(self, path, index, lats, lons, time_tag):
+        """
+        Store model to wps format files
+        """
+        test_latslons=True
+
+        logging.info("fmda.fuel_moisture_model.to_wps_format path=%s lats %s lons %s" % (path, inq(lats), inq(lons)))
+        logging.info("fmda.fuel_moisture_model.to_wps_format: index="+str(index))
+        ny, nx, n = self.m_ext.shape
+        if n != 5:
+            logging.error('wrong number of extended state fields, expecting 5')
+
+        m = 7
+        var = np.zeros((ny, nx, m))
+        var[:,:,:3] = self.m_ext[:,:,:3]
+        var[:,:,3] = lons
+        var[:,:,4] = lats
+        var[:,:,5:] = self.m_ext[:,:,3:]
+        arrs = [var[:,:,k].swapaxes(0,1) for k in range(m)]
+        startloc = "SWCORNER"
+        startlat = lats[0,0]
+        startlon = lons[0,0]
+        params = {
+            'ifv': 5, 'hdate': "{}:00:00".format(time_tag), 'xfcst': 0.,
+            'map_source': "WRF-SFIRE Wildland Fire Information and Forecasting System",
+            'field': ["FM1H", "FM10H", "FM100H", "FMXLON", "FMXLAT", "FMEP0", "FMEP1"], 
+            'units': ["1", "1", "1", "degrees", "degrees", "1", "1"],
+            'desc': ["1h Fuel Moisture Content","10h Fuel Moisture Content","100h Fuel Moisture Content",
+                     "Longitude for testing", "Latitude for testing", "Drying/Wetting Equilibrium Adjustment",
+                     "Rain Equilibrium Adjustment"],
+            'xlvl': 200100., 'nx': nx, 'ny': ny, 'iproj': 3, 'startloc': startloc, 
+            'startlat': startlat, 'startlon': startlon, 'dx': index['dx'], 'dy': index['dy'], 
+            'xlonc': index['stdlon'], 'truelat1': index['truelat1'], 'truelat2': index['truelat2'], 
+            'earth_radius': index['radius'], 'is_wind_earth_rel': 0, 'slab': arrs
+        }
+        WPSFormat.from_params(**params).to_file(osp.join(path,'FMDA:{}'.format(time_tag)))
+
     @classmethod
     def from_netcdf(cls, path):
         """

@@ -385,6 +385,11 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     print('index',index)
     model.to_geogrid(geo_path,index,lats,lons)
 
+    # make wps format files for WPS
+    fmda_path = osp.join(wksp_path,cfg.code,'{:04d}{:02d}'.format(cycle.year,cycle.month))
+    time_tag = '{:04d}-{:02d}-{:02d}_{:02d}'.format(cycle.year, cycle.month, cycle.day, cycle.hour)
+    model.to_wps_format(fmda_path,index,lats,lons,time_tag)
+    
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path)
     logging.info('CYCLER writing model variables to:  %s.' % model_path)
