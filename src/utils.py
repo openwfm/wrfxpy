@@ -668,3 +668,14 @@ def addquotes(s):
     add quotes to string
     """
     return '"'+s+'"'
+
+def split_path(path):
+    """
+    split path into a list of components
+    """
+    path_list = []
+    while osp.basename(path):
+        path_list.append(osp.basename(path))
+        path = osp.dirname(path)
+    path_list.reverse()
+    return path_list
