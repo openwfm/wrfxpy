@@ -7,6 +7,7 @@ import logging
 import re
 import os.path as osp
 from datetime import datetime, timedelta
+import subprocess
 from utils import Dict, split_path, utc_to_utcf
 from ingest.sat_source import SatSource
 
@@ -24,33 +25,34 @@ def parse_filename(file_name):
     return info
 
 def aws_search(awspaths):
+    ls_cmd = 'aws s3 ls {} --recursive --no-sign-request'
     result = []
     for awspath in awspaths:
-        cmd = 'aws s3 ls {} --recursive --no-sign-request'.format(awspath).split()
+        cmd = ls_cmd.format(awspath).split()
         logging.debug('aws_search - {}'.format(' '.join(cmd)))
         max_retries = 5
-        while max_retries:
+        for tries in range(max_retries):
             try:
                 r = subprocess.check_output(cmd)
-                for line in r.decode().split('\n'):
-                    if len(line):
-                        file_date,file_time,file_size,file_name = list(map(str.strip,line.split()))
-                        file_info = parse_filename(file_name)
-                        base = split_path(file_name)[0]
-                        url = 's3://{}'.format(osp.join(base,file_name)) 
-                        result.append({'producer_granule_id': file_name, 
-                            'time_start': utc_to_utcf(file_info['start_date']), 
-                            'updated': datetime.now(), 'url': url, 
-                            'time_end': utc_to_utcf(file_info['end_date']), 
-                            'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']),
-                            'mode': info['mode']})
-                        break
             except:
-                if not max_retries:
+                if tries == max_retries-1:
                     logging.error('error when requesting "{}", no more retries left'.format(' '.join(cmd)))
                 else:
-                    logging.warning('error when requesting "{}", retrying...'.format(' '.join(cmd)))
-                    max_retries -= 1
+                    logging.warning('error when requesting "{}", retry {}/{}...'.format(' '.join(cmd),tries+1,max_retries))
+                continue
+            for line in r.decode().split('\n'):
+                if len(line):
+                    file_date,file_time,file_size,file_name = list(map(str.strip,line.split()))
+                    info = parse_filename(file_name)
+                    base = split_path(file_name)[0]
+                    url = 's3://{}'.format(osp.join(base,file_name)) 
+                    result.append({'producer_granule_id': file_name, 
+                        'time_start': utc_to_utcf(info['start_date']), 
+                        'updated': datetime.now(), 'url': url, 
+                        'time_end': utc_to_utcf(info['end_date']), 
+                        'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']),
+                        'mode': info['mode']})
+            break
     return result
 
 class SatSourceAWSError(Exception):
@@ -104,6 +106,7 @@ class SatSourceAWS(SatSource):
         last_hours = [h for h in ((stime + timedelta(hours=x)).strftime('%Y/%j/%H/') for x in range(n_last_hours)) if h not in first_hours]
         awspaths = [osp.join(self.base_url.format(self.platform), self.product.format(self.sector), hour) for hour in last_hours]
         metas += aws_search(awspaths)
+        logging.info('SatSourceAWS.search_api_sat - {} metas found'.format(len(metas)))
         return metas
 
     def get_metas_sat(self, bounds, time):
