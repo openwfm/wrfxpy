@@ -24,7 +24,7 @@ def parse_filename(file_name):
         info['end_date'] = datetime.strptime(match.group(5)[0:13],tfrmt)
     return info
 
-def aws_search(awspaths):
+def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
     ls_cmd = 'aws s3 ls {} --recursive --no-sign-request'
     result = []
     for awspath in awspaths:
@@ -42,16 +42,17 @@ def aws_search(awspaths):
                 continue
             for line in r.decode().split('\n'):
                 if len(line):
-                    file_date,file_time,file_size,file_name = list(map(str.strip,line.split()))
+                    _,_,file_size,file_name = list(map(str.strip,line.split()))
                     info = parse_filename(file_name)
-                    base = split_path(file_name)[0]
-                    url = 's3://{}'.format(osp.join(base,file_name)) 
-                    result.append({'producer_granule_id': file_name, 
-                        'time_start': utc_to_utcf(info['start_date']), 
-                        'updated': datetime.now(), 'url': url, 
-                        'time_end': utc_to_utcf(info['end_date']), 
-                        'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']),
-                        'mode': info['mode']})
+                    if info['start_date'] <= time[1] and info['start_date'] >= time[0]:
+                        base = split_path(file_name)[0]
+                        url = 's3://{}'.format(osp.join(base,file_name)) 
+                        result.append({'producer_granule_id': file_name, 
+                            'time_start': utc_to_utcf(info['start_date']), 
+                            'time_end': utc_to_utcf(info['end_date']), 
+                            'updated': datetime.now(), 'url': url, 'file_size': file_size,
+                            'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']),
+                            'mode': info['mode']})
             break
     return result
 
@@ -83,29 +84,13 @@ class SatSourceAWS(SatSource):
 
         :return metas: a dictionary with all the metadata for the API search
         """
-        metas = []
-        # hours first day
-        stime = time[0]
-        etime = min(time[0].replace(hour=23),time[1])
-        n_first_hours = int((etime-stime).total_seconds()/3600)+1
-        first_hours = [(stime + timedelta(hours=x)).strftime('%Y/%j/%H/') for x in range(n_first_hours)]
-        awspaths = [osp.join(self.base_url.format(self.platform), self.product.format(self.sector), hour) for hour in first_hours]
-        metas += aws_search(awspaths)
         # complete_days
-        stime = (time[0]+timedelta(days=1)).replace(hour=0)
-        etime = (time[1]-timedelta(days=1)).replace(hour=23)
-        if stime < etime:
-            n_complete_days = int((etime-stime).days)+1
-            complete_days = [(stime + timedelta(days=x)).strftime('%Y/%j/') for x in range(n_complete_days)]
-            awspaths = [osp.join(self.base_url.format(self.platform), self.product.format(self.sector), hour) for hour in complete_days]
-            metas += aws_search(awspaths)
-        # hours last day
-        stime = max(time[0],time[1].replace(hour=0))
+        stime = time[0]
         etime = time[1]
-        n_last_hours = int((etime-stime).total_seconds()/3600)+1
-        last_hours = [h for h in ((stime + timedelta(hours=x)).strftime('%Y/%j/%H/') for x in range(n_last_hours)) if h not in first_hours]
-        awspaths = [osp.join(self.base_url.format(self.platform), self.product.format(self.sector), hour) for hour in last_hours]
-        metas += aws_search(awspaths)
+        n_complete_days = int((etime-stime).days)+1
+        complete_days = [(stime + timedelta(days=x)).strftime('%Y/%j/') for x in range(n_complete_days)]
+        awspaths = [osp.join(self.base_url.format(self.platform), self.product.format(self.sector), hour) for hour in complete_days]
+        metas = aws_search(awspaths,time)
         logging.info('SatSourceAWS.search_api_sat - {} metas found'.format(len(metas)))
         return metas
 
