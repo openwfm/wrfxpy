@@ -674,6 +674,7 @@ def split_path(path):
     split path into a list of components
     """
     path_list = []
+    path = osp.dirname(path)
     while osp.basename(path):
         path_list.append(osp.basename(path))
         path = osp.dirname(path)

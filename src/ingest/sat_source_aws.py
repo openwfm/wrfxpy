@@ -55,7 +55,8 @@ def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
                 _,_,file_size,file_name = list(map(str.strip,line.split()))
                 info = parse_filename(file_name)
                 if info['start_date'] <= time[1] and info['start_date'] >= time[0]:
-                    url = osp.join('s3://',file_name) 
+                    base = split_path(awspath)[0]
+                    url = osp.join('s3://',base,file_name) 
                     result.append({'file_name': file_name, 
                         'time_start': utc_to_utcf(info['start_date']), 
                         'time_end': utc_to_utcf(info['end_date']), 
