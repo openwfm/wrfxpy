@@ -5,13 +5,17 @@
 from __future__ import absolute_import
 import logging
 import re
+import subprocess
 import os.path as osp
 from datetime import datetime, timedelta
-import subprocess
+import netCDF4 as nc
 from utils import Dict, split_path, utc_to_utcf
 from ingest.sat_source import SatSource
 
 def parse_filename(file_name):
+    """
+    Parse filename from AWS dataset name
+    """
     info = {}
     pattern = 'FDC([CF]{1})-M([0-9]{1})_G([0-9]{2})_s([0-9]{14})_e([0-9]{14})'
     tfrmt = '%Y%j%H%M%S'
@@ -24,37 +28,47 @@ def parse_filename(file_name):
         info['end_date'] = datetime.strptime(match.group(5)[0:13],tfrmt)
     return info
 
+def aws_request(cmd, max_retries=5):
+    for tries in range(max_retries):
+        try:
+            r = subprocess.check_output(cmd)
+            return r
+        except:
+            if tries == max_retries-1:
+                logging.error('error when requesting "{}", no more retries left'.format(' '.join(cmd)))
+            else:
+                logging.warning('error when requesting "{}", retry {}/{}...'.format(' '.join(cmd),tries+1,max_retries))
+    return None
+
 def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
+    """
+    Search data in AWS storage using AWS CLI
+    """
     ls_cmd = 'aws s3 ls {} --recursive --no-sign-request'
     result = []
     for awspath in awspaths:
         cmd = ls_cmd.format(awspath).split()
         logging.debug('aws_search - {}'.format(' '.join(cmd)))
-        max_retries = 5
-        for tries in range(max_retries):
-            try:
-                r = subprocess.check_output(cmd)
-            except:
-                if tries == max_retries-1:
-                    logging.error('error when requesting "{}", no more retries left'.format(' '.join(cmd)))
-                else:
-                    logging.warning('error when requesting "{}", retry {}/{}...'.format(' '.join(cmd),tries+1,max_retries))
-                continue
-            for line in r.decode().split('\n'):
-                if len(line):
-                    _,_,file_size,file_name = list(map(str.strip,line.split()))
-                    info = parse_filename(file_name)
-                    if info['start_date'] <= time[1] and info['start_date'] >= time[0]:
-                        base = split_path(file_name)[0]
-                        url = 's3://{}'.format(osp.join(base,file_name)) 
-                        result.append({'producer_granule_id': file_name, 
-                            'time_start': utc_to_utcf(info['start_date']), 
-                            'time_end': utc_to_utcf(info['end_date']), 
-                            'updated': datetime.now(), 'url': url, 'file_size': file_size,
-                            'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']),
-                            'mode': info['mode']})
-            break
+        r = aws_request(cmd)
+        for line in r.decode().split('\n'):
+            if len(line):
+                _,_,file_size,file_name = list(map(str.strip,line.split()))
+                info = parse_filename(file_name)
+                if info['start_date'] <= time[1] and info['start_date'] >= time[0]:
+                    url = osp.join('s3://',file_name) 
+                    result.append({'file_name': file_name, 
+                        'time_start': utc_to_utcf(info['start_date']), 
+                        'time_end': utc_to_utcf(info['end_date']), 
+                        'updated': datetime.now(), 'url': url, 'file_size': file_size,
+                        'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']),
+                        'mode': info['mode']})
     return result
+
+def download_url(url):
+    """
+    Download URL from AWS storage using AWS CLI
+    """
+    cmd = 'aws s3 cp s3://'
 
 class SatSourceAWSError(Exception):
     """
@@ -103,11 +117,13 @@ class SatSourceAWS(SatSource):
         :param maxg: max number of granules to process
         :return granules: dictionary with the metadata of all the products
         """
-        metas=Dict({})
-        metas.geo=self.search_api_sat(self.geo_prefix,bounds,time,collection=self.geo_collection_id)
-        metas.fire=self.search_api_sat(self.fire_prefix,bounds,time,collection=self.fire_collection_id)
-        metas.geo_nrt=self.search_api_sat(self.geo_nrt_prefix,bounds,time,collection=self.geo_nrt_collection_id)
-        metas.fire_nrt=self.search_api_sat(self.fire_nrt_prefix,bounds,time,collection=self.fire_nrt_collection_id)
+        metas = Dict({})
+        metas.fire = self.search_api_sat(None,None,time)
+        if len(metas.fire):
+            path = osp.join(self.static_path,self.sys_dir)
+            metas.geo = search_grid(metas.fire[0])
+        else:
+            metas.geo = []
         return metas
 
     def group_metas(self, metas):

@@ -32,6 +32,7 @@ class SatSource(object):
         """
         self.ingest_dir=osp.abspath(osp.join(js.get('ingest_path','ingest'),self.prefix))
         self.cache_dir=osp.abspath(js.get('cache_path','cache'))
+        self.static_dir=osp.abspath(js.get('static_path','static'))
         self.sys_dir=osp.abspath(js.get('sys_install_path',None))
         self.appkey=js.get('appkey',None)
         if not self.appkey:
