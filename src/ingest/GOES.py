@@ -22,11 +22,11 @@ class GOES16(SatSourceAWS):
 
 class GOES17(SatSourceAWS):
     """
-    GOES16 satellite source.
+    GOES17 satellite source.
     """
 
     def __init__(self, arg):
-        super(GOES16, self).__init__(arg)
+        super(GOES17, self).__init__(arg)
 
     # instance variables
     id='G17'

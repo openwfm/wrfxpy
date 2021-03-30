@@ -10,6 +10,7 @@ import json
 import subprocess
 import os.path as osp
 from datetime import datetime, timedelta
+import pytz
 import numpy as np
 import netCDF4 as nc
 from utils import Dict, split_path, utc_to_utcf, ensure_dir
@@ -30,8 +31,8 @@ def parse_filename(file_name):
         info['domain'] = match.group(1)
         info['mode'] = match.group(2)
         info['satellite'] = match.group(3)
-        info['start_date'] = datetime.strptime(match.group(4)[0:13],tfrmt)
-        info['end_date'] = datetime.strptime(match.group(5)[0:13],tfrmt)
+        info['start_date'] = datetime.strptime(match.group(4)[0:13],tfrmt).replace(tzinfo=pytz.UTC)
+        info['end_date'] = datetime.strptime(match.group(5)[0:13],tfrmt).replace(tzinfo=pytz.UTC)
     return info
 
 def parse_projinfo(file_name):
