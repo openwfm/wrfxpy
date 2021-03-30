@@ -171,16 +171,16 @@ def process_grid(ingest_dir, meta):
     current_proj = parse_projinfo(meta['local_path'])
     current_proj.update({'grid_path': current_grid_path})
     archived_proj_paths = glob.glob(osp.join(ingest_dir, '*_projinfo.json'))
-    if len(proj_files):
+    if len(archived_proj_paths):
         for archived_proj_path in archived_proj_paths:
-            if osp.exists(proj_file):
+            if osp.exists(archived_proj_path):
                 archived_proj = eval(json.load(open(archived_proj_path, 'r')))
-                if archived_json == current_json:
+                if archived_proj == current_proj:
                     archived_grid_path = archived_proj['grid_path']
                     if not osp.exists(archived_grid_path):
-                        create_grid(archived_proj, )
+                        create_grid(archived_proj, archived_grid_path)
                     return {'proj_path': archived_proj_path, 'grid_path': archived_grid_path}
-    create_grid(current_proj)
+    create_grid(current_proj, current_grid_path)
     return {'proj_path': current_proj_path, 'grid_path': current_grid_path}
 
 class SatSourceAWSError(Exception):
