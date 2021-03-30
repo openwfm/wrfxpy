@@ -97,7 +97,13 @@ def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
                         'time_end': utc_to_utcf(info['end_date']), 
                         'updated': datetime.now(), 'url': url, 'file_size': int(file_size), 
                         'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']), 
-                        'mode': info['mode']})
+                        'mode': info['mode'], 
+                        'granule_id': 'A{:04d}{:03d}{:02d}{:02d}'.format(
+                            info['start_date'].year,
+                            info['start_date'].timetuple().tm_yday,
+                            info['start_date'].hour,
+                            info['start_date'].minute
+                        )})
     return result
 
 def download_url(url, sat_path):
@@ -107,8 +113,9 @@ def download_url(url, sat_path):
     :param url:
     :param sat_path:
     """
-    cmd = 'aws s3 cp {} {}'.format(url, sat_path).split()
+    cmd = 'aws s3 cp {} {} --no-sign-request'.format(url, sat_path).split()
     r = aws_request(cmd)
+    file_size = osp.getsize(sat_path)
 
 def create_grid(proj_info, out_path):
     """
@@ -260,7 +267,7 @@ class SatSourceAWS(SatSource):
             fire_meta = self.download_sat(urls)
             fire_meta.update(meta)
             geo_meta = process_grid(self.ingest_dir,fire_meta)
-            manifest.update({g_id: {
+            manifest.update({fire_meta['granule_id']: {
                 'time_start_iso' : fire_meta['time_start'],
                 'time_end_iso' : fire_meta['time_end'],
                 'geo_url' : fire_meta['url'],
