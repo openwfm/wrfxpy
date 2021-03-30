@@ -12,7 +12,7 @@ import os.path as osp
 from datetime import datetime, timedelta
 import numpy as np
 import netCDF4 as nc
-from utils import Dict, split_path, utc_to_utcf
+from utils import Dict, split_path, utc_to_utcf, ensure_dir
 from ingest.sat_source import SatSource
 
 def parse_filename(file_name):
