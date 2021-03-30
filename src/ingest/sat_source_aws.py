@@ -233,7 +233,7 @@ class SatSourceAWS(SatSource):
         :param maxg: max number of granules to process
         :return metas: dictionary with the metadata of all the products
         """
-        return Dict(self.search_api_sat(None,None,time))
+        return Dict({'fire': self.search_api_sat(None,None,time)})
 
     def group_metas(self, metas):
         """
@@ -263,7 +263,7 @@ class SatSourceAWS(SatSource):
         """
         logging.info('retrieve_metas - downloading {} products'.format(self.id))
         manifest = Dict({})
-        for p_id,meta in metas.items():
+        for p_id,meta in metas['fire'].items():
             urls = [meta['url']]
             fire_meta = self.download_sat(urls)
             fire_meta.update(meta)
