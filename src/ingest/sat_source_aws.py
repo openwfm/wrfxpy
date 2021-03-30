@@ -144,7 +144,8 @@ def create_grid(proj_info, out_path):
     a = np.sin(x)**2 + np.cos(x)**2*(np.cos(y)**2 + rrat*np.sin(y)**2)
     b = -2*bigh*np.cos(x)*np.cos(y)
     c = bigh**2-requ**2
-    rs = (-b - np.sqrt(b*b - 4.*a*c))/(2.*a)
+    with np.errstate(invalid='ignore'):
+        rs = (-b - np.sqrt(b*b - 4.*a*c))/(2.*a)
     sx = rs*np.cos(x)*np.cos(y)
     sy = -rs*np.sin(x)
     sz = rs*np.cos(x)*np.sin(y)
