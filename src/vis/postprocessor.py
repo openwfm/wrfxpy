@@ -838,7 +838,7 @@ class Postprocessor(object):
             dgs,dfs,egs,efs = [],[],[],[]
             for k,gran in jsat.granules[sat_source].items():
                 gran_time = esmf_to_utc(gran['time_start_iso'])
-                logging.info('process_sats: evaluating product %s, granule %s, at time %s, and for time %s' % (sat, k, utc_to_esmf(gran_time), ts_esmf))
+                logging.debug('process_sats: evaluating product %s, granule %s, at time %s, and for time %s' % (sat, k, utc_to_esmf(gran_time), ts_esmf))
                 if gran_time >= ts_initial and gran_time < ts_final:
                     try:
                         dg,eg = self.open_file(gran['geo_local_path'])
