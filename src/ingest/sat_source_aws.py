@@ -92,7 +92,7 @@ def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
                     base = split_path(awspath)[0]
                     url = osp.join('s3://',base,file_name) 
                     file_basename = osp.basename(file_name)
-                    product_id = 'A{:04d}{:03d}{:02d}{:02d}'.format(info['start_date'].year,
+                    product_id = 'A{:04d}{:03d}_{:02d}{:02d}'.format(info['start_date'].year,
                                             info['start_date'].timetuple().tm_yday,
                                             info['start_date'].hour,
                                             info['start_date'].minute)
