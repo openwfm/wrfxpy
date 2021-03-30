@@ -174,8 +174,9 @@ def process_grid(ingest_dir, meta):
         for archived_proj_path in archived_proj_paths:
             if osp.exists(archived_proj_path):
                 current_proj.update({'grid_path': archived_proj_path})
-                archived_proj = eval(json.load(open(archived_proj_path, 'r')))
-                if archived_proj == current_proj:
+                archived_proj = json.load(open(archived_proj_path, 'r'))
+                if archived_proj == str(current_proj):
+                    archived_proj = eval(archived_proj)
                     archived_grid_path = archived_proj['grid_path']
                     if not osp.exists(archived_grid_path):
                         create_grid(archived_proj, archived_grid_path)
