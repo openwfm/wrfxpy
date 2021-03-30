@@ -175,8 +175,6 @@ class SatSourceCMR(SatSource):
                             'fire_local_path' : fire_meta['local_path'],
                             'fire_description' : fire_meta['dataset_id']
                         }})
-                
-
         return manifest
 
     def read_sat(self, files, metas, bounds):

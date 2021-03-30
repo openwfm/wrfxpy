@@ -5,9 +5,12 @@
 from __future__ import absolute_import
 import logging
 import re
+import glob
+import json
 import subprocess
 import os.path as osp
 from datetime import datetime, timedelta
+import numpy as np
 import netCDF4 as nc
 from utils import Dict, split_path, utc_to_utcf
 from ingest.sat_source import SatSource
@@ -15,6 +18,9 @@ from ingest.sat_source import SatSource
 def parse_filename(file_name):
     """
     Parse filename from AWS dataset name
+
+    :param file_name: AWS file name to parse
+    :return info: dictionary with information from file name
     """
     info = {}
     pattern = 'FDC([CF]{1})-M([0-9]{1})_G([0-9]{2})_s([0-9]{14})_e([0-9]{14})'
@@ -28,9 +34,34 @@ def parse_filename(file_name):
         info['end_date'] = datetime.strptime(match.group(5)[0:13],tfrmt)
     return info
 
+def parse_projinfo(file_name):
+    """
+    Parse projection information from NetCDF AWS dataset file
+
+    :param file_name: AWS file name to parse
+    :return info: dictionary with information from file name
+    """
+    d = nc.Dataset(file_name)
+    gip = d['goes_imager_projection']
+    x = d['x']
+    y = d['y']
+    return {'shgt': gip.getncattr('perspective_point_height'), 'requ': gip.getncattr('semi_major_axis'),
+        'rpol': gip.getncattr('semi_minor_axis'), 'lon0': gip.getncattr('longitude_of_projection_origin'),
+        'xscl': x.getncattr('scale_factor'), 'xoff': x.getncattr('add_offset'), 'xdim': x.shape[0], 
+        'yscl': y.getncattr('scale_factor'), 'yoff': y.getncattr('add_offset'), 'ydim': y.shape[0],
+        'file_name': file_name}
+
 def aws_request(cmd, max_retries=5):
+    """
+    Request command in AWS storage using AWS CLI retrying if an error occurs
+
+    :param cmd: list with command and flags to run using subprocess
+    :param max_retries: max retries to request to AWS CLI
+    :return r: output from check_output method of subprocess
+    """
     for tries in range(max_retries):
         try:
+            logging.debug('aws_request - {}'.format(' '.join(cmd)))
             r = subprocess.check_output(cmd)
             return r
         except:
@@ -43,12 +74,15 @@ def aws_request(cmd, max_retries=5):
 def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
     """
     Search data in AWS storage using AWS CLI
+
+    :param awspaths: list of paths to search using AWS CLI
+    :param time: time interval in datetime format to consider the data from
+    :return result: metadata of the satellite data found
     """
     ls_cmd = 'aws s3 ls {} --recursive --no-sign-request'
     result = []
     for awspath in awspaths:
         cmd = ls_cmd.format(awspath).split()
-        logging.debug('aws_search - {}'.format(' '.join(cmd)))
         r = aws_request(cmd)
         for line in r.decode().split('\n'):
             if len(line):
@@ -57,19 +91,91 @@ def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
                 if info['start_date'] <= time[1] and info['start_date'] >= time[0]:
                     base = split_path(awspath)[0]
                     url = osp.join('s3://',base,file_name) 
-                    result.append({'file_name': file_name, 
+                    file_basename = osp.basename(file_name)
+                    result.append({'file_name': file_basename, 'file_remote_path': file_name,
                         'time_start': utc_to_utcf(info['start_date']), 
                         'time_end': utc_to_utcf(info['end_date']), 
-                        'updated': datetime.now(), 'url': url, 'file_size': file_size,
-                        'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']),
+                        'updated': datetime.now(), 'url': url, 'file_size': int(file_size), 
+                        'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']), 
                         'mode': info['mode']})
     return result
 
-def download_url(url):
+def download_url(url, sat_path):
     """
     Download URL from AWS storage using AWS CLI
+
+    :param url:
+    :param sat_path:
     """
-    cmd = 'aws s3 cp s3://'
+    cmd = 'aws s3 cp {} {}'.format(url, sat_path).split()
+    r = aws_request(cmd)
+
+def create_grid(proj_info, out_path):
+    """
+    Create AWS grid
+
+    :param proj_info: projection information dictionary to create the grid coordinates
+    :param out_path: output path to write the grid coordinates
+    """
+    shgt = proj_info['shgt']
+    requ = proj_info['requ']
+    rpol = proj_info['rpol']
+    lon0 = proj_info['lon0']
+    xscl = proj_info['xscl']
+    xoff = proj_info['xoff']
+    xdim = proj_info['xdim']
+    yscl = proj_info['yscl']
+    yoff = proj_info['yoff']
+    ydim = proj_info['ydim']
+    dtor = 0.0174533
+    pi = 3.1415926536
+    rrat = (requ*requ)/(rpol*rpol)
+    bigh = requ + shgt
+    i = np.reshape(np.arange(xdim),(1,xdim))
+    j = np.reshape(np.arange(ydim),(ydim,1))[::-1]
+    x = i*xscl + xoff
+    y = j*yscl + yoff
+    a = np.sin(x)**2 + np.cos(x)**2*(np.cos(y)**2 + rrat*np.sin(y)**2)
+    b = -2*bigh*np.cos(x)*np.cos(y)
+    c = bigh**2-requ**2
+    rs = (-b - np.sqrt(b*b - 4.*a*c))/(2.*a)
+    sx = rs*np.cos(x)*np.cos(y)
+    sy = -rs*np.sin(x)
+    sz = rs*np.cos(x)*np.sin(y)
+    lats = (np.arctan(rrat*sz/np.sqrt((bigh-sx)**2 + sy**2)))/dtor
+    lons = (lon0*dtor - np.arctan(sy/(bigh-sx)))/dtor
+    nc_file = nc.Dataset(out_path, 'w')
+    xx = nc_file.createDimension("x", xdim)
+    yy = nc_file.createDimension("y", ydim)
+    longitude = nc_file.createVariable("lon", "f4", ("y","x"))
+    latitude = nc_file.createVariable("lat", "f4", ("y","x"))
+    longitude[:] = lons
+    latitude[:] = lats
+    nc_file.close()
+
+def process_grid(ingest_dir, meta):
+    """
+    Process AWS grid
+
+    :param ingest_dir: path to ingest directory for the satellite product
+    :param meta: metadata to create the grid for
+    """
+    current_proj_path = osp.join(ingest_dir,'{}_projinfo.json'.format(meta['file_name'].split('.')[0]))
+    current_grid_path = osp.join(ingest_dir,'{}_grid.nc'.format(meta['file_name'].split('.')[0]))
+    current_proj = parse_projinfo(meta['local_path'])
+    current_proj.update({'grid_path': current_grid_path})
+    archived_proj_paths = glob.glob(osp.join(ingest_dir, '*_projinfo.json'))
+    if len(proj_files):
+        for archived_proj_path in archived_proj_paths:
+            if osp.exists(proj_file):
+                archived_proj = eval(json.load(open(archived_proj_path, 'r')))
+                if archived_json == current_json:
+                    archived_grid_path = archived_proj['grid_path']
+                    if not osp.exists(archived_grid_path):
+                        create_grid(archived_proj, )
+                    return {'proj_path': archived_proj_path, 'grid_path': archived_grid_path}
+    create_grid(current_proj)
+    return {'proj_path': current_proj_path, 'grid_path': current_grid_path}
 
 class SatSourceAWSError(Exception):
     """
@@ -118,13 +224,7 @@ class SatSourceAWS(SatSource):
         :param maxg: max number of granules to process
         :return granules: dictionary with the metadata of all the products
         """
-        metas = Dict({})
-        metas.fire = self.search_api_sat(None,None,time)
-        if len(metas.fire):
-            path = osp.join(self.static_path,self.sys_dir)
-            metas.geo = search_grid(metas.fire[0])
-        else:
-            metas.geo = []
+        metas = Dict(self.search_api_sat(None,None,time))
         return metas
 
     def group_metas(self, metas):
@@ -132,48 +232,19 @@ class SatSourceAWS(SatSource):
         Group all the satellite metas before downloading to minimize number of files downloaded
 
         :param metas: satellite metadatas from API search
-        :return result: groupped and cleanned metadata dictionary
+        :return metas: groupped and cleanned metadata dictionary
         """
-        g_id = lambda m: '_'.join(m['producer_granule_id'].split('.')[1:3])
-        gmetas = Dict({})
-        gmetas.geo = Dict({})
-        gmetas.fire = Dict({})
-        for m in metas['geo']:
-            m.update({'archive_url': self.archive_url(m,osp.join(self.geo_col,self.geo_prefix))})
-            gmetas.geo.update({g_id(m): m})
-        # add fire metas, if geo available
-        for m in metas['fire']:
-            k = g_id(m)
-            if k in gmetas.geo.keys():
-                m.update({'archive_url': self.archive_url(m,osp.join(self.fire_col,self.fire_prefix))})
-                gmetas.fire.update({k: m})
-            else:
-                logging.warning('group_metas - geolocation meta not found for id {}, eliminating fire meta'.format(k))
-        # add geolocation NRT metas, if necessary
-        for m in metas['geo_nrt']:
-            k = g_id(m)
-            if k not in gmetas.geo.keys():
-                m.update({'archive_url': self.archive_url(m,osp.join(self.geo_nrt_col,self.geo_nrt_prefix),True)})
-                gmetas.geo.update({k: m})
-        # add fire NRT metas, if necessary
-        for m in metas['fire_nrt']:
-            k = g_id(m)
-            if k not in gmetas.fire.keys():
-                if k in gmetas.geo.keys():
-                    m.update({'archive_url': self.archive_url(m,osp.join(self.fire_nrt_col,self.fire_nrt_prefix),True)})
-                    gmetas.fire.update({k: m})
-                else:
-                    logging.warning('group_metas - geolocation not found for id {}'.format(k))
-        # delete geolocation if not fire on it
-        exc = []
-        for k in gmetas.geo.keys():
-            if k not in gmetas.fire.keys():
-                logging.warning('group_metas - fire meta not found for id {}, eliminating geolocation meta'.format(k))
-                exc.append(k)
-        for k in exc:
-            gmetas.geo.pop(k)
+        return metas
 
-        return gmetas
+    def _download_url(self, url, sat_path, appkey):
+        """
+        Download a satellite file from a satellite service
+
+        :param url: the URL of the file
+        :param sat_path: local path to download the file
+        :param appkey: key to use for the download or None if not
+        """
+        download_url(url, sat_path)
 
     def retrieve_metas(self, metas):
         """
@@ -184,30 +255,21 @@ class SatSourceAWS(SatSource):
         """
         logging.info('retrieve_metas - downloading {} products'.format(self.id))
         manifest = Dict({})
-        for g_id, geo_meta in metas['geo'].items():
-            if g_id in metas['fire'].keys():
-                fire_meta = metas['fire'][g_id]
-                logging.info('retrieve_metas - downloading product id {}'.format(g_id))
-                urls = [geo_meta['links'][0]['href'],geo_meta.get('archive_url')]
-                m_geo = self.download_sat(urls,self.datacenter_to_appkey(geo_meta['data_center']))
-                if m_geo:
-                    geo_meta.update(m_geo)
-                    urls = [fire_meta['links'][0]['href'],fire_meta.get('archive_url')]
-                    m_fire = self.download_sat(urls,self.datacenter_to_appkey(fire_meta['data_center']))
-                    if m_fire:
-                        fire_meta.update(m_fire)
-                        manifest.update({g_id: {
-                            'time_start_iso' : geo_meta['time_start'],
-                            'time_end_iso' : geo_meta['time_end'],
-                            'geo_url' : geo_meta['url'],
-                            'geo_local_path' : geo_meta['local_path'],
-                            'geo_description' : geo_meta['dataset_id'],
-                            'fire_url' : fire_meta['url'],
-                            'fire_local_path' : fire_meta['local_path'],
-                            'fire_description' : fire_meta['dataset_id']
-                        }})
-                
-
+        for meta in metas:
+            urls = [meta['url']]
+            fire_meta = self.download_sat(urls)
+            fire_meta.update(meta)
+            geo_meta = process_grid(self.ingest_dir,fire_meta)
+            manifest.update({g_id: {
+                'time_start_iso' : fire_meta['time_start'],
+                'time_end_iso' : fire_meta['time_end'],
+                'geo_url' : fire_meta['url'],
+                'geo_local_path' : geo_meta['grid_path'],
+                'geo_description' : self.info,
+                'fire_url' : fire_meta['url'],
+                'fire_local_path' : fire_meta['local_path'],
+                'fire_description' : self.info
+            }})
         return manifest
 
     def read_sat(self, files, metas, bounds):

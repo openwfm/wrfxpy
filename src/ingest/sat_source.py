@@ -32,7 +32,6 @@ class SatSource(object):
         """
         self.ingest_dir=osp.abspath(osp.join(js.get('ingest_path','ingest'),self.prefix))
         self.cache_dir=osp.abspath(js.get('cache_path','cache'))
-        self.static_dir=osp.abspath(js.get('static_path','static'))
         self.sys_dir=osp.abspath(js.get('sys_install_path',None))
         self.appkey=js.get('appkey',None)
         if not self.appkey:
@@ -100,9 +99,19 @@ class SatSource(object):
         """
         return Dict({})
 
-    def download_sat(self, urls, appkey):
+    def _download_url(self, url, sat_path, appkey=None):
         """
         Download a satellite file from a satellite service
+
+        :param url: the URL of the file
+        :param sat_path: local path to download the file
+        :param appkey: key to use for the download or None if not
+        """
+        download_url(url, sat_path, appkey=appkey)
+
+    def download_sat(self, urls, appkey=None):
+        """
+        Download all satellite file from a satellite service
 
         :param urls: the URL of the file
         :param appkey: key to use for the download or None if not
@@ -116,7 +125,7 @@ class SatSource(object):
                 return {'url': urls[0],'local_path': sat_path}
             else:
                 try:
-                    download_url(url, sat_path, appkey=appkey)
+                    self._download_url(url, sat_path, appkey=appkey)
                     return {'url': url,'local_path': sat_path,'downloaded': datetime.now()}
                 except DownloadError as e:
                     logging.warning('download_sat - {0} cannot download satellite file {1}'.format(self.prefix, url))
@@ -124,7 +133,6 @@ class SatSource(object):
         logging.error('%s cannot download satellite file using %s' % (self.prefix, urls))
         logging.warning('Please check %s for %s' % (self.info_url, self.info))
         return {}
-        raise SatError('SatSource: failed to download file %s' % url)
 
     def retrieve_metas(self, metas):
         """
@@ -183,8 +191,7 @@ class SatSource(object):
         """
         return {'LAADS': self.appkey,
                 'LPDAAC_ECS': None,
-                'LANCEMODIS': self.appkey,
-                'AWS': None
+                'LANCEMODIS': self.appkey
             }.get(data_center,None)
 
     # instance variables
