@@ -48,8 +48,7 @@ def parse_projinfo(file_name):
     return {'shgt': gip.getncattr('perspective_point_height'), 'requ': gip.getncattr('semi_major_axis'),
         'rpol': gip.getncattr('semi_minor_axis'), 'lon0': gip.getncattr('longitude_of_projection_origin'),
         'xscl': x.getncattr('scale_factor'), 'xoff': x.getncattr('add_offset'), 'xdim': x.shape[0], 
-        'yscl': y.getncattr('scale_factor'), 'yoff': y.getncattr('add_offset'), 'ydim': y.shape[0],
-        'file_name': file_name}
+        'yscl': y.getncattr('scale_factor'), 'yoff': y.getncattr('add_offset'), 'ydim': y.shape[0]}
 
 def aws_request(cmd, max_retries=5):
     """
@@ -170,17 +169,18 @@ def process_grid(ingest_dir, meta):
     current_proj_path = osp.join(ingest_dir,'{}_projinfo.json'.format(meta['file_name'].split('.')[0]))
     current_grid_path = osp.join(ingest_dir,'{}_grid.nc'.format(meta['file_name'].split('.')[0]))
     current_proj = parse_projinfo(meta['local_path'])
-    current_proj.update({'grid_path': current_grid_path})
     archived_proj_paths = glob.glob(osp.join(ingest_dir, '*_projinfo.json'))
     if len(archived_proj_paths):
         for archived_proj_path in archived_proj_paths:
             if osp.exists(archived_proj_path):
+                current_proj.update({'grid_path': archived_proj_path})
                 archived_proj = eval(json.load(open(archived_proj_path, 'r')))
                 if archived_proj == current_proj:
                     archived_grid_path = archived_proj['grid_path']
                     if not osp.exists(archived_grid_path):
                         create_grid(archived_proj, archived_grid_path)
                     return {'proj_path': archived_proj_path, 'grid_path': archived_grid_path}
+    current_proj.update({'grid_path': current_proj_path})
     json.dump(str(current_proj), open(current_proj_path, 'w'))
     create_grid(current_proj, current_grid_path)
     return {'proj_path': current_proj_path, 'grid_path': current_grid_path}
