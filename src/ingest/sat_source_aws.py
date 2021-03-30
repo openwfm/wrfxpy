@@ -181,6 +181,7 @@ def process_grid(ingest_dir, meta):
                     if not osp.exists(archived_grid_path):
                         create_grid(archived_proj, archived_grid_path)
                     return {'proj_path': archived_proj_path, 'grid_path': archived_grid_path}
+    json.dump(str(current_proj), current_proj_path)
     create_grid(current_proj, current_grid_path)
     return {'proj_path': current_proj_path, 'grid_path': current_grid_path}
 
