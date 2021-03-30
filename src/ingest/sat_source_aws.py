@@ -137,7 +137,7 @@ def create_grid(proj_info, out_path):
     rrat = (requ*requ)/(rpol*rpol)
     bigh = requ + shgt
     i = np.reshape(np.arange(xdim),(1,xdim))
-    j = np.reshape(np.arange(ydim),(ydim,1))[::-1]
+    j = np.reshape(np.arange(ydim),(ydim,1))
     x = i*xscl + xoff
     y = j*yscl + yoff
     a = np.sin(x)**2 + np.cos(x)**2*(np.cos(y)**2 + rrat*np.sin(y)**2)

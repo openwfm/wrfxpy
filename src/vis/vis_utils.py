@@ -306,6 +306,6 @@ def transform_goes(d):
       Transform GOES mask data into similar to MODIS-VIIRS AF mask
       :param d: open NetCDF4 dataset
       """
-      fill = Dict({(151, 152, 153): 3, (100): 5, (15, 35): 7, (14, 34): 8, (10, 11, 12, 13, 30, 31, 32, 33): 9})
+      fill = Dict({(150., 151., 152., 153.): 3, (100.): 5, (15., 35.): 7, (14., 34.): 8, (10., 11., 12., 13., 30., 31., 32., 33.): 9})
       array = d.variables['Mask'][:]
       return fill_categories(array, fill)
