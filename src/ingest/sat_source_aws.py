@@ -80,7 +80,7 @@ def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
     :return result: metadata of the satellite data found
     """
     ls_cmd = 'aws s3 ls {} --recursive --no-sign-request'
-    result = []
+    result = {}
     for awspath in awspaths:
         cmd = ls_cmd.format(awspath).split()
         r = aws_request(cmd)
@@ -92,18 +92,17 @@ def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
                     base = split_path(awspath)[0]
                     url = osp.join('s3://',base,file_name) 
                     file_basename = osp.basename(file_name)
-                    result.append({'file_name': file_basename, 'file_remote_path': file_name,
+                    product_id = 'A{:04d}{:03d}{:02d}{:02d}'.format(info['start_date'].year,
+                                            info['start_date'].timetuple().tm_yday,
+                                            info['start_date'].hour,
+                                            info['start_date'].minute)
+                    result.update({product_id: {'file_name': file_basename, 'file_remote_path': file_name,
                         'time_start': utc_to_utcf(info['start_date']), 
                         'time_end': utc_to_utcf(info['end_date']), 
                         'updated': datetime.now(), 'url': url, 'file_size': int(file_size), 
                         'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']), 
                         'mode': info['mode'], 
-                        'granule_id': 'A{:04d}{:03d}{:02d}{:02d}'.format(
-                            info['start_date'].year,
-                            info['start_date'].timetuple().tm_yday,
-                            info['start_date'].hour,
-                            info['start_date'].minute
-                        )})
+                        'product_id': product_id}})
     return result
 
 def download_url(url, sat_path):
@@ -234,7 +233,7 @@ class SatSourceAWS(SatSource):
         :param maxg: max number of granules to process
         :return metas: dictionary with the metadata of all the products
         """
-        return self.search_api_sat(None,None,time)
+        return Dict(self.search_api_sat(None,None,time))
 
     def group_metas(self, metas):
         """
@@ -264,7 +263,7 @@ class SatSourceAWS(SatSource):
         """
         logging.info('retrieve_metas - downloading {} products'.format(self.id))
         manifest = Dict({})
-        for meta in metas:
+        for p_id,meta in metas.items():
             urls = [meta['url']]
             fire_meta = self.download_sat(urls)
             fire_meta.update(meta)
@@ -277,15 +276,15 @@ class SatSourceAWS(SatSource):
             info_path = local_path + '.size'
             open(ensure_dir(info_path), 'w').write(str(local_size))
             geo_meta = process_grid(self.ingest_dir,fire_meta)
-            manifest.update({fire_meta['granule_id']: {
-                'time_start_iso' : fire_meta['time_start'],
-                'time_end_iso' : fire_meta['time_end'],
-                'geo_url' : fire_meta['url'],
-                'geo_local_path' : geo_meta['grid_path'],
-                'geo_description' : self.info,
-                'fire_url' : fire_meta['url'],
-                'fire_local_path' : fire_meta['local_path'],
-                'fire_description' : self.info
+            manifest.update({p_id: {
+                    'time_start_iso' : fire_meta['time_start'],
+                    'time_end_iso' : fire_meta['time_end'],
+                    'geo_url' : fire_meta['url'],
+                    'geo_local_path' : geo_meta['grid_path'],
+                    'geo_description' : self.info,
+                    'fire_url' : fire_meta['url'],
+                    'fire_local_path' : fire_meta['local_path'],
+                    'fire_description' : self.info
             }})
         return manifest
 
