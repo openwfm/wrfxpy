@@ -115,7 +115,7 @@ def download_url(url, sat_path):
     """
     cmd = 'aws s3 cp {} {} --no-sign-request'.format(url, sat_path).split()
     r = aws_request(cmd)
-    file_size = osp.getsize(sat_path)
+    return osp.getsize(sat_path)
 
 def create_grid(proj_info, out_path):
     """
@@ -265,6 +265,14 @@ class SatSourceAWS(SatSource):
         for meta in metas:
             urls = [meta['url']]
             fire_meta = self.download_sat(urls)
+            local_path = fire_meta['local_path']
+            remote_size = int(fire_meta['file_size'])
+            local_size = osp.getsize(local_path)
+            if local_size != remote_size:
+                logging.error('retireve_metas - local file with size {} different than remote size {}'.format())
+                continue
+            info_path = local_path + '.size'
+            open(ensure_dir(info_path), 'w').write(str(local_size))
             fire_meta.update(meta)
             geo_meta = process_grid(self.ingest_dir,fire_meta)
             manifest.update({fire_meta['granule_id']: {
