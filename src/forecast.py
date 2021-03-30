@@ -46,6 +46,8 @@ from ingest.GFSF import GFSF_P, GFSF_S
 
 from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP
+from ingest.GOES16 import G16
+from ingest.GOES17 import G17
 
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
