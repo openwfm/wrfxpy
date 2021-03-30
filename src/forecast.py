@@ -168,12 +168,12 @@ class JobState(Dict):
         if 'SNPP' in sat_list:
             snpp=SNPP(js)
             sat.append(snpp)
-        if 'GOES16' in sat_list:
-            goes16=GOES16(js)
-            sat.append(goes16)
-        if 'GOES17' in sat_list:
-            goes17=GOES17(js)
-            sat.append(goes17)
+        if 'G16' in sat_list:
+            g16=GOES16(js)
+            sat.append(g16)
+        if 'G17' in sat_list:
+            g17=GOES17(js)
+            sat.append(g17)
         return sat
 
     def parse_satellite_source(self, args):
@@ -1203,8 +1203,8 @@ def verify_inputs(args,sys_cfg):
     # check for valid satellite source
     if 'satellite_source' in args:
         for sat in args['satellite_source']:
-            if sat not in ['Terra','Aqua','SNPP','GOES16','GOES17']:
-                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP, GOES16, GOES17' % sat)
+            if sat not in ['Terra','Aqua','SNPP','G16','G17']:
+                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP, G16, G17' % sat)
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:

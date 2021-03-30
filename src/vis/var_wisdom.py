@@ -881,9 +881,9 @@ _var_wisdom = {
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
         'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
     },
-    'GOES16_AF' : {
+    'G16_AF' : {
         'name' : 'GOES16 ABI Fire Detections satellite data',
-        'source' : 'GOES16',
+        'source' : 'G16',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'discrete',
@@ -892,9 +892,9 @@ _var_wisdom = {
         'retrieve_as' : lambda d : transform_goes(d),
         'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
     },
-    'GOES17_AF' : {
+    'G17_AF' : {
         'name' : 'GOES17 ABI Fire Detections satellite data',
-        'source' : 'GOES17',
+        'source' : 'G17',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'discrete',
@@ -936,9 +936,9 @@ _var_wisdom = {
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
         'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
     },
-    'GOES16_NF' : {
+    'G16_NF' : {
         'name' : 'GOES16 ABI No Fire Detections satellite data',
-        'source' : 'GOES16',
+        'source' : 'G16',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'discrete',
@@ -947,9 +947,9 @@ _var_wisdom = {
         'retrieve_as' : lambda d : transform_goes(d),
         'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
     },
-    'GOES17_NF' : {
+    'G17_NF' : {
         'name' : 'GOES17 ABI No Fire Detections satellite data',
-        'source' : 'GOES17',
+        'source' : 'G17',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'discrete',
