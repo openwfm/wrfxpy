@@ -46,8 +46,7 @@ from ingest.GFSF import GFSF_P, GFSF_S
 
 from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP
-from ingest.GOES16 import G16
-from ingest.GOES17 import G17
+from ingest.GOES import GOES16, GOES17
 
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
@@ -169,6 +168,12 @@ class JobState(Dict):
         if 'SNPP' in sat_list:
             snpp=SNPP(js)
             sat.append(snpp)
+        if 'GOES16' in sat_list:
+            goes16=GOES16(js)
+            sat.append(goes16)
+        if 'GOES17' in sat_list:
+            goes17=GOES17(js)
+            sat.append(goes17)
         return sat
 
     def parse_satellite_source(self, args):
@@ -1198,8 +1203,8 @@ def verify_inputs(args,sys_cfg):
     # check for valid satellite source
     if 'satellite_source' in args:
         for sat in args['satellite_source']:
-            if sat not in ['Terra','Aqua','SNPP']:
-                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP' % sat)
+            if sat not in ['Terra','Aqua','SNPP','GOES16','GOES17']:
+                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP, GOES16, GOES17' % sat)
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:

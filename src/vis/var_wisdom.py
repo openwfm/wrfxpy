@@ -4,7 +4,7 @@ import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
       u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
-      smoke_concentration
+      smoke_concentration, transform_goes
 from six.moves import range
 
 smoke_threshold_int = 10
@@ -881,6 +881,28 @@ _var_wisdom = {
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
         'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
     },
+    'G16_AF' : {
+        'name' : 'GOES16 ABI Fire Detections satellite data',
+        'source' : 'GOES16',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
+    'G17_AF' : {
+        'name' : 'GOES17 ABI Fire Detections satellite data',
+        'source' : 'GOES17',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
     'TERRA_NF' : {
        'name' : 'MODIS Terra No Fire Detections satellite data',
        'source' : 'Terra',
@@ -913,6 +935,28 @@ _var_wisdom = {
         'options' : _discrete_wisdom['nofire'],
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
         'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'G16_NF' : {
+        'name' : 'GOES16 ABI No Fire Detections satellite data',
+        'source' : 'GOES16',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
+    'G17_NF' : {
+        'name' : 'GOES17 ABI No Fire Detections satellite data',
+        'source' : 'GOES17',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
     }
 }
 
