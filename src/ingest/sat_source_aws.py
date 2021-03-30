@@ -232,10 +232,9 @@ class SatSourceAWS(SatSource):
         :param bounds: bounding box as (lon_min,lon_max,lat_min,lat_max)
         :param time: time interval (init_time_datetime,final_time_datetime)
         :param maxg: max number of granules to process
-        :return granules: dictionary with the metadata of all the products
+        :return metas: dictionary with the metadata of all the products
         """
-        metas = Dict(self.search_api_sat(None,None,time))
-        return metas
+        return self.search_api_sat(None,None,time)
 
     def group_metas(self, metas):
         """
@@ -273,7 +272,7 @@ class SatSourceAWS(SatSource):
             remote_size = int(fire_meta['file_size'])
             local_size = osp.getsize(local_path)
             if local_size != remote_size:
-                logging.error('retireve_metas - local file with size {} different than remote size {}'.format())
+                logging.error('retrieve_metas - local file with size {} different than remote size {}'.format())
                 continue
             info_path = local_path + '.size'
             open(ensure_dir(info_path), 'w').write(str(local_size))
