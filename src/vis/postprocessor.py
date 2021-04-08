@@ -242,6 +242,8 @@ class Postprocessor(object):
             logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (var, cbu_min,cbu_max, legend))
             spacing = wisdom.get('spacing','proportional')
             cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm)
+        else:
+            levels = None
 
         # replace masked values by nans just in case
         fa.data[fa.mask]=np.nan
@@ -266,7 +268,7 @@ class Postprocessor(object):
             geot = tif_args.get('geot')
             GeoDriver.from_elements(fa, crs, geot).to_geotiff(tif_path, desc = wisdom['name'], unit = native_unit, ndv = ndv)
 
-        return raster_png_data, corner_coords, cb_png_data, levels.tolist()
+        return raster_png_data, corner_coords, cb_png_data, levels
 
 
     def _vector2raster(self, d, var, tndx, **tif_args):

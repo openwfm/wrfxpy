@@ -86,7 +86,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proport
     fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
     plt.close()
 
-    return str_io.getvalue(),cb.get_ticks()
+    return str_io.getvalue(),cb.get_ticks().tolist()
 
 
 def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=200):
