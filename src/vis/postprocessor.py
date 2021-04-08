@@ -81,7 +81,7 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
         #  colorbar + add it to the KMZ as a screen overlay
         logging.info('scalar_field_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
-        cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
+        cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
 
     # create the raster & get coordinate bounds
     raster_png_data,corner_coords = basemap_raster_mercator(lons,lats,fa,fa_min,fa_max,cmap)
@@ -241,7 +241,7 @@ class Postprocessor(object):
             legend = wisdom['name'] + ' ' + cb_unit
             logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (var, cbu_min,cbu_max, legend))
             spacing = wisdom.get('spacing','proportional')
-            cb_png_data = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm)
+            cb_png_data,values = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm)
 
         # replace masked values by nans just in case
         fa.data[fa.mask]=np.nan
@@ -266,7 +266,7 @@ class Postprocessor(object):
             geot = tif_args.get('geot')
             GeoDriver.from_elements(fa, crs, geot).to_geotiff(tif_path, desc = wisdom['name'], unit = native_unit, ndv = ndv)
 
-        return raster_png_data, corner_coords, cb_png_data
+        return raster_png_data, corner_coords, cb_png_data, levels
 
 
     def _vector2raster(self, d, var, tndx, **tif_args):
@@ -405,7 +405,7 @@ class Postprocessor(object):
         cmax = N-.5
         raster_png_data,corner_coords = basemap_scatter_mercator(vals,lons,lats,bounds,alphas,cmin,cmax,cmap)
 
-        return raster_png_data, corner_coords, cb_png_data
+        return raster_png_data, corner_coords, cb_png_data, values
 
 
     def _sat2raster_empty(self, sat, bounds):
@@ -421,6 +421,7 @@ class Postprocessor(object):
         wisdom.update(self.wisdom_update.get(sat, {}))
         cmap_name = wisdom['colormap']
 
+        values = wisdom['options'].get('values',(3,5,7,8,9))
         labels = wisdom['options'].get('labels',('Water','Ground','Fire low','Fire nominal','Fire high'))
         colors = wisdom['options'].get('colors',((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0)))
         N = len(labels)
@@ -446,7 +447,7 @@ class Postprocessor(object):
         # create the raster & get coordinate bounds
         raster_png_data,corner_coords = basemap_scatter_mercator([],[],[],bounds,[],0,0,cmap)
 
-        return raster_png_data, corner_coords, cb_png_data
+        return raster_png_data, corner_coords, cb_png_data, values
 
 
     def _scalar2png(self, d, var, tndx, out_path, **tif_args):
@@ -460,7 +461,7 @@ class Postprocessor(object):
         :return: the path to the raster, to the colorbar and the bounding coordinates
         """
         # render the raster & colorbar
-        raster_png_data, corner_coords, cb_png_data = self._scalar2raster(d, var, tndx, **tif_args)
+        raster_png_data, corner_coords, cb_png_data, levels = self._scalar2raster(d, var, tndx, **tif_args)
 
         # write raster file
         raster_path = out_path + "-raster.png"
@@ -475,7 +476,7 @@ class Postprocessor(object):
             with open(colorbar_path, "wb") as f:
                 f.write(cb_png_data)
 
-        return raster_path, colorbar_path, corner_coords
+        return raster_path, colorbar_path, corner_coords, levels
 
 
     def _vector2png(self, d, var, tndx, out_path, **tif_args):
@@ -510,7 +511,7 @@ class Postprocessor(object):
         :return: the path to the raster and the bounding coordinates
         """
         # render the raster & colorbar
-        raster_png_data, corner_coords, cb_png_data = self._sat2raster(dgs, dfs, sat, bounds)
+        raster_png_data, corner_coords, cb_png_data, levels = self._sat2raster(dgs, dfs, sat, bounds)
 
         raster_path = out_path + '-raster.png'
         logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
@@ -525,7 +526,7 @@ class Postprocessor(object):
             with open(colorbar_path, "wb") as f:
                 f.write(cb_png_data)
 
-        return raster_path, colorbar_path, corner_coords
+        return raster_path, colorbar_path, corner_coords, levels
 
 
     def _sat2png_empty(self, sat, bounds, out_path):
@@ -538,7 +539,7 @@ class Postprocessor(object):
         :return: the path to the raster and the bounding coordinates
         """
         # render the raster & colorbar
-        raster_png_data, corner_coords, cb_png_data = self._sat2raster_empty(sat, bounds)
+        raster_png_data, corner_coords, cb_png_data, levels = self._sat2raster_empty(sat, bounds)
 
         raster_path = out_path + '-raster.png'
         logging.info("writing file %s size %s" % (raster_path, sys.getsizeof(raster_png_data)))
@@ -553,7 +554,7 @@ class Postprocessor(object):
             with open(colorbar_path, "wb") as f:
                 f.write(cb_png_data)
 
-        return raster_path, colorbar_path, corner_coords
+        return raster_path, colorbar_path, corner_coords, levels
 
 
     def _scalar2kmz(self, d, var, tndx, ts_esmf_begin, ts_esmf_end, out_path, cleanup = True, **tif_args):
@@ -578,7 +579,7 @@ class Postprocessor(object):
             doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
 
         # generate the png files
-        raster_path, cb_path, corner_coords = self._scalar2png(d, var, tndx, out_path, **tif_args)
+        raster_path, cb_path, corner_coords, levels = self._scalar2png(d, var, tndx, out_path, **tif_args)
 
         # add colorbar to KMZ
         if cb_path is not None:
@@ -607,7 +608,7 @@ class Postprocessor(object):
             if cb_path is not None:
                 os.remove(cb_path)
 
-        return kmz_path, raster_path, cb_path, corner_coords
+        return kmz_path, raster_path, cb_path, corner_coords, levels
 
 
     def _vector2kmz(self, d, var, tndx, ts_esmf_begin, ts_esmf_end, out_path, cleanup = True, **tif_args):
@@ -676,7 +677,7 @@ class Postprocessor(object):
             doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
 
         # generate the png files
-        raster_path, cb_path, corner_coords = self._sat2png(dgs, dfs, sat, bounds, out_path)
+        raster_path, cb_path, corner_coords, levels = self._sat2png(dgs, dfs, sat, bounds, out_path)
 
         # add colorbar to KMZ
         if cb_path is not None:
@@ -703,7 +704,7 @@ class Postprocessor(object):
             if cb_path is not None:
                 os.remove(cb_path)
 
-        return kmz_path, raster_path, cb_path, corner_coords
+        return kmz_path, raster_path, cb_path, corner_coords, levels
 
 
     def _sat2kmz_empty(self, sat, ts_esmf_begin, ts_esmf_end, bounds, out_path, cleanup = True):
@@ -728,7 +729,7 @@ class Postprocessor(object):
             doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
 
         # generate the png files
-        raster_path, cb_path, corner_coords = self._sat2png_empty(sat, bounds, out_path)
+        raster_path, cb_path, corner_coords, levels = self._sat2png_empty(sat, bounds, out_path)
 
         # add colorbar to KMZ
         if cb_path is not None:
@@ -755,7 +756,7 @@ class Postprocessor(object):
             if cb_path is not None:
                 os.remove(cb_path)
 
-        return kmz_path, raster_path, cb_path, corner_coords
+        return kmz_path, raster_path, cb_path, corner_coords, levels
 
 
     def open_file(self, path_file):
@@ -854,7 +855,7 @@ class Postprocessor(object):
                 logging.info('process_sats: any granule %s in output process interval %s - %s' % (sat, utc_to_esmf(ts_initial), utc_to_esmf(ts_final)))
                 try:
                     outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + "sat_empty")
-                    kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
+                    kmz_path, raster_path, cb_path, coords, levels, mf_upd = None, None, None, None, None, {}
                     if osp.exists(outpath_base+".kmz"):
                         logging.info('process_sats: empty sat %s already processed' % (outpath_base+".kmz"))
                         kmz_path = outpath_base+".kmz"
@@ -868,7 +869,9 @@ class Postprocessor(object):
                         coords = float_bounds
                     else:
                         logging.info('process_sats: processing empty sat %s for the first time' % (outpath_base+".kmz"))
-                        kmz_path,raster_path,cb_path,coords = self._sat2kmz_empty(sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
+                        kmz_path,raster_path,cb_path,coords,levels = self._sat2kmz_empty(sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
+                    if levels is not None:
+                        mf_upd['levels'] = levels
                     if cb_path is not None:
                         mf_upd['colorbar'] = osp.basename(cb_path)
                     mf_upd['kml'] = osp.basename(kmz_path)
@@ -884,7 +887,9 @@ class Postprocessor(object):
                 try:
                     outpath_base = osp.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + sat)
                     kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
-                    kmz_path,raster_path,cb_path,coords = self._sat2kmz(dgs, dfs, sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
+                    kmz_path,raster_path,cb_path,coords,levels = self._sat2kmz(dgs, dfs, sat, ts_esmf, None, bounds, outpath_base, cleanup=False)
+                    if levels is not None:
+                        mf_upd['levels'] = levels
                     if cb_path is not None:
                         mf_upd['colorbar'] = osp.basename(cb_path)
                     mf_upd['kml'] = osp.basename(kmz_path)
@@ -967,14 +972,15 @@ class Postprocessor(object):
                     tif_args = {'crs': crs, 'geot': geot, 'tif_path': outpath_base+'.tif'}
                 else:
                     tif_args = {}
-                kmz_path, raster_path, cb_path, coords, mf_upd = None, None, None, None, {}
+                kmz_path, raster_path, cb_path, coords, levels, mf_upd = None, None, None, None, None, {}
                 if is_windvec(var):
                     kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False, **tif_args)
                 else:
-                    kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False, **tif_args)
+                    kmz_path,raster_path,cb_path,coords,levels = self._scalar2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False, **tif_args)
+                    if levels is not None:
+                        mf_upd['levels'] = levels
                     if cb_path is not None:
                         mf_upd['colorbar'] = osp.basename(cb_path)
-
                 mf_upd['kml'] = osp.basename(kmz_path)
                 mf_upd['raster'] = osp.basename(raster_path)
                 mf_upd['coords'] = coords
@@ -1023,7 +1029,7 @@ class Postprocessor(object):
                 if is_windvec(var):
                     kmz_path,_,_ = self._vector2kmz(d, var, tndx, ts_esmf, outpath_base)
                 else:
-                    kmz_path,_,_,_ = self._scalar2kmz(d, var, tndx, ts_esmf, outpath_base)
+                    kmz_path,_,_,_,_ = self._scalar2kmz(d, var, tndx, ts_esmf, outpath_base)
                 kmz_name = osp.basename(kmz_path)
                 self._update_manifest(dom_id, ts_esmf, var, { 'kml' : kmz_name })
 
@@ -1060,10 +1066,12 @@ class Postprocessor(object):
                     raster_name = osp.basename(raster_path)
                     self._update_manifest(dom_id, ts_esmf, var, { 'raster' : raster_name, 'coords' : coords})
                 else:
-                    raster_path, cb_path, coords = self._scalar2png(d, var, tndx, outpath_base)
+                    raster_path, cb_path, coords, levels = self._scalar2png(d, var, tndx, outpath_base)
                     mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords}
                     if cb_path is not None:
                         mf_upd['colorbar'] = osp.basename(cb_path)
+                    if levels is not None:
+                        mf_upd['levels'] = levels
                     self._update_manifest(dom_id, ts_esmf, var, mf_upd)
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s into PNG" % (e, var, ts_esmf))
@@ -1098,7 +1106,7 @@ class Postprocessor(object):
                         kmz_name = osp.basename(kmz_path)
                         self._update_manifest(dom_id, ts_esmf, var, { 'raster' : raster_name, 'coords' : coords, 'kml' : kmz_name})
                     else:
-                        kmz_path,raster_path,cb_path,coords = self._scalar2kmz(d, var, tndx, ts_esmf, outpath_base, cleanup=False)
+                        kmz_path,raster_path,cb_path,coords,levels = self._scalar2kmz(d, var, tndx, ts_esmf, outpath_base, cleanup=False)
                         mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords, 'kml' : osp.basename(kmz_path) }
                         if cb_path is not None:
                             # optimization for display when we know colorbar has fixed scale
@@ -1114,6 +1122,8 @@ class Postprocessor(object):
                                 mf_upd['colorbar'] = fixed_colorbars[var]
                             else:
                                 mf_upd['colorbar'] = osp.basename(cb_path)
+                        if levels is not None:
+                            mf_upd['levels'] = levels
                         self._update_manifest(dom_id, ts_esmf, var, mf_upd)
                 except Exception as e:
                     logging.warning("Exception %s while postprocessing %s for time %s" % (e, var, ts_esmf))
