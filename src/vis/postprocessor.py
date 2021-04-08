@@ -266,7 +266,7 @@ class Postprocessor(object):
             geot = tif_args.get('geot')
             GeoDriver.from_elements(fa, crs, geot).to_geotiff(tif_path, desc = wisdom['name'], unit = native_unit, ndv = ndv)
 
-        return raster_png_data, corner_coords, cb_png_data, levels
+        return raster_png_data, corner_coords, cb_png_data, levels.tolist()
 
 
     def _vector2raster(self, d, var, tndx, **tif_args):
@@ -405,7 +405,7 @@ class Postprocessor(object):
         cmax = N-.5
         raster_png_data,corner_coords = basemap_scatter_mercator(vals,lons,lats,bounds,alphas,cmin,cmax,cmap)
 
-        return raster_png_data, corner_coords, cb_png_data, values
+        return raster_png_data, corner_coords, cb_png_data, np.array(values).tolist()
 
 
     def _sat2raster_empty(self, sat, bounds):
@@ -447,7 +447,7 @@ class Postprocessor(object):
         # create the raster & get coordinate bounds
         raster_png_data,corner_coords = basemap_scatter_mercator([],[],[],bounds,[],0,0,cmap)
 
-        return raster_png_data, corner_coords, cb_png_data, values
+        return raster_png_data, corner_coords, cb_png_data, np.array(values).tolist()
 
 
     def _scalar2png(self, d, var, tndx, out_path, **tif_args):
