@@ -1267,8 +1267,6 @@ def process_arguments(job_args,sys_cfg):
             for sat in sats:
                 for prod in _sat_prods:
                     satprod = sat.upper()+prod
-                    if not satprod in args['postproc'][str(args['max_dom_pp'])]:
-                        args['postproc'][str(args['max_dom_pp'])].append(satprod)
                     args['satprod_satsource'].update({satprod: sat})
 
     # load tokens if etc/tokens.json exists
