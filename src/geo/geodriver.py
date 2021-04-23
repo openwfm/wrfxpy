@@ -121,14 +121,17 @@ class GeoDriver(object):
         # find resample indexes
         i_mins = np.where(x_min <= xx)[0]
         i_maxs = np.where(xx <= x_max)[0]
+        j_mins = np.where(y_min <= yy)[0]
+        j_maxs = np.where(yy <= y_max)[0]
+        if len(i_mins)==0 or len(i_maxs)==0 or len(j_mins)==0 or len(j_maxs)==0:
+            logging.error('GeoTIFF.resample_bbox - bbox provided does not intersect the image')
+            raise GeoDriverError('Incorrect bbox {}'.format(bbox))
         if dx > 0:
             i_min = i_mins.min()
             i_max = i_maxs.max()
         else:
             i_max = i_mins.max()
             i_min = i_maxs.min()
-        j_mins = np.where(y_min <= yy)[0]
-        j_maxs = np.where(yy <= y_max)[0]
         if dy > 0:
             j_min = j_mins.min()
             j_max = j_maxs.max()
