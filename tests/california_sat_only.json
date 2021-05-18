@@ -26,7 +26,7 @@
                 37.396380,
                 -119.671094
             ],
-            "history_interval": 10,
+            "history_interval": 180,
             "geog_res": ".3s",
             "time_step": 2,
             "stand_lon": -122.12,
