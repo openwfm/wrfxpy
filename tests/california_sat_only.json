@@ -1,0 +1,52 @@
+{
+    "grid_code": "california_sat_only",
+    "start_utc": "2020-08-16_00:00:00",
+    "end_utc": "2020-08-17_00:00:00",
+    "sat_only": true,
+    "satellite_source": ["Aqua","Terra","SNPP","G16","G17"],
+    "domains": {
+        "1": {
+            "cell_size": [
+                5000,
+                5000
+            ],
+            "truelats": [
+                37.11,
+                37.11
+            ],
+            "domain_size": [
+                230,
+                221
+            ],
+            "subgrid_ratio": [
+                20,
+                20
+            ],
+            "center_latlon": [
+                37.396380,
+                -119.671094
+            ],
+            "history_interval": 10,
+            "geog_res": ".3s",
+            "time_step": 2,
+            "stand_lon": -122.12,
+            "sat_interval": [0, 180]
+        }
+    },
+    "postproc": {
+        "1": [
+            "AQUA_AF",
+            "TERRA_AF",
+            "SNPP_AF",
+            "G16_AF",
+            "G17_AF",
+            "AQUA_NF",
+            "TERRA_NF",
+            "SNPP_NF",
+            "G16_NF",
+            "G17_NF"
+        ],
+        "shuttle": "incremental",
+        "description": "CALI SAT DATA"
+    }
+}

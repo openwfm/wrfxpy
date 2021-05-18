@@ -1,5 +1,4 @@
 {
-    "tif_proc": true,
     "wall_time_hrs": 2,
     "postproc": {
         "1": [
@@ -13,7 +12,8 @@
             "SMOKE_INT"
         ],
         "shuttle": "incremental",
-        "description": "default simple forecast with geotiff"
+        "description": "default simple forecast with geotiff",
+        "tif_proc": true
     },
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",

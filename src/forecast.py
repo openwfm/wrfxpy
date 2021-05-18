@@ -88,7 +88,7 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
-        self.grib_source = self.resolve_grib_source(self.grib_source,args)
+        self.grib_source = self.resolve_grib_source(self.get('grib_source',None),args)
         self.satellite_source_list = args.get('satellite_source',[])
         self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
@@ -112,9 +112,8 @@ class JobState(Dict):
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
         self.ignitions = args.get('ignitions', None)
-        self.fmda = self.parse_fmda(args)
+        self.fmda = args.get('fuel_moisture_da', None)
         self.postproc = args['postproc']
-        self.tif_proc = args.get('tif_proc', False)
         self.wrfxpy_dir = args['sys_install_path']
         if 'clean_dir' in args:
             self.clean_dir = args['clean_dir']
@@ -148,7 +147,11 @@ class JobState(Dict):
         elif gs_name == 'GFSF':
             return [GFSF_P(js),GFSF_S(js)]
         else:
-            raise ValueError('Unrecognized grib_source %s' % gs_name)
+            sat_only = js.get('sat_only',False)
+            if not sat_only:
+                raise ValueError('Unrecognized grib_source %s' % gs_name)
+            else:
+                return [Dict({'period_hours': 1, 'cycle_hours': 1})]
 
     def resolve_satellite_source(self, js):
         """
@@ -187,19 +190,6 @@ class JobState(Dict):
             return sats
         else:
             return []
-
-    def parse_fmda(self, args):
-        """
-        Parse information inside the FMDA blob, if any.
-
-        :param args: the forecast job argument dictionary
-        """
-        if 'fuel_moisture_da' in args:
-            fmda = args['fuel_moisture_da']
-            return Dict({'token' : fmda['mesowest_token'], 'domains' : fmda['domains']})
-        else:
-            return None
-
 
     def parse_emails(self, args):
         """
@@ -422,7 +412,6 @@ def make_job_file(js):
     jsub.grid_code = js.grid_code
     jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     jsub.num_doms = js.num_doms
-    jsub.tif_proc = js.tif_proc
     if 'tslist' in js.keys():
         jsub.tslist = js.tslist
     else:
@@ -601,20 +590,9 @@ def execute(args,job_args):
     sys.stdout.flush()
     send_email(js, 'start', 'Job %s started.' % js.job_id)
 
-    # read in all namelists
-    js.wps_nml = read_namelist(js.args['wps_namelist_path'])
-    js.wrf_nml = read_namelist(js.args['wrf_namelist_path'])
-    js.fire_nml = read_namelist(js.args['fire_namelist_path'])
-    js.ems_nml = None
-    if 'emissions_namelist_path' in js.args:
-        js.ems_nml = read_namelist(js.args['emissions_namelist_path'])
-
     # Parse and setup the domain configuration
     js.domain_conf = WPSDomainConf(js.domains)
     js.num_doms = len(js.domain_conf)
-
-    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds
-
     logging.info("number of domains defined is %d." % js.num_doms)
 
     js.bounds = Dict({})
@@ -647,6 +625,15 @@ def execute(args,job_args):
         else:
             logging.error('any available sat source specified')
             return
+    else:
+        # read in all namelists
+        js.wps_nml = read_namelist(js.args['wps_namelist_path'])
+        js.wrf_nml = read_namelist(js.args['wrf_namelist_path'])
+        js.fire_nml = read_namelist(js.args['fire_namelist_path'])
+        js.ems_nml = None
+        if 'emissions_namelist_path' in js.args:
+            js.ems_nml = read_namelist(js.args['emissions_namelist_path'])
+        js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds
 
     # build directories in workspace
     js.wps_dir = osp.abspath(osp.join(js.jobdir, 'wps'))
@@ -882,7 +869,7 @@ def process_output(job_id):
         ts = None
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
-    tif_proc = js.get('tif_proc', False)
+    tif_proc = js.postproc.get('tif_proc', False)
 
     if js.postproc.get('from', None) == 'wrfout':
         logging.info('Postprocessing all wrfout files.')
@@ -1173,6 +1160,12 @@ def verify_inputs(args,sys_cfg):
     if 'sat_only' in args and args['sat_only']:
         required_files = [('sys_install_path', 'Non-existent system installation directory %s')]
         optional_files = []
+    elif 'ungrib_only' in args and args['ungrib_only']:
+        required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
+                      ('workspace_path', 'Non-existent workspace directory %s'),
+                      ('wps_install_path', 'Non-existent WPS installation directory %s'),
+                      ('wps_namelist_path', 'Non-existent WPS namelist template %s')]
+        optional_files = []
     else:
         required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
                       ('workspace_path', 'Non-existent workspace directory %s'),
@@ -1182,7 +1175,6 @@ def verify_inputs(args,sys_cfg):
                       ('wrf_namelist_path', 'Non-existent WRF namelist template %s'),
                       ('fire_namelist_path', 'Non-existent fire namelist template %s'),
                       ('wps_geog_path', 'Non-existent geogrid data (WPS-GEOG) path %s')]
-
         optional_files = [('emissions_namelist_path', 'Non-existent namelist template %s')]
 
     # check each path that should exist
@@ -1197,8 +1189,9 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
-    if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR','GFSA','GFSF']:
-        raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
+    if 'grib_source' in args:
+        if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR','GFSA','GFSF']:
+            raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
 
     # check for valid satellite source
     if 'satellite_source' in args:
