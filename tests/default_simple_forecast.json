@@ -63,6 +63,5 @@
         }
     },
     "end_utc": "T+300",
-    "qsys": "kingspeak",
     "grib_source": "NAM"
 }
