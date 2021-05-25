@@ -204,19 +204,35 @@ def find_region_indices(glat,glon,minlat,maxlat,minlon,maxlon):
     done = False
     while not done:
         done = True
-        tmp = np.where(np.amax(glat[:, j1:j2],axis=1) < minlat)[0][-1]
+        tmp = np.where(np.amax(glat[:, j1:j2],axis=1) < minlat)[0]
+        if len(tmp):
+            tmp = tmp[-1]
+        else:
+            tmp = i1
         if i1 != tmp:
             i1 = tmp
             done = False
-        tmp = np.where(np.amin(glat[:, j1:j2],axis=1) > maxlat)[0][0]
+        tmp = np.where(np.amin(glat[:, j1:j2],axis=1) > maxlat)[0]
+        if len(tmp):
+            tmp = tmp[0]
+        else:
+            tmp = i2
         if i2 != tmp:
             i2 = tmp
             done = False
-        tmp = np.where(np.amax(glon[i1:i2,:],axis=0) < minlon)[0][-1]
+        tmp = np.where(np.amax(glon[i1:i2,:],axis=0) < minlon)[0]
+        if len(tmp):
+            tmp = tmp[-1]
+        else:
+            tmp = j1
         if j1 != tmp:
             j1 = tmp
             done = False
-        tmp = np.where(np.amin(glon[i1:i2,:],axis=0) > maxlon)[0][0]
+        tmp = np.where(np.amin(glon[i1:i2,:],axis=0) > maxlon)[0]
+        if len(tmp):
+            tmp = tmp[0]
+        else:
+            tmp = j2
         if j2 != tmp:
             j2 = tmp
             done = False
@@ -362,7 +378,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # perform assimilation with mesowest observations
     tm_start = cycle - timedelta(minutes=30)
     tm_end = cycle + timedelta(minutes=30)
-    fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons)
+    fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt)
     fm10v = []
     for fm10_obs in fm10.values():
         for obs in fm10_obs:

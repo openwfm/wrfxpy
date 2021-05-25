@@ -1,0 +1,11 @@
+{
+    "workspace_path" : "wksp_fmda",
+    "lookback_length" : 20,
+    "regions" : {
+       "California GACC" : {
+         "code" : "CALI",
+         "bbox" : [32, -123, 42.5, -112]
+       }
+    }
+}
+

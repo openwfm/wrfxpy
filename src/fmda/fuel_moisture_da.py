@@ -52,7 +52,7 @@ def check_overlap(wrf_path,ts_now):
     return False
 
 
-def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
+def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghgt):
     """
     Retrieve observation data from Mesowest and repackage them as a time-indexed
     dictionary of lists of observations.  
@@ -61,6 +61,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
     :param tm_end: the end of the observation window
     :param glat: the lattitudes of the grid points
     :param glon: the longitudes of the grid points
+    :param ghgt: the elevation of the grid points
     """
     def decode_meso_time(t):
         # example: '2016-03-30T00:30:00Z'
@@ -92,8 +93,12 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
     obs_data = {}
     for stinfo in meso_obss['STATION']:
         st_lat, st_lon = float(stinfo['LATITUDE']), float(stinfo['LONGITUDE'])
-        elev = float(stinfo['ELEVATION']) / 3.2808
         ngp = find_closest_grid_point(st_lon, st_lat, glon, glat)
+        st_elev = stinfo['ELEVATION']
+        if st_elev is None:
+            elev = ghgt[ngp] 
+        else:
+            elev = float(stinfo['ELEVATION']) / 3.2808
         dts = [decode_meso_time(x) for x in stinfo['OBSERVATIONS']['date_time']]
         if 'fuel_moisture_set_1' in stinfo['OBSERVATIONS']:
             fms = stinfo['OBSERVATIONS']['fuel_moisture_set_1']
@@ -246,7 +251,7 @@ def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
   grid_dist_km = great_circle_distance(lon[0,0], lat[0,0], lon[1,1], lat[1,1])
  
   # retrieve fuel moisture observations via the Mesowest API
-  fm10 = retrieve_mesowest_observations(mesowest_token, tm_start, tm_end, wrfin.get_lats(), wrfin.get_lons())
+  fm10 = retrieve_mesowest_observations(mesowest_token, tm_start, tm_end, wrfin.get_lats(), wrfin.get_lons(), wrfin.get_field('HGT'))
 
   logging.info('FMDA retrieved %d observations from Mesowest.' % len(fm10))
 
