@@ -34,7 +34,7 @@ import pytz
 import netCDF4
 import logging
 import json
-from MesoPy import Meso
+from MesoPy import Meso,MesoPyError
 from utils import inq
 from six.moves import range
 from six.moves import zip
@@ -56,7 +56,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
     """
     Retrieve observation data from Mesowest and repackage them as a time-indexed
     dictionary of lists of observations.  
-    :param meso_token: the mesowest API access token
+    :param meso_token: the mesowest API access token or list of them
     :param tm_start: the start of the observation window
     :param tm_end: the end of the observation window
     :param glat: the lattitudes of the grid points
@@ -75,15 +75,29 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
     min_lat, max_lat = np.amin(glat), np.amax(glat)
     min_lon, max_lon = np.amin(glon), np.amax(glon)
 
-    # retrieve data from Mesowest API (http://mesowest.org/api/)
-    m = Meso(meso_token)
-    logging.info("Retrieving fuel moisture from %s to %s" % (meso_time(tm_start - timedelta(minutes=30)),
+    # retrieve data from Mesonet API (http://api.mesowest.net/)
+    if isinstance(meso_token,str):
+        meso_tokens = [meso_token]
+        n_tokens = 1
+    else:
+        meso_tokens = meso_token
+        n_tokens = len(meso_tokens)
+    for tn,meso_token in enumerate(meso_tokens):
+        m = Meso(meso_token)
+        logging.info("Retrieving fuel moisture from %s to %s" % (meso_time(tm_start - timedelta(minutes=30)),
                           meso_time(tm_end + timedelta(minutes=30))))
-    logging.info("bbox=' %g,%g,%g,%g'" % (min_lon, min_lat, max_lon, max_lat))
-    meso_obss = m.timeseries(meso_time(tm_start - timedelta(minutes=30)),
+        logging.info("bbox=' %g,%g,%g,%g'" % (min_lon, min_lat, max_lon, max_lat))
+        try:
+            meso_obss = m.timeseries(meso_time(tm_start - timedelta(minutes=30)),
                           meso_time(tm_end + timedelta(minutes=30)),
                           showemptystations = '0', bbox='%g,%g,%g,%g' % (min_lon, min_lat, max_lon, max_lat),
                           vars='fuel_moisture')
+        except Exception as e:
+            if tn == n_tokens-1: 
+                raise MesoPyError('Could not connect to the API. Probably the token(s) usage for this month is full.') 
+            else:
+                logging.warning('Could not connect to the API. Probably the token usage for this month is full. Trying next token...')
+
     if meso_obss is None:
         logging.info('retrieve_mesowest_observations: Meso.timeseries returned None')
         return {}

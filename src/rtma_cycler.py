@@ -303,7 +303,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     :param rtma: the RTMA object that can be used to retrieve variables for this cycle
     :param wksp_path: the workspace path for the cycler
     :param lookback_length: number of cycles to search before we find a computed cycle
-    :param meso_token: the mesowest API access token
+    :param meso_token: the mesowest API access token or a list of them
     :return: the model advanced and assimilated at the current cycle
     """
     logging.info("rtma_cycler.fmda_advance_region: %s" % str(cycle))
