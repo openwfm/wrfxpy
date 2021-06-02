@@ -54,10 +54,14 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     :param wksp_path: the workspace path
     :return: the postprocessing path
     """
+    prev_cycle = cycle-timedelta(hours=1)
     model_path = compute_model_path(cycle, region_cfg.code, wksp_path)
     year_month = '%04d%02d' % (cycle.year, cycle.month)
+    prev_year_month = '%04d%02d' % (prev_cycle.year, prev_cycle.month)
     cycle_dir = 'fmda-%s-%04d%02d%02d-%02d' %  (region_cfg.code, cycle.year, cycle.month, cycle.day, cycle.hour)
+    prev_cycle_dir = 'fmda-%s-%04d%02d%02d-%02d' %  (region_cfg.code, prev_cycle.year, prev_cycle.month, prev_cycle.day, prev_cycle.hour)
     postproc_path = osp.join(wksp_path, year_month, cycle_dir)
+    prev_postproc_path = osp.join(wksp_path, prev_year_month, prev_cycle_dir)
 
     # read in the longitudes and latitudes
     geo_path = osp.join(wksp_path, '%s-geo.nc' % region_cfg.code)
@@ -137,8 +141,10 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
 
     esmf_cycle = utc_to_esmf(cycle) 
     mf = { "1" : {esmf_cycle : {}}}
-    manifest_name = 'fmda-%s-%04d%02d%02d-%02d.json' %  (region_cfg.code, cycle.year, cycle.month, cycle.day, cycle.hour)
+    manifest_name = cycle_dir + '.json'
+    complete_manifest_name = 'fmda-%s.json' % region_cfg.code
     ensure_dir(osp.join(postproc_path, manifest_name))
+    ensure_dir(osp.join(postproc_path, complete_manifest_name))
     
     # read and process model variables
     with netCDF4.Dataset(model_path) as d:
@@ -146,8 +152,8 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             fm_wisdom = var_wisdom['fm']
             fm_wisdom['name'] = '%s fuel moisture' % name
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
-            raster_name = 'fmda-%s-raster.png' % name
-            cb_name = 'fmda-%s-raster-cb.png' % name
+            raster_name = cycle_dir + '-%s-raster.png' % name
+            cb_name = cycle_dir + '-%s-raster-cb.png' % name
             with open(osp.join(postproc_path, raster_name), 'wb') as f:
                 f.write(raster_png)
             with open(osp.join(postproc_path, cb_name), 'wb') as f:
@@ -155,8 +161,8 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
         for name in show:
             raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
-            raster_name = 'fmda-%s-raster.png' % name
-            cb_name = 'fmda-%s-raster-cb.png' % name
+            raster_name = cycle_dir + '-%s-raster.png' % name
+            cb_name = cycle_dir + '-%s-raster-cb.png' % name
             with open(osp.join(postproc_path, raster_name), 'wb') as f:
                 f.write(raster_png)
             with open(osp.join(postproc_path, cb_name), 'wb') as f:
@@ -165,8 +171,13 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
 
     logging.info('writing manifest file %s' % osp.join(postproc_path, manifest_name) )
     json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'), indent=1, separators=(',',':'))
-    #logging.info(json.dumps(mf, indent=1, separators=(',',':')))
     logging.info(json.dumps(mf))
+    if osp.exists(prev_postproc_path):
+        prev_mf = json.load(open(osp.join(prev_postproc_path, complete_manifest_name), 'r'))
+        prev_mf['1'].update(mf['1'])
+        json.dump(prev_mf, open(osp.join(postproc_path, complete_manifest_name), 'w'), indent=1, separators=(',',':'))
+    else:
+        json.dump(mf, open(osp.join(postproc_path, complete_manifest_name), 'w'), indent=1, separators=(',',':'))
 
     return postproc_path
 
@@ -497,7 +508,7 @@ if __name__ == '__main__':
             pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
             if 'shuttle_remote_host' in sys_cfg:
                 sim_code = 'fmda-' + wrapped_cfg.code
-                send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, '*.json', region_id + ' FM')
+                send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
         else:
             logging.info('CYCLER the cycle %s for region %s is already complete, skipping ...' % (str(cycle), str(region_id)))
 
