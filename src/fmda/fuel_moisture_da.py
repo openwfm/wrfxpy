@@ -94,6 +94,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
                           meso_time(tm_end + timedelta(minutes=30)),
                           showemptystations = '0', bbox='%g,%g,%g,%g' % (min_lon, min_lat, max_lon, max_lat),
                           vars='fuel_moisture')
+            break
         except Exception as e:
             if tn == n_tokens-1: 
                 raise MesoPyError('Could not connect to the API. Probably the token(s) usage for this month is full.') 
