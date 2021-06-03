@@ -24,7 +24,7 @@ from .trend_surface_model import fit_tsm
 from utils import great_circle_distance, find_closest_grid_point
 from .fuel_moisture_model import FuelMoistureModel
 from .fm10_observation import FM10Observation
-from utils import find_closest_grid_point
+from utils import find_closest_grid_point, ensure_dir
 
 import sys
 import os
@@ -106,6 +106,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
     
     if ingest:
         sts_path = 'ingest/meso/stations.pkl'
+        ensure_dir(sts_path)
         if osp.exists(sts_path):
             sts_pd = pd.read_pickle(sts_path)    
         else:

@@ -408,7 +408,6 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     tm_start = cycle - timedelta(minutes=30)
     tm_end = cycle + timedelta(minutes=30)
     if cfg.code == 'CONUS':
-        ensure_dir('ingest/meso')
         fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt, True)
     else:
         fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt)
@@ -528,8 +527,9 @@ if __name__ == '__main__':
             logging.info('CYCLER processing region %s for cycle %s' % (region_id, str(cycle)))
             try:
                 fmda_advance_region(cycle, wrapped_cfg, rtma, cfg.workspace_path, lookback_length, meso_token)
-            except:
+            except Exception as e:
                 logging.warning('CYCLER failed processing region {} for cycle {}'.format(region_id,str(cycle)))
+                logging.warning('CYCLER exception {}'.format(e))
             pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
             if pp_path != None:
                 if 'shuttle_remote_host' in sys_cfg:
