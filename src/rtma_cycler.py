@@ -23,7 +23,7 @@ from fmda.fuel_moisture_da import execute_da_step, retrieve_mesowest_observation
 from fmda.fuel_moisture_model import FuelMoistureModel
 from ingest.grib_file import GribFile, GribMessage
 from ingest.rtma_source import RTMA
-from utils import Dict, ensure_dir, utc_to_esmf, delete
+from utils import Dict, ensure_dir, utc_to_esmf, delete, force_copy, move
 from vis.postprocessor import scalar_field_to_raster
 from ssh_shuttle import send_product_to_server
 
@@ -35,6 +35,7 @@ import sys
 import logging
 import os
 import os.path as osp
+import glob
 
 from datetime import datetime, timedelta
 import pytz
@@ -62,14 +63,12 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     prev_cycle_dir = 'fmda-%s-%04d%02d%02d-%02d' %  (region_cfg.code, prev_cycle.year, prev_cycle.month, prev_cycle.day, prev_cycle.hour)
     postproc_path = osp.join(wksp_path, year_month, cycle_dir)
     prev_postproc_path = osp.join(wksp_path, prev_year_month, prev_cycle_dir)
+    manifest_name = cycle_dir + '.json'
+    complete_manifest_name = 'fmda-%s.json' % region_cfg.code
 
-    # read in the longitudes and latitudes
-    geo_path = osp.join(wksp_path, '%s-geo.nc' % region_cfg.code)
-    logging.info('CYCLER reading longitudes and latitudes from NetCDF file %s' % geo_path )
-    d = netCDF4.Dataset(geo_path)
-    lats = d.variables['XLAT'][:,:]
-    lons = d.variables['XLONG'][:,:]
-    d.close()
+    if not is_cycle_computed(cycle, region_cfg, cfg.workspace_path) and not osp.exists(prev_postproc_path):
+        logging.warning('CYCLER postprocessing failed for time {}'.format(str(cycler)))
+        return None
 
     var_wisdom = {
         'fm' : {
@@ -141,41 +140,60 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
 
     esmf_cycle = utc_to_esmf(cycle) 
     mf = { "1" : {esmf_cycle : {}}}
-    manifest_name = cycle_dir + '.json'
-    complete_manifest_name = 'fmda-%s.json' % region_cfg.code
     ensure_dir(osp.join(postproc_path, manifest_name))
-    ensure_dir(osp.join(postproc_path, complete_manifest_name))
     
-    # read and process model variables
-    with netCDF4.Dataset(model_path) as d:
-        for i,name in [(0, '1-hr FM'), (1, '10-hr FM'), (2, '100-hr FM')]:
-            fm_wisdom = var_wisdom['fm']
-            fm_wisdom['name'] = '%s fuel moisture' % name
-            raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
+    if not is_cycle_computed(cycle, region_cfg, cfg.workspace_path):
+        logging.info('CYCLER copying postprocessing from cycle {} to cycle {}'.format(str(prev_cycle),str(cycle)))
+        prev_manifest_name = prev_cycle_dir + '.json'
+        prev_esmf_cycle = utc_to_esmf(prev_cycle)
+        prev_mf = json.load(open(osp.join(prev_postproc_path, prev_manifest_name), 'r')) 
+        for name in prev_mf['1'][prev_esmf_cycle].keys():
+            prev_raster_name = prev_mf['1'][prev_esmf_cycle][name]['raster']
+            prev_cb_name = prev_mf['1'][prev_esmf_cycle][name]['colorbar']
             raster_name = cycle_dir + '-%s-raster.png' % name
             cb_name = cycle_dir + '-%s-raster-cb.png' % name
-            with open(osp.join(postproc_path, raster_name), 'wb') as f:
-                f.write(raster_png)
-            with open(osp.join(postproc_path, cb_name), 'wb') as f:
-                f.write(cb_png) 
+            coords = prev_mf['1'][prev_esmf_cycle][name]['coords']
+            force_copy(osp.join(prev_postproc_path, prev_raster_name),osp.join(postproc_path, raster_name))
+            force_copy(osp.join(prev_postproc_path, prev_cb_name),osp.join(postproc_path, cb_name))
             mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
-        for name in show:
-            raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
-            raster_name = cycle_dir + '-%s-raster.png' % name
-            cb_name = cycle_dir + '-%s-raster-cb.png' % name
-            with open(osp.join(postproc_path, raster_name), 'wb') as f:
-                f.write(raster_png)
-            with open(osp.join(postproc_path, cb_name), 'wb') as f:
-                f.write(cb_png) 
-            mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+    else:
+        # read in the longitudes and latitudes
+        geo_path = osp.join(wksp_path, '%s-geo.nc' % region_cfg.code)
+        logging.info('CYCLER reading longitudes and latitudes from NetCDF file %s' % geo_path )
+        d = netCDF4.Dataset(geo_path)
+        lats = d.variables['XLAT'][:,:]
+        lons = d.variables['XLONG'][:,:]
+        d.close()
+        # read and process model variables
+        with netCDF4.Dataset(model_path) as d:
+            for i,name in [(0, '1-hr FM'), (1, '10-hr FM'), (2, '100-hr FM')]:
+                fm_wisdom = var_wisdom['fm']
+                fm_wisdom['name'] = '%s fuel moisture' % name
+                raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
+                raster_name = cycle_dir + '-%s-raster.png' % name
+                cb_name = cycle_dir + '-%s-raster-cb.png' % name
+                with open(osp.join(postproc_path, raster_name), 'wb') as f:
+                    f.write(raster_png)
+                with open(osp.join(postproc_path, cb_name), 'wb') as f:
+                    f.write(cb_png) 
+                mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+            for name in show:
+                raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
+                raster_name = cycle_dir + '-%s-raster.png' % name
+                cb_name = cycle_dir + '-%s-raster-cb.png' % name
+                with open(osp.join(postproc_path, raster_name), 'wb') as f:
+                    f.write(raster_png)
+                with open(osp.join(postproc_path, cb_name), 'wb') as f:
+                    f.write(cb_png) 
+                mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
 
     logging.info('writing manifest file %s' % osp.join(postproc_path, manifest_name) )
     json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'), indent=1, separators=(',',':'))
     logging.info(json.dumps(mf))
-    if osp.exists(prev_postproc_path):
-        prev_mf = json.load(open(osp.join(prev_postproc_path, complete_manifest_name), 'r'))
-        prev_mf['1'].update(mf['1'])
-        json.dump(prev_mf, open(osp.join(postproc_path, complete_manifest_name), 'w'), indent=1, separators=(',',':'))
+    if osp.exists(osp.join(prev_postproc_path, complete_manifest_name)):
+        complete_mf = json.load(open(osp.join(prev_postproc_path, complete_manifest_name), 'r'))
+        complete_mf['1'].update(mf['1'])
+        json.dump(complete_mf, open(osp.join(postproc_path, complete_manifest_name), 'w'), indent=1, separators=(',',':'))
     else:
         json.dump(mf, open(osp.join(postproc_path, complete_manifest_name), 'w'), indent=1, separators=(',',':'))
 
@@ -389,7 +407,11 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # perform assimilation with mesowest observations
     tm_start = cycle - timedelta(minutes=30)
     tm_end = cycle + timedelta(minutes=30)
-    fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt)
+    if cfg.code == 'CONUS':
+        ensure_dir('ingest/meso')
+        fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt, True)
+    else:
+        fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt)
     fm10v = []
     for fm10_obs in fm10.values():
         for obs in fm10_obs:
@@ -504,11 +526,15 @@ if __name__ == '__main__':
         #if 1:   # to run every time for debugging
         if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
             logging.info('CYCLER processing region %s for cycle %s' % (region_id, str(cycle)))
-            fmda_advance_region(cycle, wrapped_cfg, rtma, cfg.workspace_path, lookback_length, meso_token)
+            try:
+                fmda_advance_region(cycle, wrapped_cfg, rtma, cfg.workspace_path, lookback_length, meso_token)
+            except:
+                logging.warning('CYCLER failed processing region {} for cycle {}'.format(region_id,str(cycle)))
             pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
-            if 'shuttle_remote_host' in sys_cfg:
-                sim_code = 'fmda-' + wrapped_cfg.code
-                send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
+            if pp_path != None:
+                if 'shuttle_remote_host' in sys_cfg:
+                    sim_code = 'fmda-' + wrapped_cfg.code
+                    send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
         else:
             logging.info('CYCLER the cycle %s for region %s is already complete, skipping ...' % (str(cycle), str(region_id)))
 

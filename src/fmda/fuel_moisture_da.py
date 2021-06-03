@@ -28,7 +28,9 @@ from utils import find_closest_grid_point
 
 import sys
 import os
+import os.path as osp
 import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta
 import pytz
 import netCDF4
@@ -52,7 +54,7 @@ def check_overlap(wrf_path,ts_now):
     return False
 
 
-def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghgt):
+def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghgt, ingest=False):
     """
     Retrieve observation data from Mesowest and repackage them as a time-indexed
     dictionary of lists of observations.  
@@ -101,16 +103,38 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
     if meso_obss is None:
         logging.info('retrieve_mesowest_observations: Meso.timeseries returned None')
         return {}
+    
+    if ingest:
+        sts_path = 'ingest/meso/stations.pkl'
+        if osp.exists(sts_path):
+            sts_pd = pd.read_pickle(sts_path)    
+        else:
+            sts_pd = pd.DataFrame([])
+        keys = ['STID','LONGITUDE','LATITUDE','ELEVATION','STATE']
+        stids = np.array([station['STID'] for station in meso_obss['STATION']])
+        np_meso = np.array(meso_obss['STATION'])
+        sts_miss = np_meso[~np.isin(stids,sts_pd.index)]
+        sts_pd = sts_pd.append(pd.DataFrame.from_dict({key: [ms[key] for ms in sts_miss] for key in keys}).set_index('STID'))
+
+        data_path = 'ingest/meso/{}_{}.pkl'.format(meso_time(tm_start - timedelta(minutes=30)),meso_time(tm_end + timedelta(minutes=30)))
+        data_pd = pd.DataFrame([])
 
     # repackage all the observations into a time-indexed structure which groups
     # observations at the same time together
     obs_data = {}
     for stinfo in meso_obss['STATION']:
+        if ingest:
+            df = pd.DataFrame.from_dict(stinfo['OBSERVATIONS'])
+            df.columns = ['datetime','fm10']
+            df['STID'] = stinfo['STID']
+            data_pd = data_pd.append(df)    
         st_lat, st_lon = float(stinfo['LATITUDE']), float(stinfo['LONGITUDE'])
         ngp = find_closest_grid_point(st_lon, st_lat, glon, glat)
         st_elev = stinfo['ELEVATION']
         if st_elev is None:
             elev = ghgt[ngp] 
+            if ingest:
+                sts_pd.loc[stinfo['STID'],'ELEVATION'] = elev
         else:
             elev = float(stinfo['ELEVATION']) / 3.2808
         dts = [decode_meso_time(x) for x in stinfo['OBSERVATIONS']['date_time']]
@@ -124,6 +148,10 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
                     obs_t.append(o)
                     obs_data[ts] = obs_t
 
+    if ingest:
+        data_pd = data_pd.reset_index(drop=True)
+        sts_pd.to_pickle(sts_path)     
+        data_pd.to_pickle(data_path)
     return obs_data
 
 
