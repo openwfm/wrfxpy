@@ -24,11 +24,12 @@ from fmda.fuel_moisture_model import FuelMoistureModel
 from ingest.grib_file import GribFile, GribMessage
 from ingest.rtma_source import RTMA
 from utils import Dict, ensure_dir, utc_to_esmf, delete, force_copy, move
-from vis.postprocessor import scalar_field_to_raster
+from vis.postprocessor import scalar_field_to_raster, scatter_to_raster
 from ssh_shuttle import send_product_to_server
 
 
 import netCDF4
+import pandas as pd
 import numpy as np
 import json
 import sys
@@ -56,6 +57,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     :return: the postprocessing path
     """
     prev_cycle = cycle-timedelta(hours=1)
+    post_cycle = cycle+timedelta(hours=1)
     model_path = compute_model_path(cycle, region_cfg.code, wksp_path)
     year_month = '%04d%02d' % (cycle.year, cycle.month)
     prev_year_month = '%04d%02d' % (prev_cycle.year, prev_cycle.month)
@@ -67,7 +69,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     complete_manifest_name = 'fmda-%s.json' % region_cfg.code
 
     if not is_cycle_computed(cycle, region_cfg, cfg.workspace_path) and not osp.exists(prev_postproc_path):
-        logging.warning('CYCLER postprocessing failed for time {}'.format(str(cycler)))
+        logging.warning('CYCLER postprocessing failed for time {}'.format(str(cycle)))
         return None
 
     var_wisdom = {
@@ -179,6 +181,36 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
                 mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
             for name in show:
                 raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
+                raster_name = cycle_dir + '-%s-raster.png' % name
+                cb_name = cycle_dir + '-%s-raster-cb.png' % name
+                with open(osp.join(postproc_path, raster_name), 'wb') as f:
+                    f.write(raster_png)
+                with open(osp.join(postproc_path, cb_name), 'wb') as f:
+                    f.write(cb_png) 
+                mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+            # plot meso observations
+            meso_file = 'ingest/meso/{:04d}{:02d}{:02d}{:02d}{:02d}_{:04d}{:02d}{:02d}{:02d}{:02d}.pkl'.format(
+                           prev_cycle.year,prev_cycle.month,prev_cycle.day,prev_cycle.hour,prev_cycle.minute,
+                           post_cycle.year,post_cycle.month,post_cycle.day,post_cycle.hour,post_cycle.minute) 
+            if osp.exists(meso_file):
+                st_file = 'ingest/meso/stations.pkl'
+                df = pd.read_pickle(meso_file)
+                st = pd.read_pickle(st_file)
+                data = df.groupby('STID').mean().join(st[['LONGITUDE','LATITUDE']])
+                lats = np.array(data['LATITUDE']).astype(float)
+                lons = np.array(data['LONGITUDE']).astype(float)
+                bounds = (region_cfg.bbox[1],region_cfg.bbox[3],region_cfg.bbox[0],region_cfg.bbox[2])
+                data = data[np.logical_and(lats <= bounds[3], 
+                                np.logical_and(lats >= bounds[2], 
+                                    np.logical_and(lons <= bounds[1], 
+                                                   lons >= bounds[0])))]
+                meso_wisdom = var_wisdom['fm']
+                meso_wisdom['name'] = 'MesoWest observations'
+                meso_wisdom['bbox'] = bounds
+                raster_png, coords, cb_png = scatter_to_raster(np.array(data['fm10'])/100., 
+                                                   np.array(data['LATITUDE']).astype(float), 
+                                                   np.array(data['LONGITUDE']).astype(float), meso_wisdom) 
+                name = 'MESO OBS'
                 raster_name = cycle_dir + '-%s-raster.png' % name
                 cb_name = cycle_dir + '-%s-raster-cb.png' % name
                 with open(osp.join(postproc_path, raster_name), 'wb') as f:

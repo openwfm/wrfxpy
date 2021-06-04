@@ -57,6 +57,8 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
         logging.info('scalar_field_to_raster: transparent from %s to %, elements %s n))ot masked %s' % (rng[0], rng[1], fa.size , fa.count()))
         logging.info('scalar_field_to_raster: masked variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa),np.nanmax(fa)))
+    else:
+        fa = np.ma.masked_array(fa)
 
     # look at mins and maxes, transparent don't count
     if fa.count():
@@ -67,9 +69,11 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
     # determine if we will use the range in the variable or a fixed range
     scale = wisdom['scale']
     if scale != 'original':
+        m = fa.mask.copy()
         fa_min, fa_max = scale[0], scale[1]
         fa[fa < fa_min] = fa_min
         fa[fa > fa_max] = fa_max
+        fa.mask = m
 
     # only create the colorbar if requested
     cb_png_data = None
@@ -82,6 +86,10 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         #  colorbar + add it to the KMZ as a screen overlay
         logging.info('scalar_field_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
         cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
+
+    # replace masked values by nans just in case
+    fa.data[fa.mask]=np.nan
+    fa.fill_value=np.nan
 
     # create the raster & get coordinate bounds
     raster_png_data,corner_coords = basemap_raster_mercator(lons,lats,fa,fa_min,fa_max,cmap)
@@ -126,6 +134,81 @@ def vector_field_to_raster(u, v, lats, lons, wisdom):
 
     return raster_png_data, corner_coords
 
+def scatter_to_raster(fa, lats, lons, wisdom):
+    """
+    Render a scatter variable into a geolocated raster and colorbar.
+
+    :param fa: the array of values
+    :param lats: the latitudes
+    :param lons: the longitudes
+    :param wisdom: a configuration dictionary controlling the visualization
+    :return: a tuple with the raster as StringIO, its geolocation and the PNG colorbar StringIO (None if not requested)
+    """
+    # gather wisdom about the variable
+    scale = wisdom['scale']
+    native_unit = wisdom['native_unit']
+    cmap_name = wisdom['colormap']
+    cmap = mpl.cm.get_cmap(cmap_name)
+    
+    if lats.shape != fa.shape:
+        raise PostprocError("Variable size %s does not correspond to grid size %s." % (fa.shape, lats.shape))
+    
+    if len(fa):
+        logging.info('scalar_field_to_raster: variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa), np.nanmax(fa)))
+        
+        # mask 'transparent' color value
+        if 'transparent_values' in wisdom:
+            rng = wisdom['transparent_values']
+            fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
+            logging.info('scalar_field_to_raster: transparent from %s to %, elements %s not masked %s' % (rng[0], rng[1], fa.size , fa.count()))
+            logging.info('scalar_field_to_raster: masked variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa), np.nanmax(fa)))
+        else:
+            fa = np.ma.masked_array(fa)
+    
+        # look at mins and maxes, transparent don't count
+        if fa.count():
+            fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
+        else:
+            fa_min, fa_max = 0.0, 0.0
+        
+        # determine if we will use the range in the variable or a fixed range
+        if scale != 'original':
+            m = fa.mask.copy()
+            fa_min, fa_max = scale[0], scale[1]
+            fa[fa < fa_min] = fa_min
+            fa[fa > fa_max] = fa_max
+            fa.mask = m
+    else:
+        fa = np.ma.masked_array(fa)
+        fa_min, fa_max = 0.0, 0.0
+
+    # only create the colorbar if requested
+    cb_png_data = None
+    if wisdom['colorbar'] is not None:
+        if scale == 'original':
+            logging.warning('postprocessor: Colorbar %s %s specified with scaling original' % (wisdom['name'],wisdom['colorbar']))
+            logging.warning('postprocessor: Colorbar is not updated by the online visualization system correctly, use only with explicit scaling')
+        cb_unit = wisdom['colorbar']
+        cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
+        #  colorbar + add it to the KMZ as a screen overlay
+        logging.info('scalar_field_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
+        cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
+
+    # replace masked values by nans just in case
+    fa.data[fa.mask]=np.nan
+    fa.fill_value=np.nan
+    
+    # other parameters
+    if len(lons):
+        bounds = wisdom.get('bbox',(np.amin(lons), np.amax(lons), np.amin(lats), np.amax(lats)))
+    else:
+        bounds = wisdom.get('bbox',(0,0,0,0))
+    alphas = .9
+    
+    # create the raster & get coordinate bounds
+    raster_png_data,corner_coords = basemap_scatter_mercator([fa],[lons],[lats],bounds,[alphas],fa_min,fa_max,cmap,10,'o',.5)
+
+    return raster_png_data, corner_coords, cb_png_data
 
 
 class Postprocessor(object):

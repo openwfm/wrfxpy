@@ -106,6 +106,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
         return {}
     
     if ingest:
+        logging.info('retrieve_mesowest_observations: storing data into ingest/meso')
         sts_path = 'ingest/meso/stations.pkl'
         ensure_dir(sts_path)
         if osp.exists(sts_path):
@@ -121,6 +122,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
         data_path = 'ingest/meso/{}_{}.pkl'.format(meso_time(tm_start - timedelta(minutes=30)),meso_time(tm_end + timedelta(minutes=30)))
         data_pd = pd.DataFrame([])
 
+    logging.info('retrieve_mesowest_observations: re-packaging the observations')
     # repackage all the observations into a time-indexed structure which groups
     # observations at the same time together
     obs_data = {}
@@ -142,7 +144,6 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
         dts = [decode_meso_time(x) for x in stinfo['OBSERVATIONS']['date_time']]
         if 'fuel_moisture_set_1' in stinfo['OBSERVATIONS']:
             fms = stinfo['OBSERVATIONS']['fuel_moisture_set_1']
-
             for ts,fm_obs in zip(dts,fms):
                 if fm_obs is not None:
                     o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp)
