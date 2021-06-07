@@ -24,17 +24,19 @@ from .trend_surface_model import fit_tsm
 from utils import great_circle_distance, find_closest_grid_point
 from .fuel_moisture_model import FuelMoistureModel
 from .fm10_observation import FM10Observation
-from utils import find_closest_grid_point
+from utils import find_closest_grid_point, ensure_dir
 
 import sys
 import os
+import os.path as osp
 import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta
 import pytz
 import netCDF4
 import logging
 import json
-from MesoPy import Meso
+from MesoPy import Meso,MesoPyError
 from utils import inq
 from six.moves import range
 from six.moves import zip
@@ -52,15 +54,16 @@ def check_overlap(wrf_path,ts_now):
     return False
 
 
-def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
+def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghgt, ingest=False):
     """
     Retrieve observation data from Mesowest and repackage them as a time-indexed
     dictionary of lists of observations.  
-    :param meso_token: the mesowest API access token
+    :param meso_token: the mesowest API access token or list of them
     :param tm_start: the start of the observation window
     :param tm_end: the end of the observation window
     :param glat: the lattitudes of the grid points
     :param glon: the longitudes of the grid points
+    :param ghgt: the elevation of the grid points
     """
     def decode_meso_time(t):
         # example: '2016-03-30T00:30:00Z'
@@ -74,30 +77,73 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
     min_lat, max_lat = np.amin(glat), np.amax(glat)
     min_lon, max_lon = np.amin(glon), np.amax(glon)
 
-    # retrieve data from Mesowest API (http://mesowest.org/api/)
-    m = Meso(meso_token)
-    logging.info("Retrieving fuel moisture from %s to %s" % (meso_time(tm_start - timedelta(minutes=30)),
+    # retrieve data from Mesonet API (http://api.mesowest.net/)
+    if isinstance(meso_token,str):
+        meso_tokens = [meso_token]
+        n_tokens = 1
+    else:
+        meso_tokens = meso_token
+        n_tokens = len(meso_tokens)
+    for tn,meso_token in enumerate(meso_tokens):
+        m = Meso(meso_token)
+        logging.info("Retrieving fuel moisture from %s to %s" % (meso_time(tm_start - timedelta(minutes=30)),
                           meso_time(tm_end + timedelta(minutes=30))))
-    logging.info("bbox=' %g,%g,%g,%g'" % (min_lon, min_lat, max_lon, max_lat))
-    meso_obss = m.timeseries(meso_time(tm_start - timedelta(minutes=30)),
+        logging.info("bbox=' %g,%g,%g,%g'" % (min_lon, min_lat, max_lon, max_lat))
+        try:
+            meso_obss = m.timeseries(meso_time(tm_start - timedelta(minutes=30)),
                           meso_time(tm_end + timedelta(minutes=30)),
                           showemptystations = '0', bbox='%g,%g,%g,%g' % (min_lon, min_lat, max_lon, max_lat),
                           vars='fuel_moisture')
+            break
+        except Exception as e:
+            if tn == n_tokens-1: 
+                raise MesoPyError('Could not connect to the API. Probably the token(s) usage for this month is full.') 
+            else:
+                logging.warning('Could not connect to the API. Probably the token usage for this month is full. Trying next token...')
+
     if meso_obss is None:
         logging.info('retrieve_mesowest_observations: Meso.timeseries returned None')
         return {}
+    
+    if ingest:
+        logging.info('retrieve_mesowest_observations: storing data into ingest/meso')
+        sts_path = 'ingest/meso/stations.pkl'
+        ensure_dir(sts_path)
+        if osp.exists(sts_path):
+            sts_pd = pd.read_pickle(sts_path)    
+        else:
+            sts_pd = pd.DataFrame([])
+        keys = ['STID','LONGITUDE','LATITUDE','ELEVATION','STATE']
+        stids = np.array([station['STID'] for station in meso_obss['STATION']])
+        np_meso = np.array(meso_obss['STATION'])
+        sts_miss = np_meso[~np.isin(stids,sts_pd.index)]
+        sts_pd = sts_pd.append(pd.DataFrame.from_dict({key: [ms[key] for ms in sts_miss] for key in keys}).set_index('STID'))
 
+        data_path = 'ingest/meso/{}_{}.pkl'.format(meso_time(tm_start - timedelta(minutes=30)),meso_time(tm_end + timedelta(minutes=30)))
+        data_pd = pd.DataFrame([])
+
+    logging.info('retrieve_mesowest_observations: re-packaging the observations')
     # repackage all the observations into a time-indexed structure which groups
     # observations at the same time together
     obs_data = {}
     for stinfo in meso_obss['STATION']:
+        if ingest:
+            df = pd.DataFrame.from_dict(stinfo['OBSERVATIONS'])
+            df.columns = ['datetime','fm10']
+            df['STID'] = stinfo['STID']
+            data_pd = data_pd.append(df)    
         st_lat, st_lon = float(stinfo['LATITUDE']), float(stinfo['LONGITUDE'])
-        elev = float(stinfo['ELEVATION']) / 3.2808
         ngp = find_closest_grid_point(st_lon, st_lat, glon, glat)
+        st_elev = stinfo['ELEVATION']
+        if st_elev is None:
+            elev = ghgt[ngp] 
+            if ingest:
+                sts_pd.loc[stinfo['STID'],'ELEVATION'] = elev
+        else:
+            elev = float(stinfo['ELEVATION']) / 3.2808
         dts = [decode_meso_time(x) for x in stinfo['OBSERVATIONS']['date_time']]
         if 'fuel_moisture_set_1' in stinfo['OBSERVATIONS']:
             fms = stinfo['OBSERVATIONS']['fuel_moisture_set_1']
-
             for ts,fm_obs in zip(dts,fms):
                 if fm_obs is not None:
                     o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp)
@@ -105,6 +151,10 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon):
                     obs_t.append(o)
                     obs_data[ts] = obs_t
 
+    if ingest:
+        data_pd = data_pd.reset_index(drop=True)
+        sts_pd.to_pickle(sts_path)     
+        data_pd.to_pickle(data_path)
     return obs_data
 
 
@@ -246,7 +296,7 @@ def assimilate_fm10_observations(path_wrf, path_wrf0, mesowest_token):
   grid_dist_km = great_circle_distance(lon[0,0], lat[0,0], lon[1,1], lat[1,1])
  
   # retrieve fuel moisture observations via the Mesowest API
-  fm10 = retrieve_mesowest_observations(mesowest_token, tm_start, tm_end, wrfin.get_lats(), wrfin.get_lons())
+  fm10 = retrieve_mesowest_observations(mesowest_token, tm_start, tm_end, wrfin.get_lats(), wrfin.get_lons(), wrfin.get_field('HGT'))
 
   logging.info('FMDA retrieved %d observations from Mesowest.' % len(fm10))
 
