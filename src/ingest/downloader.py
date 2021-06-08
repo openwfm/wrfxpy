@@ -53,7 +53,7 @@ def get_dList(url):
         listing.append(l.split()[-1])
     return listing
 
-def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def, appkey=None):
+def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def, token=None):
     """
     Download a remote URL to the location local_path with retries.
 
@@ -64,6 +64,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     :param url: the remote URL
     :param local_path: the path to the local file
     :param max_retries: how many times we may retry to download the file
+    :param token: key to use for the download or None if not
     """
     logging.info('download_url %s as %s' % (url, local_path))
     logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
@@ -74,8 +75,8 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     use_urllib2 = url[:6] == 'ftp://'
 
     try:
-        if appkey:
-            r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % appkey})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % appkey})   
+        if token:
+            r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % token})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % token})   
         else:
             r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
         content_size = int(r.headers.get('content-length',0))
@@ -87,7 +88,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             logging.info('not found, download_url trying again, retries available %d' % max_retries)
             logging.info('download_url sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
-            download_url(url, local_path, max_retries = max_retries-1, appkey = appkey)
+            download_url(url, local_path, max_retries = max_retries-1, token = token)
         return
 
     logging.info('download_url %s as %s' % (url,local_path))
@@ -95,16 +96,16 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     command=[wget,'-O',ensure_dir(local_path),url]
     for opt in wget_options:
         command.insert(1,opt)
-    if appkey:
-        command.insert(1,'--header=\'Authorization: Bearer %s\'' % appkey)
+    if token:
+        command.insert(1,'--header=\'Authorization: Bearer %s\'' % token)
     logging.info(' '.join(command))
     subprocess.call(' '.join(command),shell=True)
 
     file_size = osp.getsize(local_path)
 
     # content size may have changed during download
-    if appkey:
-        r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % appkey})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % appkey})
+    if token:
+        r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % token})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % token})
     else:
         r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
     content_size = int(r.headers.get('content-length',0))
@@ -119,7 +120,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             # and overwrite previously downloaded data
             logging.info('download_url sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
-            download_url(url, local_path, max_retries = max_retries-1, appkey = appkey)
+            download_url(url, local_path, max_retries = max_retries-1, token = token)
             return  # success
         else:
             os.remove(local_path)

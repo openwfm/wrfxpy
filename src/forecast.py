@@ -1265,7 +1265,7 @@ def process_arguments(job_args,sys_cfg):
     # load tokens if etc/tokens.json exists
     try:
         tokens = json.load(open('etc/tokens.json'))
-        args.update(tokens)
+        args.update({'tokens': tokens})
     except:
         logging.warning('Any etc/tokens.json specified, any token is going to be used.')
 

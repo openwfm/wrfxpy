@@ -244,13 +244,13 @@ class SatSourceAWS(SatSource):
         """
         return metas
 
-    def _download_url(self, url, sat_path, appkey):
+    def _download_url(self, url, sat_path, token):
         """
         Download a satellite file from a satellite service
 
         :param url: the URL of the file
         :param sat_path: local path to download the file
-        :param appkey: key to use for the download or None if not
+        :param token: key to use for the download or None if not
         """
         download_url(url, sat_path)
 
