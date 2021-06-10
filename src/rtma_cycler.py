@@ -101,7 +101,8 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             'native_unit' : '-',
             'colorbar' : '-',
             'colormap' : 'jet_r',
-            'scale' : [0.0, 3.0]
+            'scale' : [0.0, 3.0],
+            'marker' : '^'
         },
         'EQUILd FM' : {
             'name' : 'Drying equilibrium FM',

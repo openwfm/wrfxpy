@@ -115,10 +115,7 @@ class JobState(Dict):
         self.fmda = args.get('fuel_moisture_da', None)
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
-        if 'clean_dir' in args:
-            self.clean_dir = args['clean_dir']
-        else:
-            self.clean_dir = True
+        self.clean_dir = args.get('clean_dir', True)
         self.run_wrf = args.get('run_wrf', True)
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
