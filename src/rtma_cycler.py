@@ -65,7 +65,7 @@ def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png
         f.write(cb_png) 
     mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
 
-def postprocess_cycle(cycle, region_cfg, wksp_path, bounds):
+def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
     """
     Build rasters from the computed fuel moisture.
 
@@ -75,6 +75,8 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, bounds):
     :param bounds: bounding box of the post-processing
     :return: the postprocessing path
     """
+    if bounds is None:
+        bounds = (region_cfg.bbox[1],region.bbox[3],region.bbox[0],region.bbox[2])
     prev_cycle = cycle-timedelta(hours=1)
     post_cycle = cycle+timedelta(hours=1)
     model_path = compute_model_path(cycle, region_cfg.code, wksp_path)
@@ -639,7 +641,16 @@ if __name__ == '__main__':
             break
             
     if dont_have_vars:
-        logging.error('CYCLER could not find useable cycle, exiting.')
+        logging.error('CYCLER could not find useable cycle.')
+        logging.warning('CYCLER copying previous post-processing.')
+        for region_id,region_cfg in six.iteritems(cfg.regions):
+            wrapped_cfg = Dict(region_cfg)
+            wrapped_cfg.update({'region_id': region_id})
+            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)
+            if pp_path != None:
+                if 'shuttle_remote_host' in sys_cfg:
+                    sim_code = 'fmda-' + wrapped_cfg.code
+                    send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
         sys.exit(1)
         
     logging.info('Have RTMA data for cycle %s.' % str(cycle))
@@ -656,8 +667,8 @@ if __name__ == '__main__':
             except Exception as e:
                 logging.warning('CYCLER failed processing region {} for cycle {}'.format(region_id,str(cycle)))
                 logging.warning('CYCLER exception {}'.format(e))
-                bounds = (wrapped_cfg.bbox[1],wrapped_cfg.bbox[3],wrapped_cfg.bbox[0],wrapped_cfg.bbox[2])
-                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)   
+                logging.warning('CYCLER copying previous post-processing.')
+                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
                 if pp_path != None:
                     if 'shuttle_remote_host' in sys_cfg:
                         sim_code = 'fmda-' + wrapped_cfg.code
