@@ -65,13 +65,14 @@ def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png
         f.write(cb_png) 
     mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
 
-def postprocess_cycle(cycle, region_cfg, wksp_path):
+def postprocess_cycle(cycle, region_cfg, wksp_path, bounds):
     """
     Build rasters from the computed fuel moisture.
 
     :param cycle: the UTC cycle time
     :param region_cfg: the region configuration
     :param wksp_path: the workspace path
+    :param bounds: bounding box of the post-processing
     :return: the postprocessing path
     """
     prev_cycle = cycle-timedelta(hours=1)
@@ -212,7 +213,6 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             data = df.groupby('STID').mean().join(st[['LONGITUDE','LATITUDE']])
             lats = np.array(data['LATITUDE']).astype(float)
             lons = np.array(data['LONGITUDE']).astype(float)
-            bounds = (region_cfg.bbox[1],region_cfg.bbox[3],region_cfg.bbox[0],region_cfg.bbox[2])
             data = data[np.logical_and(lats <= bounds[3], 
                             np.logical_and(lats >= bounds[2], 
                                 np.logical_and(lons <= bounds[1], 
@@ -220,6 +220,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             meso_wisdom = var_wisdom['dfm']
             meso_wisdom['name'] = 'MesoWest 10-hr DFM'
             meso_wisdom['bbox'] = bounds
+            meso_wisdom['text'] = False
             raster_png, coords, cb_png = scatter_to_raster(np.array(data['fm10'])/100., 
                                                    np.array(data['LATITUDE']).astype(float), 
                                                    np.array(data['LONGITUDE']).astype(float), meso_wisdom) 
@@ -227,28 +228,36 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
         # NFMDB observations
         if osp.exists('src/ingest/FMDB'):
+            period_length = 7 # period in days
+            period = np.ceil(now.day/period_length)
             from ingest.FMDB.FMDB import FMDB
             from ingest.FMDB.utils import filter_outliers
             db = FMDB('ingest/NFMDB')
+            db.params['startYear'] = 2019
             data = db.get_data()
             data = filter_outliers(data) 
             data['fuel_type'] = data['fuel_type'].fillna('None').str.upper()
             data['fuel_variation'] = data['fuel_variation'].fillna('None').str.upper()
             sts = db.sites()
             data = data.join(sts[['lng','lat']],'site_number')
-            # mask time 
-            start = now-timedelta(days=7)
-            end = now
-            dates = data['date'].dt.tz_localize(pytz.UTC)
-            data = data[np.logical_and(dates >= start, dates <= end)]
             # mask space
-            bounds = (region_cfg.bbox[1],region_cfg.bbox[3],region_cfg.bbox[0],region_cfg.bbox[2])
             lats = data['lat']
             lons = data['lng']
             data = data[np.logical_and(lats <= bounds[3],
                             np.logical_and(lats >= bounds[2],
                                 np.logical_and(lons <= bounds[1],
                                                lons >= bounds[0])))]
+            dates = data['date'].dt.tz_localize(pytz.UTC)
+            # calculate top 5
+            hist_data = data[dates.dt.year <= 2020]
+            hist_dfm_mask = np.array(['-HOUR' in ft for ft in np.array(hist_data['fuel_type'])])
+            hist_df_lfm = hist_data[~hist_dfm_mask].reset_index(drop=True)
+            fts = np.array(hist_df_lfm[['fuel_type','percent']].groupby('fuel_type').count().sort_values(by='percent',ascending=False).index[:5])
+            # mask time 
+            start = now.replace(day=int(period_length*(period-1)+1),hour=0,minute=0,second=0,microsecond=0)
+            end = now
+            data = data[np.logical_and(dates >= start, dates <= end)]
+            cycle_dir = 'fmda-%s-%04d%02d%02d-%02d' %  (region_cfg.code, start.year, start.month, start.day, start.hour)
             # mask dead and live fuel moisture
             dfm_mask = np.array(['-HOUR' in ft for ft in np.array(data['fuel_type'])])
             df_dfm = data[dfm_mask].reset_index(drop=True)
@@ -258,6 +267,9 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
                 fmdb_wisdom = var_wisdom['dfm']
                 fmdb_wisdom['name'] = name
                 fmdb_wisdom['bbox'] = bounds
+                fmdb_wisdom['text'] = True
+                fmdb_wisdom['size'] = 40
+                fmdb_wisdom['linewidth'] = 1.
                 data = df_dfm[df_dfm['fuel_type'] == i]
                 raster_png, coords, cb_png = scatter_to_raster(np.array(data['percent'])/100., 
                                                                    np.array(data['lat']), 
@@ -265,12 +277,14 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
                 write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
             # plot NFMDB live fuel moisture
             df_lfm = df_lfm.sort_values('date').groupby(['site_number','fuel_type']).last().reset_index()
-            fts = np.array(df_lfm[['fuel_type','percent']].groupby('fuel_type').count().sort_values(by='percent',ascending=False).index[:5])
             for ft in fts:
                 name = 'NFMDB {} LFM'.format(ft)
                 fmdb_wisdom = var_wisdom['lfm']
                 fmdb_wisdom['name'] = name
                 fmdb_wisdom['bbox'] = bounds
+                fmdb_wisdom['text'] = True
+                fmdb_wisdom['size'] = 40
+                fmdb_wisdom['linewidth'] = 1.
                 data = df_lfm[df_lfm['fuel_type'] == ft]
                 raster_png, coords, cb_png = scatter_to_raster(np.array(data['percent'])/100., 
                                                                    np.array(data['lat']), 
@@ -280,7 +294,11 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             fmdb_wisdom = var_wisdom['lfm']
             fmdb_wisdom['name'] = name
             fmdb_wisdom['bbox'] = bounds
+            fmdb_wisdom['text'] = True
+            fmdb_wisdom['size'] = 40
+            fmdb_wisdom['linewidth'] = 1.
             data = df_lfm[~df_lfm['fuel_type'].isin(fts)]
+            data = data.groupby('site_number').mean()
             raster_png, coords, cb_png = scatter_to_raster(np.array(data['percent'])/100.,
                                                                np.array(data['lat']),
                                                                np.array(data['lng']), fmdb_wisdom)
@@ -544,7 +562,8 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
         {'EQUILd FM':Ed,'EQUILw FM':Ew,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
 
     # create visualization and send results
-    pp_path = postprocess_cycle(cycle, cfg, wksp_path)   
+    bounds = (lons.min(), lons.max(), lats.min(), lats.max())
+    pp_path = postprocess_cycle(cycle, cfg, wksp_path, bounds)   
     if pp_path != None:
         if 'shuttle_remote_host' in sys_cfg:
             sim_code = 'fmda-' + cfg.code
@@ -637,7 +656,8 @@ if __name__ == '__main__':
             except Exception as e:
                 logging.warning('CYCLER failed processing region {} for cycle {}'.format(region_id,str(cycle)))
                 logging.warning('CYCLER exception {}'.format(e))
-                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
+                bounds = (wrapped_cfg.bbox[1],wrapped_cfg.bbox[3],wrapped_cfg.bbox[0],wrapped_cfg.bbox[2])
+                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)   
                 if pp_path != None:
                     if 'shuttle_remote_host' in sys_cfg:
                         sim_code = 'fmda-' + wrapped_cfg.code

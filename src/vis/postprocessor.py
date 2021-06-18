@@ -154,14 +154,14 @@ def scatter_to_raster(fa, lats, lons, wisdom):
         raise PostprocError("Variable size %s does not correspond to grid size %s." % (fa.shape, lats.shape))
     
     if len(fa):
-        logging.info('scalar_field_to_raster: variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa), np.nanmax(fa)))
+        logging.info('scatter_to_raster: variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa), np.nanmax(fa)))
         
         # mask 'transparent' color value
         if 'transparent_values' in wisdom:
             rng = wisdom['transparent_values']
             fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
-            logging.info('scalar_field_to_raster: transparent from %s to %, elements %s not masked %s' % (rng[0], rng[1], fa.size , fa.count()))
-            logging.info('scalar_field_to_raster: masked variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa), np.nanmax(fa)))
+            logging.info('scatter_to_raster: transparent from %s to %, elements %s not masked %s' % (rng[0], rng[1], fa.size , fa.count()))
+            logging.info('scatter_to_raster: masked variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa), np.nanmax(fa)))
         else:
             fa = np.ma.masked_array(fa)
     
@@ -180,7 +180,11 @@ def scatter_to_raster(fa, lats, lons, wisdom):
             fa.mask = m
     else:
         fa = np.ma.masked_array(fa)
-        fa_min, fa_max = 0.0, 0.0
+        # determine if we will use the range in the variable or a fixed range
+        if scale != 'original':
+            fa_min, fa_max = scale[0], scale[1]
+        else:
+            fa_min, fa_max = 0.0, 0.0
 
     # only create the colorbar if requested
     cb_png_data = None
@@ -191,7 +195,7 @@ def scatter_to_raster(fa, lats, lons, wisdom):
         cb_unit = wisdom['colorbar']
         cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
         #  colorbar + add it to the KMZ as a screen overlay
-        logging.info('scalar_field_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
+        logging.info('scatter_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
         cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
 
     # replace masked values by nans just in case
@@ -203,10 +207,15 @@ def scatter_to_raster(fa, lats, lons, wisdom):
         bounds = wisdom.get('bbox',(np.amin(lons), np.amax(lons), np.amin(lats), np.amax(lats)))
     else:
         bounds = wisdom.get('bbox',(0,0,0,0))
-    alphas = .9
-    
+    alpha = wisdom.get('alpha',.7)
+    marker = wisdom.get('marker','o')
+    text = wisdom.get('text',False)
+    size = wisdom.get('size',15)
+    linewidth = wisdom.get('linewidth',.7)
+    logging.info('scatter_to_raster: options: alpha={}, marker={}, text={}, size={}, linewidth={}'.format(alpha,marker,text,size,linewidth))
+
     # create the raster & get coordinate bounds
-    raster_png_data,corner_coords = basemap_scatter_mercator([fa],[lons],[lats],bounds,[alphas],fa_min,fa_max,cmap,10,'o',.5)
+    raster_png_data,corner_coords = basemap_scatter_mercator([fa],[lons],[lats],bounds,[alpha],fa_min,fa_max,cmap,size,marker,linewidth,text)
 
     return raster_png_data, corner_coords, cb_png_data
 
