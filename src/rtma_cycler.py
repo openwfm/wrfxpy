@@ -620,7 +620,16 @@ if __name__ == '__main__':
             break
             
     if dont_have_vars:
-        logging.error('CYCLER could not find useable cycle, exiting.')
+        logging.error('CYCLER could not find useable cycle.')
+        logging.warning('CYCLER copying previous post-processing.')
+        for region_id,region_cfg in six.iteritems(cfg.regions):
+            wrapped_cfg = Dict(region_cfg)
+            wrapped_cfg.update({'region_id': region_id})
+            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)
+            if pp_path != None:
+                if 'shuttle_remote_host' in sys_cfg:
+                    sim_code = 'fmda-' + wrapped_cfg.code
+                    send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
         sys.exit(1)
         
     logging.info('Have RTMA data for cycle %s.' % str(cycle))
@@ -637,6 +646,7 @@ if __name__ == '__main__':
             except Exception as e:
                 logging.warning('CYCLER failed processing region {} for cycle {}'.format(region_id,str(cycle)))
                 logging.warning('CYCLER exception {}'.format(e))
+                logging.warning('CYCLER copying previous post-processing.')
                 pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
                 if pp_path != None:
                     if 'shuttle_remote_host' in sys_cfg:

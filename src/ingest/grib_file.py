@@ -40,7 +40,18 @@ def grib_messages(path,print_messages=False,max_messages=9999):
             break
     grbf.seek(0)
     return i
-    
+   
+def grib_valid_date(path): 
+    """
+    Look at validDate in a grib file 
+    :param path: path to the file
+    :return: valid date in datetime format
+    """
+    grbf = pygrib.open(path)
+    if grbf.messages:
+        if grbf.message(1).has_key('validDate'):
+            return grbf.message(1).validDate
+    return None
 
 class GribFile(object):
     """

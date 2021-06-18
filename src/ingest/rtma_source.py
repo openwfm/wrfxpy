@@ -27,9 +27,9 @@ from datetime import datetime, timedelta
 import pytz
 import logging
 import os.path as osp
-from utils import readhead
+from utils import readhead,remove
 import time
-from .grib_file import grib_messages
+from .grib_file import grib_messages,grib_valid_date
 from six.moves import range
 
 # global parameter
@@ -94,6 +94,8 @@ class RTMA(object):
                         logging.info('file %s contains %s message(s)' % (local_path, num))
                         if num == 0:
                             raise ValueError
+                        vd=grib_valid_date(local_path).replace(tzinfo=pytz.UTC)
+                        logging.info('file has valid date {}'.format(vd))
                         var_ready = True
                         break
                 except Exception as e:
