@@ -262,6 +262,13 @@ def create_sat_manifest(js):
         else:
             sat_manifest.sat_interval[k] = (js.domains[k]['history_interval'], js.domains[k]['history_interval'])
     sat_manifest.satprod_satsource = js.satprod_satsource
+    satfile = osp.join(js.jobdir, 'sat.json')
+    if js.restart and osp.exists(satfile):
+        try:
+            jsat = Dict(json.load(open(satfile,'r')))
+            json.dump(jsat, open(osp.join(js.jobdir, 'sat_{}_{}.json'.format(*jsat.time_interval)),'w'), indent=4, separators=(',', ': '))
+        except:
+            logging.warning('not able to recover previous satellite file')
     json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
     return sat_manifest
 
@@ -409,6 +416,7 @@ def make_job_file(js):
     jsub.grid_code = js.grid_code
     jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     jsub.num_doms = js.num_doms
+    jsub.restart = js.restart
     if 'tslist' in js.keys():
         jsub.tslist = js.tslist
     else:
@@ -575,7 +583,7 @@ def execute(args,job_args):
 
     jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
     js.jobdir = jobdir
-    if js.clean_dir or not osp.exists(osp.join(js.jobdir,'input.json')):
+    if (js.clean_dir and not js.restart) or not osp.exists(osp.join(js.jobdir,'input.json')):
         make_clean_dir(js.jobdir)
 
     js.num_doms = len(js.domains)
@@ -840,6 +848,7 @@ def process_output(job_id):
     js.old_pid = js.pid
     js.pid = os.getpid()
     js.state = 'Processing'
+    js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
@@ -851,13 +860,12 @@ def process_output(job_id):
         return
 
     # set up postprocessing
-    if js.postproc.get('shuttle', None) is None:
-        local_rmdir(osp.join(js.job_id,'products'))
-    else:
+    if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-    make_clean_dir(js.pp_dir)
+    if not js.restart:
+        make_clean_dir(js.pp_dir)
     prod_name = 'wfc-' + js.grid_code
     pp = Postprocessor(js.pp_dir, prod_name)
     if 'tslist' in js.keys() and js.tslist is not None:
@@ -1075,17 +1083,17 @@ def process_sat_output(job_id):
     js.old_pid = js.pid
     js.pid = os.getpid()
     js.state = 'Processing'
+    js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     pp = None
     already_sent_files = []
-    if js.postproc.get('shuttle', None) is None:
-        local_rmdir(osp.join(js.job_id,'products'))
-    else:
+    if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-    make_clean_dir(js.pp_dir)
+    if not js.restart:
+        make_clean_dir(js.pp_dir)
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)

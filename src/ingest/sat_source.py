@@ -127,8 +127,9 @@ class SatSource(object):
                 try:
                     self._download_url(url, sat_path, token=token)
                     return {'url': url,'local_path': sat_path,'downloaded': datetime.now()}
-                except DownloadError as e:
+                except Exception as e:
                     logging.warning('download_sat - {0} cannot download satellite file {1}'.format(self.prefix, url))
+                    logging.warning(e)
 
         logging.error('%s cannot download satellite file using %s' % (self.prefix, urls))
         logging.warning('Please check %s for %s' % (self.info_url, self.info))

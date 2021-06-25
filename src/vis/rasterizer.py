@@ -197,8 +197,10 @@ def basemap_barbs_mercator(u,v,lat,lon):
 def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's', linewidths = 0, text = False):
     # number of scatter elements
     N = len(val)	
+    border = .05
+    bounds = (bounds[0]-border, bounds[1]+border, bounds[2]-border, bounds[3]+border)
    
-    logging.info('basemap_scatter_mercator: bounding box %s %s %s %s' % bounds)
+    logging.info('basemap_scatter_mercator: bounding box {}'.format(bounds))
 
     # construct spherical mercator projection for region of interest
     m = Basemap(projection='merc',llcrnrlat=bounds[2], urcrnrlat=bounds[3],
