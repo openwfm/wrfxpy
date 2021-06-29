@@ -96,6 +96,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     command=[wget,'-O',ensure_dir(local_path),url]
     for opt in wget_options:
         command.insert(1,opt)
+    command.insert(1,'--tries={}'.format(max_retries_def))
     if token:
         command.insert(1,'--header=\'Authorization: Bearer %s\'' % token)
     logging.info(' '.join(command))
