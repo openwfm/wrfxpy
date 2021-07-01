@@ -854,7 +854,6 @@ def process_output(job_id):
     js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
 
     pp = None
-    already_sent_files = []
     if js.postproc is None:
         logging.info('No postprocessing specified, exiting.')
         return
@@ -865,7 +864,10 @@ def process_output(job_id):
 
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
     if not js.restart:
+        already_sent_files = []
         make_clean_dir(js.pp_dir)
+    else:
+        already_sent_files = [x for x in os.listdir(js.pp_dir) if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
     prod_name = 'wfc-' + js.grid_code
     pp = Postprocessor(js.pp_dir, prod_name)
     if 'tslist' in js.keys() and js.tslist is not None:
@@ -1087,13 +1089,15 @@ def process_sat_output(job_id):
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     pp = None
-    already_sent_files = []
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
     if not js.restart:
+        already_sent_files = []
         make_clean_dir(js.pp_dir)
+    else:
+        already_sent_files = [x for x in os.listdir(js.pp_dir) if not x.endswith('json')]
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)

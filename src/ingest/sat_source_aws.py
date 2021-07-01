@@ -216,9 +216,8 @@ class SatSourceAWS(SatSource):
         :return metas: a dictionary with all the metadata for the API search
         """
         # complete_days
-        stime = time[0]
-        etime = time[1]
-        n_complete_days = int((etime-stime).days)+1
+        stime,etime = time
+        n_complete_days = int((etime.replace(hour=0,minute=0,second=0,microsecond=0)-stime.replace(hour=0,minute=0,second=0,microsecond=0)).days)+1
         complete_days = [(stime + timedelta(days=x)).strftime('%Y/%j/') for x in range(n_complete_days)]
         awspaths = [osp.join(self.base_url.format(self.platform), self.product.format(self.sector), hour) for hour in complete_days]
         metas = aws_search(awspaths,time)
