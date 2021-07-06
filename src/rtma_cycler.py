@@ -388,7 +388,17 @@ def find_region_indices(glat,glon,minlat,maxlat,minlon,maxlon):
             done = False
     return i1,i2,j1,j2
 
-
+def compute_rtma_bounds(bbox):
+    """
+    Compute bounds from RTMA data even when RTMA data is not available from terrain static data
+    
+    :param bbox: the bounding box of the data
+    :return: a tuple containing bound coordinates (min_lon,max_lon,min_lat,max_lat)
+    """
+    lats,lons = GribFile('static/ds.terrainh.bin')[1].latlons()
+    i1, i2, j1, j2 = find_region_indices(lats, lons, bbox[0], bbox[2], bbox[1], bbox[3])
+    lats,lons = lats[i1:i2,j1:j2], lons[i1:i2,j1:j2]
+    return (lons.min(), lons.max(), lats.min(), lats.max())
 
 def load_rtma_data(rtma_data, bbox):
     """
@@ -645,7 +655,8 @@ if __name__ == '__main__':
         for region_id,region_cfg in six.iteritems(cfg.regions):
             wrapped_cfg = Dict(region_cfg)
             wrapped_cfg.update({'region_id': region_id})
-            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)
+            bounds = compute_rtma_bounds(wrapped_cfg.bbox)
+            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)
             if pp_path != None:
                 if 'shuttle_remote_host' in sys_cfg:
                     sim_code = 'fmda-' + wrapped_cfg.code
@@ -667,7 +678,8 @@ if __name__ == '__main__':
                 logging.warning('CYCLER failed processing region {} for cycle {}'.format(region_id,str(cycle)))
                 logging.warning('CYCLER exception {}'.format(e))
                 logging.warning('CYCLER copying previous post-processing.')
-                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
+                bounds = compute_rtma_bounds(wrapped_cfg.bbox)
+                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)   
                 if pp_path != None:
                     if 'shuttle_remote_host' in sys_cfg:
                         sim_code = 'fmda-' + wrapped_cfg.code
