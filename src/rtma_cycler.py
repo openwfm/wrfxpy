@@ -185,10 +185,13 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
             raster_name = cycle_dir + '-%s-raster.png' % name
             cb_name = cycle_dir + '-%s-raster-cb.png' % name
             coords = prev_mf['1'][prev_esmf_cycle][name]['coords']
-            alpha = prev_mf['1'][prev_esmf_cycle][name]['alpha']
+            alpha = prev_mf['1'][prev_esmf_cycle][name].get('alpha',None)
             force_copy(osp.join(prev_postproc_path, prev_raster_name),osp.join(postproc_path, raster_name))
             force_copy(osp.join(prev_postproc_path, prev_cb_name),osp.join(postproc_path, cb_name))
-            mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name, 'alpha' : alpha }
+            if alpha:
+                mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name, 'alpha' : alpha }
+            else:
+                mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
     else:
         if bounds is None:
             bounds = (region_cfg.bbox[1],region_cfg.bbox[3],region_cfg.bbox[0],region_cfg.bbox[2])
@@ -203,12 +206,12 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
         with netCDF4.Dataset(model_path) as d:
             for name in show:
                 raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, .5)
             for i,name in [(0, '1-hr DFM'), (1, '10-hr DFM'), (2, '100-hr DFM')]:
                 fm_wisdom = var_wisdom['dfm']
                 fm_wisdom['name'] = 'Estimated %s' % name
                 raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, .5)
         if osp.exists('src/ingest/MesoDB'):
             from ingest.MesoDB.mesoDB import mesoDB
             db = mesoDB('ingest/MesoDB')
