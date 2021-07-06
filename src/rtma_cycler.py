@@ -46,6 +46,7 @@ sys_cfg = Dict(json.load(open('etc/conf.json')))
 cfg = Dict(json.load(open('etc/rtma_cycler.json')))
 meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
+
 def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, alpha=None):
     """
     Write postprocessing files.
@@ -66,6 +67,7 @@ def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png
         mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
     else:
         mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name, 'alpha' : alpha }
+
 
 def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
     """
@@ -336,7 +338,6 @@ def compute_model_path(cycle, region_code, wksp_path, ext='nc'):
     return osp.join(wksp_path,region_code,year_month,filename) 
 
 
-
 def find_region_indices(glat,glon,minlat,maxlat,minlon,maxlon):
     """
     Find the indices i1:i2 (lat dimension) and j1:j2 (lon dimension)
@@ -388,6 +389,7 @@ def find_region_indices(glat,glon,minlat,maxlat,minlon,maxlon):
             done = False
     return i1,i2,j1,j2
 
+
 def compute_rtma_bounds(bbox):
     """
     Compute bounds from RTMA data even when RTMA data is not available from terrain static data
@@ -399,6 +401,7 @@ def compute_rtma_bounds(bbox):
     i1, i2, j1, j2 = find_region_indices(lats, lons, bbox[0], bbox[2], bbox[1], bbox[3])
     lats,lons = lats[i1:i2,j1:j2], lons[i1:i2,j1:j2]
     return (lons.min(), lons.max(), lats.min(), lats.max())
+
 
 def load_rtma_data(rtma_data, bbox):
     """
@@ -650,17 +653,21 @@ if __name__ == '__main__':
             break
             
     if dont_have_vars:
-        logging.error('CYCLER could not find useable cycle.')
+        logging.warning('CYCLER could not find useable cycle.')
         logging.warning('CYCLER copying previous post-processing.')
         for region_id,region_cfg in six.iteritems(cfg.regions):
             wrapped_cfg = Dict(region_cfg)
             wrapped_cfg.update({'region_id': region_id})
-            bounds = compute_rtma_bounds(wrapped_cfg.bbox)
-            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)
-            if pp_path != None:
-                if 'shuttle_remote_host' in sys_cfg:
-                    sim_code = 'fmda-' + wrapped_cfg.code
-                    send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
+            try:
+                bounds = compute_rtma_bounds(wrapped_cfg.bbox)
+                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)
+                if pp_path != None:
+                    if 'shuttle_remote_host' in sys_cfg:
+                        sim_code = 'fmda-' + wrapped_cfg.code
+                        send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
+            except Exception as e:
+                logging.warning('CYCLER exception {}'.format(e))
+                logging.error('CYCLER skipping region {} for cycle {}'.format(region_id,str(cycle)))
         sys.exit(1)
         
     logging.info('Have RTMA data for cycle %s.' % str(cycle))
@@ -677,13 +684,17 @@ if __name__ == '__main__':
             except Exception as e:
                 logging.warning('CYCLER failed processing region {} for cycle {}'.format(region_id,str(cycle)))
                 logging.warning('CYCLER exception {}'.format(e))
-                logging.warning('CYCLER copying previous post-processing.')
-                bounds = compute_rtma_bounds(wrapped_cfg.bbox)
-                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)   
-                if pp_path != None:
-                    if 'shuttle_remote_host' in sys_cfg:
-                        sim_code = 'fmda-' + wrapped_cfg.code
-                        send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
+                logging.warning('CYCLER copying previous post-processing or re-trying.')
+                try:
+                    bounds = compute_rtma_bounds(wrapped_cfg.bbox)
+                    pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)   
+                    if pp_path != None:
+                        if 'shuttle_remote_host' in sys_cfg:
+                            sim_code = 'fmda-' + wrapped_cfg.code
+                            send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
+                except Exception as e:
+                    logging.warning('CYCLER exception {}'.format(e))
+                    logging.error('CYCLER skipping region {} for cycle {}'.format(region_id,str(cycle)))
         else:
             logging.info('CYCLER the cycle %s for region %s is already complete, skipping ...' % (str(cycle), str(region_id)))
 
