@@ -268,13 +268,14 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    commands = [ 'list', 'cancel', 'output', 'delete', 'workspace', 'update', 'send']
+    commands = [ 'list', 'cancel', 'output', 'vis', 'delete', 'workspace', 'update', 'send']
 
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
         print(('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]'))
         print('list            : show list of current simulations with their job_id and description')
         print('cancel <job_id> : kill all processes and the WRF parallel job, do not delete any files')
         print('output <job id> : cancel, and delete all WRF output and visualization files only')
+        print('vis <job_id> : cancel, and delete all files')
         print('delete <job_id> : cancel, and delete all files')
         print('workspace       : delete jobs that are not on the visulalization server')
         print('update <job_id> : check if the job is running and update its job state file')
@@ -282,7 +283,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     cmd = sys.argv[1]
-    if cmd in ['delete' , 'cancel', 'output', 'update', 'visualization', 'send']: 
+    if cmd in ['delete' , 'cancel', 'output', 'update', 'vis', 'send']: 
         if len(sys.argv) == 3 and not sys.argv[2] == "" :
             job_id = sys.argv[2]
         else:
@@ -294,7 +295,6 @@ if __name__ == '__main__':
     logging.info('cleanup: command=%s job_id=%s' % (cmd,job_id))
     s = SSHShuttle(cfg)
 
-    
     if cmd == 'list':
         list(s)
 
@@ -309,7 +309,7 @@ if __name__ == '__main__':
         cancel(job_id)
         delete(s,job_id)
 
-    if cmd == 'visualization':
+    if cmd == 'vis':
         delete_visualization(job_id)
 
     if cmd == 'workspace':
@@ -321,5 +321,3 @@ if __name__ == '__main__':
     if cmd == 'send':
         send_products_to_server(job_id)
 		
-
-
