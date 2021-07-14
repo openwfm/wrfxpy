@@ -84,25 +84,26 @@ def aws_search(awspaths, time=(datetime(2000,1,1),datetime.now())):
     for awspath in awspaths:
         cmd = ls_cmd.format(awspath).split()
         r = aws_request(cmd)
-        for line in r.decode().split('\n'):
-            if len(line):
-                _,_,file_size,file_name = list(map(str.strip,line.split()))
-                info = parse_filename(file_name)
-                if info['start_date'] <= time[1] and info['start_date'] >= time[0]:
-                    base = split_path(awspath)[0]
-                    url = osp.join('s3://',base,file_name) 
-                    file_basename = osp.basename(file_name)
-                    product_id = 'A{:04d}{:03d}_{:02d}{:02d}'.format(info['start_date'].year,
+        if r != None:
+            for line in r.decode().split('\n'):
+                if len(line):
+                    _,_,file_size,file_name = list(map(str.strip,line.split()))
+                    info = parse_filename(file_name)
+                    if info['start_date'] <= time[1] and info['start_date'] >= time[0]:
+                        base = split_path(awspath)[0]
+                        url = osp.join('s3://',base,file_name) 
+                        file_basename = osp.basename(file_name)
+                        product_id = 'A{:04d}{:03d}_{:02d}{:02d}'.format(info['start_date'].year,
                                             info['start_date'].timetuple().tm_yday,
                                             info['start_date'].hour,
                                             info['start_date'].minute)
-                    result.update({product_id: {'file_name': file_basename, 'file_remote_path': file_name,
-                        'time_start': utc_to_utcf(info['start_date']), 
-                        'time_end': utc_to_utcf(info['end_date']), 
-                        'updated': datetime.now(), 'url': url, 'file_size': int(file_size), 
-                        'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']), 
-                        'mode': info['mode'], 
-                        'product_id': product_id}})
+                        result.update({product_id: {'file_name': file_basename, 'file_remote_path': file_name,
+                            'time_start': utc_to_utcf(info['start_date']), 
+                            'time_end': utc_to_utcf(info['end_date']), 
+                            'updated': datetime.now(), 'url': url, 'file_size': int(file_size), 
+                            'domain': info['domain'], 'satellite': 'G{}'.format(info['satellite']), 
+                            'mode': info['mode'], 
+                            'product_id': product_id}})
     return result
 
 def download_url(url, sat_path):
@@ -215,9 +216,8 @@ class SatSourceAWS(SatSource):
         :return metas: a dictionary with all the metadata for the API search
         """
         # complete_days
-        stime = time[0]
-        etime = time[1]
-        n_complete_days = int((etime-stime).days)+1
+        stime,etime = time
+        n_complete_days = int((etime.replace(hour=0,minute=0,second=0,microsecond=0)-stime.replace(hour=0,minute=0,second=0,microsecond=0)).days)+1
         complete_days = [(stime + timedelta(days=x)).strftime('%Y/%j/') for x in range(n_complete_days)]
         awspaths = [osp.join(self.base_url.format(self.platform), self.product.format(self.sector), hour) for hour in complete_days]
         metas = aws_search(awspaths,time)
@@ -244,13 +244,13 @@ class SatSourceAWS(SatSource):
         """
         return metas
 
-    def _download_url(self, url, sat_path, appkey):
+    def _download_url(self, url, sat_path, token):
         """
         Download a satellite file from a satellite service
 
         :param url: the URL of the file
         :param sat_path: local path to download the file
-        :param appkey: key to use for the download or None if not
+        :param token: key to use for the download or None if not
         """
         download_url(url, sat_path)
 

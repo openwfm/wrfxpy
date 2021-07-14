@@ -33,11 +33,11 @@ class SatSource(object):
         self.ingest_dir=osp.abspath(osp.join(js.get('ingest_path','ingest'),self.prefix))
         self.cache_dir=osp.abspath(js.get('cache_path','cache'))
         self.sys_dir=osp.abspath(js.get('sys_install_path',None))
-        self.appkey=js.get('appkey',None)
-        if not self.appkey:
+        self.tokens=js.get('tokens',{})
+        if not self.tokens:
             try:
                 tokens = json.load(open('etc/tokens.json'))
-                self.appkey = tokens.get('appkey',None)
+                self.tokens = tokens.get('tokens',{})
             except:
                 logging.warning('Any etc/tokens.json specified, any token is going to be used.')
 
@@ -99,22 +99,22 @@ class SatSource(object):
         """
         return Dict({})
 
-    def _download_url(self, url, sat_path, appkey=None):
+    def _download_url(self, url, sat_path, token=None):
         """
         Download a satellite file from a satellite service
 
         :param url: the URL of the file
         :param sat_path: local path to download the file
-        :param appkey: key to use for the download or None if not
+        :param token: key to use for the download or None if not
         """
-        download_url(url, sat_path, appkey=appkey)
+        download_url(url, sat_path, token=token)
 
-    def download_sat(self, urls, appkey=None):
+    def download_sat(self, urls, token=None):
         """
         Download all satellite file from a satellite service
 
         :param urls: the URL of the file
-        :param appkey: key to use for the download or None if not
+        :param token: key to use for the download or None if not
         """
         for url in urls:
             logging.info('downloading %s satellite data from %s' % (self.prefix, url))
@@ -125,10 +125,11 @@ class SatSource(object):
                 return {'url': urls[0],'local_path': sat_path}
             else:
                 try:
-                    self._download_url(url, sat_path, appkey=appkey)
+                    self._download_url(url, sat_path, token=token)
                     return {'url': url,'local_path': sat_path,'downloaded': datetime.now()}
-                except DownloadError as e:
+                except Exception as e:
                     logging.warning('download_sat - {0} cannot download satellite file {1}'.format(self.prefix, url))
+                    logging.warning(e)
 
         logging.error('%s cannot download satellite file using %s' % (self.prefix, urls))
         logging.warning('Please check %s for %s' % (self.info_url, self.info))
@@ -183,15 +184,15 @@ class SatSource(object):
         """
         pass
 
-    def datacenter_to_appkey(self,data_center):
+    def datacenter_to_token(self,data_center):
         """
-        From data center to appkey to use for that data center
+        From data center to token to use for that data center
 
         :param data_center: string with the data center information
         """
-        return {'LAADS': self.appkey,
+        return {'LAADS': self.tokens.get('laads',None),
                 'LPDAAC_ECS': None,
-                'LANCEMODIS': self.appkey
+                'LANCEMODIS': self.tokens.get('nrt',None)
             }.get(data_center,None)
 
     # instance variables

@@ -29,7 +29,6 @@ from ssh_shuttle import send_product_to_server
 
 
 import netCDF4
-import pandas as pd
 import numpy as np
 import json
 import sys
@@ -47,7 +46,8 @@ sys_cfg = Dict(json.load(open('etc/conf.json')))
 cfg = Dict(json.load(open('etc/rtma_cycler.json')))
 meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
-def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png):
+
+def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, alpha=None):
     """
     Write postprocessing files.
 
@@ -63,15 +63,20 @@ def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png
         f.write(raster_png)
     with open(osp.join(postproc_path, cb_name), 'wb') as f:
         f.write(cb_png) 
-    mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+    if alpha is None:
+        mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+    else:
+        mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name, 'alpha' : alpha }
 
-def postprocess_cycle(cycle, region_cfg, wksp_path):
+
+def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
     """
     Build rasters from the computed fuel moisture.
 
     :param cycle: the UTC cycle time
     :param region_cfg: the region configuration
     :param wksp_path: the workspace path
+    :param bounds: bounding box of the post-processing
     :return: the postprocessing path
     """
     prev_cycle = cycle-timedelta(hours=1)
@@ -86,7 +91,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     manifest_name = cycle_dir + '.json'
     complete_manifest_name = 'fmda-%s.json' % region_cfg.code
 
-    if not is_cycle_computed(cycle, region_cfg, cfg.workspace_path) and not osp.exists(prev_postproc_path):
+    if not is_cycle_computed(cycle, region_cfg, wksp_path) and not osp.exists(prev_postproc_path):
         logging.warning('CYCLER postprocessing failed for time {}'.format(str(cycle)))
         return None
 
@@ -101,7 +106,8 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             'native_unit' : '-',
             'colorbar' : '-',
             'colormap' : 'jet_r',
-            'scale' : [0.0, 3.0]
+            'scale' : [0.0, 3.0],
+            'marker' : '^'
         },
         'EQUILd FM' : {
             'name' : 'Drying equilibrium FM',
@@ -168,7 +174,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
     mf = { "1" : {esmf_cycle : {}}}
     ensure_dir(osp.join(postproc_path, manifest_name))
     
-    if not is_cycle_computed(cycle, region_cfg, cfg.workspace_path):
+    if not is_cycle_computed(cycle, region_cfg, wksp_path):
         logging.info('CYCLER copying postprocessing from cycle {} to cycle {}'.format(str(prev_cycle),str(cycle)))
         prev_manifest_name = prev_cycle_dir + '.json'
         prev_esmf_cycle = utc_to_esmf(prev_cycle)
@@ -179,10 +185,16 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
             raster_name = cycle_dir + '-%s-raster.png' % name
             cb_name = cycle_dir + '-%s-raster-cb.png' % name
             coords = prev_mf['1'][prev_esmf_cycle][name]['coords']
+            alpha = prev_mf['1'][prev_esmf_cycle][name].get('alpha',None)
             force_copy(osp.join(prev_postproc_path, prev_raster_name),osp.join(postproc_path, raster_name))
             force_copy(osp.join(prev_postproc_path, prev_cb_name),osp.join(postproc_path, cb_name))
-            mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
+            if alpha:
+                mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name, 'alpha' : alpha }
+            else:
+                mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
     else:
+        if bounds is None:
+            bounds = (region_cfg.bbox[1],region_cfg.bbox[3],region_cfg.bbox[0],region_cfg.bbox[2])
         # read in the longitudes and latitudes
         geo_path = osp.join(wksp_path, '%s-geo.nc' % region_cfg.code)
         logging.info('CYCLER reading longitudes and latitudes from NetCDF file %s' % geo_path )
@@ -194,62 +206,69 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
         with netCDF4.Dataset(model_path) as d:
             for name in show:
                 raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, .5)
             for i,name in [(0, '1-hr DFM'), (1, '10-hr DFM'), (2, '100-hr DFM')]:
                 fm_wisdom = var_wisdom['dfm']
                 fm_wisdom['name'] = 'Estimated %s' % name
                 raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
-        # MesoWest observations
-        meso_file = 'ingest/meso/{:04d}{:02d}{:02d}{:02d}{:02d}_{:04d}{:02d}{:02d}{:02d}{:02d}.pkl'.format(
-                           prev_cycle.year,prev_cycle.month,prev_cycle.day,prev_cycle.hour,prev_cycle.minute,
-                           post_cycle.year,post_cycle.month,post_cycle.day,post_cycle.hour,post_cycle.minute) 
-        if osp.exists(meso_file):
-            st_file = 'ingest/meso/stations.pkl'
-            df = pd.read_pickle(meso_file)
-            st = pd.read_pickle(st_file)
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, .5)
+        if osp.exists('src/ingest/MesoDB'):
+            from ingest.MesoDB.mesoDB import mesoDB
+            db = mesoDB('ingest/MesoDB')
+            db.update['startTime'] = cycle - timedelta(hours=1)
+            db.update['endTime'] = cycle + timedelta(hours=1)
+            db.params['startTime'] = cycle - timedelta(hours=1)
+            db.params['endTime'] = cycle + timedelta(hours=1)
+            db.params['longitude1'], db.params['longitude2'], db.params['latitude1'], db.params['latitude2'] = bounds
+            if is_cycle_computed(cycle, region_cfg, wksp_path):
+                db.params['updateDB'] = False
+            df = db.get_DB()
+            st = db.sites()
             data = df.groupby('STID').mean().join(st[['LONGITUDE','LATITUDE']])
-            lats = np.array(data['LATITUDE']).astype(float)
-            lons = np.array(data['LONGITUDE']).astype(float)
-            bounds = (region_cfg.bbox[1],region_cfg.bbox[3],region_cfg.bbox[0],region_cfg.bbox[2])
-            data = data[np.logical_and(lats <= bounds[3], 
-                            np.logical_and(lats >= bounds[2], 
-                                np.logical_and(lons <= bounds[1], 
-                                               lons >= bounds[0])))]
             meso_wisdom = var_wisdom['dfm']
             meso_wisdom['name'] = 'MesoWest 10-hr DFM'
             meso_wisdom['bbox'] = bounds
+            meso_wisdom['text'] = False
             raster_png, coords, cb_png = scatter_to_raster(np.array(data['fm10'])/100., 
                                                    np.array(data['LATITUDE']).astype(float), 
                                                    np.array(data['LONGITUDE']).astype(float), meso_wisdom) 
             name = 'MESO 10-hr DFM'
-            write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
+            write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, 1.)
         # NFMDB observations
         if osp.exists('src/ingest/FMDB'):
             from ingest.FMDB.FMDB import FMDB
             from ingest.FMDB.utils import filter_outliers
+            period_length = 7 # period in days
+            period_num = np.ceil(cycle.day/period_length)
             db = FMDB('ingest/NFMDB')
+            db.params['startYear'] = 2019
             data = db.get_data()
             data = filter_outliers(data) 
             data['fuel_type'] = data['fuel_type'].fillna('None').str.upper()
             data['fuel_variation'] = data['fuel_variation'].fillna('None').str.upper()
             sts = db.sites()
             data = data.join(sts[['lng','lat']],'site_number')
-            # mask time 
-            start = now-timedelta(days=7)
-            end = now
-            dates = data['date'].dt.tz_localize(pytz.UTC)
-            data = data[np.logical_and(dates >= start, dates <= end)]
             # mask space
-            bounds = (region_cfg.bbox[1],region_cfg.bbox[3],region_cfg.bbox[0],region_cfg.bbox[2])
             lats = data['lat']
             lons = data['lng']
             data = data[np.logical_and(lats <= bounds[3],
                             np.logical_and(lats >= bounds[2],
                                 np.logical_and(lons <= bounds[1],
                                                lons >= bounds[0])))]
+            dates = data['date'].dt.tz_localize(pytz.UTC)
+            # calculate top 5 LFM to always plot the same
+            top = 5
+            hist_data = data[dates.dt.year <= 2020]
+            hist_dfm_mask = np.array(['-HOUR' in ft for ft in np.array(hist_data['fuel_type'])]).astype(bool)
+            hist_df_lfm = hist_data[~hist_dfm_mask].reset_index(drop=True)
+            fts = np.array(hist_df_lfm[['fuel_type','percent']].groupby('fuel_type').count().sort_values(by='percent',ascending=False).index[:top])
+            # mask time 
+            start = cycle.replace(day=int(period_length*(period_num-1)+1),hour=0,minute=0,second=0,microsecond=0)
+            end = cycle
+            data = data[np.logical_and(dates >= start, dates <= end)]
+            cycle_dir = 'fmda-%s-%04d%02d%02d-%02d' %  (region_cfg.code, start.year, start.month, start.day, start.hour)
             # mask dead and live fuel moisture
-            dfm_mask = np.array(['-HOUR' in ft for ft in np.array(data['fuel_type'])])
+            dfm_mask = np.array(['-HOUR' in ft for ft in np.array(data['fuel_type'])]).astype(bool)
             df_dfm = data[dfm_mask].reset_index(drop=True)
             df_lfm = data[~dfm_mask].reset_index(drop=True)
             # plot NFMDB dead fuel moisture
@@ -257,33 +276,42 @@ def postprocess_cycle(cycle, region_cfg, wksp_path):
                 fmdb_wisdom = var_wisdom['dfm']
                 fmdb_wisdom['name'] = name
                 fmdb_wisdom['bbox'] = bounds
+                fmdb_wisdom['text'] = True
+                fmdb_wisdom['size'] = 40
+                fmdb_wisdom['linewidth'] = 1.
                 data = df_dfm[df_dfm['fuel_type'] == i]
                 raster_png, coords, cb_png = scatter_to_raster(np.array(data['percent'])/100., 
                                                                    np.array(data['lat']), 
                                                                    np.array(data['lng']), fmdb_wisdom) 
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, 1.)
             # plot NFMDB live fuel moisture
             df_lfm = df_lfm.sort_values('date').groupby(['site_number','fuel_type']).last().reset_index()
-            fts = np.array(df_lfm[['fuel_type','percent']].groupby('fuel_type').count().sort_values(by='percent',ascending=False).index[:5])
             for ft in fts:
                 name = 'NFMDB {} LFM'.format(ft)
                 fmdb_wisdom = var_wisdom['lfm']
                 fmdb_wisdom['name'] = name
                 fmdb_wisdom['bbox'] = bounds
+                fmdb_wisdom['text'] = True
+                fmdb_wisdom['size'] = 40
+                fmdb_wisdom['linewidth'] = 1.
                 data = df_lfm[df_lfm['fuel_type'] == ft]
                 raster_png, coords, cb_png = scatter_to_raster(np.array(data['percent'])/100., 
                                                                    np.array(data['lat']), 
                                                                    np.array(data['lng']), fmdb_wisdom)
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, 1.)
             name = 'NFMDB OTHERS LFM'
             fmdb_wisdom = var_wisdom['lfm']
             fmdb_wisdom['name'] = name
             fmdb_wisdom['bbox'] = bounds
+            fmdb_wisdom['text'] = True
+            fmdb_wisdom['size'] = 40
+            fmdb_wisdom['linewidth'] = 1.
             data = df_lfm[~df_lfm['fuel_type'].isin(fts)]
+            data = data.groupby('site_number').mean()
             raster_png, coords, cb_png = scatter_to_raster(np.array(data['percent'])/100.,
                                                                np.array(data['lat']),
                                                                np.array(data['lng']), fmdb_wisdom)
-            write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png)
+            write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, 1.)
 
     logging.info('writing manifest file %s' % osp.join(postproc_path, manifest_name) )
     json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'), indent=1, separators=(',',':'))
@@ -311,7 +339,6 @@ def compute_model_path(cycle, region_code, wksp_path, ext='nc'):
     year_month = '%04d%02d' % (cycle.year, cycle.month)
     filename = 'fmda-%s-%04d%02d%02d-%02d.%s' %  (region_code, cycle.year, cycle.month, cycle.day, cycle.hour, ext)
     return osp.join(wksp_path,region_code,year_month,filename) 
-
 
 
 def find_region_indices(glat,glon,minlat,maxlat,minlon,maxlon):
@@ -365,6 +392,18 @@ def find_region_indices(glat,glon,minlat,maxlat,minlon,maxlon):
             done = False
     return i1,i2,j1,j2
 
+
+def compute_rtma_bounds(bbox):
+    """
+    Compute bounds from RTMA data even when RTMA data is not available from terrain static data
+    
+    :param bbox: the bounding box of the data
+    :return: a tuple containing bound coordinates (min_lon,max_lon,min_lat,max_lat)
+    """
+    lats,lons = GribFile('static/ds.terrainh.bin')[1].latlons()
+    i1, i2, j1, j2 = find_region_indices(lats, lons, bbox[0], bbox[2], bbox[1], bbox[3])
+    lats,lons = lats[i1:i2,j1:j2], lons[i1:i2,j1:j2]
+    return (lons.min(), lons.max(), lats.min(), lats.max())
 
 
 def load_rtma_data(rtma_data, bbox):
@@ -505,10 +544,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # perform assimilation with mesowest observations
     tm_start = cycle - timedelta(minutes=30)
     tm_end = cycle + timedelta(minutes=30)
-    if cfg.code == 'CONUS':
-        fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt, True)
-    else:
-        fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt)
+    fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt)
     fm10v = []
     for fm10_obs in fm10.values():
         for obs in fm10_obs:
@@ -543,7 +579,8 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
         {'EQUILd FM':Ed,'EQUILw FM':Ew,'TD':TD,'T2':T2,'RH':RH,'PRECIPA':precipa,'PRECIP':rain,'HGT':hgt})
 
     # create visualization and send results
-    pp_path = postprocess_cycle(cycle, cfg, wksp_path)   
+    bounds = (lons.min(), lons.max(), lats.min(), lats.max())
+    pp_path = postprocess_cycle(cycle, cfg, wksp_path, bounds)   
     if pp_path != None:
         if 'shuttle_remote_host' in sys_cfg:
             sim_code = 'fmda-' + cfg.code
@@ -619,7 +656,21 @@ if __name__ == '__main__':
             break
             
     if dont_have_vars:
-        logging.error('CYCLER could not find useable cycle, exiting.')
+        logging.warning('CYCLER could not find useable cycle.')
+        logging.warning('CYCLER copying previous post-processing.')
+        for region_id,region_cfg in six.iteritems(cfg.regions):
+            wrapped_cfg = Dict(region_cfg)
+            wrapped_cfg.update({'region_id': region_id})
+            try:
+                bounds = compute_rtma_bounds(wrapped_cfg.bbox)
+                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)
+                if pp_path != None:
+                    if 'shuttle_remote_host' in sys_cfg:
+                        sim_code = 'fmda-' + wrapped_cfg.code
+                        send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
+            except Exception as e:
+                logging.warning('CYCLER exception {}'.format(e))
+                logging.error('CYCLER skipping region {} for cycle {}'.format(region_id,str(cycle)))
         sys.exit(1)
         
     logging.info('Have RTMA data for cycle %s.' % str(cycle))
@@ -636,11 +687,17 @@ if __name__ == '__main__':
             except Exception as e:
                 logging.warning('CYCLER failed processing region {} for cycle {}'.format(region_id,str(cycle)))
                 logging.warning('CYCLER exception {}'.format(e))
-                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path)   
-                if pp_path != None:
-                    if 'shuttle_remote_host' in sys_cfg:
-                        sim_code = 'fmda-' + wrapped_cfg.code
-                        send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
+                logging.warning('CYCLER copying previous post-processing or re-trying.')
+                try:
+                    bounds = compute_rtma_bounds(wrapped_cfg.bbox)
+                    pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)   
+                    if pp_path != None:
+                        if 'shuttle_remote_host' in sys_cfg:
+                            sim_code = 'fmda-' + wrapped_cfg.code
+                            send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', region_id + ' FM')
+                except Exception as e:
+                    logging.warning('CYCLER exception {}'.format(e))
+                    logging.error('CYCLER skipping region {} for cycle {}'.format(region_id,str(cycle)))
         else:
             logging.info('CYCLER the cycle %s for region %s is already complete, skipping ...' % (str(cycle), str(region_id)))
 

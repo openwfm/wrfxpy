@@ -957,6 +957,16 @@ _var_wisdom = {
         'options' : _discrete_wisdom['nofire'],
         'retrieve_as' : lambda d : transform_goes(d),
         'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
+    'TERRA_AF_T' : {
+       'name' : 'MODIS Terra Temporal Active Fires satellite data',
+       'source' : 'Terra',
+       'native_unit' : '-',
+       'colorbar' : '-',
+       'colormap' : 'jet',
+       'scale' : 'original',
+       'retrieve_as' : lambda d : d.select('fire mask').get(),
+       'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
     }
 }
 

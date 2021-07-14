@@ -115,10 +115,7 @@ class JobState(Dict):
         self.fmda = args.get('fuel_moisture_da', None)
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
-        if 'clean_dir' in args:
-            self.clean_dir = args['clean_dir']
-        else:
-            self.clean_dir = True
+        self.clean_dir = args.get('clean_dir', True)
         self.run_wrf = args.get('run_wrf', True)
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
@@ -265,6 +262,15 @@ def create_sat_manifest(js):
         else:
             sat_manifest.sat_interval[k] = (js.domains[k]['history_interval'], js.domains[k]['history_interval'])
     sat_manifest.satprod_satsource = js.satprod_satsource
+    satfile = osp.join(js.jobdir, 'sat.json')
+    if js.restart and osp.exists(satfile):
+        try:
+            hist_sats = osp.join(js.jobdir, 'sats')
+            ensure_dir(hist_sats)
+            jsat = Dict(json.load(open(satfile,'r')))
+            json.dump(jsat, open(osp.join(hist_sats, 'sat_{}_{}.json'.format(*jsat.time_interval)),'w'), indent=4, separators=(',', ': '))
+        except:
+            logging.warning('not able to recover previous satellite file')
     json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
     return sat_manifest
 
@@ -412,6 +418,7 @@ def make_job_file(js):
     jsub.grid_code = js.grid_code
     jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     jsub.num_doms = js.num_doms
+    jsub.restart = js.restart
     if 'tslist' in js.keys():
         jsub.tslist = js.tslist
     else:
@@ -578,7 +585,7 @@ def execute(args,job_args):
 
     jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
     js.jobdir = jobdir
-    if js.clean_dir or not osp.exists(osp.join(js.jobdir,'input.json')):
+    if (js.clean_dir and not js.restart) or not osp.exists(osp.join(js.jobdir,'input.json')):
         make_clean_dir(js.jobdir)
 
     js.num_doms = len(js.domains)
@@ -843,24 +850,26 @@ def process_output(job_id):
     js.old_pid = js.pid
     js.pid = os.getpid()
     js.state = 'Processing'
+    js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
 
     pp = None
-    already_sent_files = []
     if js.postproc is None:
         logging.info('No postprocessing specified, exiting.')
         return
 
     # set up postprocessing
-    if js.postproc.get('shuttle', None) is None:
-        local_rmdir(osp.join(js.job_id,'products'))
-    else:
+    if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-    make_clean_dir(js.pp_dir)
+    if not js.restart:
+        already_sent_files = []
+        make_clean_dir(js.pp_dir)
+    else:
+        already_sent_files = [x for x in os.listdir(js.pp_dir) if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
     prod_name = 'wfc-' + js.grid_code
     pp = Postprocessor(js.pp_dir, prod_name)
     if 'tslist' in js.keys() and js.tslist is not None:
@@ -1078,17 +1087,19 @@ def process_sat_output(job_id):
     js.old_pid = js.pid
     js.pid = os.getpid()
     js.state = 'Processing'
+    js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     pp = None
-    already_sent_files = []
-    if js.postproc.get('shuttle', None) is None:
-        local_rmdir(osp.join(js.job_id,'products'))
-    else:
+    if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-    make_clean_dir(js.pp_dir)
+    if not js.restart:
+        already_sent_files = []
+        make_clean_dir(js.pp_dir)
+    else:
+        already_sent_files = [x for x in os.listdir(js.pp_dir) if not x.endswith('json')]
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
@@ -1265,7 +1276,7 @@ def process_arguments(job_args,sys_cfg):
     # load tokens if etc/tokens.json exists
     try:
         tokens = json.load(open('etc/tokens.json'))
-        args.update(tokens)
+        args.update({'tokens': tokens})
     except:
         logging.warning('Any etc/tokens.json specified, any token is going to be used.')
 
