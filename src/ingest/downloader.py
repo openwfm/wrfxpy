@@ -88,7 +88,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             logging.info('not found, download_url trying again, retries available %d' % max_retries)
             logging.info('download_url sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
-            download_url(url, local_path, max_retries = max_retries-1, token = token)
+            download_url(url, local_path, max_retries = max_retries-1, token = token, min_size = min_size)
         return
 
     logging.info('download_url %s as %s' % (url,local_path))
@@ -111,7 +111,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
         r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
     content_size = int(r.headers.get('content-length',0))
 
-    logging.info('local file size %d remote content size %d' % (file_size, content_size))
+    logging.info('local file size %d remote content size %d minimum size %d' % (file_size, content_size, min_size))
 
     # it should be != but for some reason content_size is wrong sometimes
     if int(file_size) < int(content_size) or int(file_size) < min_size:
@@ -121,7 +121,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             # and overwrite previously downloaded data
             logging.info('download_url sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
-            download_url(url, local_path, max_retries = max_retries-1, token = token)
+            download_url(url, local_path, max_retries = max_retries-1, token = token, min_size = min_size)
             return  # success
         else:
             os.remove(local_path)
