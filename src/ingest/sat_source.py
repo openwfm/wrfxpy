@@ -99,7 +99,7 @@ class SatSource(object):
         """
         return Dict({})
 
-    def _download_url(self, url, sat_path, token=None):
+    def _download_url(self, url, sat_path, token=None, min_size=1):
         """
         Download a satellite file from a satellite service
 
@@ -107,9 +107,9 @@ class SatSource(object):
         :param sat_path: local path to download the file
         :param token: key to use for the download or None if not
         """
-        download_url(url, sat_path, token=token)
+        download_url(url, sat_path, token=token, min_size=min_size)
 
-    def download_sat(self, urls, token=None):
+    def download_sat(self, urls, token=None, min_size=10000):
         """
         Download all satellite file from a satellite service
 
@@ -125,7 +125,7 @@ class SatSource(object):
                 return {'url': urls[0],'local_path': sat_path}
             else:
                 try:
-                    self._download_url(url, sat_path, token=token)
+                    self._download_url(url, sat_path, token=token, min_size=min_size)
                     return {'url': url,'local_path': sat_path,'downloaded': datetime.now()}
                 except Exception as e:
                     logging.warning('download_sat - {0} cannot download satellite file {1}'.format(self.prefix, url))

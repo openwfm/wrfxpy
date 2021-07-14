@@ -53,7 +53,7 @@ def get_dList(url):
         listing.append(l.split()[-1])
     return listing
 
-def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def, token=None):
+def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def, token=None, min_size=1):
     """
     Download a remote URL to the location local_path with retries.
 
@@ -114,7 +114,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     logging.info('local file size %d remote content size %d' % (file_size, content_size))
 
     # it should be != but for some reason content_size is wrong sometimes
-    if int(file_size) < int(content_size) or int(file_size) == 0:
+    if int(file_size) < int(content_size) or int(file_size) < min_size:
         logging.warning('wrong file size, download_url trying again, retries available %d' % max_retries)
         if max_retries > 0:
             # call the entire function recursively, this will attempt to redownload the entire file
