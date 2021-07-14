@@ -42,7 +42,7 @@ class SatSource(object):
                 logging.warning('Any etc/tokens.json specified, any token is going to be used.')
 
 
-    def available_locally_sat(self, path):
+    def available_locally_sat(self, path, min_size):
         """
         Check if a satellite file is available locally and if it's file size checks out.
 
@@ -51,7 +51,7 @@ class SatSource(object):
         info_path = path + '.size'
         if osp.exists(path) and osp.exists(info_path):
             content_size = int(open(info_path).read())
-            if content_size > 0:
+            if content_size >= min_size:
                 return osp.getsize(path) == content_size
         return False
 
@@ -120,7 +120,7 @@ class SatSource(object):
             logging.info('downloading %s satellite data from %s' % (self.prefix, url))
             sat_name = osp.basename(url)
             sat_path = osp.join(self.ingest_dir,sat_name)
-            if self.available_locally_sat(sat_path):
+            if self.available_locally_sat(sat_path, min_size):
                 logging.info('%s is available locally' % sat_path)
                 return {'url': urls[0],'local_path': sat_path}
             else:

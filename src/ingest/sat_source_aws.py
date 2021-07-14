@@ -244,7 +244,7 @@ class SatSourceAWS(SatSource):
         """
         return metas
 
-    def _download_url(self, url, sat_path, token):
+    def _download_url(self, url, sat_path, token, min_size):
         """
         Download a satellite file from a satellite service
 
