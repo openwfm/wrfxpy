@@ -266,9 +266,10 @@ def create_sat_manifest(js):
     if js.restart and osp.exists(satfile):
         try:
             hist_sats = osp.join(js.jobdir, 'sats')
-            ensure_dir(hist_sats)
             jsat = Dict(json.load(open(satfile,'r')))
-            json.dump(jsat, open(osp.join(hist_sats, 'sat_{}_{}.json'.format(*jsat.time_interval)),'w'), indent=4, separators=(',', ': '))
+            hist_jsat = osp.join(hist_sats, 'sat_{}_{}.json'.format(*jsat.time_interval))
+            ensure_dir(hist_jsat)
+            json.dump(jsat, open(hist_jsat, 'w'), indent=4, separators=(',', ': '))
         except:
             logging.warning('not able to recover previous satellite file')
     json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
