@@ -86,6 +86,8 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         #  colorbar + add it to the KMZ as a screen overlay
         logging.info('scalar_field_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
         cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
+    else:
+        levels = None
 
     # replace masked values by nans just in case
     fa.data[fa.mask]=np.nan
@@ -94,7 +96,7 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
     # create the raster & get coordinate bounds
     raster_png_data,corner_coords = basemap_raster_mercator(lons,lats,fa,fa_min,fa_max,cmap)
 
-    return raster_png_data, corner_coords, cb_png_data
+    return raster_png_data, corner_coords, cb_png_data, levels
 
 
 def vector_field_to_raster(u, v, lats, lons, wisdom):
@@ -197,6 +199,8 @@ def scatter_to_raster(fa, lats, lons, wisdom):
         #  colorbar + add it to the KMZ as a screen overlay
         logging.info('scatter_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
         cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
+    else:
+        levels = None
 
     # replace masked values by nans just in case
     fa.data[fa.mask]=np.nan

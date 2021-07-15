@@ -47,7 +47,7 @@ cfg = Dict(json.load(open('etc/rtma_cycler.json')))
 meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
 
-def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, alpha=None):
+def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, levels=None, alpha=None):
     """
     Write postprocessing files.
 
@@ -63,10 +63,11 @@ def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png
         f.write(raster_png)
     with open(osp.join(postproc_path, cb_name), 'wb') as f:
         f.write(cb_png) 
-    if alpha is None:
-        mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name }
-    else:
-        mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar' : cb_name, 'alpha' : alpha }
+    mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords }
+    if levels is not None:
+        mf["1"][esmf_cycle][name].update({ 'levels' : levels })
+    if alpha is not None:
+        mf["1"][esmf_cycle][name].update({ 'alpha' : alpha })
 
 
 def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
@@ -205,13 +206,13 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
         # read and process model variables
         with netCDF4.Dataset(model_path) as d:
             for name in show:
-                raster_png, coords, cb_png = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, .5)
+                raster_png, coords, cb_png, levels = scalar_field_to_raster(d.variables[name][:,:], lats, lons, var_wisdom[name])
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, levels, .5)
             for i,name in [(0, '1-hr DFM'), (1, '10-hr DFM'), (2, '100-hr DFM')]:
                 fm_wisdom = var_wisdom['dfm']
                 fm_wisdom['name'] = 'Estimated %s' % name
-                raster_png, coords, cb_png = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, .5)
+                raster_png, coords, cb_png, levels = scalar_field_to_raster(d.variables['FMC_GC'][:,:,i], lats, lons, fm_wisdom)
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, levels, .5)
         if osp.exists('src/ingest/MesoDB'):
             from ingest.MesoDB.mesoDB import mesoDB
             db = mesoDB('ingest/MesoDB')
@@ -229,11 +230,11 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
             meso_wisdom['name'] = 'MesoWest 10-hr DFM'
             meso_wisdom['bbox'] = bounds
             meso_wisdom['text'] = False
-            raster_png, coords, cb_png = scatter_to_raster(np.array(data['fm10'])/100., 
+            raster_png, coords, cb_png, levels = scatter_to_raster(np.array(data['fm10'])/100., 
                                                    np.array(data['LATITUDE']).astype(float), 
                                                    np.array(data['LONGITUDE']).astype(float), meso_wisdom) 
             name = 'MESO 10-hr DFM'
-            write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, 1.)
+            write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, levels, 1.)
         # NFMDB observations
         if osp.exists('src/ingest/FMDB'):
             from ingest.FMDB.FMDB import FMDB
@@ -280,10 +281,10 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
                 fmdb_wisdom['size'] = 40
                 fmdb_wisdom['linewidth'] = 1.
                 data = df_dfm[df_dfm['fuel_type'] == i]
-                raster_png, coords, cb_png = scatter_to_raster(np.array(data['percent'])/100., 
+                raster_png, coords, cb_png, levels = scatter_to_raster(np.array(data['percent'])/100., 
                                                                    np.array(data['lat']), 
                                                                    np.array(data['lng']), fmdb_wisdom) 
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, 1.)
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, levels, 1.)
             # plot NFMDB live fuel moisture
             df_lfm = df_lfm.sort_values('date').groupby(['site_number','fuel_type']).last().reset_index()
             for ft in fts:
@@ -295,10 +296,10 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
                 fmdb_wisdom['size'] = 40
                 fmdb_wisdom['linewidth'] = 1.
                 data = df_lfm[df_lfm['fuel_type'] == ft]
-                raster_png, coords, cb_png = scatter_to_raster(np.array(data['percent'])/100., 
+                raster_png, coords, cb_png, levels = scatter_to_raster(np.array(data['percent'])/100., 
                                                                    np.array(data['lat']), 
                                                                    np.array(data['lng']), fmdb_wisdom)
-                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, 1.)
+                write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, levels, 1.)
             name = 'NFMDB OTHERS LFM'
             fmdb_wisdom = var_wisdom['lfm']
             fmdb_wisdom['name'] = name
@@ -308,10 +309,10 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
             fmdb_wisdom['linewidth'] = 1.
             data = df_lfm[~df_lfm['fuel_type'].isin(fts)]
             data = data.groupby('site_number').mean()
-            raster_png, coords, cb_png = scatter_to_raster(np.array(data['percent'])/100.,
+            raster_png, coords, cb_png, levels = scatter_to_raster(np.array(data['percent'])/100.,
                                                                np.array(data['lat']),
                                                                np.array(data['lng']), fmdb_wisdom)
-            write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, 1.)
+            write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png, coords, cb_png, levels, 1.)
 
     logging.info('writing manifest file %s' % osp.join(postproc_path, manifest_name) )
     json.dump(mf, open(osp.join(postproc_path, manifest_name), 'w'), indent=1, separators=(',',':'))
