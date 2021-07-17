@@ -221,7 +221,7 @@ def scatter_to_raster(fa, lats, lons, wisdom):
     # create the raster & get coordinate bounds
     raster_png_data,corner_coords = basemap_scatter_mercator([fa],[lons],[lats],bounds,[alpha],fa_min,fa_max,cmap,size,marker,linewidth,text)
 
-    return raster_png_data, corner_coords, cb_png_data
+    return raster_png_data, corner_coords, cb_png_data, levels
 
 
 class Postprocessor(object):
