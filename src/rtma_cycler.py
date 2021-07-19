@@ -63,7 +63,7 @@ def write_postprocess(mf, postproc_path, cycle_dir, esmf_cycle, name, raster_png
         f.write(raster_png)
     with open(osp.join(postproc_path, cb_name), 'wb') as f:
         f.write(cb_png) 
-    mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords }
+    mf["1"][esmf_cycle][name] = { 'raster' : raster_name, 'coords' : coords, 'colorbar': cb_name }
     if levels is not None:
         mf["1"][esmf_cycle][name].update({ 'levels' : levels })
     if alpha is not None:
