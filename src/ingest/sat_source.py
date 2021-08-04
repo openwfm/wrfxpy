@@ -3,16 +3,12 @@
 #
 
 from __future__ import absolute_import
-import glob, re, datetime, logging, requests, json
+import logging
+import json
 import os.path as osp
-import numpy as np
 from datetime import datetime 
-from six.moves.urllib.request import urlopen
-from cmr import GranuleQuery
-from utils import Dict, esmf_to_utc, utc_to_utcf, duplicates
+from utils import Dict
 from .downloader import download_url, DownloadError
-from six.moves import filter
-from six.moves import range
 
 class SatError(Exception):
     """
@@ -37,16 +33,16 @@ class SatSource(object):
         self.ingest_dir=osp.abspath(osp.join(js.get('ingest_path','ingest'),self.prefix))
         self.cache_dir=osp.abspath(js.get('cache_path','cache'))
         self.sys_dir=osp.abspath(js.get('sys_install_path',None))
-        self.appkey=js.get('appkey',None)
-        if not self.appkey:
+        self.tokens=js.get('tokens',{})
+        if not self.tokens:
             try:
                 tokens = json.load(open('etc/tokens.json'))
-                self.appkey = tokens.get('appkey',None)
+                self.tokens = tokens.get('tokens',{})
             except:
                 logging.warning('Any etc/tokens.json specified, any token is going to be used.')
 
 
-    def available_locally_sat(self, path):
+    def available_locally_sat(self, path, min_size):
         """
         Check if a satellite file is available locally and if it's file size checks out.
 
@@ -55,40 +51,22 @@ class SatSource(object):
         info_path = path + '.size'
         if osp.exists(path) and osp.exists(info_path):
             content_size = int(open(info_path).read())
-            if content_size > 0:
+            if content_size >= min_size:
                 return osp.getsize(path) == content_size
         return False
 
-    def search_api_sat(self, sname, bbox, time, collection=None):
+    def search_api_sat(self, sname, bounds, time, collection=None):
         """
         API search of the different satellite granules and return metadata dictionary
 
         :param sname: short name satellite product, ex: 'MOD03'
-        :param bbox: polygon with the search bounding box
+        :param bounds: bounding box as (lon_min,lon_max,lat_min,lat_max)
         :param time: time interval (init_time_iso,final_time_iso)
+        :param collection: id of the collection to specify
 
         :return metas: a dictionary with all the metadata for the API search
         """
-        maxg=1000
-        time_utcf=(utc_to_utcf(time[0]),utc_to_utcf(time[1]))
-        api = GranuleQuery()
-        search = api.parameters(
-                short_name=sname,
-                downloadable=True,
-                polygon=bbox,
-                temporal=time_utcf)
-        sh=search.hits()
-        if sh>maxg:
-            logging.warning("The number of hits %s is larger than the limit %s." % (sh,maxg))
-            logging.warning("Any satellite data with prefix %s used." % self.prefix)
-            logging.warning("Use a reduced bounding box or a reduced time interval.")
-            metas = []
-        else:
-            metas = api.get(sh)
-        if collection:
-            metas = [m for m in metas if m['collection_concept_id'] == collection]
-        logging.info('search_api_sat - CMR API gives {0} hits for {1} of collection {2}'.format(len(metas),sname,collection))
-        return metas
+        return {}
 
     def archive_url(self, meta, path_col, nrt=False):
         """
@@ -99,30 +77,18 @@ class SatSource(object):
         :param nrt: near real time (nrt) flag
         :return url: url of the archive reconstruction
         """
-        base_url = self.base_url if not nrt else self.base_url_nrt
-        g_id = osp.basename(meta['links'][0]['href'])
-        split = g_id.split('.')
-        time_str = '{0}-{1}_{2}:{3}'.format(split[1][1:5],split[1][5:8],split[2][:2],split[2][2:4])
-        tt = datetime.strptime(time_str,'%Y-%j_%H:%M').timetuple()
-        folder = '{0:04d}/{1:03d}'.format(tt.tm_year,tt.tm_yday)
-        url = osp.join(base_url,path_col,folder,g_id) 
-        return url
+        return ''
 
-    def get_metas_sat(self, bbox, time):
+    def get_metas_sat(self, bounds, time):
         """
         Get all the meta data for all the necessary products
 
-        :param bbox: polygon with the search bounding box
+        :param bounds: bounding box as (lon_min,lon_max,lat_min,lat_max)
         :param time: time interval (init_time_datetime,final_time_datetime)
         :param maxg: max number of granules to process
         :return granules: dictionary with the metadata of all the products
         """
-        metas=Dict({})
-        metas.geo=self.search_api_sat(self.geo_prefix,bbox,time,collection=self.geo_collection_id)
-        metas.fire=self.search_api_sat(self.fire_prefix,bbox,time,collection=self.fire_collection_id)
-        metas.geo_nrt=self.search_api_sat(self.geo_nrt_prefix,bbox,time,collection=self.geo_nrt_collection_id)
-        metas.fire_nrt=self.search_api_sat(self.fire_nrt_prefix,bbox,time,collection=self.fire_nrt_collection_id)
-        return metas
+        return Dict({})
 
     def group_metas(self, metas):
         """
@@ -131,72 +97,43 @@ class SatSource(object):
         :param metas: satellite metadatas from API search
         :return result: groupped and cleanned metadata dictionary
         """
-        g_id = lambda m: '_'.join(m['producer_granule_id'].split('.')[1:3])
-        gmetas = Dict({})
-        gmetas.geo = Dict({})
-        gmetas.fire = Dict({})
-        for m in metas['geo']:
-            m.update({'archive_url': self.archive_url(m,osp.join(self.geo_col,self.geo_prefix))})
-            gmetas.geo.update({g_id(m): m})
-        # add fire metas, if geo available
-        for m in metas['fire']:
-            k = g_id(m)
-            if k in gmetas.geo.keys():
-                m.update({'archive_url': self.archive_url(m,osp.join(self.fire_col,self.fire_prefix))})
-                gmetas.fire.update({k: m})
-            else:
-                logging.warning('group_metas - geolocation meta not found for id {}, eliminating fire meta'.format(k))
-        # add geolocation NRT metas, if necessary
-        for m in metas['geo_nrt']:
-            k = g_id(m)
-            if k not in gmetas.geo.keys():
-                m.update({'archive_url': self.archive_url(m,osp.join(self.geo_nrt_col,self.geo_nrt_prefix),True)})
-                gmetas.geo.update({k: m})
-        # add fire NRT metas, if necessary
-        for m in metas['fire_nrt']:
-            k = g_id(m)
-            if k not in gmetas.fire.keys():
-                if k in gmetas.geo.keys():
-                    m.update({'archive_url': self.archive_url(m,osp.join(self.fire_nrt_col,self.fire_nrt_prefix),True)})
-                    gmetas.fire.update({k: m})
-                else:
-                    logging.warning('group_metas - geolocation not found for id {}'.format(k))
-        # delete geolocation if not fire on it
-        exc = []
-        for k in gmetas.geo.keys():
-            if k not in gmetas.fire.keys():
-                logging.warning('group_metas - fire meta not found for id {}, eliminating geolocation meta'.format(k))
-                exc.append(k)
-        for k in exc:
-            gmetas.geo.pop(k)
+        return Dict({})
 
-        return gmetas
-
-    def download_sat(self, urls, appkey):
+    def _download_url(self, url, sat_path, token=None, min_size=1):
         """
         Download a satellite file from a satellite service
 
+        :param url: the URL of the file
+        :param sat_path: local path to download the file
+        :param token: key to use for the download or None if not
+        """
+        download_url(url, sat_path, token=token, min_size=min_size)
+
+    def download_sat(self, urls, token=None, min_size=10000):
+        """
+        Download all satellite file from a satellite service
+
         :param urls: the URL of the file
-        :param appkey: key to use for the download or None if not
+        :param token: key to use for the download or None if not
         """
         for url in urls:
             logging.info('downloading %s satellite data from %s' % (self.prefix, url))
             sat_name = osp.basename(url)
             sat_path = osp.join(self.ingest_dir,sat_name)
-            if self.available_locally_sat(sat_path):
+            if self.available_locally_sat(sat_path, min_size):
                 logging.info('%s is available locally' % sat_path)
                 return {'url': urls[0],'local_path': sat_path}
             else:
                 try:
-                    download_url(url, sat_path, appkey=appkey)
-                    return {'url': url,'local_path': sat_path,'downloaded': datetime.now}
-                except DownloadError as e:
+                    self._download_url(url, sat_path, token=token, min_size=min_size)
+                    return {'url': url,'local_path': sat_path,'downloaded': datetime.now()}
+                except Exception as e:
                     logging.warning('download_sat - {0} cannot download satellite file {1}'.format(self.prefix, url))
+                    logging.warning(e)
 
         logging.error('%s cannot download satellite file using %s' % (self.prefix, urls))
         logging.warning('Please check %s for %s' % (self.info_url, self.info))
         return {}
-        raise SatError('SatSource: failed to download file %s' % url)
 
     def retrieve_metas(self, metas):
         """
@@ -205,33 +142,7 @@ class SatSource(object):
         :return metas: dictonary with all the satellite data to retrieve
         :return manifest: dictonary with all the satellite data retrieved
         """
-        logging.info('retrieve_metas - downloading {} products'.format(self.id))
-        manifest = Dict({})
-        for g_id, geo_meta in metas['geo'].items():
-            if g_id in metas['fire'].keys():
-                fire_meta = metas['fire'][g_id]
-                logging.info('retrieve_metas - downloading product id {}'.format(g_id))
-                urls = [geo_meta['links'][0]['href'],geo_meta.get('archive_url')]
-                m_geo = self.download_sat(urls,self.datacenter_to_appkey(geo_meta['data_center']))
-                if m_geo:
-                    geo_meta.update(m_geo)
-                    urls = [fire_meta['links'][0]['href'],fire_meta.get('archive_url')]
-                    m_fire = self.download_sat(urls,self.datacenter_to_appkey(fire_meta['data_center']))
-                    if m_fire:
-                        fire_meta.update(m_fire)
-                        manifest.update({g_id: {
-                            'time_start_iso' : geo_meta['time_start'],
-                            'time_end_iso' : geo_meta['time_end'],
-                            'geo_url' : geo_meta['url'],
-                            'geo_local_path' : geo_meta['local_path'],
-                            'geo_description' : geo_meta['dataset_id'],
-                            'fire_url' : fire_meta['url'],
-                            'fire_local_path' : fire_meta['local_path'],
-                            'fire_description' : fire_meta['dataset_id']
-                        }})
-                
-
-        return manifest
+        return Dict({})
 
     def retrieve_data_sat(self, bounds, from_utc, to_utc):
         """
@@ -244,11 +155,8 @@ class SatSource(object):
         if not osp.exists(osp.join(osp.expanduser('~'),'.netrc')):
             logging.warning('satellite acquisition can fail because some data centers require to have $HOME/.netrc specified from an existent Earthdata account')
         
-        lonmin,lonmax,latmin,latmax = bounds
-        bbox = [(lonmin,latmax),(lonmin,latmin),(lonmax,latmin),(lonmax,latmax),(lonmin,latmax)]
         time = (from_utc, to_utc)
-
-        metas = self.group_metas(self.get_metas_sat(bbox,time))
+        metas = self.group_metas(self.get_metas_sat(bounds,time))
         logging.info('retrieve_data_sat - found {0} metas for {1} satellite service'.format(sum([len(m) for m in metas.values()]),self.prefix))
 
         manifest = self.retrieve_metas(metas)
@@ -276,15 +184,15 @@ class SatSource(object):
         """
         pass
 
-    def datacenter_to_appkey(self,data_center):
+    def datacenter_to_token(self,data_center):
         """
-        From data center to appkey to use for that data center
+        From data center to token to use for that data center
 
         :param data_center: string with the data center information
         """
-        return {'LAADS': self.appkey,
+        return {'LAADS': self.tokens.get('laads',None),
                 'LPDAAC_ECS': None,
-                'LANCEMODIS': self.appkey
+                'LANCEMODIS': self.tokens.get('nrt',None)
             }.get(data_center,None)
 
     # instance variables
@@ -305,6 +213,8 @@ class SatSource(object):
     fire_col=None
     geo_nrt_col=None
     fire_nrt_col=None
-    base_url='https://ladsweb.modaps.eosdis.nasa.gov/archive/allData'
-    base_url_nrt='https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/allData'
+    base_url=None
+    base_url_nrt=None
+    product=None
+    sector=None
 

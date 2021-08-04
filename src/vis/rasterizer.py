@@ -86,7 +86,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proport
     fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
     plt.close()
 
-    return str_io.getvalue()
+    return str_io.getvalue(),cb.get_ticks().tolist()
 
 
 def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=200):
@@ -194,10 +194,14 @@ def basemap_barbs_mercator(u,v,lat,lon):
     return str_io.getvalue(), float_bounds
 
 
-def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
+def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's', linewidths = 0, text = False):
     # number of scatter elements
     N = len(val)	
+    border = .05
+    bounds = (bounds[0]-border, bounds[1]+border, bounds[2]-border, bounds[3]+border)
    
+    logging.info('basemap_scatter_mercator: bounding box {}'.format(bounds))
+
     # construct spherical mercator projection for region of interest
     m = Basemap(projection='merc',llcrnrlat=bounds[2], urcrnrlat=bounds[3],
                 		llcrnrlon=bounds[0],urcrnrlon=bounds[1])
@@ -205,7 +209,13 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
     for i in range(N):
-    	m.scatter(lon[i],lat[i],2,c=val[i],latlon=True,marker='s',cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
+    	m.scatter(lon[i],lat[i],size,c=val[i],latlon=True,marker=marker,cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=linewidths,edgecolors='k')
+    if text:
+        for i in range(N):
+            for x1,x2,x3 in zip(lon[i],lat[i],val[i]):
+                x,y = m(x1+.05,x2+.05)
+                s = '{:.2f}'.format(x3)
+                plt.text(x,y,s,fontsize=size/7,fontweight='bold')
 
     # save png to a StringIO
     str_io = StringIO()

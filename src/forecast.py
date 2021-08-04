@@ -46,6 +46,7 @@ from ingest.GFSF import GFSF_P, GFSF_S
 
 from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP
+from ingest.GOES import GOES16, GOES17
 
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
@@ -87,7 +88,7 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
-        self.grib_source = self.resolve_grib_source(self.grib_source,args)
+        self.grib_source = self.resolve_grib_source(self.get('grib_source',None),args)
         self.satellite_source_list = args.get('satellite_source',[])
         self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
@@ -111,14 +112,10 @@ class JobState(Dict):
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
         self.ignitions = args.get('ignitions', None)
-        self.fmda = self.parse_fmda(args)
+        self.fmda = args.get('fuel_moisture_da', None)
         self.postproc = args['postproc']
-        self.tif_proc = args.get('tif_proc', False)
         self.wrfxpy_dir = args['sys_install_path']
-        if 'clean_dir' in args:
-            self.clean_dir = args['clean_dir']
-        else:
-            self.clean_dir = True
+        self.clean_dir = args.get('clean_dir', True)
         self.run_wrf = args.get('run_wrf', True)
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
@@ -147,7 +144,11 @@ class JobState(Dict):
         elif gs_name == 'GFSF':
             return [GFSF_P(js),GFSF_S(js)]
         else:
-            raise ValueError('Unrecognized grib_source %s' % gs_name)
+            sat_only = js.get('sat_only',False)
+            if not sat_only:
+                raise ValueError('Unrecognized grib_source %s' % gs_name)
+            else:
+                return [Dict({'period_hours': 1, 'cycle_hours': 1})]
 
     def resolve_satellite_source(self, js):
         """
@@ -167,6 +168,12 @@ class JobState(Dict):
         if 'SNPP' in sat_list:
             snpp=SNPP(js)
             sat.append(snpp)
+        if 'G16' in sat_list:
+            g16=GOES16(js)
+            sat.append(g16)
+        if 'G17' in sat_list:
+            g17=GOES17(js)
+            sat.append(g17)
         return sat
 
     def parse_satellite_source(self, args):
@@ -180,19 +187,6 @@ class JobState(Dict):
             return sats
         else:
             return []
-
-    def parse_fmda(self, args):
-        """
-        Parse information inside the FMDA blob, if any.
-
-        :param args: the forecast job argument dictionary
-        """
-        if 'fuel_moisture_da' in args:
-            fmda = args['fuel_moisture_da']
-            return Dict({'token' : fmda['mesowest_token'], 'domains' : fmda['domains']})
-        else:
-            return None
-
 
     def parse_emails(self, args):
         """
@@ -268,6 +262,16 @@ def create_sat_manifest(js):
         else:
             sat_manifest.sat_interval[k] = (js.domains[k]['history_interval'], js.domains[k]['history_interval'])
     sat_manifest.satprod_satsource = js.satprod_satsource
+    satfile = osp.join(js.jobdir, 'sat.json')
+    if js.restart and osp.exists(satfile):
+        try:
+            hist_sats = osp.join(js.jobdir, 'sats')
+            jsat = Dict(json.load(open(satfile,'r')))
+            hist_jsat = osp.join(hist_sats, 'sat_{}_{}.json'.format(*jsat.time_interval))
+            ensure_dir(hist_jsat)
+            json.dump(jsat, open(hist_jsat, 'w'), indent=4, separators=(',', ': '))
+        except:
+            logging.warning('not able to recover previous satellite file')
     json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
     return sat_manifest
 
@@ -415,7 +419,7 @@ def make_job_file(js):
     jsub.grid_code = js.grid_code
     jsub.jobfile = osp.abspath(osp.join(js.workspace_path, js.job_id,'job.json'))
     jsub.num_doms = js.num_doms
-    jsub.tif_proc = js.tif_proc
+    jsub.restart = js.restart
     if 'tslist' in js.keys():
         jsub.tslist = js.tslist
     else:
@@ -478,6 +482,7 @@ def vars_add_to_geogrid(js):
                 raise OSError('Failed to process GeoTIFF file for variable {}'.format(var))
             else:
                 logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
+                logging.warning('Exception: %s',e)
     
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
@@ -581,7 +586,7 @@ def execute(args,job_args):
 
     jobdir = osp.abspath(osp.join(js.workspace_path, js.job_id))
     js.jobdir = jobdir
-    if js.clean_dir or not osp.exists(osp.join(js.jobdir,'input.json')):
+    if (js.clean_dir and not js.restart) or not osp.exists(osp.join(js.jobdir,'input.json')):
         make_clean_dir(js.jobdir)
 
     js.num_doms = len(js.domains)
@@ -593,20 +598,9 @@ def execute(args,job_args):
     sys.stdout.flush()
     send_email(js, 'start', 'Job %s started.' % js.job_id)
 
-    # read in all namelists
-    js.wps_nml = read_namelist(js.args['wps_namelist_path'])
-    js.wrf_nml = read_namelist(js.args['wrf_namelist_path'])
-    js.fire_nml = read_namelist(js.args['fire_namelist_path'])
-    js.ems_nml = None
-    if 'emissions_namelist_path' in js.args:
-        js.ems_nml = read_namelist(js.args['emissions_namelist_path'])
-
     # Parse and setup the domain configuration
     js.domain_conf = WPSDomainConf(js.domains)
     js.num_doms = len(js.domain_conf)
-
-    js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds
-
     logging.info("number of domains defined is %d." % js.num_doms)
 
     js.bounds = Dict({})
@@ -639,6 +633,15 @@ def execute(args,job_args):
         else:
             logging.error('any available sat source specified')
             return
+    else:
+        # read in all namelists
+        js.wps_nml = read_namelist(js.args['wps_namelist_path'])
+        js.wrf_nml = read_namelist(js.args['wrf_namelist_path'])
+        js.fire_nml = read_namelist(js.args['fire_namelist_path'])
+        js.ems_nml = None
+        if 'emissions_namelist_path' in js.args:
+            js.ems_nml = read_namelist(js.args['emissions_namelist_path'])
+        js.wps_nml['share']['interval_seconds'] = js.grib_source[0].interval_seconds
 
     # build directories in workspace
     js.wps_dir = osp.abspath(osp.join(js.jobdir, 'wps'))
@@ -848,24 +851,26 @@ def process_output(job_id):
     js.old_pid = js.pid
     js.pid = os.getpid()
     js.state = 'Processing'
+    js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
 
     pp = None
-    already_sent_files = []
     if js.postproc is None:
         logging.info('No postprocessing specified, exiting.')
         return
 
     # set up postprocessing
-    if js.postproc.get('shuttle', None) is None:
-        local_rmdir(osp.join(js.job_id,'products'))
-    else:
+    if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-    make_clean_dir(js.pp_dir)
+    if not js.restart:
+        already_sent_files = []
+        make_clean_dir(js.pp_dir)
+    else:
+        already_sent_files = [x for x in os.listdir(js.pp_dir) if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
     prod_name = 'wfc-' + js.grid_code
     pp = Postprocessor(js.pp_dir, prod_name)
     if 'tslist' in js.keys() and js.tslist is not None:
@@ -874,7 +879,7 @@ def process_output(job_id):
         ts = None
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
-    tif_proc = js.get('tif_proc', False)
+    tif_proc = js.postproc.get('tif_proc', False)
 
     if js.postproc.get('from', None) == 'wrfout':
         logging.info('Postprocessing all wrfout files.')
@@ -1083,17 +1088,19 @@ def process_sat_output(job_id):
     js.old_pid = js.pid
     js.pid = os.getpid()
     js.state = 'Processing'
+    js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
     pp = None
-    already_sent_files = []
-    if js.postproc.get('shuttle', None) is None:
-        local_rmdir(osp.join(js.job_id,'products'))
-    else:
+    if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
     js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
-    make_clean_dir(js.pp_dir)
+    if not js.restart:
+        already_sent_files = []
+        make_clean_dir(js.pp_dir)
+    else:
+        already_sent_files = [x for x in os.listdir(js.pp_dir) if not x.endswith('json')]
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
     js.manifest_filename= 'wfc-' + js.grid_code + '.json'
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
@@ -1161,9 +1168,18 @@ def verify_inputs(args,sys_cfg):
                    % (key, sys_cfg[key], args[key]))
                raise ValueError('System configuration values may not be overwritten.')
 
-
     # we don't check if job_id is a valid path
-    required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
+    if 'sat_only' in args and args['sat_only']:
+        required_files = [('sys_install_path', 'Non-existent system installation directory %s')]
+        optional_files = []
+    elif 'ungrib_only' in args and args['ungrib_only']:
+        required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
+                      ('workspace_path', 'Non-existent workspace directory %s'),
+                      ('wps_install_path', 'Non-existent WPS installation directory %s'),
+                      ('wps_namelist_path', 'Non-existent WPS namelist template %s')]
+        optional_files = []
+    else:
+        required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
                       ('workspace_path', 'Non-existent workspace directory %s'),
                       ('wps_install_path', 'Non-existent WPS installation directory %s'),
                       ('wrf_install_path', 'Non-existent WRF installation directory %s'),
@@ -1171,8 +1187,7 @@ def verify_inputs(args,sys_cfg):
                       ('wrf_namelist_path', 'Non-existent WRF namelist template %s'),
                       ('fire_namelist_path', 'Non-existent fire namelist template %s'),
                       ('wps_geog_path', 'Non-existent geogrid data (WPS-GEOG) path %s')]
-
-    optional_files = [('emissions_namelist_path', 'Non-existent namelist template %s')]
+        optional_files = [('emissions_namelist_path', 'Non-existent namelist template %s')]
 
     # check each path that should exist
     for key, err in required_files:
@@ -1186,14 +1201,15 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
-    if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR','GFSA','GFSF']:
-        raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
+    if 'grib_source' in args:
+        if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR','GFSA','GFSF']:
+            raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
 
     # check for valid satellite source
     if 'satellite_source' in args:
         for sat in args['satellite_source']:
-            if sat not in ['Terra','Aqua','SNPP']:
-                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP' % sat)
+            if sat not in ['Terra','Aqua','SNPP','G16','G17']:
+                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP, G16, G17' % sat)
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
@@ -1256,14 +1272,12 @@ def process_arguments(job_args,sys_cfg):
             for sat in sats:
                 for prod in _sat_prods:
                     satprod = sat.upper()+prod
-                    if not satprod in args['postproc'][str(args['max_dom_pp'])]:
-                        args['postproc'][str(args['max_dom_pp'])].append(satprod)
                     args['satprod_satsource'].update({satprod: sat})
 
     # load tokens if etc/tokens.json exists
     try:
         tokens = json.load(open('etc/tokens.json'))
-        args.update(tokens)
+        args.update({'tokens': tokens})
     except:
         logging.warning('Any etc/tokens.json specified, any token is going to be used.')
 

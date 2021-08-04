@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 import numpy as np
 import logging
+from utils import Dict
+from geo.geo_utils import fill_categories
 from six.moves import range
 
 def print_stats(varname,v,unit):
@@ -299,4 +301,11 @@ def smoke_to_height_terrain(d,t,level):
       logging.info('integrated smoke to %sm min %s max %s ug/m^2' % (level,np.min(smoke_int),np.max(smoke_int)))
       return smoke_int
       
-
+def transform_goes(d):
+      """
+      Transform GOES mask data into similar to MODIS-VIIRS AF mask
+      :param d: open NetCDF4 dataset
+      """
+      fill = Dict({(150., 151., 152., 153.): 3, (100.): 5, (15., 35.): 7, (14., 34.): 8, (10., 11., 12., 13., 30., 31., 32., 33.): 9})
+      array = d.variables['Mask'][:]
+      return fill_categories(array, fill)

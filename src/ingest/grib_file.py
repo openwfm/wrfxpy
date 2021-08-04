@@ -40,7 +40,18 @@ def grib_messages(path,print_messages=False,max_messages=9999):
             break
     grbf.seek(0)
     return i
-    
+   
+def grib_valid_date(path): 
+    """
+    Look at validDate in a grib file 
+    :param path: path to the file
+    :return: valid date in datetime format
+    """
+    grbf = pygrib.open(path)
+    if grbf.messages:
+        if grbf.message(1).has_key('validDate'):
+            return grbf.message(1).validDate
+    return None
 
 class GribFile(object):
     """
@@ -166,7 +177,7 @@ class GribMessage(object):
 if __name__ == '__main__':
     import sys
     
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 2 or sys.argv[1] not in ['list', 'to_netcdf']:
         print(('usage: %s list <grib_file>' % sys.argv[0]))
         print(('usage: %s to_netcdf <grib_file> <message-name> <netcdf_file>' % sys.argv[0]))
         sys.exit(1)
@@ -174,16 +185,16 @@ if __name__ == '__main__':
     if sys.argv[1] == 'list':
         gf = GribFile(sys.argv[2])
         print('Listing messages in GRIB file')
-        for gm in gf:
+        for gm in gf.grbf:
             print(gm)
         gf.close()
         
     if sys.argv[1] == 'to_netcdf':
         import netCDF4
         gf = GribFile(sys.argv[2])
-        msg_name = sys.argv[3]
+        msg_name = int(sys.argv[3])
         gm = gf[msg_name]
-        vals = list(gm.values())
+        vals = gm.values()
         lats, lons = gm.latlons()
         nc_path = sys.argv[4]
         d = netCDF4.Dataset(nc_path, 'w', format='NETCDF4')

@@ -22,6 +22,22 @@ _var_wisdom = {'NFUEL_CAT' : {
                     'z_dim_name': 'fuel_cat',
                     'halt_on_missing': 'no'}             
     },
+    'NTREE_CAT' : {
+        'units': "tree type",
+        'description': "Existing 200 vegetation type categories",
+        'type': "categorical",
+        'category_range': [0,6],
+        'fill_missing': 0,
+        'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
+        'fill' : 'from_file',
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:nearest_neighbor+average_16pt+search',
+        'subgrid': 'yes',
+        'add_opts': {'dominant_only': 'NTREE_CAT',
+                    'z_dim_name': 'tree_cat',
+                    'halt_on_missing': 'no'}
+    },
     'ZSF' : {
         'units': "meters",
         'description': "National Elevation Dataset 1/3 arcsecond resolution",
@@ -37,13 +53,41 @@ _var_wisdom = {'NFUEL_CAT' : {
                     'df_dy': 'DZDYF',
                     'halt_on_missing': 'no'}
     },
+    'CAN_TOP' : {
+        'units': "meters",
+        'description': "Forest Canopy Height from LANDFIRE",
+        'type': "continuous",
+        'signed': 'yes',
+        'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
+        'bits': 16,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+    },
+    'CAN_BOT' : {
+        'units': "meters",
+        'description': "Forest Canopy Base Height from LANDFIRE",
+        'type': "continuous",
+        'signed': 'yes',
+        'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
+        'bits': 16,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+    },
+    'CAN_COV' : {
+        'units': "1",
+        'description': "Forest Canopy Cover from LANDFIRE (%)",
+        'type': "continuous",
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+    },
     'FMC_GC' : {
         'units': "1",
         'description': "1h, 10h, 100h fuel moisture",
         'type': "continuous",
         'tile_bdr': 0,
         'signed': 'yes',
-        'subgrid': 'yes',
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
     },
     'FMEP' : {
@@ -52,7 +96,6 @@ _var_wisdom = {'NFUEL_CAT' : {
         'type': "continuous",
         'tile_bdr': 0,
         'signed': 'yes',
-        'subgrid': 'yes',
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
     },
     'XLONG' : {

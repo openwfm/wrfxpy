@@ -3,9 +3,9 @@
 #
 
 from __future__ import absolute_import
-from ingest.sat_source import SatSource
+from ingest.sat_source_cmr import SatSourceCMR
 
-class MODIS(SatSource):
+class MODIS(SatSourceCMR):
     """
     MODIS (Moderate Resolution Imaging Spectroradiometer) satellite source.
     """

@@ -59,7 +59,6 @@
         }
     },
     "end_utc": "T+720",
-    "qsys": "kingspeak",
     "grib_source": "NAM",
     "satellite_source": ["Aqua","Terra","SNPP"]
 }

@@ -3,21 +3,22 @@ import numpy as np
 import logging
 from osgeo import osr
 import pyproj
+import os.path as osp
 
 def fill_categories(array,fill,coord=None):
     """
     Replace categorical labels and interpolate missing categories depending on a custom dictionary
     
     :param array: array of a categorical variable
-    :param fill: dictionary with category replacements and missing caregories
+    :param fill: dictionary with category replacements and missing categories
     :param coord: optional, coordinates (x,y)
     :return: array with categories replaced and interpolated missing categories using nearest neighbour
     """
     # replace categories
     for k in fill.keys():
         if fill[k] != 'nearest':
-            logging.info('geo_utils.fill_categories() - replacing categories %s -> %s' % (k,fill[k]))
-            array[array==int(k)]=fill[k]
+            logging.info('geo_utils.fill_categories() - replacing categories %s -> %s' % (int(k),int(fill[k])))
+            array[array==int(k)]=int(fill[k])
     # interpolate missing values
     missing = [k for k in fill.keys() if fill[k] == 'nearest']
     if len(missing):

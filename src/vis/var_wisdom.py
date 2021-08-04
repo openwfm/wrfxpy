@@ -4,7 +4,7 @@ import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
       u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
-      smoke_concentration
+      smoke_concentration, transform_goes
 from six.moves import range
 
 smoke_threshold_int = 10
@@ -12,7 +12,7 @@ smoke_threshold = 1
 smoke_integrated_unit = 'g/m^2'
 smoke_integrated_transparent = 0.01
 smoke_concentration_scale = 300
-smoke_concentration_transparent = 1e-5
+smoke_concentration_transparent = 1e-2
 
 def strip_end(d):
       m,n = d.variables['XLONG'][0,:,:].shape
@@ -150,7 +150,7 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'lognorm',
         'transparent_values' : [-np.inf,10],
-        'scale' : [0, 500],
+        'scale' : [0, 200],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain('SMOKE10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
@@ -410,6 +410,15 @@ _var_wisdom = {
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
+     'WINDSPD1000FT_mph' : {
+        'name' : 'wind speed at 1000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
     'WINDVEC1000FT' : {
         'name' : 'wind speed at 1000ft',
         'components' : [ 'U1000FT', 'V1000FT' ],
@@ -429,6 +438,15 @@ _var_wisdom = {
         'name' : 'wind speed at 4000ft',
         'native_unit' : 'm/s',
         'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
+     'WINDSPD4000FT_mph' : {
+        'name' : 'wind speed at 4000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
         'colormap' : 'jet',
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
@@ -458,6 +476,15 @@ _var_wisdom = {
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
+     'WINDSPD6000FT_mph' : {
+        'name' : 'wind speed at 6000ft',
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
     'WINDVEC6000FT' : {
         'name' : 'wind speed at 6000ft',
         'components' : [ 'U6000FT', 'V6000FT' ],
@@ -477,6 +504,16 @@ _var_wisdom = {
         'name' : 'plume height',
         'native_unit' : 'm',
         'colorbar' : 'm',
+        'colormap' : 'jet',
+        'transparent_values' : [-np.inf, 50],
+        'scale' : [0, 10000],
+        'retrieve_as' : lambda d,t: plume_height(d,t),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
+     'PLUME_HEIGHT_ft' : {
+        'name' : 'plume height',
+        'native_unit' : 'm',
+        'colorbar' : 'ft',
         'colormap' : 'jet',
         'transparent_values' : [-np.inf, 50],
         'scale' : [0, 10000],
@@ -530,7 +567,7 @@ _var_wisdom = {
         'colorbar' : smoke_integrated_unit,
         'colormap' : 'rainbow',
         'transparent_values' : [-np.inf, 0.05],
-        'scale' : [0, 2],
+        'scale' : [0, 1],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
@@ -619,6 +656,15 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: d.variables['T2'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },
+    'T2_F' : {
+        'name' : 'temperature at 2m',
+        'native_unit' : 'K',
+        'colorbar' : 'F',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d.variables['T2'][t,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
+      },
     'FIRE_AREA' : {
         'name' : 'fire area',
         'native_unit' : '-',
@@ -678,7 +724,7 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
      'WINDSPD' : {
-        'name' : 'wind speed',
+        'name' : 'wind speed at 10m',
         'native_unit' : 'm/s',
         'colorbar' : 'm/s',
         'colormap' : 'jet',
@@ -686,8 +732,17 @@ _var_wisdom = {
         'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
+     'WINDSPD_mph' : {
+        'name' : 'wind speed at 10m',
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
     'WINDVEC' : {
-        'name' : 'wind speed',
+        'name' : 'wind speed at 10m',
         'components' : [ 'U10', 'V10' ],
         'native_unit' : 'm/s',
         'scale' : 'original',
@@ -773,6 +828,26 @@ _var_wisdom = {
        'retrieve_as' : lambda d,t: d.variables['FMC_EQUI'][t,0,:,:],
        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
+    'RAIN' : {
+       'name' : 'accumulated precipitation',
+       'native_unit' : 'mm',
+       'colorbar' : 'mm',
+       'colormap' : 'jet_r',
+       'scale' : 'original',
+       'transparent_values' : [-np.inf, 1],
+       'retrieve_as' : lambda d,t: d.variables['RAINNC'][t,:,:],
+       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'SNOWH' : {
+       'name' : 'snow depth',
+       'native_unit' : 'm',
+       'transparent_values' : [-np.inf, 0.01],
+       'colorbar' : 'mm',
+       'colormap' : 'tab20b_r',
+       'scale' : 'original',
+       'retrieve_as' : lambda d,t: d.variables['SNOWH'][t,:,:],
+       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
     'TERRA_AF' : {
        'name' : 'MODIS Terra Active Fires satellite data',
        'source' : 'Terra',
@@ -806,6 +881,28 @@ _var_wisdom = {
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
         'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
     },
+    'G16_AF' : {
+        'name' : 'GOES16 ABI Fire Detections satellite data',
+        'source' : 'G16',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
+    'G17_AF' : {
+        'name' : 'GOES17 ABI Fire Detections satellite data',
+        'source' : 'G17',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
     'TERRA_NF' : {
        'name' : 'MODIS Terra No Fire Detections satellite data',
        'source' : 'Terra',
@@ -838,6 +935,38 @@ _var_wisdom = {
         'options' : _discrete_wisdom['nofire'],
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
         'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'G16_NF' : {
+        'name' : 'GOES16 ABI No Fire Detections satellite data',
+        'source' : 'G16',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
+    'G17_NF' : {
+        'name' : 'GOES17 ABI No Fire Detections satellite data',
+        'source' : 'G17',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
+    'TERRA_AF_T' : {
+       'name' : 'MODIS Terra Temporal Active Fires satellite data',
+       'source' : 'Terra',
+       'native_unit' : '-',
+       'colorbar' : '-',
+       'colormap' : 'jet',
+       'scale' : 'original',
+       'retrieve_as' : lambda d : d.select('fire mask').get(),
+       'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
     }
 }
 
@@ -850,9 +979,10 @@ _units_wisdom = {
     ('K',   'C') : lambda x: x - 273.15,
     ('K',   'F') : lambda x: 9.0 / 5.0 * (x - 273.15) + 32,
     ('m/s', 'ft/s') : lambda x: 3.2808399 * x,
+    ('m/s', 'mph') : lambda x: 2.236936292 * x,
     ('m',   'ft') : lambda x: 3.2808399 * x,
     ('km',   'miles') : lambda x: 0.621371 * x,
-    ('miles', 'km') : lambda x: 1.60934 * x,
+    ('miles', 'km') : lambda x: 1.609344 * x,
     ('ft/s','m/s') : lambda x: x / 3.2808399,
     ('ft',  'm') : lambda x: x / 3.2808399,
     ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x,
