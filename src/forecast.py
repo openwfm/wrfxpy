@@ -467,7 +467,7 @@ def vars_add_to_geogrid(js):
             geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
         else:
             logging.critical('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
-            raise OSError('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
+            raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     for var,tif_file in six.iteritems(geo_vars):
@@ -479,7 +479,7 @@ def vars_add_to_geogrid(js):
             if var in ['NFUEL_CAT', 'ZSF']:
                 logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
                 logging.error('Exception: %s',e)
-                raise OSError('Failed to process GeoTIFF file for variable {}'.format(var))
+                raise Exception('Failed to process GeoTIFF file for variable {}'.format(var))
             else:
                 logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
                 logging.warning('Exception: %s',e)
@@ -516,7 +516,7 @@ def fmda_add_to_geogrid(js):
         logging.info('Loaded fmda geogrid index at %s' % index_path)
     except:
         logging.error('Cannot open %s' % index_path)
-        sys.exit(1)
+        raise Exception('Failed opening index file {}'.format(index_path))
     geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
     logging.info('fmda_add_to_geogrid reading longitudes and latitudes from NetCDF file %s' % geo_path )
     with nc4.Dataset(geo_path,'r') as d:
@@ -529,19 +529,7 @@ def fmda_add_to_geogrid(js):
     i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)  
     if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
         logging.error('fmda_add_to_geogrid: WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
-        sys.exit(1)
-    """
-    for varname,varindex in index.iteritems():
-        # update index 
-        varindex['known_y']=float(i)
-        varindex['known_x']=float(j)
-        varindex['known_lat']=lats[i-1,j-1]
-        varindex['known_lon']=lons[i-1,j-1]
-        logging.info('fmda_add_to_geogrid: updating index known_x=%s known_y=%s known_lat=%s known_lon=%s' % 
-           (varindex['known_x'],varindex['known_y'],varindex['known_lat'],varindex['known_lon']))
-        varindex_path=osp.join(fmda_geogrid_path,varname,'index')
-        write_table(varindex_path,varindex)
-    """
+        raise OSError('{} is not correct geolocated compared to WRF domain'.format(fmda_geogrid_path))
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)

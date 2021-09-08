@@ -104,7 +104,7 @@ def clamp2mesh(nc_path,x,y):
         print('> interpolating xlong to fxlong and xlat to fxlat...')
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
     else:
-        print('Error: %s NetCDF file specifiedc has not coordinates specified' % nc_path)
+        print('Error: %s NetCDF file specific has not coordinates specified' % nc_path)
         sys.exit(1)
 
     idx = nearest_idx(lons,lats,x,y)
