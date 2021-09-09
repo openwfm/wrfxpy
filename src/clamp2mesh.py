@@ -139,7 +139,11 @@ def clamp2mesh(nc_path,x,y):
         logging.info('> interpolating xlong to fxlong and xlat to fxlat...')
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
     else:
+<<<<<<< HEAD
         logging.error('%s NetCDF file has not coordinates specified' % nc_path)
+=======
+        print('Error: %s NetCDF file specific has not coordinates specified' % nc_path)
+>>>>>>> refs/remotes/origin/angel
         sys.exit(1)
 
     idx = nearest_idx(lons,lats,x,y)

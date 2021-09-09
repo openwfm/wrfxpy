@@ -110,6 +110,15 @@ _discrete_wisdom = {
 }
 
 _var_wisdom = {
+     'PBLH': {
+        'name' : 'PBL height',
+        'native_unit': 'm',
+        'colorbar' : 'm',
+        'colormap' : 'rainbow',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d['PBLH'][t,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+     },
      'CLOUDTO700HPA' : {
         'name' : 'Cloud up to 700hPa',
         'native_unit' : 'kg/m^2',
