@@ -35,6 +35,7 @@ from geo.geodriver import GeoDriver
 from vis.postprocessor import Postprocessor
 from vis.timeseries import Timeseries
 from vis.var_wisdom import get_wisdom_variables,_sat_prods
+from clamp2mesh import fill_subgrid
 
 from ingest.NAM218 import NAM218
 from ingest.HRRR import HRRR
@@ -773,7 +774,10 @@ def execute(args,job_args):
     except Exception as e:
         logging.error('Real step failed with exception %s, retrying ...' % str(e))
         Real(js.wrf_dir).execute().check_output()
-
+    # write subgrid coordinates in input files
+    subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio')) > 0).all()]
+    for in_path in subgrid_wrfinput_files:
+    	fill_subgrid(osp.join(js.wrf_dir, in_path))
 
     logging.info('step 7b: if requested, do fuel moisture DA')
     logging.info('fmda = %s' % js.fmda)

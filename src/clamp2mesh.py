@@ -10,6 +10,7 @@ import os.path as osp
 import os
 import netCDF4 as nc4
 import numpy as np
+import logging
 
 def nearest_idx(lons,lats,x,y):
     flons = lons.flatten()
@@ -68,6 +69,40 @@ def interpolate_coords(lons,lats,srx,sry):
 
     return lonsr,latsr
 
+def fill_subgrid(nc_path):
+    """
+    Fill netCDF file with refined coordinates, if necessary
+    :param nc_path: netcdf file with WRF coordinate arrays
+    """
+    d = nc4.Dataset(nc_path,'a')
+    varis = d.variables
+
+    if 'FXLONG' in varis and 'FXLAT' in varis and array_filled(d.variables['FXLONG']) and array_filled(d.variables['FXLAT']):
+        logging.info('subgrid coordinates already defined')
+        return
+    else:
+        logging.info('filling subgrid coordinates in netCDF file...')
+        attrs = d.ncattrs()
+        if 'sr_x' in attrs and 'sr_y' in attrs:
+            srx = d.getncattr('sr_x')
+            sry = d.getncattr('sr_y')
+        else:
+            srx = int(d.dimensions['west_east_subgrid'].size/(d.dimensions['west_east'].size+1))
+            sry = int(d.dimensions['south_north_subgrid'].size/(d.dimensions['south_north'].size+1))
+        if 'XLONG_M' in varis and 'XLAT_M' in varis:
+            lons_atm = np.array(d.variables['XLONG_M'][0])
+            lats_atm = np.array(d.variables['XLAT_M'][0])
+        elif 'XLONG' in varis and 'XLAT' in varis:
+            lons_atm = np.array(d.variables['XLONG'][0])
+            lats_atm = np.array(d.variables['XLAT'][0])
+        else:
+            logging.warning('atmospheric coordinates not found, skipping')
+            return
+        lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
+    d['FXLONG'][:] = lons
+    d['FXLAT'][:] = lats
+    return
+
 def clamp2mesh(nc_path,x,y):
     """
     Return the closes node on the fire mesh
@@ -88,23 +123,23 @@ def clamp2mesh(nc_path,x,y):
         sry = int(d.dimensions['south_north_subgrid'].size/(d.dimensions['south_north'].size+1))
 
     if 'FXLONG' in varis and 'FXLAT' in varis and array_filled(d.variables['FXLONG']) and array_filled(d.variables['FXLAT']):
-        print('> fxlong and fxlat exist')
+        logging.info('> fxlong and fxlat exist')
         lons = np.array(d.variables['FXLONG'][0])
         lats = np.array(d.variables['FXLAT'][0])
     elif 'XLONG_M' in varis and 'XLAT_M' in varis:
-        print('> fxlong and fxlat does not exist')
+        logging.info('> fxlong and fxlat does not exist')
         lons_atm = np.array(d.variables['XLONG_M'][0])
         lats_atm = np.array(d.variables['XLAT_M'][0])
-        print('> interpolating xlong_m to fxlong and xlat_m to fxlat...')
+        logging.info('> interpolating xlong_m to fxlong and xlat_m to fxlat...')
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
     elif 'XLONG' in varis and 'XLAT' in varis:
-        print('> fxlong and fxlat does not exist')
+        logging.info('> fxlong and fxlat does not exist')
         lons_atm = np.array(d.variables['XLONG'][0])
         lats_atm = np.array(d.variables['XLAT'][0])
-        print('> interpolating xlong to fxlong and xlat to fxlat...')
+        logging.info('> interpolating xlong to fxlong and xlat to fxlat...')
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
     else:
-        print('Error: %s NetCDF file specifiedc has not coordinates specified' % nc_path)
+        logging.error('%s NetCDF file has not coordinates specified' % nc_path)
         sys.exit(1)
 
     idx = nearest_idx(lons,lats,x,y)
@@ -112,9 +147,9 @@ def clamp2mesh(nc_path,x,y):
     
 
 if __name__ == '__main__':
-
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     # process arguments
     self, path, x, y  = sys.argv
     nlon, nlat =  clamp2mesh(path,float(x),float(y))
-    print('%f %f\n' % (nlon, nlat))
+    logging.info('%f %f\n' % (nlon, nlat))
 
