@@ -99,8 +99,9 @@ def fill_subgrid(nc_path):
             logging.warning('atmospheric coordinates not found, skipping')
             return
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
-    d['FXLONG'][:] = lons
-    d['FXLAT'][:] = lats
+    d['FXLONG'][:] = lons[np.newaxis,:,:]
+    d['FXLAT'][:] = lats[np.newaxis,:,:]
+    d.close()
     return
 
 def clamp2mesh(nc_path,x,y):
@@ -139,11 +140,7 @@ def clamp2mesh(nc_path,x,y):
         logging.info('> interpolating xlong to fxlong and xlat to fxlat...')
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
     else:
-<<<<<<< HEAD
         logging.error('%s NetCDF file has not coordinates specified' % nc_path)
-=======
-        print('Error: %s NetCDF file specific has not coordinates specified' % nc_path)
->>>>>>> refs/remotes/origin/angel
         sys.exit(1)
 
     idx = nearest_idx(lons,lats,x,y)
