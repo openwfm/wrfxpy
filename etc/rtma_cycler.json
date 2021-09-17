@@ -29,6 +29,10 @@
        "Northern CA GACC" : {
          "code" : "ONCC",
          "bbox" : [37, -124, 42, -119.5]
+       },
+       "California" : {
+         "code" : "CALI",
+         "bbox" : [32, -123, 42.5, -112]
        }
     }
 }
