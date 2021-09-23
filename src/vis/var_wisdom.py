@@ -92,7 +92,7 @@ def is_windvec(name):
        return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC']
 
 def is_fire_var(name):
-       return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FIRE_HFX','F_ROS','F_INT','NFUEL_CAT','ZSF','FMC_G']
+       return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FLINEINT_btupftps','FIRE_HFX','F_ROS','F_ROS_chsph','F_INT','NFUEL_CAT','ZSF','FMC_G']
 
 _discrete_wisdom = {
     'all' : {'values': (3,5,7,8,9),
@@ -694,6 +694,15 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: np.ma.filled(np.ma.log10(np.ma.masked_less_equal(d.variables['FLINEINT'][t,:,:], 0)), 0),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
       },
+     'FLINEINT_btupftps' : {
+         'name' : 'fireline intensity',
+         'native_unit' : 'W/m',
+         'colorbar' : 'BTU/ft/s',
+         'colormap' : 'jet',
+         'scale' : 'original',
+         'retrieve_as' : lambda d,t: d.variables['FLINEINT'][t,:,:],
+         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+       },
      'RH_FIRE' : {
         'name' : 'relative humidity',
         'native_unit' : '-',
@@ -723,6 +732,15 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: d.variables['F_ROS'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
       },
+     'F_ROS_chsph' : {
+         'name' : 'fire spread rate',
+         'native_unit' : 'm/s',
+         'colorbar' : 'chains/h',
+         'colormap' : 'jet',
+         'scale' : [0.0, 1000.0],
+         'retrieve_as' : lambda d,t: d.variables['F_ROS'][t,:,:],
+         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+       },
     'PSFC' : {
         'name' : 'surface pressure',
         'native_unit' : 'Pa',
@@ -989,13 +1007,15 @@ _units_wisdom = {
     ('K',   'F') : lambda x: 9.0 / 5.0 * (x - 273.15) + 32,
     ('m/s', 'ft/s') : lambda x: 3.2808399 * x,
     ('m/s', 'mph') : lambda x: 2.236936292 * x,
+    ('m/s', 'chains/h') : lambda x: 178.95492 * x,
     ('m',   'ft') : lambda x: 3.2808399 * x,
     ('km',   'miles') : lambda x: 0.621371 * x,
     ('miles', 'km') : lambda x: 1.609344 * x,
     ('ft/s','m/s') : lambda x: x / 3.2808399,
     ('ft',  'm') : lambda x: x / 3.2808399,
     ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x,
-    ('ug/m^3', 'g/m^3') : lambda x: 1e-6 * x
+    ('ug/m^3', 'g/m^3') : lambda x: 1e-6 * x,
+    ('W/m', 'BTU/ft/s') : lambda x: 0.0002888946124 * x
 }
 
 def get_wisdom(var_name):

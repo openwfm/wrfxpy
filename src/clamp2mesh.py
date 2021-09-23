@@ -23,31 +23,68 @@ def nearest_idx(lons,lats,x,y):
 def array_filled(array):
     return bool(np.array(array).sum())
 
-def interpolate_coords(lons,lats,srx,sry):
+def interpolate_coords(lons,lats,srx,sry,extrap=True):
     """
     Return the closes node on the mesh 
     :param lons,lats: longitude and latitude coordinate arrays for the coarse grid
     :param srx,sry: refinement
+    :param extrap: extrapolation
     :return lonsr,latsr: longitude and latitude coordinate arrays for the refinement grid
     """
-    # compute mesh ratios
-    rx = 1./srx
-    ry = 1./sry
+    def continue_at_boundary(lons,lats):
+        # extrapolation, max quarded
+        def EX(a,b,bias=0.):
+            a = np.array(a)
+            b = np.array(b)
+            return np.squeeze((1.-bias)*(2.*a-b)+bias*np.max(np.c_[2.*a-b,a,b],axis=1))
+        # continue at boundary
+        clons = np.zeros(np.array(lons.shape)+2)
+        clats = np.zeros(np.array(lats.shape)+2)
+        clons[1:-1,1:-1] = lons
+        clats[1:-1,1:-1] = lats
+        clons[0,1:-1] = EX(lons[0],lons[1])
+        clats[0,1:-1] = EX(lats[0],lats[1])
+        clons[-1,1:-1] = EX(lons[-1],lons[-2])
+        clats[-1,1:-1] = EX(lats[-1],lats[-2])
+        clons[1:-1,0] = EX(lons[:,0],lons[:,1])
+        clats[1:-1,0] = EX(lats[:,0],lats[:,1])
+        clons[1:-1,-1] = EX(lons[:,-1],lons[:,-2])
+        clats[1:-1,-1] = EX(lats[:,-1],lats[:,-2])
+        clons[0,0] = EX(lons[0,0],lons[1,1])
+        clats[0,0] = EX(lats[0,0],lats[1,1])
+        clons[0,-1] = EX(lons[0,-1],lons[1,-2])
+        clats[0,-1] = EX(lats[0,-1],lats[1,-2])
+        clons[-1,0] = EX(lons[-1,0],lons[-2,1])
+        clats[-1,0] = EX(lats[-1,0],lats[-2,1])
+        clons[-1,-1] = EX(lons[-1,-1],lons[-2,-2])
+        clats[-1,-1] = EX(lats[-1,-1],lats[-2,-2])
+        return clons,clats
+
+    # apply extrapolation if requiered
+    if extrap:
+        # continue at boundary for atmospheric mesh (extrapolation)
+        lons,lats = continue_at_boundary(lons,lats)
     # coarse sizes 
     nyc,nxc = lons.shape 
     # refined sizes
     nyr,nxr = (nyc+1)*sry,(nxc+1)*srx
+    # initialize refined grid
+    lonsr = np.zeros((nyr,nxr))
+    latsr = np.zeros((nyr,nxr))
     # real index of fire mesh of first atmosphere point
     i0 = (srx-1)*.5
     j0 = (sry-1)*.5
     # first fire index
     i0f = int(np.ceil(i0))
     j0f = int(np.ceil(j0))
-    # initialize refined grid
-    lonsr = np.zeros((nyr,nxr))
-    latsr = np.zeros((nyr,nxr))
+    # last fire index
+    i1f = nxr-2*srx
+    j1f = nyr-2*sry
+    # compute mesh ratios
+    rx = 1./srx
+    ry = 1./sry
     # create bilinear coefficients
-    tx,ty = np.meshgrid(np.arange(i0f-i0,srx,1)*rx,np.arange(j0f-j0,sry,1)*ry)
+    tx,ty = np.meshgrid(np.arange(.5,srx,1)*rx,np.arange(.5,sry,1)*ry)
     t0 = np.multiply((1-tx),(1-ty))
     t1 = np.multiply((1-tx),ty)
     t2 = np.multiply(tx,(1-ty))
@@ -64,10 +101,13 @@ def interpolate_coords(lons,lats,srx,sry):
     # loop over refined position
     for y in range(t0.shape[0]):
         for x in range(t0.shape[1]):
-            lonsr[j0f+y:nyr-2*sry+y:sry,i0f+x:nxr-2*srx+x:srx] = t0[y,x]*lon0+t1[y,x]*lon1+t2[y,x]*lon2+t3[y,x]*lon3
-            latsr[j0f+y:nyr-2*sry+y:sry,i0f+x:nxr-2*srx+x:srx] = t0[y,x]*lat0+t1[y,x]*lat1+t2[y,x]*lat2+t3[y,x]*lat3
+            lonsr[j0f+y:j1f+y:sry,i0f+x:i1f+x:srx] = t0[y,x]*lon0+t1[y,x]*lon1+t2[y,x]*lon2+t3[y,x]*lon3
+            latsr[j0f+y:j1f+y:sry,i0f+x:j1f+x:srx] = t0[y,x]*lat0+t1[y,x]*lat1+t2[y,x]*lat2+t3[y,x]*lat3
 
-    return lonsr,latsr
+    if extrap:
+        return lonsr[sry:-sry,srx:-srx],latsr[sry:-sry,srx:-srx]
+    else:
+        return lonsr,latsr
 
 def fill_subgrid(nc_path):
     """
