@@ -942,14 +942,14 @@ def process_output(job_id):
     js.run_utc = time.ctime(os.path.getmtime(rsl_path))
     js.processed_utc = time.asctime(time.gmtime())
 
-    # step 10: track log output and check for history writes fro WRF
+    # step 10: track log output and check for history writes from WRF
     wait_lines = 0
     wait_wrfout = 0
     failures = cases = 0
     while True:
         line = wrf_out.readline().strip()
         if not line:
-            if not parallel_job_running(js):
+            if wait_lines > 10 and not parallel_job_running(js):
                 logging.warning('WRF did not run to completion.')
                 break
             if not wait_lines:
