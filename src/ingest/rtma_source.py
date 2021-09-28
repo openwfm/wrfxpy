@@ -32,12 +32,10 @@ import time
 from .grib_file import grib_messages,grib_valid_date
 from six.moves import range
 
-# global parameter
+# global parameters
 min_content_size = 10000
-
-cfg = load_sys_cfg()
-sleep_seconds = cfg.get('sleep_seconds', 20)
-max_retries = cfg.get('max_retries', 3)
+sleep_seconds = 20
+max_retries = 3
 
 
 class RTMA(object):
@@ -58,6 +56,13 @@ class RTMA(object):
         :param var_list: variables to download
         :param ingest_path: path to the ingest directory
         """
+        try:
+            cfg = load_sys_cfg()
+            sleep_seconds = cfg.get('sleep_seconds', 20)
+            max_retries = cfg.get('max_retries', 3)
+        except:
+            logging.info('RTMA cannot load configuration, using defaults')
+
         self.var_list = var_list
         self.ingest_path = ingest_path
         logging.info('Initialized RTMA for ingest path %s variables %s' % (ingest_path,' '.join(var_list)))
