@@ -33,12 +33,20 @@ import json
 
 from utils import ensure_dir, load_sys_cfg, remove
 
-cfg = load_sys_cfg()
-sleep_seconds_def = cfg.get('sleep_seconds', 20)
-max_retries_def = cfg.get('max_retries', 3)
-wget = cfg.get('wget','/usr/bin/wget')
-wget_options=cfg.get('wget_options',["--read-timeout=1"])
-download_sleep_seconds=cfg.get('download_sleep_seconds', 5)
+sleep_seconds_def = 20
+max_retries_def = 3
+wget_options = ["--read-timeout=1"]
+download_sleep_seconds=5
+try:
+    cfg = load_sys_cfg()
+    sleep_seconds_def = cfg.get('sleep_seconds', 20)
+    max_retries_def = cfg.get('max_retries', 3)
+    wget = cfg.get('wget','/usr/bin/wget')
+    wget_options=cfg.get('wget_options',["--read-timeout=1"])
+    download_sleep_seconds=cfg.get('download_sleep_seconds', 5)
+except:
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s') # does nothing if already configured
+    logging.info('downloader cannot read cfg,using defaults')
 
 class DownloadError(Exception):
     """

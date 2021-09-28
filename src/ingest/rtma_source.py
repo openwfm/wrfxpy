@@ -56,6 +56,8 @@ class RTMA(object):
         :param var_list: variables to download
         :param ingest_path: path to the ingest directory
         """
+
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s') # does nothing if already configured
         try:
             cfg = load_sys_cfg()
             sleep_seconds = cfg.get('sleep_seconds', 20)
