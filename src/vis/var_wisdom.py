@@ -92,7 +92,7 @@ def is_windvec(name):
        return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC']
 
 def is_fire_var(name):
-       return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FIRE_HFX','F_ROS','F_INT','NFUEL_CAT','ZSF','FMC_G']
+       return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FLINEINT_btupftps','FIRE_HFX','F_ROS','F_ROS_chsph','F_INT','NFUEL_CAT','ZSF','FMC_G']
 
 _discrete_wisdom = {
     'all' : {'values': (3,5,7,8,9),
