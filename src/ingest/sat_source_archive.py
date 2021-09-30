@@ -8,7 +8,7 @@ import os.path as osp
 import re
 import requests
 import pytz
-from datetime import datetime 
+from datetime import datetime,timedelta
 from utils import Dict, utc_to_utcf
 from ingest.sat_source import SatSource
 
@@ -28,6 +28,7 @@ def parse_filename(file_name):
         end_date = match.group(1)+match.group(3)+'00000' 
         info['start_date'] = datetime.strptime(start_date,tfrmt).replace(tzinfo=pytz.UTC)
         info['end_date'] = datetime.strptime(end_date,tfrmt).replace(tzinfo=pytz.UTC)
+        info['producer_granule_id'] = 'd{:08d}_t{:07d}_e{:07d}_b{:05d}'.format(*map(int,match.groups()))
     return info
 
 def archive_request(url, max_retries=5):
@@ -50,7 +51,8 @@ def archive_request(url, max_retries=5):
                 for aline in content.split('\n'):
                     amatch = re.search(pattern,aline)
                     if amatch:
-                       result.append(osp.basename(amatch.group(1))) 
+                       files.append(osp.basename(amatch.group(1))) 
+                return files
         except Exception as e:
             if tries == max_retries-1:
                 logging.error('error when requesting {}, no more retries left'.format(url))
@@ -71,13 +73,14 @@ def archive_search(archive_paths, time):
        files = archive_request(url) 
        for f in files:
            info = parse_filename(f)
-           if info['start_date'] <= time[1] and info['start_date'] >= time[0]:
-               product_id = 'A{:04d}{:03d}_{:02d}{:02d}'.format(info['start_date'].year,
+           if info['start_date'] <= time[1].replace(tzinfo=pytz.UTC) and info['start_date'] >= time[0].replace(tzinfo=pytz.UTC):
+               product_id = 'A{:04d}{:03d}_{:02d}{:02d}{:02d}'.format(info['start_date'].year,
                                             info['start_date'].timetuple().tm_yday,
                                             info['start_date'].hour,
-                                            info['start_date'].minute)
+                                            info['start_date'].minute,
+                                            info['start_date'].second)
                remote_path = osp.join(url,f)
-               metas.update({'product_id': {'file_name': f, 'file_remote_path': remote_path, 
+               metas.update({product_id: {'file_name': f, 'file_remote_path': remote_path, 
                    'time_start': utc_to_utcf(info['start_date']), 
                    'time_end':  utc_to_utcf(info['end_date']),
                    'updated': datetime.now(), 'url': remote_path, 'product_id': product_id}})
@@ -115,7 +118,7 @@ class SatSourceArchive(SatSource):
         stime,etime = time
         n_complete_days = int((etime.replace(hour=0,minute=0,second=0,microsecond=0)-stime.replace(hour=0,minute=0,second=0,microsecond=0)).days)+1
         complete_days = [(stime + timedelta(days=x)).strftime('%Y/%j/') for x in range(n_complete_days)]
-        archive_paths = [u for day  in complete_days for u in osp.join(self.base_url, sname, day)]
+        archive_paths = [osp.join(self.base_url, sname, day) for day in complete_days]
         metas = archive_search(archive_paths,time)
         return metas
 
@@ -128,12 +131,18 @@ class SatSourceArchive(SatSource):
         :return granules: dictionary with the metadata of all the products
         """
         metas=Dict({})
-        if hasattribute(self,'geo_prefix') and self.geo_prefix is not None:
+        if hasattr(self,'geo_prefix') and self.geo_prefix is not None:
             metas.geo=self.search_api_sat(self.geo_prefix,bounds,time,collection=False)
             metas.fire=self.search_api_sat(self.fire_prefix,bounds,time,collection=False)
-        if hasattribute(self,'geo_nrt_prefix') and self.geo_nrt_prefix is not None:
+        else:
+            metas.geo={}
+            metas.fire={}
+        if hasattr(self,'geo_nrt_prefix') and self.geo_nrt_prefix is not None:
             metas.geo_nrt=self.search_api_sat(self.geo_nrt_prefix,bounds,time,collection=True)
             metas.fire_nrt=self.search_api_sat(self.fire_nrt_prefix,bounds,time,collection=True)
+        else:
+            metas.geo_nrt={}
+            metas.fire_nrt={}
         return metas
 
     def group_metas(self, metas):
@@ -143,33 +152,25 @@ class SatSourceArchive(SatSource):
         :param metas: satellite metadatas from API search
         :return result: groupped and cleanned metadata dictionary
         """
-        g_id = lambda m: '_'.join(m['producer_granule_id'].split('.')[1:3])
         gmetas = Dict({})
         gmetas.geo = Dict({})
         gmetas.fire = Dict({})
-        for m in metas['geo']:
-            m.update({'archive_url': self.archive_url(m,osp.join(self.geo_col,self.geo_prefix))})
-            gmetas.geo.update({g_id(m): m})
+        for k,m in metas['geo'].items():
+            gmetas.geo.update({k: m})
         # add fire metas, if geo available
-        for m in metas['fire']:
-            k = g_id(m)
+        for k,m in metas['fire'].items():
             if k in gmetas.geo.keys():
-                m.update({'archive_url': self.archive_url(m,osp.join(self.fire_col,self.fire_prefix))})
                 gmetas.fire.update({k: m})
             else:
                 logging.warning('group_metas - geolocation meta not found for id {}, eliminating fire meta'.format(k))
         # add geolocation NRT metas, if necessary
-        for m in metas['geo_nrt']:
-            k = g_id(m)
+        for k,m in metas['geo_nrt'].items():
             if k not in gmetas.geo.keys():
-                m.update({'archive_url': self.archive_url(m,osp.join(self.geo_nrt_col,self.geo_nrt_prefix),True)})
                 gmetas.geo.update({k: m})
         # add fire NRT metas, if necessary
-        for m in metas['fire_nrt']:
-            k = g_id(m)
+        for k,m in metas['fire_nrt'].items():
             if k not in gmetas.fire.keys():
                 if k in gmetas.geo.keys():
-                    m.update({'archive_url': self.archive_url(m,osp.join(self.fire_nrt_col,self.fire_nrt_prefix),True)})
                     gmetas.fire.update({k: m})
                 else:
                     logging.warning('group_metas - geolocation not found for id {}'.format(k))
@@ -197,12 +198,12 @@ class SatSourceArchive(SatSource):
             if g_id in metas['fire'].keys():
                 fire_meta = metas['fire'][g_id]
                 logging.info('retrieve_metas - downloading product id {}'.format(g_id))
-                urls = [geo_meta['links'][0]['href'],geo_meta.get('archive_url')]
-                m_geo = self.download_sat(urls,self.datacenter_to_token(geo_meta['data_center']))
+                urls = [geo_meta['url']]
+                m_geo = self.download_sat(urls)
                 if m_geo:
                     geo_meta.update(m_geo)
-                    urls = [fire_meta['links'][0]['href'],fire_meta.get('archive_url')]
-                    m_fire = self.download_sat(urls,self.datacenter_to_token(fire_meta['data_center']))
+                    urls = [fire_meta['url']]
+                    m_fire = self.download_sat(urls)
                     if m_fire:
                         fire_meta.update(m_fire)
                         manifest.update({g_id: {
@@ -210,10 +211,8 @@ class SatSourceArchive(SatSource):
                             'time_end_iso' : geo_meta['time_end'],
                             'geo_url' : geo_meta['url'],
                             'geo_local_path' : geo_meta['local_path'],
-                            'geo_description' : geo_meta['dataset_id'],
                             'fire_url' : fire_meta['url'],
-                            'fire_local_path' : fire_meta['local_path'],
-                            'fire_description' : fire_meta['dataset_id']
+                            'fire_local_path' : fire_meta['local_path']
                         }})
         return manifest
 
