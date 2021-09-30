@@ -32,17 +32,17 @@ class SNPPLL(VIIRSLL):
     fire_nrt_prefix='VNP14IMG_NRT'
     platform='S-NPP'
 
-class VJ01LL(VIIRSLL):
+class J01LL(VIIRSLL):
     """
     J01 VIIRS (Visible Infrared Imaging Radiometer Suite) Low Latency satellite source.
     """
 
     def __init__(self, arg):
-        super(VJ01LL, self).__init__(arg)
+        super(J01LL, self).__init__(arg)
 
     # instance variables
     base_url='http://52.200.226.137/archive/allData/5200'
-    id='VJ01LL'
+    id='J01LL'
     info_url='https://www.nasa.gov/mission_pages/NPP/mission_overview/index.html'
     info='J01 Visible Infrared Imaging Radiometer Suite (VIIRS) Low Latency'
     prefix='VJ1LL'
