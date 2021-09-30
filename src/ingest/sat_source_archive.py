@@ -128,10 +128,10 @@ class SatSourceArchive(SatSource):
         :return granules: dictionary with the metadata of all the products
         """
         metas=Dict({})
-        if 'geo_prefix' in self:
+        if hasattribute(self,'geo_prefix') and self.geo_prefix is not None:
             metas.geo=self.search_api_sat(self.geo_prefix,bounds,time,collection=False)
             metas.fire=self.search_api_sat(self.fire_prefix,bounds,time,collection=False)
-        if 'geo_nrt_prefix' in self:
+        if hasattribute(self,'geo_nrt_prefix') and self.geo_nrt_prefix is not None:
             metas.geo_nrt=self.search_api_sat(self.geo_nrt_prefix,bounds,time,collection=True)
             metas.fire_nrt=self.search_api_sat(self.fire_nrt_prefix,bounds,time,collection=True)
         return metas
