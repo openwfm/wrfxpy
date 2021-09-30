@@ -238,6 +238,6 @@ class SatSourceArchive(SatSource):
         pass
 
     # instance variables
-    base_url='https://ladsweb.modaps.eosdis.nasa.gov/archive/allData'
-    base_url_nrt='https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/allData'
+    base_url=None
+    base_url_nrt=None
 
