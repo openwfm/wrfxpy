@@ -46,7 +46,7 @@ try:
     download_sleep_seconds=cfg.get('download_sleep_seconds', 5)
 except:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s') # does nothing if already configured
-    logging.info('downloader cannot read cfg,using defaults')
+    logging.error('downloader cannot read configuration, using defaults')
 
 class DownloadError(Exception):
     """
