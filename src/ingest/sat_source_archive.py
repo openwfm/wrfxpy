@@ -28,6 +28,7 @@ def parse_filename(file_name):
         end_date = match.group(1)+match.group(3)+'00000' 
         info['start_date'] = datetime.strptime(start_date,tfrmt).replace(tzinfo=pytz.UTC)
         info['end_date'] = datetime.strptime(end_date,tfrmt).replace(tzinfo=pytz.UTC)
+        info['orbit_number'] = match.group(4)
         info['producer_granule_id'] = 'd{:08d}_t{:07d}_e{:07d}_b{:05d}'.format(*map(int,match.groups()))
     return info
 
@@ -83,7 +84,8 @@ def archive_search(archive_paths, time):
                metas.update({product_id: {'file_name': f, 'file_remote_path': remote_path, 
                    'time_start': utc_to_utcf(info['start_date']), 
                    'time_end':  utc_to_utcf(info['end_date']),
-                   'updated': datetime.now(), 'url': remote_path, 'product_id': product_id}})
+                   'updated': datetime.now(), 'orbit_number': info['orbit_number'],
+                   'url': remote_path, 'product_id': product_id}})
 
     return metas
 
