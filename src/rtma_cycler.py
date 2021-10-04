@@ -502,6 +502,8 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     rain[rain < 0.01] = 0
     # remove bogus rain that is too large 
     rain[rain > 1e10] = 0
+    # remove masked rain values
+    rain[rain.mask] = 0
 
     dom_shape = T2.shape
 
