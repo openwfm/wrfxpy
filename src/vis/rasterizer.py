@@ -36,7 +36,7 @@ except ImportError:
     # python 3
     from io import BytesIO as StringIO
 
-def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proportional',ticks=None,norm=None):
+def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proportional',ticks=None,norm=None,ticklabels=None):
     """
     Create a colorbar to accompany a raseter image.
 
@@ -74,6 +74,11 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proport
     # construct the colorbar and modify properties
     cb = mpl.colorbar.ColorbarBase(ax,**kwargs)
     cb.set_label(cb_label,color='0',fontsize=8,labelpad=-40)
+    if ticklabels:
+        cb.set_ticklabels(ticklabels)
+        levels = ticklabels        
+    else:
+        levels = cb.get_ticks().tolist()
 
     # move ticks to left side
     ax.yaxis.set_ticks_position('left')
@@ -86,7 +91,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proport
     fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
     plt.close()
 
-    return str_io.getvalue(),cb.get_ticks().tolist()
+    return str_io.getvalue(),levels
 
 
 def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=200):

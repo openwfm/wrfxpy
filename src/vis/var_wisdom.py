@@ -615,8 +615,8 @@ _var_wisdom = {
         'colorbar' : 'ug/m^3',
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
-        'bounds' : [0,100,300,500],
-        'colors' : np.array([(107,170,213),(249,201,80),(188,28,32),(147,32,205)])/255.,
+        'bounds' : [0,12,35,55,150,210],
+        'colors' : np.array([(114,190,75),(249,201,80),(245,137,56),(217,45,43),(156,22,27),(147,32,205)])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf, smoke_concentration_transparent],
         'scale' : [0,800],
@@ -706,8 +706,15 @@ _var_wisdom = {
      'RH_FIRE' : {
         'name' : 'relative humidity',
         'native_unit' : '-',
-        'colorbar' : '-',
+        'colorbar' : '%',
         'colormap' : 'viridis_r',
+        'norm_opt' : 'boundary',
+        'bounds' : [0,.02,.05,.1,.2,.3,.4,.5,.6,.7,.8],
+        'colors' : np.array([(156,22,27),(188,28,32),(217,45,43),
+       			     (234,84,43),(245,137,56),(249,201,80),
+			     (210,244,254),(197,234,252),(148,210,240),
+			     (107,170,213),(72,149,176)])/255.,
+        'spacing' : 'uniform',
         'transparent_values' : [70, np.inf],
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['RH_FIRE'][t,:,:],
@@ -804,7 +811,7 @@ _var_wisdom = {
     'ZSF' : {
        'name' : 'terrain height',
        'native_unit' : 'm',
-       'colorbar' : 'm',
+       'colorbar' : 'ft',
        'colormap' : 'terrain',
        'scale' : 'original',
        'retrieve_as' : lambda d,t: d.variables['ZSF'][t,:,:],
@@ -831,9 +838,16 @@ _var_wisdom = {
     '10HR_FM' : {
        'name' : '10-HR fuel moisture',
        'native_unit' : '-',
-       'colorbar' : '-',
+       'colorbar' : '%',
        'colormap' : 'jet_r',
-       'scale' : [0.0, 0.5],
+       'norm_opt' : 'boundary',
+       'bounds' : [0,.02,.04,.06,.08,.1,.12,.15,.2,.25,.3],
+       'colors' : np.array([(156,22,27),(188,28,32),(217,45,43),
+                            (234,84,43),(245,137,56),(249,201,80),
+           		    (215,225,95),(203,217,88),(114,190,75),
+			    (74,167,113),(60,150,120)])/255.,
+       'spacing' : 'uniform',
+       'scale' : [0.0, 0.3],
        'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,1,:,:],
        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
@@ -1003,6 +1017,7 @@ _sat_prods = ['_AF','_NF']
 # it's a dictionary with keys in the form (from_unit, to_unit) and the value is a lambda
 # that maps the value from <from_unit> to <to_unit>.
 _units_wisdom = {
+    ('-',   '%') : lambda x: int(x*100),
     ('K',   'C') : lambda x: x - 273.15,
     ('K',   'F') : lambda x: 9.0 / 5.0 * (x - 273.15) + 32,
     ('m/s', 'ft/s') : lambda x: 3.2808399 * x,

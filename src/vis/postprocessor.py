@@ -314,6 +314,11 @@ class Postprocessor(object):
                 norm = lambda xmin,xmax: mpl.colors.SymLogNorm(linthresh=linthresh,linscale=linscale,vmin=xmin,vmax=xmax,base=10) 
             elif norm_opt == 'boundary':
                 bounds = wisdom.get('bounds',[0,1,2,4,6,8,12,16,20,25,30,40,60,100,200])
+                if wisdom['colorbar'] is not None:
+                    cb_unit = wisdom['colorbar']
+                    ticklabels = [convert_value(native_unit, cb_unit, b) for b in bounds[1:]]
+                else:
+                    ticklabels = None
                 ticks = bounds[1:]
                 bounds = bounds + [1e10]
                 colors = wisdom.get('colors',np.array([(255,255,255),(197,234,252),(148,210,240),
@@ -327,6 +332,7 @@ class Postprocessor(object):
                 norm = lambda xmin,xmax: mpl.colors.Normalize(xmin,xmax) 
         else:
             norm = None 
+            ticklabels = None
 
         # only create the colorbar if requested
         cb_png_data = None
@@ -337,7 +343,7 @@ class Postprocessor(object):
             legend = wisdom['name'] + ' ' + cb_unit
             logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (var, cbu_min,cbu_max, legend))
             spacing = wisdom.get('spacing','proportional')
-            cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm)
+            cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm,ticklabels=ticklabels)
         else:
             levels = None
 
