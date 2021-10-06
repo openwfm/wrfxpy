@@ -488,10 +488,22 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # retrieve the variables and make sure they are available (we should not be here if they are not)
     try:
         dont_have_vars, have_vars = rtma.retrieve_rtma(cycle)
-    except ValueError as e:
+        assert not dont_have_vars
+    except AssertionError or ValueError as e:
+        logging.warning('CYCLER could not find useable cycle.')
         logging.error(e)
+        logging.warning('CYCLER copying previous post-processing.')
+        try:
+            bounds = compute_rtma_bounds(cfg.bbox)
+            pp_path = postprocess_cycle(cycle, cfg, wksp_path, bounds)   
+            if pp_path != None:
+                if 'shuttle_remote_host' in sys_cfg:
+                    sim_code = 'fmda-' + cfg.code
+                    send_product_to_server(sys_cfg, pp_path, sim_code, sim_code, sim_code + '.json', cfg.region_id + ' FM')
+        except Exception as e:
+            logging.warning('CYCLER exception {}'.format(e))
+            logging.error('CYCLER skipping region {} for cycle {}'.format(cfg.region_id,str(cycle)))
         sys.exit(1) 
-    assert not dont_have_vars
     
     logging.info('CYCLER loading RTMA data for cycle %s.' % str(cycle))
     TD, T2, RH, precipa, hgt, lats, lons = load_rtma_data(have_vars, cfg.bbox)

@@ -1000,7 +1000,7 @@ def process_output(job_id):
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
-                        logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
+                        logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
         else:
             if not wait_wrfout:
                 logging.info('Waiting for wrfout')
@@ -1122,7 +1122,7 @@ def process_sat_output(job_id):
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
-                        logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
+                        logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
 
     # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':
