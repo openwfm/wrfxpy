@@ -309,3 +309,32 @@ def transform_goes(d):
       fill = Dict({(150., 151., 152., 153.): 3, (100.): 5, (15., 35.): 7, (14., 34.): 8, (10., 11., 12., 13., 30., 31., 32., 33.): 9})
       array = d.variables['Mask'][:]
       return fill_categories(array, fill)
+
+def hdw(d,t):
+	"""
+	Calculate Hot Dry and Windy Index
+	:param d: open NetCDF4 dataset
+	:param t: number of timestep
+	"""
+	tempK = d.variables['T2'][t,:,:] # Temperature at 2 M (Kelvin)
+	tempC = tempK - 273.15
+	pressP = d.variables['PSFC'][t,:,:] # Surface Pressure (Pa)
+	pressM = pressP / 100. # Convert to millibars
+	uwind = d.variables['U10'][t,:,:] # U at 10 M (m s-1)
+	vwind = d.variables['V10'][t,:,:] # V at 10 M (m s-1)
+	wndspd = np.sqrt((uwind**2)+vwind**2) # Wind Speed (m s-1)
+	relh = d.variables['RH_FIRE'][t,:,:] # Surface Relative Humidity (1)
+	mwr = 18.015268 / 28.96546 # Molecular Weight Ratio (Unitless)
+	#Saturation Vapor Pressure
+	svp = 6.112 * np.exp((17.67 * tempC)/(tempC + 243.5)) # Millibar Units
+	# Saturation Mixing Ratio
+	smr = mwr * svp / (pressM-svp) # Unitless
+	# Mixing Ratio from Relative Humidity
+	mr = relh * smr # Unitless
+	# Vapor Pressure
+	vp = pressM * mr / (mwr + mr) # Millibar Units
+	# Vapor Pressure Deficit
+	vpd = svp - vp # Millibar Units
+	# Hot-Dry-Windy Index
+	hdw = wndspd * vpd # Unitless
+	return hdw

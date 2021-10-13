@@ -4,7 +4,7 @@ import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
       u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
-      smoke_concentration, transform_goes
+      smoke_concentration, transform_goes, hdw
 from six.moves import range
 
 smoke_threshold_int = 10
@@ -994,6 +994,15 @@ _var_wisdom = {
        'scale' : 'original',
        'retrieve_as' : lambda d : d.select('fire mask').get(),
        'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
+    },
+    'HDW' : {
+	'name' : 'Hot-Dry-Windy Index',
+	'native_unit' : '-',
+	'colorbar' : '-',
+	'colormap' : 'YlOrBr',
+	'scale' : 'original',
+	'retrieve_as' : lambda d,t : hdw(d,t),
+	'grid' : lambda d : (d.variables['XLAT'][0,:,:],d.variables['XLONG'][0,:,:])
     }
 }
 
