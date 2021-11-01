@@ -1016,7 +1016,7 @@ def process_output(job_id):
             send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         if js.postproc.get('shuttle', None) is not None:
-            steps = ','.join(['1' for x in js.postproc.keys() if len(x) == 1])
+            steps = ','.join(['1' for x in range(max(list(map(int, list(js.domains.keys())))))])
             args = ' '.join([js.job_id,steps,'inc'])
             make_kmz(args)
             args = ' '.join([js.job_id,steps,'ref'])
@@ -1131,7 +1131,7 @@ def process_sat_output(job_id):
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
     if js.postproc.get('shuttle', None) is not None:
-        steps = ','.join(['1' for x in js.postproc.keys() if len(x) == 1])
+        steps = ','.join(['1' for x in range(max(list(map(int, list(js.domains.keys())))))])
         args = ' '.join([js.job_id,steps,'inc'])
         make_kmz(args)
         args = ' '.join([js.job_id,steps,'ref'])

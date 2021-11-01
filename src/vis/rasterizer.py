@@ -158,9 +158,7 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None):
     m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],
                 llcrnrlon=lons[0],urcrnrlon=lons[1])
 
-    #vmin,vmax = np.nanmin(grid),np.nanmax(grid)
     masked_grid = np.ma.array(grid,mask=np.isnan(grid))
-    # logging.info('basemap_raster_mercator: not masked %s %s' % (grid.count(),masked_grid.count()))
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72)
     plt.axis('off')
     cmap = mpl.cm.get_cmap(cmap_name)
@@ -175,20 +173,29 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None):
     return str_io.getvalue(), float_bounds
 
 
-def basemap_barbs_mercator(u,v,lat,lon):
+def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,norm=None):
 
     # lon/lat extents
     lons = (np.amin(lon), np.amax(lon))
     lats = (np.amin(lat), np.amax(lat))
 
+    logging.info('basemap_barbs_mercator: bounding box %s %s %s %s' % (lons + lats))
+    
     # construct spherical mercator projection for region of interest
     m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],
                 llcrnrlon=lons[0],urcrnrlon=lons[1])
 
-    #vmin,vmax = np.nanmin(grid),np.nanmax(grid)
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
-    m.quiver(lon,lat,u,v,latlon=True)
+    # if cmap_name is set, create speed coloring using all the other parameters
+    if cmap_name is not None:
+        masked_grid = np.ma.array(grid,mask=np.isnan(grid))
+        if norm:
+            norm = norm(cmin,cmax)
+        cmap = mpl.cm.get_cmap(cmap_name)
+        m.quiver(lon,lat,u,v,masked_grid,latlon=True,norm=norm,cmap=cmap,clim=(cmin,cmax),edgecolor='k',linewidth=.2)
+    else:
+        m.quiver(lon,lat,u,v,latlon=True)
 
     str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
