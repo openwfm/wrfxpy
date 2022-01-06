@@ -60,7 +60,8 @@ class NARR(GribReanalysis):
     period_hours = 3
     id = "NARR"
     available_from_utc = datetime(1979,1,1,tzinfo=pytz.UTC)
-    available_to_utc = datetime(2014,10,2,tzinfo=pytz.UTC)
+    available_to_utc = datetime.now(pytz.UTC)
+    #available_to_utc = datetime(2014,10,2,tzinfo=pytz.UTC)
 
     # see also
     # https://rda.ucar.edu/datasets/ds608.0/

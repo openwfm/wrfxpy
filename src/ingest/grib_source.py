@@ -199,12 +199,15 @@ class GribSource(object):
         :return: link available online, '' otherwise
         """
 
-        logging.info('GribSource: Looking for grib links available online')
-        available = [x for x in links if readhead(self.remote_url + '/' + x, msg_level=0).status_code == 200]
-        if len(available) > 0:
-            return available[0]
-        else:
-            raise GribError('GribSource: failed to find an available online file')
+        url_bases = self.remote_url
+        if isinstance(url_bases,str):
+            url_bases = [url_bases]
+        for url_base in url_bases:
+            available = [x for x in links if readhead(url_base + '/' + x, msg_level=0).status_code == 200]
+            if len(available) > 0:
+                self.remote_url = url_base
+                return available[0]
+        raise GribError('GribSource: failed to find an available online file')
 
 
     # instance variables  
