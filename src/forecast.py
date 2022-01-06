@@ -741,7 +741,8 @@ def execute(args,job_args):
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
-
+    if 'fmda_geogrid_path' in js.args:
+        js.fire_nml['moisture']['fmc_gc_initialization'] = [0,0,0,2,1]
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
         logging.debug('namelist.fire_emissions given, turning on tracers')
