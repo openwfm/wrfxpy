@@ -91,12 +91,17 @@ class GribForecast(GribSource):
                 nonlocals = [x for x in grib_files if not self.grib_available_locally(osp.join(self.ingest_dir, x))]
     
                 # check if GRIBs we don't are available remotely
-                url_base = self.remote_url
-                logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
-                unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
+                url_bases = self.remote_url
+                if isinstance(url_bases,str):
+                    url_bases = [url_bases]
+                for url_base in url_bases:
+                    logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
+                    unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
+                    if len(unavailables) == 0:
+                        break
                 if len(unavailables) > 0:
                     logging.warning('%s failed retrieving cycle data for cycle %s, unavailables %s'
-                    % (self.id, cycle_start, repr(unavailables)))
+                                         % (self.id, cycle_start, repr(unavailables)))
                     cycle_shift += 1
                     continue
     
