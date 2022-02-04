@@ -54,11 +54,12 @@ class NARR(GribReanalysis):
         return path_tmpl % (year, mon, year, mon, day, year, mon, day, hour)
 
     # instance variables
+    id = "NARR"
     info_url = 'https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/north-american-regional-reanalysis-narr'
+    info_text = 'NCEP North American Regional Reanalysis (NARR)'
     info = "North American Regional Reanalysis (NARR)"
     remote_url = 'https://www.ncei.noaa.gov/data/north-american-regional-reanalysis/access/3-hourly'
     period_hours = 3
-    id = "NARR"
     available_from_utc = datetime(1979,1,1,tzinfo=pytz.UTC)
     available_to_utc = datetime.now(pytz.UTC)
     #available_to_utc = datetime(2014,10,2,tzinfo=pytz.UTC)

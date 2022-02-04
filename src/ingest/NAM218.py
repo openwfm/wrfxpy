@@ -62,14 +62,14 @@ class NAM218(GribForecast):
 
     # instance variables
     id = "NAM218"
+    info_url = "https://www.nco.ncep.noaa.gov/pmb/products/nam/"
+    info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
+    info = "North American Mesoscale (NAM) Forecast System Grid 218"
+    remote_url = 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/'
+    cycle_hours = 6
+    period_hours = 3    # for METGRID and WRF
     #    NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
     #    every 3 hours, starting with 39 and ending with 84.
-    # grib_forecast_hours_periods = [{'hours':36,'period':3} , {'hours':84,'period':3}]
     grib_forecast_hours_periods = [{'hours':84,'period':3}]
-    cycle_hours = 6
-    remote_url = 'https://ftp.ncep.noaa.gov/data/nccf/com/nam/prod/'
-    period_hours = 3    # for METGRID and WRF
-    info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
-    info_url = "https://www.nco.ncep.noaa.gov/pmb/products/nam/"
 
 

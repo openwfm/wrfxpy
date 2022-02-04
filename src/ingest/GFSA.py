@@ -55,11 +55,12 @@ class GFSA(GribReanalysis):
         return self.available_online(path_tmpls)
 
     # instance variables
+    id = "GFSA"
     info_url = 'https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00634'
+    info_text = "Global Forecast System (GFS) Analysis"
     info = "Global Forecast System (GFS) Analysis"
     remote_url = ['https://www.ncei.noaa.gov/data/global-forecast-system/access/historical/analysis', 'https://www.ncei.noaa.gov/data/global-forecast-system/access/grid-004-0.5-degree/analysis']
     period_hours = 6
-    id = "GFSA"
     available_from_utc = datetime(2004,3,1,tzinfo=pytz.UTC)
     available_to_utc = datetime.now(pytz.UTC)
 

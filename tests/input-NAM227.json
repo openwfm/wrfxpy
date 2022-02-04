@@ -2,8 +2,8 @@
     "job_id": "testing-NAM227",
     "wall_time_hrs": 12,
     "grib_source": "NAM227",
-    "start_utc": "2018-05-22_07:00:00",
-    "end_utc": "2018-05-22_16:00:00",
+    "start_utc": "T-30",
+    "end_utc": "T+120",
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
     "postproc": {
@@ -84,7 +84,7 @@
                     40.0699,
                     -106.5981
                 ],
-                "time_utc": "2018-05-22_07:32:00",
+                "time_utc": "T+30",
                 "duration_s": 240,
                 "start_delay_s": 600
             }
