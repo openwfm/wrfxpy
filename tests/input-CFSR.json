@@ -3,7 +3,7 @@
     "wall_time_hrs": 12,
     "grib_source": "CFSR",
     "start_utc": "2019-11-06_00:00:00",
-    "end_utc": "2019-11-09_00:00:00",
+    "end_utc": "2019-11-06_03:00:00",
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
     "postproc": {
@@ -106,7 +106,7 @@
     "ignitions": {
         "3": [
             {
-                "time_utc": "2018-05-05_19:47:00",
+                "time_utc": "2019-11-06_00:30:00",
                 "latlon": [
                     40.0699,
                     -108.2909

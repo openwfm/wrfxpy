@@ -3,7 +3,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
 from utils import load_sys_cfg
-from forecast import process_arguments, JobState
 import json, netCDF4, os, sys, glob, json
 import numpy as np
 import os.path as osp
@@ -20,11 +19,8 @@ else:
     PATH = sys.argv[1]
     print(PATH)
     if osp.isfile(PATH) and os.access(PATH, os.R_OK):
-        sys_cfg = load_sys_cfg()
-        job_args = json.load(open(PATH)) 
-        args = process_arguments(job_args,sys_cfg)
-        js = JobState(args)
-        domain_conf = WPSDomainConf(js.domains)
+        js = json.load(open(PATH)) 
+        domain_conf = WPSDomainConf(js['domains'])
         domains = domain_conf.domains
     else:
         from_files = True
@@ -57,7 +53,7 @@ if from_files:
 
 err = 0
 for k,d in enumerate(domains):
-    print('>> Domain 0{} <<'.format(k+1))
+    print('>> Domain {:02d} <<'.format(d.dom_id))
     ilist = [0,d.domain_size[0]-2,d.domain_size[0]-2,0,5]
     jlist = [0,0,d.domain_size[1]-2,d.domain_size[1]-2,10]
     print('ij -> ll')
@@ -87,9 +83,9 @@ if from_files:
 
 print('>> Bounding box <<')
 for d in domains:
+    print('Domain {:02d}'.format(d.dom_id))
     bbox = d.bounding_box()
     lons = [b[1] for b in bbox]
     lats = [b[0] for b in bbox]
-    print('{}'.format(bbox))
-    print('bbox={0},{1},{2},{3}'.format(min(lons),max(lons),min(lats),max(lats)))
+    print('bbox={},{},{},{}'.format(min(lons),max(lons),min(lats),max(lats)))
 

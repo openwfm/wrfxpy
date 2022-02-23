@@ -741,7 +741,8 @@ def execute(args,job_args):
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
-
+    if 'fmda_geogrid_path' in js.args:
+        js.fire_nml['moisture']['fmc_gc_initialization'] = [0,0,0,2,1]
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
         logging.debug('namelist.fire_emissions given, turning on tracers')
@@ -763,7 +764,7 @@ def execute(args,job_args):
         logging.error('Real step failed with exception %s, retrying ...' % str(e))
         Real(js.wrf_dir).execute().check_output()
     # write subgrid coordinates in input files
-    subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 0).all()]
+    subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()]
     for in_path in subgrid_wrfinput_files:
     	fill_subgrid(osp.join(js.wrf_dir, in_path))
 

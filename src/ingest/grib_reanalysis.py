@@ -68,9 +68,14 @@ class GribReanalysis(GribSource):
             nonlocals = [x for x in grib_files if not self.grib_available_locally(osp.join(self.ingest_dir, x))]
             #print 'nonlocals = ' + str(nonlocals)
             # check if GRIBs we don't have are available remotely
-            url_base = self.remote_url
-            logging.info('Retrieving CFSR GRIBs from %s' % url_base)
-            unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
+            url_bases = self.remote_url
+            if isinstance(url_bases,str):
+                url_bases = [url_bases]
+            for url_base in url_bases:
+                logging.info('Retrieving CFSR GRIBs from %s' % url_base)
+                unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
+                if len(unavailables) == 0:
+                    break
             if len(unavailables) > 0:
                 raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
 

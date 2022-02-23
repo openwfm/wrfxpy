@@ -213,8 +213,8 @@ def height8w_terrain(d,t):
       """
       h = height8w(d,t)
       terrain_height = h[0,:,:] 
-      for i in range(0, h.shape[2]):
-          for j in range(0, h.shape[1]):
+      for i in range(0, h.shape[1]):
+          for j in range(0, h.shape[2]):
               h[:,i,j] -= terrain_height[i,j]
       return h
 
@@ -235,8 +235,8 @@ def height8p_terrain(d,t):
       """
       z8w = height8w(d,t)
       h =  0.5*(z8w[0:z8w.shape[0]-1,:,:]+z8w[1:,:,:])
-      for i in range(0, h.shape[2]):
-          for j in range(0, h.shape[1]):
+      for i in range(0, h.shape[1]):
+          for j in range(0, h.shape[2]):
               h[:,i,j] -= z8w[0,i,j]
       return h
 
