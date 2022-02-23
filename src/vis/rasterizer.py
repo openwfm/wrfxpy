@@ -185,7 +185,7 @@ def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,no
     m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],
                 llcrnrlon=lons[0],urcrnrlon=lons[1])
 
-    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
+    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*2)
     plt.axis('off')
     # if cmap_name is set, create speed coloring using all the other parameters
     if cmap_name is not None:
@@ -218,7 +218,7 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, si
     m = Basemap(projection='merc',llcrnrlat=bounds[2], urcrnrlat=bounds[3],
                 		llcrnrlon=bounds[0],urcrnrlon=bounds[1])
     
-    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
+    fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*2)
     plt.axis('off')
     for i in range(N):
     	m.scatter(lon[i],lat[i],size,c=val[i],latlon=True,marker=marker,cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=linewidths,edgecolors='k')
