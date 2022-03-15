@@ -472,7 +472,7 @@ def vars_add_to_geogrid(js):
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     for var,tif_file in six.iteritems(geo_vars):
-        bbox = js.bounds[str(js.max_dom)]
+        bbox = js.bounds[str(js.min_sub_dom)]
         logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
         try:
             GeoDriver.from_file(tif_file).to_geogrid(geo_data_path,var,bbox)
@@ -1271,6 +1271,7 @@ def process_arguments(job_args,sys_cfg):
     args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
     args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
     args['max_dom'] = max([int(x) for x in [x for x in args['domains'] if len(x) == 1]])
+    args['min_sub_dom'] = min([int(x) for x in [x for x in args['domains'] if len(x) == 1] if (np.array(args['domains'][x].get('subgrid_ratio',[0,0])) > 0).all()])
     args['max_dom_pp'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
     args['satprod_satsource'] = Dict({})
 
