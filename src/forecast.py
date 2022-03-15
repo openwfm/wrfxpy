@@ -820,8 +820,16 @@ def wrf_execute(job_id):
 
 def process_output(job_id):
     args = load_sys_cfg()
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+    logging.info('process_output: loading input description from %s' % inpfile)
+    try:
+        jsin = Dict(json.load(open(inpfile,'r')))
+    except Exception as e:
+        logging.error('Cannot load the input description file %s' % inpfile)
+        logging.error('%s' % e)
+        sys.exit(1)
     logging.info('process_output: loading job description from %s' % jobfile)
     try:
         js = Dict(json.load(open(jobfile,'r')))
@@ -1017,7 +1025,7 @@ def process_output(job_id):
             send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         if js.postproc.get('shuttle', None) is not None:
-            steps = ','.join(['1' for x in range(max(list(map(int, list(js.domains.keys())))))])
+            steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
             args = ' '.join([js.job_id,steps,'inc'])
             make_kmz(args)
             args = ' '.join([js.job_id,steps,'ref'])
@@ -1054,8 +1062,16 @@ def create_process_output_script(job_id):
 
 def process_sat_output(job_id):
     args = load_sys_cfg()
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+    logging.info('process_output: loading input description from %s' % inpfile)
+    try:
+        jsin = Dict(json.load(open(inpfile,'r')))
+    except Exception as e:
+        logging.error('Cannot load the input description file %s' % inpfile)
+        logging.error('%s' % e)
+        sys.exit(1)
     logging.info('process_sat_output: loading job description from %s' % jobfile)
     try:
         js = Dict(json.load(open(jobfile,'r')))
@@ -1132,7 +1148,7 @@ def process_sat_output(job_id):
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
     if js.postproc.get('shuttle', None) is not None:
-        steps = ','.join(['1' for x in range(max(list(map(int, list(js.domains.keys())))))])
+        steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
         args = ' '.join([js.job_id,steps,'inc'])
         make_kmz(args)
         args = ' '.join([js.job_id,steps,'ref'])
