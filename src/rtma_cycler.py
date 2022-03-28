@@ -362,6 +362,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
     # perform assimilation with mesowest observations
     tm_start = cycle - timedelta(minutes=30)
     tm_end = cycle + timedelta(minutes=30)
+    logging.info('calling retrieve_mesowest_observations') 
     fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons)
     fm10v = []
     for fm10_obs in fm10.values():
