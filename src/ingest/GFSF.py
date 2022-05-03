@@ -48,6 +48,7 @@ class GFSF(GribForecast):
     remote_url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"
     cycle_hours = 6
     period_hours = 3 # for METGRID and WRF
+    hours_behind_real_time = 6 # choose forecast cycle at least one hour behind
     #    GFS provides hourly GRIB2 files up to hour 120 and then one GRIB2 file
     #    every 3 hours, starting with 123 and ending with 384.
     grib_forecast_hours_periods = [{'hours':384,'period':3}]
