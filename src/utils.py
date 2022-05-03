@@ -42,7 +42,7 @@ import collections
 import six
 from six.moves import map
 from six.moves import zip
-
+from clamp2mesh import clamp2mesh
 
 class Dict(dict):
     """
@@ -468,10 +468,11 @@ def render_ignitions(js, max_dom):
             start_time = timespec_to_utc(ign['time_utc'], orig_start_time)
             start = int((start_time - js.start_utc).total_seconds())
             dur = ign['duration_s']
-            lat, lon = ign['latlon']
+            lat,lon = ign['latlon']
+            nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
             radius = ign.get('radius',200)
             ros = ign.get('ros',1)
-            vals = [ lat, lat, lon, lon, start, start+dur, radius, ros]
+            vals = [ nlat, nlat, nlon, nlon, start, start+dur, radius, ros]
             kv = dict(list(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals])))
             nml_fire.update(kv)
 

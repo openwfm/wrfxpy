@@ -866,7 +866,7 @@ def process_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
+    js.pp_dir = js.postproc.get("pp_path", osp.join(args.workspace_path, js.job_id, "products"))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
@@ -1104,7 +1104,7 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
+    js.pp_dir = js.postproc.get("pp_path", osp.join(args.workspace_path, js.job_id, "products"))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
