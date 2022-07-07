@@ -503,45 +503,49 @@ def fmda_add_to_geogrid(js):
     """
     if 'fmda_geogrid_path' in js:
         fmda_geogrid_path = osp.abspath(js['fmda_geogrid_path'])
-        logging.info('fmda_geogrid_path is %s' % fmda_geogrid_path)
-        fmda_geogrid_basename = osp.basename(fmda_geogrid_path)
-        sym_fmda_geogrid_path = osp.join(js.wps_dir,fmda_geogrid_basename)
-        symlink_unless_exists(fmda_geogrid_path,sym_fmda_geogrid_path)
-        logging.info('fmda_geogrid_path is linked to %s' % sym_fmda_geogrid_path)
+        if osp.exists(fmda_geogrid_path):
+            logging.info('fmda_add_to_geogrid - fmda_geogrid_path is %s' % fmda_geogrid_path)
+            fmda_geogrid_basename = osp.basename(fmda_geogrid_path)
+            sym_fmda_geogrid_path = osp.join(js.wps_dir,fmda_geogrid_basename)
+            symlink_unless_exists(fmda_geogrid_path,sym_fmda_geogrid_path)
+            logging.info('fmda_add_to_geogrid - fmda_geogrid_path is linked to %s' % sym_fmda_geogrid_path)
+        else:
+            logging.warning('fmda_add_to_geogrid - fmda_geogrid_path not exist')
+            return
     else:
+        logging.info('fmda_add_to_geogrid - fmda_geogrid_path not given')
         return
-        logging.info('fmda_geogrid_path not given')
     try:
         index_path = osp.join(fmda_geogrid_path,'index.json')
         index = json.load(open(index_path,'r'))
-        logging.info('Loaded fmda geogrid index at %s' % index_path)
+        logging.info('fmda_add_to_geogrid - loaded fmda geogrid index at %s' % index_path)
     except:
-        logging.error('Cannot open %s' % index_path)
-        raise Exception('Failed opening index file {}'.format(index_path))
+        logging.error('fmda_add_to_geogrid - cannot open %s' % index_path)
+        raise Exception('fmda_add_to_geogrid - failed opening index file {}'.format(index_path))
     geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
-    logging.info('fmda_add_to_geogrid reading longitudes and latitudes from NetCDF file %s' % geo_path )
+    logging.info('fmda_add_to_geogrid - reading longitudes and latitudes from NetCDF file %s' % geo_path )
     with nc4.Dataset(geo_path,'r') as d:
         lats = d.variables['XLAT'][:,:]
         lons = d.variables['XLONG'][:,:]
     ndomains = len(js['domains'])
     lat,lon = js['domains'][str(ndomains)]['center_latlon'] if 'center_latlon' in js['domains'][str(ndomains)] else js['domains']['1']['center_latlon']
     bbox = (np.min(lats), np.min(lons), np.max(lats), np.max(lons))
-    logging.info('fmda_add_to_geogrid: fmda bounding box is %s %s %s %s' % bbox)
+    logging.info('fmda_add_to_geogrid - fmda bounding box is %s %s %s %s' % bbox)
     i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)  
     if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
-        logging.error('fmda_add_to_geogrid: WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
-        raise OSError('{} is not correct geolocated compared to WRF domain'.format(fmda_geogrid_path))
+        logging.error('fmda_add_to_geogrid - WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
+        raise OSError('fmda_add_to_geogrid - {} is not correct geolocated compared to WRF domain'.format(fmda_geogrid_path))
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
     geogrid_tbl_json_path = osp.join(fmda_geogrid_path,'geogrid_tbl.json')
-    logging.info('fmda_add_to_geogrid: updating GEOGRID.TBL at %s from %s' % 
+    logging.info('fmda_add_to_geogrid - updating GEOGRID.TBL at %s from %s' % 
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in six.iteritems(geogrid_tbl_json):
         vartable['abs_path'] = osp.join(js.wps_dir,fmda_geogrid_basename,osp.basename(vartable['abs_path']))
         vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
-        logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
+        logging.info('fmda_add_to_geogrid - GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
 
     
