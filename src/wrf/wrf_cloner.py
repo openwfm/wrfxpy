@@ -103,7 +103,8 @@ class WRFCloner(object):
     wps_exec_files = ['geogrid.exe', 'metgrid.exe', 'ungrib.exe']
 
     # list of files that must(?) be symlinked from the WRFV3 directory
-    wrf_files = ["CAM_ABS_DATA", "CAM_AEROPT_DATA", "co2_trans", "ETAMPNEW_DATA", "ETAMPNEW_DATA_DBL",
+    wrf_files = ["CAM_ABS_DATA", "CAM_AEROPT_DATA", "CAMtr_volume_mixing_ratio" 
+                 "co2_trans", "ETAMPNEW_DATA", "ETAMPNEW_DATA_DBL",
                  "ETAMPNEW_DATA.expanded_rain", "ETAMPNEW_DATA.expanded_rain_DBL", "GENPARM.TBL",
                  "gribmap.txt", "grib2map.tbl", "LANDUSE.TBL", "MPTABLE.TBL",
                  "ozone.formatted", "ozone_lat.formatted", "ozone_plev.formatted",
