@@ -467,12 +467,19 @@ def render_ignitions(js, max_dom):
         for ndx,ign in enumerate(dom_igns):
             start_time = timespec_to_utc(ign['time_utc'], orig_start_time)
             start = int((start_time - js.start_utc).total_seconds())
-            dur = ign['duration_s']
-            lat,lon = ign['latlon']
-            nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+            dur = ign.get('duration_s',240)
             radius = ign.get('radius',200)
             ros = ign.get('ros',1)
-            vals = [ nlat, nlat, nlon, nlon, start, start+dur, radius, ros]
+            if 'latlon' in ign.keys():
+                lat,lon = ign['latlon']
+                nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+                vals = [ nlat, nlat, nlon, nlon, start, start+dur, radius, ros]
+            elif 'start_latlon' in ign.keys() and 'end_latlon' in ign.keys():
+                lat,lon = ign['start_latlon']
+                slon,slat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+                lat,lon = ign['end_latlon']
+                elon,elat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+                vals = [ slat, elat, slon, elon, start, start+dur, radius, ros]
             kv = dict(list(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals])))
             nml_fire.update(kv)
 
