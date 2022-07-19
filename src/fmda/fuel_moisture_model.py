@@ -483,7 +483,7 @@ class FuelMoistureModel:
 
         logging.info('fuel_moisture_model.from_netcdf: reading FMC_GC %s FMC_COV %s' % (inq(ncfmc),inq(P)))
         
-        Tk = np.array([1.0, 10.0, 100.0]) * 3600
+        Tk = np.cumprod(np.concatenate(([1], np.ones(k-3)*10.))) * 3600
         
         fm = cls(ncfmc[:,:,:k-2], Tk)
         

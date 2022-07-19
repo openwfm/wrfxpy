@@ -72,7 +72,6 @@ def numerical_solve_bisect(e2, eps2, k):
     return 0.5 * (s2_eta_left + s2_eta_right)
 
 
-
 def fit_tsm(obs_data, X):
     """
     Trend surface model kriging, which assumes spatially uncorrelated errors.
@@ -195,3 +194,109 @@ def fit_tsm(obs_data, X):
 
     return K, V
 
+
+def fit_tsm_lstsq(obs_data, X):
+    """
+    Trend surface model kriging, which assumes spatially uncorrelated errors.
+    The kriging results in the matrix K, which contains the kriged observations
+    and the matrix V, which contains the kriging variance. 
+    Closest least-squares solution when singular matrix.
+    """
+    Nobs = len(obs_data)
+
+    # we ensure we have at most Nobs covariates
+    Nallcov = min(X.shape[2], Nobs)
+
+    # the matrix of covariates
+    Xobs = np.zeros((Nobs, Nallcov))
+
+    # outputs
+    K = np.zeros(X[:,:,0].shape)
+    V = np.zeros_like(K)
+
+    # the vector of target observations
+    y = np.zeros((Nobs,1))
+
+    # the vector of observation variances
+    obs_var = np.zeros((Nobs,))
+
+    # fill out matrix/vector structures
+    for (obs,i) in zip(obs_data, list(range(Nobs))):
+        p = obs.get_nearest_grid_point()
+        y[i,0] = obs.get_value()
+        Xobs[i,:] = X[p[0], p[1], :Nallcov]
+        obs_var[i] = obs.get_variance()
+
+    # remove covariates that contain only zeros
+    norms = np.sum(Xobs**2, axis = 0) ** 0.5
+    nz_covs = np.nonzero(norms)[0]
+    Ncov = len(nz_covs)
+    X = X[:,:,nz_covs]
+    Xobs = Xobs[:,nz_covs]
+    norms = norms[nz_covs]
+
+    # normalize all covariates
+    for i in range(1, Ncov):
+        scalar = norms[0] / norms[i]
+        Xobs[:,i] *= scalar
+        X[:,:,i] *= scalar
+
+    Xobs = np.asmatrix(Xobs)
+
+    # initialize the iterative algorithm
+    s2_eta_hat_old = 10.0
+    s2_eta_hat = 0.0
+    iters = 0
+    res2 = None
+    XtSX = None
+    equal_variance_flag = np.all(obs_var == obs_var[0])
+
+    if equal_variance_flag:
+        # use a much faster algorithm that requires no iterations
+        Q, R = np.linalg.qr(Xobs)
+        beta = np.linalg.solve(R, np.asmatrix(Q).T * y)
+        res2 = np.asarray(y - Xobs * beta)[:,0]**2
+        gamma2 = obs_var[0]
+        if Nobs > Ncov:
+            s2_eta_hat = max(1.0 / (Nobs - Ncov) * np.sum(res2) - gamma2, 0.0)
+        else:
+            s2_eta_hat = 0.0
+        XtSX = 1.0 / (s2_eta_hat + gamma2) * (Xobs.T* Xobs)
+        iters = -1
+    else:
+        # while the relative change is more than 0.1%
+        while abs( (s2_eta_hat_old - s2_eta_hat) / max(s2_eta_hat_old, 1e-8)) > 1e-3:
+            s2_eta_hat_old = s2_eta_hat
+            # recompute covariance matrix
+            Sigma_diag = obs_var + s2_eta_hat
+            #Sigma = np.diag(Sigma_diag)
+            Sigma_1 = np.diag(1.0 / Sigma_diag)
+            XtSX = Xobs.T * Sigma_1 * Xobs
+            # QR solution method of the least squares problem
+            Sigma_1_2 = np.asmatrix(np.diag(Sigma_diag ** -0.5))
+            yt = Sigma_1_2 * y
+            Q, R = np.linalg.qr(Sigma_1_2 * Xobs)
+            beta = np.linalg.lstsq(R, np.asmatrix(Q).T * yt, rcond=None)[0]
+            res2 = np.asarray(y - Xobs * beta)[:,0]**2
+            # compute new estimate of variance of microscale variability
+            s2_array = res2 - obs_var
+            for i in range(len(s2_array)):
+                s2_array[i] += np.dot(Xobs[i,:], np.linalg.lstsq(XtSX, Xobs[i,:].T, rcond=None)[0])
+            s2_eta_hat = numerical_solve_bisect(res2, obs_var, Ncov)
+            if s2_eta_hat < 0.0:
+                s2_eta_hat = 0.0
+            iters += 1
+
+    # map computed betas to original (possibly extended) betas which include unused variables
+    beta_ext = np.asmatrix(np.zeros((Nallcov,1)))
+    beta_ext[nz_covs] = beta
+
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            x_ij = X[i,j,:]
+            K[i,j] = np.dot(x_ij, beta)
+            V[i,j] = s2_eta_hat + np.dot(x_ij, np.linalg.lstsq(XtSX, x_ij, rcond=None)[0])
+            if V[i,j] < 0.0:
+              logging.error("FMDA negative kriging variance in trend surface model.")
+
+    return K, V

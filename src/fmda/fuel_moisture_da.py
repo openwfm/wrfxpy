@@ -80,7 +80,8 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
     # the bbox for mesowest is: (min(lon), min(lat), max(lon), max(lat)).
     min_lat, max_lat = np.amin(glat), np.amax(glat)
     min_lon, max_lon = np.amin(glon), np.amax(glon)
-
+    
+    meso_obss = None
     # retrieve data from Mesonet API (http://api.mesowest.net/)
     try:
         logging.info('retrieve_mesowest_observations: retrieving data using MesoDB')
@@ -115,7 +116,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
                 fms = np.array(data.fm10) 
                 for ts,fm_obs in zip(dts,fms):
                     if fm_obs is not None:
-                        o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp)
+                        o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp,stid)
                         obs_t = obs_data.get(ts, [])
                         obs_t.append(o)
                         obs_data[ts] = obs_t
@@ -167,7 +168,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
                 fms = stinfo['OBSERVATIONS']['fuel_moisture_set_1']
                 for ts,fm_obs in zip(dts,fms):
                     if fm_obs is not None:
-                        o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp)
+                        o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp,stinfo['STID'])
                         obs_t = obs_data.get(ts, [])
                         obs_t.append(o)
                         obs_data[ts] = obs_t
