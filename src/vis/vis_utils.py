@@ -314,9 +314,9 @@ def fire_front(d,t,var):
       """
       Plot variable only at the fire front
       """
-      dt = 2.*60.
+      dt = 15.*60.
       v = d.variables[var][t,:,:]
       lfn = d.variables['LFN'][t,:,:]
-      m = np.logical_and(lfn > 5.,lfn <= dt)
+      m = np.logical_and(lfn > 60.,lfn <= dt)
       v[~m] = np.nan
       return v
