@@ -4,8 +4,7 @@
     "grib_source": "GFSF",
     "start_utc": "T-30",
     "end_utc": "T+120",
-    "cycle_start_utc": "T-120",
-    "download_whole_cycle": true,
+    "download_whole_cycle": false,
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
     "postproc": {

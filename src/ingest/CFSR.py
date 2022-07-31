@@ -45,12 +45,13 @@ class CFSR(GribReanalysis):
                                'p_top_requested' : 10000 }}
 
  
-    period_hours = 6
     id = "CFSR"
-    info_text = "The CFSRv2 (Climate Forecast System Reanalysis v2)"
     info_url = "https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/climate-forecast-system-version2-cfsv2"
+    info_text = "The CFSRv2 (Climate Forecast System Reanalysis v2)"
+    info = "The CFSRv2 (Climate Forecast System Reanalysis v2)"
     available_from_utc = datetime(2011,4,1,tzinfo=pytz.UTC)
     available_to_utc = datetime.now(pytz.UTC)
+    period_hours = 6
 
 
 class CFSR_P(CFSR):
@@ -88,9 +89,9 @@ class CFSR_P(CFSR):
         return self.available_online(path_tmpls)
 
     # instance variables
-    remote_url = 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-by-pressure'
     id = "CFSR_P"
     prefix = 'COLMET_P'
+    remote_url = 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-by-pressure'
 
 class CFSR_S(CFSR):
     """
@@ -127,8 +128,8 @@ class CFSR_S(CFSR):
         return self.available_online(path_tmpls)
 
     # instance variables
-    remote_url = 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux'
     id = "CFSR_S"
     prefix = 'COLMET_S'
+    remote_url = 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux'
 
 

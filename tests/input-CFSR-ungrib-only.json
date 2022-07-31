@@ -2,8 +2,8 @@
     "job_id": "testing-CFSR-ungrib-only",
     "wall_time_hrs": 12,
     "grib_source": "CFSR",
-    "start_utc": "2015-08-15_00:00:00",
-    "end_utc": "2015-08-24_00:00:00",
+    "start_utc": "2019-11-06_00:00:00",
+    "end_utc": "2019-11-06_03:00:00",
     "ungrib_only": true,
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
@@ -107,7 +107,7 @@
     "ignitions": {
         "3": [
             {
-                "time_utc": "2018-05-05_19:47:00",
+                "time_utc": "2019-11-06_00:30:00",
                 "latlon": [
                     40.0699,
                     -108.2909

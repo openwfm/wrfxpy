@@ -93,12 +93,13 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
         db.params['longitude2'] = max_lon
         db.params['latitude1'] = min_lat
         db.params['latitude2'] = max_lat
-        df = db.get_DB().dropna(subset=['fm10'])
+        df = db.get_DB()
         st = db.sites()
         if not len(df):
             logging.info('retrieve_mesowest_observations: no data for the query specified')
             return {}
         logging.info('retrieve_mesowest_observations: re-packaging the observations')
+        df = df.dropna(subset=['fm10'])
         obs_data = {}
         for stid,data in df.groupby('STID'):
             if len(data):

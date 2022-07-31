@@ -56,6 +56,7 @@ class GribForecast(GribSource):
         while cycle_shift < 3:
     
             if cycle_start is not None:
+                cycle_start = cycle_start.replace(minute=0,second=0,microsecond=0)
                 logging.info('forecast cycle start given as %s' % cycle_start)
             else:
                 # select cycle (at least hours_behind_real_time behind)
@@ -63,7 +64,7 @@ class GribForecast(GribSource):
                 ref_utc_2 = ref_utc - timedelta(hours=self.hours_behind_real_time)
                 ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
                 cycle_start = min(from_utc, ref_utc_2)
-                cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
+                cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % self.cycle_hours)
                 cycle_start -= timedelta(hours=self.cycle_hours*cycle_shift)
                 logging.info('forecast cycle start selected as %s' % cycle_start)
 
