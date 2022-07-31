@@ -1,4 +1,5 @@
 #!/bin/bash
+#SBATCH --exclusive # not share nodes with other running jobs
 #SBATCH --time=%(wall_time_hrs)02d:00:00 # walltime, abbreviated by -t
 ##SBATCH -o  # name of the stdout
 #SBATCH --ntasks=%(np)d   # number of MPI tasks, abbreviated by -n
