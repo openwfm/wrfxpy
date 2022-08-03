@@ -824,8 +824,16 @@ def wrf_execute(job_id):
 
 def process_output(job_id):
     args = load_sys_cfg()
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+    logging.info('process_output: loading input description from %s' % inpfile)
+    try:
+        jsin = Dict(json.load(open(inpfile,'r')))
+    except Exception as e:
+        logging.error('Cannot load the input description file %s' % inpfile)
+        logging.error('%s' % e)
+        sys.exit(1)
     logging.info('process_output: loading job description from %s' % jobfile)
     try:
         js = Dict(json.load(open(jobfile,'r')))
@@ -851,7 +859,7 @@ def process_output(job_id):
     js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
-    js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
+    js.wrf_dir = js.get('wrf_dir',osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf')))
 
     pp = None
     if js.postproc is None:
@@ -862,19 +870,19 @@ def process_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
+    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
     else:
         already_sent_files = [x for x in os.listdir(js.pp_dir) if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
-    prod_name = 'wfc-' + js.grid_code
-    pp = Postprocessor(js.pp_dir, prod_name)
+    js.prod_name = js.get('prod_name', 'wfc-' + js.grid_code)
+    pp = Postprocessor(js.pp_dir, js.prod_name)
     if 'tslist' in js.keys() and js.tslist is not None:
         ts = Timeseries(js.pp_dir, prod_name, js.tslist, js.num_doms)
     else:
         ts = None
-    js.manifest_filename= 'wfc-' + js.grid_code + '.json'
+    js.manifest_filename= js.get('manifest_filename', 'wfc-' + js.grid_code + '.json')
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
     tif_proc = js.postproc.get('tif_proc', False)
 
@@ -1021,7 +1029,7 @@ def process_output(job_id):
             send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         if js.postproc.get('shuttle', None) is not None:
-            steps = ','.join(['1' for x in js.postproc.keys() if len(x) == 1])
+            steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
             args = ' '.join([js.job_id,steps,'inc'])
             make_kmz(args)
             args = ' '.join([js.job_id,steps,'ref'])
@@ -1058,8 +1066,16 @@ def create_process_output_script(job_id):
 
 def process_sat_output(job_id):
     args = load_sys_cfg()
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+    logging.info('process_output: loading input description from %s' % inpfile)
+    try:
+        jsin = Dict(json.load(open(inpfile,'r')))
+    except Exception as e:
+        logging.error('Cannot load the input description file %s' % inpfile)
+        logging.error('%s' % e)
+        sys.exit(1)
     logging.info('process_sat_output: loading job description from %s' % jobfile)
     try:
         js = Dict(json.load(open(jobfile,'r')))
@@ -1092,14 +1108,14 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
+    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
     else:
         already_sent_files = [x for x in os.listdir(js.pp_dir) if not x.endswith('json')]
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
-    js.manifest_filename= 'wfc-' + js.grid_code + '.json'
+    js.manifest_filename= js.get('manifest_filename', 'wfc-' + js.grid_code + '.json')
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
     domains = sorted([int(x) for x in [x for x in js.postproc if len(x) == 1]])
     for dom_id in domains:
@@ -1136,7 +1152,7 @@ def process_sat_output(job_id):
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
     if js.postproc.get('shuttle', None) is not None:
-        steps = ','.join(['1' for x in js.postproc.keys() if len(x) == 1])
+        steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
         args = ' '.join([js.job_id,steps,'inc'])
         make_kmz(args)
         args = ' '.join([js.job_id,steps,'ref'])
