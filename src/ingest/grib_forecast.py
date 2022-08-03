@@ -56,6 +56,7 @@ class GribForecast(GribSource):
         while cycle_shift < 3:
     
             if cycle_start is not None:
+                cycle_start = cycle_start.replace(minute=0,second=0,microsecond=0)
                 logging.info('forecast cycle start given as %s' % cycle_start)
             else:
                 # select cycle (at least hours_behind_real_time behind)
@@ -63,7 +64,7 @@ class GribForecast(GribSource):
                 ref_utc_2 = ref_utc - timedelta(hours=self.hours_behind_real_time)
                 ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
                 cycle_start = min(from_utc, ref_utc_2)
-                cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % 6)
+                cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % self.cycle_hours)
                 cycle_start -= timedelta(hours=self.cycle_hours*cycle_shift)
                 logging.info('forecast cycle start selected as %s' % cycle_start)
 
@@ -91,12 +92,17 @@ class GribForecast(GribSource):
                 nonlocals = [x for x in grib_files if not self.grib_available_locally(osp.join(self.ingest_dir, x))]
     
                 # check if GRIBs we don't are available remotely
-                url_base = self.remote_url
-                logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
-                unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
+                url_bases = self.remote_url
+                if isinstance(url_bases,str):
+                    url_bases = [url_bases]
+                for url_base in url_bases:
+                    logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
+                    unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
+                    if len(unavailables) == 0:
+                        break
                 if len(unavailables) > 0:
                     logging.warning('%s failed retrieving cycle data for cycle %s, unavailables %s'
-                    % (self.id, cycle_start, repr(unavailables)))
+                                         % (self.id, cycle_start, repr(unavailables)))
                     cycle_shift += 1
                     continue
     

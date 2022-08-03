@@ -472,7 +472,7 @@ def vars_add_to_geogrid(js):
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     for var,tif_file in six.iteritems(geo_vars):
-        bbox = js.bounds[str(js.max_dom)]
+        bbox = js.bounds[str(js.min_sub_dom)]
         logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
         try:
             GeoDriver.from_file(tif_file).to_geogrid(geo_data_path,var,bbox)
@@ -503,45 +503,49 @@ def fmda_add_to_geogrid(js):
     """
     if 'fmda_geogrid_path' in js:
         fmda_geogrid_path = osp.abspath(js['fmda_geogrid_path'])
-        logging.info('fmda_geogrid_path is %s' % fmda_geogrid_path)
-        fmda_geogrid_basename = osp.basename(fmda_geogrid_path)
-        sym_fmda_geogrid_path = osp.join(js.wps_dir,fmda_geogrid_basename)
-        symlink_unless_exists(fmda_geogrid_path,sym_fmda_geogrid_path)
-        logging.info('fmda_geogrid_path is linked to %s' % sym_fmda_geogrid_path)
+        if osp.exists(fmda_geogrid_path):
+            logging.info('fmda_add_to_geogrid - fmda_geogrid_path is %s' % fmda_geogrid_path)
+            fmda_geogrid_basename = osp.basename(fmda_geogrid_path)
+            sym_fmda_geogrid_path = osp.join(js.wps_dir,fmda_geogrid_basename)
+            symlink_unless_exists(fmda_geogrid_path,sym_fmda_geogrid_path)
+            logging.info('fmda_add_to_geogrid - fmda_geogrid_path is linked to %s' % sym_fmda_geogrid_path)
+        else:
+            logging.warning('fmda_add_to_geogrid - fmda_geogrid_path not exist')
+            return
     else:
+        logging.info('fmda_add_to_geogrid - fmda_geogrid_path not given')
         return
-        logging.info('fmda_geogrid_path not given')
     try:
         index_path = osp.join(fmda_geogrid_path,'index.json')
         index = json.load(open(index_path,'r'))
-        logging.info('Loaded fmda geogrid index at %s' % index_path)
+        logging.info('fmda_add_to_geogrid - loaded fmda geogrid index at %s' % index_path)
     except:
-        logging.error('Cannot open %s' % index_path)
-        raise Exception('Failed opening index file {}'.format(index_path))
+        logging.error('fmda_add_to_geogrid - cannot open %s' % index_path)
+        raise Exception('fmda_add_to_geogrid - failed opening index file {}'.format(index_path))
     geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
-    logging.info('fmda_add_to_geogrid reading longitudes and latitudes from NetCDF file %s' % geo_path )
+    logging.info('fmda_add_to_geogrid - reading longitudes and latitudes from NetCDF file %s' % geo_path )
     with nc4.Dataset(geo_path,'r') as d:
         lats = d.variables['XLAT'][:,:]
         lons = d.variables['XLONG'][:,:]
     ndomains = len(js['domains'])
     lat,lon = js['domains'][str(ndomains)]['center_latlon'] if 'center_latlon' in js['domains'][str(ndomains)] else js['domains']['1']['center_latlon']
     bbox = (np.min(lats), np.min(lons), np.max(lats), np.max(lons))
-    logging.info('fmda_add_to_geogrid: fmda bounding box is %s %s %s %s' % bbox)
+    logging.info('fmda_add_to_geogrid - fmda bounding box is %s %s %s %s' % bbox)
     i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)  
     if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
-        logging.error('fmda_add_to_geogrid: WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
-        raise OSError('{} is not correct geolocated compared to WRF domain'.format(fmda_geogrid_path))
+        logging.error('fmda_add_to_geogrid - WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
+        raise OSError('fmda_add_to_geogrid - {} is not correct geolocated compared to WRF domain'.format(fmda_geogrid_path))
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
     geogrid_tbl_json_path = osp.join(fmda_geogrid_path,'geogrid_tbl.json')
-    logging.info('fmda_add_to_geogrid: updating GEOGRID.TBL at %s from %s' % 
+    logging.info('fmda_add_to_geogrid - updating GEOGRID.TBL at %s from %s' % 
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in six.iteritems(geogrid_tbl_json):
         vartable['abs_path'] = osp.join(js.wps_dir,fmda_geogrid_basename,osp.basename(vartable['abs_path']))
         vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
-        logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
+        logging.info('fmda_add_to_geogrid - GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
 
     
@@ -741,7 +745,8 @@ def execute(args,job_args):
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
-
+    if 'fmda_geogrid_path' in js.args:
+        js.fire_nml['moisture']['fmc_gc_initialization'] = [0,0,0,2,1]
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
         logging.debug('namelist.fire_emissions given, turning on tracers')
@@ -763,7 +768,7 @@ def execute(args,job_args):
         logging.error('Real step failed with exception %s, retrying ...' % str(e))
         Real(js.wrf_dir).execute().check_output()
     # write subgrid coordinates in input files
-    subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 0).all()]
+    subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()]
     for in_path in subgrid_wrfinput_files:
     	fill_subgrid(osp.join(js.wrf_dir, in_path))
 
@@ -819,8 +824,16 @@ def wrf_execute(job_id):
 
 def process_output(job_id):
     args = load_sys_cfg()
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+    logging.info('process_output: loading input description from %s' % inpfile)
+    try:
+        jsin = Dict(json.load(open(inpfile,'r')))
+    except Exception as e:
+        logging.error('Cannot load the input description file %s' % inpfile)
+        logging.error('%s' % e)
+        sys.exit(1)
     logging.info('process_output: loading job description from %s' % jobfile)
     try:
         js = Dict(json.load(open(jobfile,'r')))
@@ -846,7 +859,7 @@ def process_output(job_id):
     js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
-    js.wrf_dir = osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf'))
+    js.wrf_dir = js.get('wrf_dir',osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf')))
 
     pp = None
     if js.postproc is None:
@@ -857,19 +870,19 @@ def process_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
+    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
     else:
         already_sent_files = [x for x in os.listdir(js.pp_dir) if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
-    prod_name = 'wfc-' + js.grid_code
-    pp = Postprocessor(js.pp_dir, prod_name)
+    js.prod_name = js.get('prod_name', 'wfc-' + js.grid_code)
+    pp = Postprocessor(js.pp_dir, js.prod_name)
     if 'tslist' in js.keys() and js.tslist is not None:
         ts = Timeseries(js.pp_dir, prod_name, js.tslist, js.num_doms)
     else:
         ts = None
-    js.manifest_filename= 'wfc-' + js.grid_code + '.json'
+    js.manifest_filename= js.get('manifest_filename', 'wfc-' + js.grid_code + '.json')
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
     tif_proc = js.postproc.get('tif_proc', False)
 
@@ -1000,7 +1013,7 @@ def process_output(job_id):
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
-                        logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
+                        logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
         else:
             if not wait_wrfout:
                 logging.info('Waiting for wrfout')
@@ -1016,7 +1029,7 @@ def process_output(job_id):
             send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         if js.postproc.get('shuttle', None) is not None:
-            steps = ','.join(['1' for x in js.postproc.keys() if len(x) == 1])
+            steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
             args = ' '.join([js.job_id,steps,'inc'])
             make_kmz(args)
             args = ' '.join([js.job_id,steps,'ref'])
@@ -1053,8 +1066,16 @@ def create_process_output_script(job_id):
 
 def process_sat_output(job_id):
     args = load_sys_cfg()
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
     jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
     satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+    logging.info('process_output: loading input description from %s' % inpfile)
+    try:
+        jsin = Dict(json.load(open(inpfile,'r')))
+    except Exception as e:
+        logging.error('Cannot load the input description file %s' % inpfile)
+        logging.error('%s' % e)
+        sys.exit(1)
     logging.info('process_sat_output: loading job description from %s' % jobfile)
     try:
         js = Dict(json.load(open(jobfile,'r')))
@@ -1087,14 +1108,14 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = osp.join(args.workspace_path, js.job_id, "products")
+    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
     else:
         already_sent_files = [x for x in os.listdir(js.pp_dir) if not x.endswith('json')]
     pp = Postprocessor(js.pp_dir, 'wfc-' + js.grid_code)
-    js.manifest_filename= 'wfc-' + js.grid_code + '.json'
+    js.manifest_filename= js.get('manifest_filename', 'wfc-' + js.grid_code + '.json')
     logging.debug('Postprocessor created manifest %s',js.manifest_filename)
     domains = sorted([int(x) for x in [x for x in js.postproc if len(x) == 1]])
     for dom_id in domains:
@@ -1122,7 +1143,7 @@ def process_sat_output(job_id):
                             sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
-                        logging.warning('Failed sending potprocess results to the server with error %s' % str(e))
+                        logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
 
     # if we are to send out the postprocessed files after completion, this is the time
     if js.postproc.get('shuttle', None) == 'on_completion':
@@ -1131,7 +1152,7 @@ def process_sat_output(job_id):
         send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
     if js.postproc.get('shuttle', None) is not None:
-        steps = ','.join(['1' for x in js.postproc.keys() if len(x) == 1])
+        steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
         args = ' '.join([js.job_id,steps,'inc'])
         make_kmz(args)
         args = ' '.join([js.job_id,steps,'ref'])
@@ -1254,6 +1275,7 @@ def process_arguments(job_args,sys_cfg):
     args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
     args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
     args['max_dom'] = max([int(x) for x in [x for x in args['domains'] if len(x) == 1]])
+    args['min_sub_dom'] = min([int(x) for x in [x for x in args['domains'] if len(x) == 1] if (np.array(args['domains'][x].get('subgrid_ratio',[0,0])) > 0).all()])
     args['max_dom_pp'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
     args['satprod_satsource'] = Dict({})
 

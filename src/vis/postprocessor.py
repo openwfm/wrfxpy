@@ -305,7 +305,9 @@ class Postprocessor(object):
             fa.mask = m                    # restore the mask
 
         # define distribution of colormap if necessary 
+        norm = None
         ticks = None
+        ticklabels = None
         if 'norm_opt' in wisdom: 
             norm_opt = wisdom['norm_opt']
             if norm_opt == 'lognorm':
@@ -314,6 +316,11 @@ class Postprocessor(object):
                 norm = lambda xmin,xmax: mpl.colors.SymLogNorm(linthresh=linthresh,linscale=linscale,vmin=xmin,vmax=xmax,base=10) 
             elif norm_opt == 'boundary':
                 bounds = wisdom.get('bounds',[0,1,2,4,6,8,12,16,20,25,30,40,60,100,200])
+                if 'labels' in wisdom and wisdom['labels'] is not None:
+                    ticklabels = wisdom['labels']
+                elif wisdom['colorbar'] is not None:
+                    cb_unit = wisdom['colorbar']
+                    ticklabels = [convert_value(native_unit, cb_unit, b) for b in bounds[1:]]
                 ticks = bounds[1:]
                 bounds = bounds + [1e10]
                 colors = wisdom.get('colors',np.array([(255,255,255),(197,234,252),(148,210,240),
@@ -325,8 +332,6 @@ class Postprocessor(object):
                 norm = lambda xmin,xmax: mpl.colors.BoundaryNorm(boundaries=bounds,ncolors=len(bounds))
             else:
                 norm = lambda xmin,xmax: mpl.colors.Normalize(xmin,xmax) 
-        else:
-            norm = None 
 
         # only create the colorbar if requested
         cb_png_data = None
@@ -337,7 +342,7 @@ class Postprocessor(object):
             legend = wisdom['name'] + ' ' + cb_unit
             logging.info('_scalar2raster: variable %s colorbar from %s to %s %s' % (var, cbu_min,cbu_max, legend))
             spacing = wisdom.get('spacing','proportional')
-            cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm)
+            cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm,ticklabels=ticklabels)
         else:
             levels = None
 
@@ -380,6 +385,7 @@ class Postprocessor(object):
         wisdom = get_wisdom(var).copy()
         wisdom.update(self.wisdom_update.get(var, {}))
         native_unit = wisdom['native_unit']
+        cmap_name = wisdom.get('colormap')
         u_name, v_name = wisdom['components']
         lat, lon = wisdom['grid'](d)
 
@@ -414,9 +420,76 @@ class Postprocessor(object):
             v[v < fa_min] = fa_min
             v[v > fa_max] = fa_max
 
-        # create the raster & get coordinate bounds, HACK to get better quiver resolution
+        # HACK to get better quiver resolution
         s = 3
-        raster_png_data,corner_coords = basemap_barbs_mercator(u[::s,::s],v[::s,::s],lat[::s,::s],lon[::s,::s])
+        cb_png_data = None
+        levels = None
+        if cmap_name is not None:
+            # create speed array and calculat min and max
+            speed_formula = wisdom.get('speed_formula',lambda u,v: np.sqrt(u**2+v**2))
+            fa = speed_formula(u,v)
+            fa_min,fa_max = np.nanmin(fa),np.nanmax(fa)
+            if 'speed_scale' in wisdom: 
+                speed_scale = wisdom['speed_scale']
+                fa_min, fa_max = speed_scale[0], speed_scale[1]
+                m = fa.mask.copy()             # save mask, resetting values below will destroy the mask
+                fa[fa < fa_min] = fa_min
+                fa[fa > fa_max] = fa_max
+                fa.mask = m
+            # replace masked values by nans just in case
+            fa.data[fa.mask]=np.nan
+            fa.fill_value=np.nan
+            logging.info('_vector2scalar: variable %s elements %s count %s not masked %s min %s max %s scale min %s max %s'
+                        % (var, fa.size , fa.count(), np.count_nonzero(fa.mask == False), np.nanmin(fa), np.nanmax(fa), fa_min, fa_max))
+            # create cmap
+            cmap = mpl.cm.get_cmap(cmap_name)
+            # check for 'transparent' color value and mask
+            if 'transparent_values' in wisdom:
+                rng = wisdom['transparent_values']
+                fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
+            else:
+                fa=np.ma.masked_array(fa)
+            # define distribution of colormap if necessary
+            norm = None
+            ticks = None
+            ticklabels = None
+            if 'norm_opt' in wisdom:
+                norm_opt = wisdom['norm_opt']
+                if norm_opt == 'lognorm':
+                    linthresh = wisdom.get('linthresh',.01)
+                    linscale = wisdom.get('linscale',.001)
+                    norm = lambda xmin,xmax: mpl.colors.SymLogNorm(linthresh=linthresh,linscale=linscale,vmin=xmin,vmax=xmax,base=10)
+                elif norm_opt == 'boundary':
+                    bounds = wisdom.get('bounds',[0,1,2,4,6,8,12,16,20,25,30,40,60,100,200])
+                    if 'labels' in wisdom and wisdom['labels'] is not None:
+                        ticklabels = wisdom['labels']
+                    elif wisdom['colorbar'] is not None:
+                        cb_unit = wisdom['colorbar']
+                        ticklabels = [convert_value(native_unit, cb_unit, b) for b in bounds[1:]]
+                    ticks = bounds[1:]
+                    bounds = bounds + [1e10]
+                    colors = wisdom.get('colors',np.array([(255,255,255),(197,234,252),(148,210,240),
+                                                       (107,170,213),(72,149,176),(74,167,113),
+                                                       (114,190,75),(203,217,88),(249,201,80),
+                                                       (245,137,56),(234,84,43),(217,45,43),
+                                                       (188,28,32),(156,22,27),(147,32,205)])/255.)
+                    cmap = mpl.colors.LinearSegmentedColormap.from_list('custom',colors,N=len(colors))
+                    norm = lambda xmin,xmax: mpl.colors.BoundaryNorm(boundaries=bounds,ncolors=len(bounds))
+                else:
+                    norm = lambda xmin,xmax: mpl.colors.Normalize(xmin,xmax)
+            # only create the colorbar if requested
+            if wisdom['colorbar'] is not None:
+                cb_unit = wisdom['colorbar']
+                cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
+                #  colorbar + add it to the KMZ as a screen overlay
+                legend = wisdom['name'] + ' ' + cb_unit
+                logging.info('_vector2raster: variable %s colorbar from %s to %s %s' % (var, cbu_min, cbu_max, legend))
+                spacing = wisdom.get('spacing','proportional')
+                cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,legend,ticks=ticks,spacing=spacing,norm=norm,ticklabels=ticklabels)
+            raster_png_data,corner_coords = basemap_barbs_mercator(u[::s,::s],v[::s,::s],lat[::s,::s],lon[::s,::s],fa[::s,::s],fa_min,fa_max,cmap,norm=norm)
+        else:
+            # create the raster & get coordinate bounds
+            raster_png_data,corner_coords = basemap_barbs_mercator(u[::s,::s],v[::s,::s],lat[::s,::s],lon[::s,::s])
 
         # create GeoTIFF file
         if tif_args:
@@ -432,7 +505,7 @@ class Postprocessor(object):
             gt = tif_args.get('geot')
             GeoDriver.from_elements(np.array([u, v]), crs, gt).to_geotiff(tif_path, desc = [uw['name'], vw['name']], unit = native_unit, ndv = ndv)
 
-        return raster_png_data, corner_coords
+        return raster_png_data, corner_coords, cb_png_data, levels
 
 
     def _sat2raster(self, dgs, dfs, gts, sat, bounds):
@@ -590,13 +663,20 @@ class Postprocessor(object):
         :return: the path to the raster and the bounding coordinates
         """
         # render the raster & colorbar
-        raster_png_data, corner_coords = self._vector2raster(d, var, tndx, **tif_args)
+        raster_png_data, corner_coords, cb_png_data, levels = self._vector2raster(d, var, tndx, **tif_args)
 
         raster_path = out_path + '-raster.png'
         with open(raster_path, 'wb') as f:
             f.write(raster_png_data)
 
-        return raster_path, corner_coords
+        # write colorbar file
+        colorbar_path = None
+        if cb_png_data is not None:
+            colorbar_path = out_path + "-cb.png"
+            with open(colorbar_path, "wb") as f:
+                f.write(cb_png_data)
+
+        return raster_path, colorbar_path, corner_coords, levels
 
 
     def _sat2png(self, dgs, dfs, gts, sat, bounds, out_path):
@@ -735,7 +815,18 @@ class Postprocessor(object):
             doc.timespan.end=ts_esmf_end.replace('_','T')+'Z'
 
         # generate the png files
-        raster_path, corner_coords = self._vector2png(d, var, tndx, out_path, **tif_args)
+        raster_path, cb_path, corner_coords, levels = self._vector2png(d, var, tndx, out_path, **tif_args)
+
+        # add colorbar to KMZ
+        if cb_path is not None:
+            cbo = doc.newscreenoverlay(name='colorbar')
+            cbo.overlayxy = kml.OverlayXY(x=0,y=1,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
+            cbo.screenxy = kml.ScreenXY(x=0.02,y=0.95,xunits=kml.Units.fraction,yunits=kml.Units.fraction)
+            cbo.size = kml.Size(x=150,y=300,xunits=kml.Units.pixels,yunits=kml.Units.pixels)
+            cbo.color = kml.Color.rgb(255,255,255,a=150)
+            cbo.visibility = 1
+            #doc.addfile(cb_path)
+            cbo.icon.href=cb_path
 
         # add ground overlay
         ground = doc.newgroundoverlay(name=var,color='80ffffff')
@@ -751,7 +842,7 @@ class Postprocessor(object):
         if cleanup:
             os.remove(raster_path)
 
-        return kmz_path, raster_path, corner_coords
+        return kmz_path, raster_path, cb_path, corner_coords, levels
 
 
     def _sat2kmz(self, dgs, dfs, gts, sat, ts_esmf_begin, ts_esmf_end, bounds, out_path, cleanup = True):
@@ -1079,13 +1170,13 @@ class Postprocessor(object):
                     tif_args = {}
                 kmz_path, raster_path, cb_path, coords, levels, mf_upd = None, None, None, None, None, {}
                 if is_windvec(var):
-                    kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False, **tif_args)
+                    kmz_path,raster_path,cb_path,coords,levels = self._vector2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False, **tif_args)
                 else:
                     kmz_path,raster_path,cb_path,coords,levels = self._scalar2kmz(d, var, tndx, ts_esmf, None, outpath_base, cleanup=False, **tif_args)
-                    if levels is not None:
-                        mf_upd['levels'] = levels
-                    if cb_path is not None:
-                        mf_upd['colorbar'] = osp.basename(cb_path)
+                if levels is not None:
+                    mf_upd['levels'] = levels
+                if cb_path is not None:
+                    mf_upd['colorbar'] = osp.basename(cb_path)
                 mf_upd['kml'] = osp.basename(kmz_path)
                 mf_upd['raster'] = osp.basename(raster_path)
                 mf_upd['coords'] = coords
@@ -1132,7 +1223,7 @@ class Postprocessor(object):
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var)
                 kmz_path = None
                 if is_windvec(var):
-                    kmz_path,_,_ = self._vector2kmz(d, var, tndx, ts_esmf, outpath_base)
+                    kmz_path,_,_,_,_ = self._vector2kmz(d, var, tndx, ts_esmf, outpath_base)
                 else:
                     kmz_path,_,_,_,_ = self._scalar2kmz(d, var, tndx, ts_esmf, outpath_base)
                 kmz_name = osp.basename(kmz_path)
@@ -1167,17 +1258,15 @@ class Postprocessor(object):
             try:
                 outpath_base = os.path.join(self.output_path, self.product_name + ("-%02d-" % dom_id) + ts_esmf + "-" + var)
                 if is_windvec(var):
-                    raster_path, coords = self._vector2png(d, var, tndx, outpath_base)
-                    raster_name = osp.basename(raster_path)
-                    self._update_manifest(dom_id, ts_esmf, var, { 'raster' : raster_name, 'coords' : coords})
+                    raster_path, cb_path, coords, levels = self._vector2png(d, var, tndx, outpath_base)
                 else:
                     raster_path, cb_path, coords, levels = self._scalar2png(d, var, tndx, outpath_base)
-                    mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords}
-                    if cb_path is not None:
-                        mf_upd['colorbar'] = osp.basename(cb_path)
-                    if levels is not None:
-                        mf_upd['levels'] = levels
-                    self._update_manifest(dom_id, ts_esmf, var, mf_upd)
+                mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords}
+                if cb_path is not None:
+                    mf_upd['colorbar'] = osp.basename(cb_path)
+                if levels is not None:
+                    mf_upd['levels'] = levels
+                self._update_manifest(dom_id, ts_esmf, var, mf_upd)
             except Exception as e:
                 logging.warning("Exception %s while postprocessing %s for time %s into PNG" % (e, var, ts_esmf))
                 logging.warning(traceback.print_exc())
@@ -1206,30 +1295,27 @@ class Postprocessor(object):
                 try:
                     outpath_base = os.path.join(self.output_path, self.product_name + '-' + ts_esmf + '-' + var)
                     if is_windvec(var):
-                        kmz_path,raster_path,coords = self._vector2kmz(d, var, tndx, ts_esmf, outpath_base, cleanup=False)
-                        raster_name = osp.basename(raster_path)
-                        kmz_name = osp.basename(kmz_path)
-                        self._update_manifest(dom_id, ts_esmf, var, { 'raster' : raster_name, 'coords' : coords, 'kml' : kmz_name})
+                        kmz_path,raster_path,cb_path,coords,levels = self._vector2kmz(d, var, tndx, ts_esmf, outpath_base, cleanup=False)
                     else:
                         kmz_path,raster_path,cb_path,coords,levels = self._scalar2kmz(d, var, tndx, ts_esmf, outpath_base, cleanup=False)
-                        mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords, 'kml' : osp.basename(kmz_path) }
-                        if cb_path is not None:
-                            # optimization for display when we know colorbar has fixed scale
-                            # we memoize the colorbar computed at time 0 and use it for all frames
-                            # although other colorbars are generated, they are deleted
-                            scale = self.wisdom_update.get('scale', get_wisdom(var)['scale'])
-                            if type(scale) == list and np.isfinite(scale[0]) and np.isfinite(scale[1]):
-                                logging.info("Using fixed colorbar strategy for variable " + var)
-                                if tndx == 0:
-                                    fixed_colorbars[var] = osp.basename(cb_path)
-                                else:
-                                    os.remove(cb_path)
-                                mf_upd['colorbar'] = fixed_colorbars[var]
+                    mf_upd = { 'raster' : osp.basename(raster_path), 'coords' : coords, 'kml' : osp.basename(kmz_path) }
+                    if cb_path is not None:
+                        # optimization for display when we know colorbar has fixed scale
+                        # we memoize the colorbar computed at time 0 and use it for all frames
+                        # although other colorbars are generated, they are deleted
+                        scale = self.wisdom_update.get('scale', get_wisdom(var)['scale'])
+                        if type(scale) == list and np.isfinite(scale[0]) and np.isfinite(scale[1]):
+                            logging.info("Using fixed colorbar strategy for variable " + var)
+                            if tndx == 0:
+                                fixed_colorbars[var] = osp.basename(cb_path)
                             else:
-                                mf_upd['colorbar'] = osp.basename(cb_path)
-                        if levels is not None:
-                            mf_upd['levels'] = levels
-                        self._update_manifest(dom_id, ts_esmf, var, mf_upd)
+                                os.remove(cb_path)
+                            mf_upd['colorbar'] = fixed_colorbars[var]
+                        else:
+                            mf_upd['colorbar'] = osp.basename(cb_path)
+                    if levels is not None:
+                        mf_upd['levels'] = levels
+                    self._update_manifest(dom_id, ts_esmf, var, mf_upd)
                 except Exception as e:
                     logging.warning("Exception %s while postprocessing %s for time %s" % (e, var, ts_esmf))
                     logging.warning(traceback.print_exc())

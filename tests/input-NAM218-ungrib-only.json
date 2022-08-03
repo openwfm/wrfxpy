@@ -4,7 +4,6 @@
     "grib_source": "NAM218",
     "start_utc": "T-30",
     "end_utc": "T+120",
-    "cycle_start_utc": "T-180",
     "download_whole_cycle": true,
     "ungrib_only": true, 
     "wps_namelist_path": "etc/nlists/default.wps",

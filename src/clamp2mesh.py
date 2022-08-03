@@ -102,7 +102,7 @@ def interpolate_coords(lons,lats,srx,sry,extrap=True):
     for y in range(t0.shape[0]):
         for x in range(t0.shape[1]):
             lonsr[j0f+y:j1f+y:sry,i0f+x:i1f+x:srx] = t0[y,x]*lon0+t1[y,x]*lon1+t2[y,x]*lon2+t3[y,x]*lon3
-            latsr[j0f+y:j1f+y:sry,i0f+x:j1f+x:srx] = t0[y,x]*lat0+t1[y,x]*lat1+t2[y,x]*lat2+t3[y,x]*lat3
+            latsr[j0f+y:j1f+y:sry,i0f+x:i1f+x:srx] = t0[y,x]*lat0+t1[y,x]*lat1+t2[y,x]*lat2+t3[y,x]*lat3
 
     if extrap:
         return lonsr[sry:-sry,srx:-srx],latsr[sry:-sry,srx:-srx]
