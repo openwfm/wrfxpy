@@ -79,9 +79,12 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % token})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % token})   
         else:
             r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
-        content_size = int(r.headers.get('content-length',0))
-        if content_size == 0:
-            raise IOError('download_url content size is equal to 0')
+        if 'content-length' in r.headers.keys():
+            content_size = int(r.headers.get('content-length',0))
+            if content_size == 0:
+                raise IOError('download_url content size is equal to 0')
+        else:
+            logging.warning('download_url not header contet-length information')
     except Exception as e:
         if max_retries > 0:
             # logging.error(str(e))
@@ -109,12 +112,18 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
         r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % token})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % token})
     else:
         r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
-    content_size = int(r.headers.get('content-length',0))
+    if 'content-length' in r.headers.keys():
+        content_size = int(r.headers.get('content-length',0))
+        if content_size == 0:
+            raise IOError('download_url content size is equal to 0')
+    else:
+        content_size = None
+        logging.warning('download_url not header contet-length information')
 
-    logging.info('local file size %d remote content size %d minimum size %d' % (file_size, content_size, min_size))
+    logging.info('local file size {} remote content size {} minimum size {}'.format(file_size, content_size, min_size))
 
     # it should be != but for some reason content_size is wrong sometimes
-    if int(file_size) < int(content_size) or int(file_size) < min_size:
+    if content_size is not None and int(file_size) < int(content_size) or int(file_size) < min_size:
         logging.warning('wrong file size, download_url trying again, retries available %d' % max_retries)
         if max_retries > 0:
             # call the entire function recursively, this will attempt to redownload the entire file
