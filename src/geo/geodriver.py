@@ -1,7 +1,8 @@
 # geodriver.py
 # Angel Farguell, March 2020
 
-import gdal, osr, pyproj, rasterio
+from osgeo import gdal, osr
+import pyproj, rasterio
 import logging
 from utils import Dict
 import numpy as np
@@ -161,6 +162,7 @@ class GeoDriver(object):
         else:
             _,self.ny,self.nx = a_r.shape
         self.resampled = True
+        self.bbox = bbox
         return a_r
 
     def geogrid_index(self):
