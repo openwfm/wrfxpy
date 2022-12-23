@@ -560,18 +560,19 @@ class response_object(object):
     def __init__(self,status_code):
         self.status_code = status_code
 
-
-def readhead(url,msg_level=1):
+def readhead(url,msg_level=1,retries=10):
     if msg_level > 0:
         logging.info('reading http head of %s ' % url)
-    try:
-        ret=requests.head(url)
-        ret.raise_for_status()
-    #except (requests.RequestException, requests.exceptions.Timeout, requests.exceptions.TooManyRedirects, requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.Timeout) as e:
-    except Exception as e:
-        if msg_level > 0:
-            logging.error(e)
-        ret = response_object(-1)
+    for n in range(retries):
+        try:
+            ret=requests.head(url)
+            ret.raise_for_status()
+        except Exception as e:
+            if msg_level > 0:
+                logging.error(e)
+            ret = response_object(-1)
+        if ret.status_code == 200:
+            break
     return ret
 
 def json2xml(d):
