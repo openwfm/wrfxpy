@@ -2,7 +2,7 @@
 # Angel Farguell, March 2020
 
 from osgeo import gdal, osr
-import pyproj, rasterio
+import pyproj
 import logging
 from utils import Dict
 import numpy as np
@@ -56,12 +56,14 @@ class GeoDriver(object):
         self.gt = self.ds.GetGeoTransform()
         # get proj4 string
         self.proj4 = self.crs.ExportToProj4()
-        # get rasterio object 
-        self.rasterio = rasterio.crs.CRS.from_proj4(self.proj4)
         # get pyproj element for tif file
         self.pyproj = pyproj.Proj(self.proj4)
         # projection short string
-        self.projstr = self.rasterio.to_dict().get('proj','longlat')
+        proj_list = [p for p in self.proj4.split(' ') if 'proj' in p]
+        if len(proj_list):
+            self.projstr = proj_list[0].split('=')[-1]
+        else:
+            self.projstr = ''
         # WPS projections from proj4 attribute +proj
         self.projwrf = {'lcc': 'lambert',
             'stere': 'polar',
