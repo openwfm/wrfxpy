@@ -164,20 +164,20 @@ def clamp2mesh(nc_path,x,y):
         sry = int(d.dimensions['south_north_subgrid'].size/(d.dimensions['south_north'].size+1))
 
     if 'FXLONG' in varis and 'FXLAT' in varis and array_filled(d.variables['FXLONG']) and array_filled(d.variables['FXLAT']):
-        logging.info('> fxlong and fxlat exist')
+        logging.info('fxlong and fxlat exist')
         lons = np.array(d.variables['FXLONG'][0])
         lats = np.array(d.variables['FXLAT'][0])
     elif 'XLONG_M' in varis and 'XLAT_M' in varis:
-        logging.info('> fxlong and fxlat does not exist')
+        logging.info('fxlong and fxlat does not exist')
         lons_atm = np.array(d.variables['XLONG_M'][0])
         lats_atm = np.array(d.variables['XLAT_M'][0])
-        logging.info('> interpolating xlong_m to fxlong and xlat_m to fxlat...')
+        logging.info('interpolating xlong_m to fxlong and xlat_m to fxlat...')
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
     elif 'XLONG' in varis and 'XLAT' in varis:
-        logging.info('> fxlong and fxlat does not exist')
+        logging.info('fxlong and fxlat does not exist')
         lons_atm = np.array(d.variables['XLONG'][0])
         lats_atm = np.array(d.variables['XLAT'][0])
-        logging.info('> interpolating xlong to fxlong and xlat to fxlat...')
+        logging.info('interpolating xlong to fxlong and xlat to fxlat...')
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
     else:
         logging.error('%s NetCDF file has not coordinates specified' % nc_path)

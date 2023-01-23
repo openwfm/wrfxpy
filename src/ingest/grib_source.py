@@ -207,6 +207,7 @@ class GribSource(object):
             if len(available) > 0:
                 self.remote_url = url_base
                 return available[0]
+        logging.error('grib_source.available_online - online file not existent, urls tried:\n {}'.format([url_base + '/' + link for url_base in url_bases for link in links]))
         raise GribError('GribSource: failed to find an available online file')
 
 
