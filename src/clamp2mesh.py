@@ -139,8 +139,14 @@ def fill_subgrid(nc_path):
             logging.warning('atmospheric coordinates not found, skipping')
             return
         lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
-    d['FXLONG'][:] = lons[np.newaxis,:,:]
-    d['FXLAT'][:] = lats[np.newaxis,:,:]
+    if 'FXLONG' in d.variables.keys():
+        d['FXLONG'][:] = lons[np.newaxis,:,:]
+        d['FXLAT'][:] = lats[np.newaxis,:,:]
+    else:
+        fxlong = d.createVariable("FXLONG","f4",("Time","south_north_subgrid","west_east_subgrid")) 
+        fxlat = d.createVariable("FXLAT","f4",("Time","south_north_subgrid","west_east_subgrid")) 
+        fxlong[:] = lons[np.newaxis,:,:]
+        fxlat[:] = lats[np.newaxis,:,:]
     d.close()
     return
 
@@ -190,7 +196,11 @@ def clamp2mesh(nc_path,x,y):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     # process arguments
-    self, path, x, y  = sys.argv
-    nlon, nlat =  clamp2mesh(path,float(x),float(y))
-    logging.info('%f %f\n' % (nlon, nlat))
-
+    if len(sys.argv) == 4:
+        self, path, x, y  = sys.argv
+        nlon, nlat =  clamp2mesh(path,float(x),float(y))
+        logging.info('%f %f\n' % (nlon, nlat))
+    elif len(sys.argv) == 2:
+        self, path = sys.argv
+        fill_subgrid(path)
+        logging.info('filled subgrid coordinates in {}'.format(path))
