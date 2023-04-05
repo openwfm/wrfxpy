@@ -231,6 +231,7 @@ def fit_tsm_lstsq(obs_data, X):
     norms = np.sum(Xobs**2, axis = 0) ** 0.5
     nz_covs = np.nonzero(norms)[0]
     Ncov = len(nz_covs)
+    logging.info('trend_surface_model.fit_tsm_lstsq - final number of covariates {}'.format(Ncov))
     X = X[:,:,nz_covs]
     Xobs = Xobs[:,nz_covs]
     norms = norms[nz_covs]
