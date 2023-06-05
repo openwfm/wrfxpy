@@ -17,7 +17,7 @@
 #        /pub/volcat/fire_csv/NGFS_daily/GOES-WEST/CONUS
 #        NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
 
-
+import numpy as np
 import pandas as pd
 import csv
 import sys
@@ -36,19 +36,120 @@ import simple_forecast as sf
 class ngfs_incident():
    def __init__(self,name):
       self.name = name
+      self.data = pd.DataFrame()
+      self.new = False
    #add a pandas dataframe subset from csv
    #def add_process_date(self,df):
    #   self.process_date = 
    def add_incident_id_string(self,id_string):
       self.incident_id_string = id_string
    def add_detections(self,df):
-      self.data = df
+      self.data = self.data.append(df)
    def add_incident_start_time(self):
       if self.data.shape[0] > 0:
          self.incident_start_time = self.data.iloc[0,3]
       else:
          self.incident_start_time = 'Unset start time'
+   def new_incident(self):
+      self.new = True
    #def add_ignition(self):
+   
+ #def autostart(job_json):
+   #
+   
+def get_ngfs_csv(days_previous,goes):
+  #downloads NGFS csv files from 0 to 4 days previous to now
+  #   to download today's csv: get_ngfs_csv(0)
+  #example csv name:
+  #   NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
+   
+  ngfs_dir = 'ingest/NGFS'
+  print('    Will download to: ',utils.make_dir(ngfs_dir))
+   
+  #name the csv file
+  csv_day = datetime.now() - timedelta(days = days_previous)
+  day_of_year = csv_day.timetuple().tm_yday
+  yyyy = csv_day.timetuple().tm_year
+  mm = csv_day.timetuple().tm_mon
+  dd = csv_day.timetuple().tm_mday
+  
+  
+  
+  if goes == 18:
+   csv_str = 'NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_'+str(yyyy)+'_'+str(mm).zfill(2)+'_'+str(dd).zfill(2)+'_'+str(day_of_year)+'.csv'
+   csv_url = 'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-WEST/CONUS/'+csv_str
+  else:
+   csv_str = 'NGFS_FIRE_DETECTIONS_GOES-16_ABI_CONUS_'+str(yyyy)+'_'+str(mm).zfill(2)+'_'+str(dd).zfill(2)+'_'+str(day_of_year)+'.csv'
+   csv_url = 'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-EAST/CONUS/'+csv_str
+  
+  print('    Downloading: ',csv_str)
+  csv_path = ngfs_dir+'/'+csv_str
+  #downloading
+  download_url(csv_url,csv_path)
+  return csv_str, csv_path
+   
+   
+def make_job_configuration():
+   #check to see if a  base ngfs configuration file exists
+   if utils.file_exists('jobs/base_ngfs_cfg.json'):
+     print('Configuration found')
+     with open('jobs/base_ngfs_cfg.json','r') as openfile:
+        temp_cfg = json.load(openfile)
+     json_print = json.dumps(temp_cfg, indent=4)   
+     #print(json_print)
+     start_utc = utils.esmf_to_utc(temp_cfg['start_utc']) #esmf_to_utc
+     end_utc = utils.esmf_to_utc(temp_cfg['end_utc'])
+     forecast_length = end_utc-start_utc
+     print('   Forecast length: ',forecast_length)
+     print('   Ignition duration: ',temp_cfg['ignitions']['1'][0]['duration_s'], 'seconds')
+     print('   Cell size: ', temp_cfg['domains']['1']['cell_size'])
+     print('   Domain size: ', temp_cfg['domains']['1']['domain_size'])
+     print('   Number of cores: ',temp_cfg['ppn'])
+     print('   Number of nodes: ',temp_cfg['num_nodes'])
+     print('   Wall time: ',temp_cfg['wall_time_hrs'], 'hours')
+     sf.print_question('Use base configuration above? yes/no, default = [yes]')
+     use_base_cfg = sf.read_boolean('yes')
+     if use_base_cfg:
+        base_cfg = temp_cfg
+     else:
+        base_cfg = sf.questionnaire()   
+   else:
+      # standard configuration to be used by all forecasts
+      base_cfg = sf.questionnaire()
+      print(base_cfg)
+   # save base confg for next time
+   json.dump(base_cfg, open('jobs/base_ngfs_cfg.json', 'w'), indent=4, separators=(',', ': '))
+   return base_cfg
+
+def read_csv_data(csv_file):
+   #parameter csv_file can be a string with a path or a list of strings
+   #reads csv file(s) and 
+   
+   #columns with critical time information
+   time_cols = ['incident_start_time','observation_time','initial_observation_time']
+   if type(csv_file) is list:
+      #read the first csv file in the list
+      data = pd.read_csv(csv_file[0], parse_dates=time_cols)
+      print('Reading: ',csv_file[0])
+      print('  Number of detections: ',data.shape[0])
+      #read the rest csv files and merge
+      for i in range(1,len(csv_file)):
+         print('Merging with csv file: ', csv_file[i])
+         data_read = pd.read_csv(csv_file[i], parse_dates=time_cols)
+         data = pd.merge(data,data_read, how = 'outer')
+         print('  Total number of detections: ',data.shape[0])
+      #for naming purposes, get only first file name in list
+      #assumes standard  filename for all detections in day
+      csv_date_str = csv_file[0][-18:-8]
+   else:
+      data = pd.read_csv(csv_file, parse_dates=time_cols)
+      csv_date_str = csv_file[-18:-8]
+   
+   #make sure the times are UTC
+   data[time_cols[0]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols[0]])).tz_localize('UTC')
+   
+   return data, csv_date_str
+   
       
 
 if __name__ == '__main__':
@@ -61,31 +162,99 @@ if __name__ == '__main__':
    #setup of automatic download of csv file
    #stores csv file in the ingest/NGFS directory
    if 'now' in str(sys.argv):
-      print('Attempting to download latest csv file:')
-      #example csv name:
-      #   NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
-      day_of_year = datetime.now().timetuple().tm_yday
-      yyyy = datetime.now().timetuple().tm_year
-      mm = datetime.now().timetuple().tm_mon
-      dd = datetime.now().timetuple().tm_mday
-      csv_str = 'NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_'+str(yyyy)+'_'+str(mm).zfill(2)+'_'+str(dd).zfill(2)+'_'+str(day_of_year)+'.csv'
-      csv_url = 'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-WEST/CONUS/'+csv_str
-      print('    ',csv_str)
-      #print('    ',csv_url)
-      #configure download path, create directory if needed
-      ngfs_dir = 'ingest/NGFS'
-      print('     Will download to: ',utils.make_dir(ngfs_dir))
       
-      csv_path = 'ingest/NGFS/'+csv_str
-      download_url(csv_url,csv_path)
+      print('Downloading latest csv files:')
+      
+      #configure download path, create directory if needed
+      # this should be set elsewhere
+      ngfs_dir = 'ingest/NGFS'
+      
+      
+      #empy lists for storing path names
+      csv_str = list()
+      csv_path = list()
+      
+      #number of days of data
+      days_to_get = 2
+      
+      
+      for i in range(days_to_get):
+         if i == 0:
+            print('NGFS data from today')
+         else:
+            print('NGFS data from yesterday')
+         #GOES-18
+         s1, s2 = get_ngfs_csv(i,18)
+         csv_str.append(s1)
+         csv_path.append(s2)
+         #GOES-16
+         s1, s2 = get_ngfs_csv(i,16)
+         csv_str.append(s1)
+         csv_path.append(s2)
+      
+         
+      
+      '''
+      #current data from GOES 18
+      csv_str, csv_path = get_ngfs_csv(0,18)
+      #yesterday's data from GOES 18
+      csv_str_0, csv_path_0 = get_ngfs_csv(1,18)
+      #current data from GOES 16
+      csv_str_1, csv_path_1 = get_ngfs_csv(0,16)
+      #yesterday's data from GOES 16
+      csv_str_2, csv_path_2 = get_ngfs_csv(1,16)
+     
+      
+      #merge two days of csv files
+      with open(csv_path,'r') as fp:
+         #cut headers from newest csv
+         c = fp.readlines()[1:]
+      with open(csv_path_0) as fp:
+         c_0 = fp.readlines()[0:]
+      with open(csv_path_1) as fp:
+         c_1 = fp.readlines()[1:]
+      with open(csv_path_2) as fp:
+         c_2 = fp.readlines()[1:]
+      #c_0 += '\n' #linebreak
+      c_0 += c_1
+      c_0 += c_2
+      c_0 += c    # join the two csv files
+      
+      
+      #read first csv_file, include headers
+      with open(csv_path[0],'r') as fp:
+         c_head = fp.readlines()[0:]
+      
+      #merge the other csv files
+      for i in range(len(csv_path)-1):
+         print('Merging ',csv_str[i+1])
+         with open(csv_path[i+1],'r') as fp:
+            c_new = fp.readlines()[1:]
+         c_head += c_new
+      
+      '''
+      
+      #name of the new file
+      #csv_file = ngfs_dir+'/merge_'+csv_str
+      #csv_file = ngfs_dir+'/merged_'+csv_str[0]
       
       csv_file = csv_path
+      #print('Will work with:')
+      #print(csv_file)
+      
+      #write the results to the csv file
+      #with open(csv_file,'w') as fp:
+      #   fp.writelines(c_0[0:])
+      #with open(csv_file,'w') as fp:
+      #   fp.writelines(c_head[0:])
    else:
+      # csv file passed as system argument
       csv_file = sys.argv[1]
       print('Using existing csv file:')
       print('    ',csv_file) 
   
-   
+
+      
    
    #setup automatic start of simulations
    if 'auto' in str(sys.argv):
@@ -99,37 +268,20 @@ if __name__ == '__main__':
    else:
       print('Simulations will need to be started manually')
    
-   #check to see if a  base ngfs configuration file exists
-   if utils.file_exists('jobs/base_ngfs_cfg.json'):
-      print('Configuration found')
-      with open('jobs/base_ngfs_cfg.json','r') as openfile:
-         temp_cfg = json.load(openfile)
-      json_print = json.dumps(temp_cfg, indent=4)   
-      print(json_print)
-      sf.print_question('Use base configuration above? yes/no, default = [yes]')
-      use_base_cfg = sf.read_boolean('yes')
-      if use_base_cfg:
-         base_cfg = temp_cfg
-      else:
-         base_cfg = sf.questionnaire()   
-   else:
-      # standard configuration to be used by all forecasts
-      base_cfg = sf.questionnaire()
-      print(base_cfg)
-   # save base confg for next time
-   json.dump(base_cfg, open('jobs/base_ngfs_cfg.json', 'w'), indent=4, separators=(',', ': '))
-      
+   ##################################################################
+   # configure the job(s), uses questionaire from simple_forecast.p #
+   ##################################################################
+   base_cfg = make_job_configuration()
    
-   #read the data and filter
-   #columns with critical time information
-   time_cols = ['incident_start_time','observation_time','initial_observation_time']
-   data = pd.read_csv(csv_file, parse_dates=time_cols)
-   #make sure the times are UTC
-   data[time_cols[0]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols[0]])).tz_localize('UTC')
-   #assumes standard  filename for all detections in day
-   #can be changed to use reg expression so that it's more general
-   csv_date_str = csv_file[-18:-8]
-   print('Detection data from ',csv_date_str)
+   ##################################################################
+   # read the data from the csv file(s), get date string for naming #
+   ##################################################################
+   data, csv_date_str = read_csv_data(csv_file)
+  
+   
+   
+   
+   #print('Detection data from ',csv_date_str)
    csv_year = int(csv_date_str[0:4])
    csv_month = int(csv_date_str[5:7])
    csv_day = int(csv_date_str[8:10])
@@ -138,34 +290,36 @@ if __name__ == '__main__':
 
    #filter out "null incidents"
    #maybe null incidents are what we are interested in?
+   data_dirty = data
    data = data.dropna(subset=['incident_name'])
-   print(data)
+   #print(data)
 
    #print('Column headers from csv file')
-   for i in data.columns:
-      print(i)
+   #for i in data.columns:
+   #   print(i)
 
-   print('Incidents in csv file')
+   #print('Incidents in csv file')
    incident_names = data['incident_name'].unique()
    num_incidents = incident_names.shape[0]
-   print('Number of incidents in csv file: ',num_incidents)
-   print(incident_names)
+   
+   #print(incident_names)
 
-
-      
-   #array of incident objects
+   #make an array of incident objects
    incidents  = [ngfs_incident(incident_names[i]) for i in range(num_incidents)]
 
+   #list of ignition points for plotting later
    ign_lon = []
    ign_lat = []
+   
+   #counter
+   new_incidents = 0
 
    for i in range(num_incidents):
       print(incidents[i].name)
-      #get only detections from individual nifc incidents
+      #get only subset of detections from individual nifc incidents
       incident_subset = data[data.incident_name == incident_names[i]]
       #sort by observation time	
       incident_subset = incident_subset.sort_values(by='observation_time')
-      #incident_subset_idx = data[data.incident_name == incident_names[i]].index
       det_count = incident_subset.shape[0]
       print('      ',det_count,'  detections') 
       incidents[i].add_detections(incident_subset)
@@ -173,23 +327,38 @@ if __name__ == '__main__':
       incidents[i].add_incident_start_time()
       incidents[i].add_incident_id_string(incident_subset['incident_id_string'][incident_subset.index[0]])
       print('       Incident start time : ', incidents[i].incident_start_time)
-      print('       Incident start day : ', incidents[i].incident_start_time.day)
+      #print('       Incident start day : ', incidents[i].incident_start_time.day)
       #print('       Incident start month: ',incidents[i].incisdent_start_time.month)
+      
+      #detect a new incident from today
       if (incidents[i].incident_start_time.day == csv_day and incidents[i].incident_start_time.month == csv_month):
+      
+         new_incidents += 1
+         #change 'new' object attribute
+         incidents[i].new_incident()
          print('       New Incident From Today')
          print('       Finding start time and location')
-         idx = incident_subset.index[0]
-         #switch to terrain corrected locations
-         ign_latlon = incident_subset.lat[idx], incident_subset.lon[idx]
-         ign_utc = incident_subset.observation_time[idx]
+         
+         idx = incident_subset.index[0] #gets the first row, having earliest time
+         ign_latlon = incident_subset.lat_tc[idx], incident_subset.lon_tc[idx]
+         unique_latlon = np.unique(ign_latlon)
+# --> is first row really the earliest detection ??
+         #search the entire csv for locations that have not been named yet
+         dirty_subset = data_dirty[data_dirty['lon_tc'] == ign_latlon[1]]
+         dirty_subset = dirty_subset[dirty_subset['lat_tc'] == ign_latlon[0]]
+         if dirty_subset.shape[0] > incident_subset.shape[0]:
+            print('       Found addtional detections')
+            ign_utc = dirty_subset.observation_time[dirty_subset.index[0]]
+         else:
+            ign_utc = incident_subset.observation_time[idx]
          start_utc = utils.round_time_to_hour(ign_utc - timedelta(minutes=30))
-         end_utc = start_utc + timedelta(hours=5)
+         end_utc = start_utc + timedelta(hours=24)
          time_utc = utils.utc_to_esmf(ign_utc)
          print('       location: ',ign_latlon)
          print('       utc ignition time: ', time_utc)
          total_frp = max(incident_subset.total_frp)
-         print('       total frp: ',total_frp)
-         #append list of ignition pts
+         #print('       total frp: ',total_frp)
+         #append list of ignition pts for plotting them spatially
          ign_lon.append(ign_latlon[1])
          ign_lat.append(ign_latlon[0])
          #print(ign_lon)
@@ -212,8 +381,10 @@ if __name__ == '__main__':
          #print(cfg)
 
          filename = 'jobs/' + cfg['grid_code'] + '.json'
-         #json.dump(cfg, open(filename, 'w'), indent=4, separators=(',', ': '))
+         json.dump(cfg, open(filename, 'w'), indent=4, separators=(',', ': '))
          print(('INT to start the simulation, execute ./forecast.sh %s' % filename))
+   print('Number of incidents in csv file: ',num_incidents)
+   print('Number of new incidents: ',new_incidents)
        
    #setup mapping object
    #print('Starting to draw map. Keep fingers crossed')
