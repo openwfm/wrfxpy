@@ -1,12 +1,4 @@
-from __future__ import absolute_import
-from ingest.grib_source import GribError
 from ingest.grib_forecast import GribForecast
-from datetime import datetime, timedelta
-import pytz
-import logging
-import os.path as osp
-from utils import Dict, timedelta_hours, readhead
-
 
 class HRRR(GribForecast):
     """
@@ -54,8 +46,8 @@ class HRRR(GribForecast):
     info_aws="https://registry.opendata.aws/noaa-hrrr-pds/"
     info_text="NOAA HRRR 3-km CONUS High-Resolution Rapid Refresh Forecast"
     info="The High-Resolution Rapid Refresh (HRRR)"
-    remote_url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"
-    remote_aws = "s3://noaa-hrrr-bdp-pds/"
+    remote_url = ["s3://noaa-hrrr-bdp-pds/", "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"]
+    browse_aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
     cycle_hours = 1
     period_hours = 1
     hours_behind_real_time = 1     # choose forecast cycle at least one hour behind
@@ -64,4 +56,3 @@ class HRRR(GribForecast):
     # more general info: https://rapidrefresh.noaa.gov/internal/pdfs/RAPX_HRRRX_NWS-13sep2016-pub.pdf
     # file content: http://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfprsf00.grib2.shtml
 
- 

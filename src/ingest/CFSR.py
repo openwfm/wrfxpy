@@ -1,11 +1,7 @@
 from __future__ import absolute_import
-from ingest.grib_source import GribError
 from ingest.grib_reanalysis import GribReanalysis
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
-import logging
-import os.path as osp
-from utils import Dict, timedelta_hours, readhead
 
 class CFSR(GribReanalysis):
     """

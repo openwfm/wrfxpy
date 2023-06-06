@@ -1,8 +1,3 @@
-#
-# Angel Farguell, CU Denver
-#
-
-from __future__ import absolute_import
 import logging
 import re
 import glob
@@ -152,8 +147,8 @@ def create_grid(proj_info, out_path):
     lats = (np.arctan(rrat*sz/np.sqrt((bigh-sx)**2 + sy**2)))/dtor
     lons = (lon0*dtor - np.arctan(sy/(bigh-sx)))/dtor
     nc_file = nc.Dataset(out_path, 'w')
-    xx = nc_file.createDimension("x", xdim)
-    yy = nc_file.createDimension("y", ydim)
+    nc_file.createDimension("x", xdim)
+    nc_file.createDimension("y", ydim)
     longitude = nc_file.createVariable("lon", "f4", ("y","x"))
     latitude = nc_file.createVariable("lat", "f4", ("y","x"))
     longitude[:] = lons
