@@ -43,9 +43,11 @@ class GFSF(GribForecast):
     # instance variables
     id = "GFSF"
     info_url = "https://www.nco.ncep.noaa.gov/pmb/products/gfs/#GFS"
+    info_aws = "https://registry.opendata.aws/noaa-gfs-bdp-pds/"
     info_text = "NCEP GFS 0.25 Degree Global Forecast Grids Historical Archive"
     info = "Global Forecast System (GFS) Forecast"
-    remote_url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"
+    remote_url = ["s3://noaa-gfs-bdp-pds/","https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"]
+    browse_aws = "https://noaa-gfs-bdp-pds.s3.amazonaws.com/"
     cycle_hours = 6
     period_hours = 3 # for METGRID and WRF
     hours_behind_real_time = 6 # choose forecast cycle at least one hour behind

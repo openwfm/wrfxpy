@@ -49,7 +49,10 @@ class GFSA(GribReanalysis):
         """
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
 
-        path_tmpls = ['%04d%02d/%04d%02d%02d/gfsanl_4_%04d%02d%02d_%02d00_000.grb2' % (year, mon, year, mon, day, year, mon, day, hour),
+        #path_tmpls = ['%04d%02d/%04d%02d%02d/gfsanl_4_%04d%02d%02d_%02d00_000.grb2' % (year, mon, year, mon, day, year, mon, day, hour),
+        #              '%04d%02d/%04d%02d%02d/gfs_4_%04d%02d%02d_%02d00_000.grb2' % (year, mon, year, mon, day, year, mon, day, hour)]
+        path_tmpls = ['gfs.%04d%02d%02d/%02d/atmos/gfs.t%02dz.pgrb2b.0p50.anl' % (year, mon, day, hour, hour),
+                      '%04d%02d/%04d%02d%02d/gfsanl_4_%04d%02d%02d_%02d00_000.grb2' % (year, mon, year, mon, day, year, mon, day, hour),
                       '%04d%02d/%04d%02d%02d/gfs_4_%04d%02d%02d_%02d00_000.grb2' % (year, mon, year, mon, day, year, mon, day, hour)]
         
         return self.available_online(path_tmpls)
@@ -57,9 +60,11 @@ class GFSA(GribReanalysis):
     # instance variables
     id = "GFSA"
     info_url = 'https://data.nodc.noaa.gov/cgi-bin/iso?id=gov.noaa.ncdc:C00634'
+    info_aws = "https://registry.opendata.aws/noaa-gfs-bdp-pds/"
     info_text = "Global Forecast System (GFS) Analysis"
     info = "Global Forecast System (GFS) Analysis"
-    remote_url = ['https://www.ncei.noaa.gov/data/global-forecast-system/access/historical/analysis', 'https://www.ncei.noaa.gov/data/global-forecast-system/access/grid-004-0.5-degree/analysis']
+    remote_url = ["s3://noaa-gfs-bdp-pds/", 'https://www.ncei.noaa.gov/data/global-forecast-system/access/historical/analysis', 'https://www.ncei.noaa.gov/data/global-forecast-system/access/grid-004-0.5-degree/analysis']
+    browse_aws = "https://noaa-gfs-bdp-pds.s3.amazonaws.com/"
     period_hours = 6
     available_from_utc = datetime(2004,3,1,tzinfo=pytz.UTC)
     available_to_utc = datetime.now(pytz.UTC)

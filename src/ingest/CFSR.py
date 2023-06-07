@@ -43,8 +43,10 @@ class CFSR(GribReanalysis):
  
     id = "CFSR"
     info_url = "https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/climate-forecast-system-version2-cfsv2"
+    info_aws = "https://registry.opendata.aws/noaa-cfs/"
     info_text = "The CFSRv2 (Climate Forecast System Reanalysis v2)"
     info = "The CFSRv2 (Climate Forecast System Reanalysis v2)"
+    browse_aws = "https://noaa-cfs-pds.s3.amazonaws.com/"
     available_from_utc = datetime(2011,4,1,tzinfo=pytz.UTC)
     available_to_utc = datetime.now(pytz.UTC)
     period_hours = 6
@@ -79,7 +81,8 @@ class CFSR_P(CFSR):
         """
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
 
-        path_tmpls = ['%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.pgrbh00.grib2' % (year, year, mon, year, mon, day, hour),
+        path_tmpls = ['cdas.%04d%02d%02d/cdas1.t%02dz.pgrbh00.grib2' % (year, mon, day, hour),
+                    '%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.pgrbh00.grib2' % (year, year, mon, year, mon, day, hour),
                     '%04d/%04d%02d/%04d%02d%02d/%04d%02d%02dcdas1.t%02dz.pgrbh00.grib2' % (year, year, mon, year, mon, day, year, mon, day, hour)]
 
         return self.available_online(path_tmpls)
@@ -87,7 +90,7 @@ class CFSR_P(CFSR):
     # instance variables
     id = "CFSR_P"
     prefix = 'COLMET_P'
-    remote_url = 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-by-pressure'
+    remote_url = ["s3://noaa-cfs-pds/", "https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-by-pressure"]
 
 class CFSR_S(CFSR):
     """
@@ -118,7 +121,8 @@ class CFSR_S(CFSR):
         """
         year, mon, day, hour = utc_time.year, utc_time.month, utc_time.day, utc_time.hour
 
-        path_tmpls = ['%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.sfluxgrbf00.grib2' % (year, year, mon, year, mon, day, hour),
+        path_tmpls = ['cdas.%04d%02d%02d/cdas1.t%02dz.sfluxgrbf00.grib2' % (year, mon, day, hour),
+                    '%04d/%04d%02d/%04d%02d%02d/cdas1.t%02dz.sfluxgrbf00.grib2' % (year, year, mon, year, mon, day, hour),
                     '%04d/%04d%02d/%04d%02d%02d/%04d%02d%02dcdas1.t%02dz.sfluxgrbf00.grib2' % (year, year, mon, year, mon, day, year, mon, day, hour)]
 
         return self.available_online(path_tmpls)
@@ -126,6 +130,6 @@ class CFSR_S(CFSR):
     # instance variables
     id = "CFSR_S"
     prefix = 'COLMET_S'
-    remote_url = 'https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux'
+    remote_url = ["s3://noaa-cfs-pds/", "https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux"]
 
 
