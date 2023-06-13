@@ -51,7 +51,7 @@ class GFSA(GribReanalysis):
 
         #path_tmpls = ['%04d%02d/%04d%02d%02d/gfsanl_4_%04d%02d%02d_%02d00_000.grb2' % (year, mon, year, mon, day, year, mon, day, hour),
         #              '%04d%02d/%04d%02d%02d/gfs_4_%04d%02d%02d_%02d00_000.grb2' % (year, mon, year, mon, day, year, mon, day, hour)]
-        path_tmpls = ['gfs.%04d%02d%02d/%02d/atmos/gfs.t%02dz.pgrb2b.0p50.anl' % (year, mon, day, hour, hour),
+        path_tmpls = ['gfs.%04d%02d%02d/%02d/atmos/gfs.t%02dz.pgrb2.0p50.f000' % (year, mon, day, hour, hour),
                       '%04d%02d/%04d%02d%02d/gfsanl_4_%04d%02d%02d_%02d00_000.grb2' % (year, mon, year, mon, day, year, mon, day, hour),
                       '%04d%02d/%04d%02d%02d/gfs_4_%04d%02d%02d_%02d00_000.grb2' % (year, mon, year, mon, day, year, mon, day, hour)]
         
