@@ -477,12 +477,7 @@ def vars_add_to_geogrid(js):
                 geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
                 for varname,vartable in six.iteritems(geogrid_tbl_json):
                     logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
-                    if 'abs_path' in vartable.keys():
-                        vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
-                        logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
-                    elif 'rel_path' in vartable.keys():
-                        vartable['rel_path'] = 'default:'+ensure_abs_path(vartable['rel_path'],js)
-                        logging.info('GEOGRID rel_path=%s' % vartable['rel_path'])
+                    write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
                 return
             else:
                 raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
@@ -508,12 +503,8 @@ def vars_add_to_geogrid(js):
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
     for varname,vartable in six.iteritems(geogrid_tbl_json):
         logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
-        if 'abs_path' in vartable.keys():
-            vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
-            logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
-        elif 'rel_path' in vartable.keys():
-            vartable['rel_path'] = 'default:'+ensure_abs_path(vartable['rel_path'],js)
-            logging.info('GEOGRID rel_path=%s' % vartable['rel_path'])
+        vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
+        logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
 
 def fmda_add_to_geogrid(js):
