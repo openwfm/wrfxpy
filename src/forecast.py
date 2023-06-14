@@ -471,7 +471,7 @@ def vars_add_to_geogrid(js):
             geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
         else:
             logging.warning('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
-            geogrid_tbl_json_path = 'etc/vtables/geogrid_tbl_lowres_fire.json'
+            geogrid_tbl_json_path = 'etc/vtables/geogrid_tbl.json'
             if osp.exists(geogrid_tbl_json_path):
                 logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path, geogrid_tbl_json_path))
                 geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
