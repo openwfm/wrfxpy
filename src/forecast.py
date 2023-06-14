@@ -51,6 +51,10 @@ from ingest.GOES import GOES16, GOES17
 
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
+from fire_init.perimeters import Perimeter
+from fire_init.tools import read_wrfinfo
+from fire_init.geometry import mask_contour_perim
+
 from ssh_shuttle import send_product_to_server, ssh_command
 
 import f90nml
@@ -114,6 +118,7 @@ class JobState(Dict):
         self.domains = args['domains']
         self.ignitions = args.get('ignitions', None)
         self.fmda = args.get('fuel_moisture_da', None)
+        self.burn_plot_boundary = args.get('burn_plot_boundary', None)
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
         self.clean_dir = args.get('clean_dir', True)
@@ -471,7 +476,7 @@ def vars_add_to_geogrid(js):
             geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
         else:
             logging.warning('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
-            geogrid_tbl_json_path = 'etc/vtables/geogrid_tbl_lowres_fire.json'
+            geogrid_tbl_json_path = 'etc/vtables/geogrid_tbl.json'
             if osp.exists(geogrid_tbl_json_path):
                 logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path, geogrid_tbl_json_path))
                 geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
@@ -791,6 +796,25 @@ def execute(args,job_args):
         for dom in js.fmda.domains:
             logging.info('assimilate_fm10_observations for domain %s' % dom)
             assimilate_fm10_observations(osp.join(js.wrf_dir, 'wrfinput_d%02d' % int(dom)), None, js.fmda.token)
+
+    logging.info('step 7c: process fire information')
+    if js.burn_plot_boundary is not None:
+        wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % js.max_dom)
+        coords = [c[::-1] for c in js.burn_plot_boundary]
+        perim = Perimeter({'poly': [[coords]]})
+        if len(perim.coords):
+            ifm,ifn,ffm,ffn,fxlon,fxlat = read_wrfinfo(wrf_path)
+            points = np.c_[np.ravel(fxlon),np.ravel(fxlat)]
+            mask = mask_contour_perim(perim.coords, points, buffer_dist=100.)
+            mask = np.reshape(mask,fxlon.shape)
+            with nc4.Dataset(wrf_path,'a') as d: 
+                NFUEL_CAT_ = d.variables['NFUEL_CAT'][0].data
+                NFUEL_CAT = NFUEL_CAT_[ifm:ffm,ifn:ffn]
+                NFUEL_CAT[mask] = 14.
+                NFUEL_CAT_[ifm:ffm,ifn:ffn] = NFUEL_CAT
+                d.variables['NFUEL_CAT'][0] = NFUEL_CAT_
+        else:
+            logging.warning('incorrect burn_plot_boundary format')
 
     logging.info('step 8: execute wrf.exe on parallel backend')
     logging.info('run_wrf = %s' % js.run_wrf)
