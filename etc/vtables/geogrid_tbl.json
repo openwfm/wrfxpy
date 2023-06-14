@@ -1,0 +1,27 @@
+{
+    "NFUEL_CAT": {
+        "name": "NFUEL_CAT",
+        "dest_type": "categorical",
+        "interp_option": "default:nearest_neighbor+average_16pt+search",
+        "rel_path": "modis_landuse_20class_30s_with_lakes/",
+        "priority": 1,
+        "fill_missing": 0,
+        "subgrid": "yes",
+        "dominant_only": "NFUEL_CAT",
+        "z_dim_name": "fuel_cat",
+        "halt_on_missing": "no"
+    },
+    "ZSF": {
+        "name": "ZSF",
+        "dest_type": "continuous",
+        "interp_option": "default:average_gcell(4.0)+four_pt+average_4pt",
+        "rel_path": "topo_gmted2010_5m/",
+        "priority": 1,
+        "fill_missing": 0,
+        "smooth_option": "smth-desmth_special; smooth_passes=1",
+        "subgrid": "yes",
+        "df_dx": "DZDXF",
+        "df_dy": "DZDYF",
+        "halt_on_missing": "no"
+    }
+}
