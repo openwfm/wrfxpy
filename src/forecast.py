@@ -455,6 +455,9 @@ def vars_add_to_geogrid(js):
     """
     # add fmda datasets to geogrid if specified
     fmda_add_to_geogrid(js)
+    # update geogrid table
+    geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
+    link2copy(geogrid_tbl_path)
     # load the variables to process
     geo_vars_path = 'etc/vtables/geo_vars.json'
     geo_vars = None
@@ -467,8 +470,19 @@ def vars_add_to_geogrid(js):
         if osp.exists(nfuel_path) and osp.exists(topo_path):
             geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
         else:
-            logging.critical('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
-            raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
+            logging.warning('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
+            geogrid_tbl_json_path = 'etc/vtables/geogrid_tbl_lowres_fire.json'
+            if osp.exists(geogrid_tbl_json_path):
+                logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path, geogrid_tbl_json_path))
+                geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
+                for varname,vartable in six.iteritems(geogrid_tbl_json):
+                    logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
+                    vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
+                    logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
+                    write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
+                return
+            else:
+                raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     for var,tif_file in six.iteritems(geo_vars):
@@ -486,8 +500,6 @@ def vars_add_to_geogrid(js):
                 logging.warning('Exception: %s',e)
     
     # update geogrid table
-    geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
-    link2copy(geogrid_tbl_path)
     geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
     logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
