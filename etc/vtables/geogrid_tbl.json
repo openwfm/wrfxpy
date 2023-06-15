@@ -15,7 +15,7 @@
         "name": "ZSF",
         "dest_type": "continuous",
         "interp_option": "default:average_gcell(4.0)+four_pt+average_4pt",
-        "rel_path": "topo_gmted2010_5m/",
+        "rel_path": "topo_gmted2010_30s/",
         "priority": 1,
         "fill_missing": 0,
         "smooth_option": "smth-desmth_special; smooth_passes=1",
