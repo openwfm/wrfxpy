@@ -80,7 +80,7 @@ Optionally, the *wrfxpy* installation can be connected to a visualization server
 
 This concludes the ``etc/conf.json`` file.
 
-Next, *wrfxpy* needs to know how jobs are submitted on your cluster.  Create an entry for your cluster, here we use ``speedy`` as an example::
+Next we need to edit ``etc/clusters.json`` file adding a new section for the cluster wrfxpy will be run on, since  *wrfxpy* needs to know how jobs are submitted there.  Create an entry for your cluster, here we use ``speedy`` as an example, but you shoudl just use the name of your cluster::
 
   {
     "speedy" : {
@@ -110,7 +110,9 @@ Note that not all keys need to be used, as shown in the ``speedy`` example::
 
 The script template should be derived from a working submission script.
 
-Note: wrfxpy has already configuration for colibri, gross, kingspeak, and cheyenne.
+You can start by copying an existing ``etc/qsub/cluster_name.sub`` under the name of your cluster, and modifyig it.
+
+Note: wrfxpy has already configuration for colibri, gross, kingspeak, and cheyenne clusters which can be used as an example (see colibri.sub, gross.sub, kingspeak.sub and cheyenne.sub in ``etc/qsub/``).
 
 tokens
 -------------
