@@ -80,7 +80,7 @@ Optionally, the *wrfxpy* installation can be connected to a visualization server
 
 This concludes the ``etc/conf.json`` file.
 
-Next we need to edit ``etc/clusters.json`` file adding a new section for the cluster wrfxpy will be run on, since  *wrfxpy* needs to know how jobs are submitted there.  Create an entry for your cluster, here we use ``speedy`` as an example, but you shoudl just use the name of your cluster::
+Next we need to edit ``etc/clusters.json`` file adding a new section for the cluster wrfxpy will be run on, since  *wrfxpy* needs to know how jobs are submitted there.  Create an entry for your cluster, here we use ``speedy`` as an example, but you should just use the name of your cluster::
 
   {
     "speedy" : {
@@ -106,7 +106,7 @@ Note that not all keys need to be used, as shown in the ``speedy`` example::
   #$ -wd %(cwd)s
   #$ -l h_rt=%(wall_time_hrs)d:00:00
   #$ -pe mpich %(np)d
-  mpirun_rsh -np %(np)d -hostfile $TMPDIR/machines %(exec_path)s
+  mpirun_rsh -np %(np)d -hostfile $TMPDIR/machines %(exec_path)d
 
 The script template should be derived from a working submission script.
 
