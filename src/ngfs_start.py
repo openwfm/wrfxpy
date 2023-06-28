@@ -20,8 +20,8 @@
 to do list:
 1) 
 2) 
-3) Make script to handle the NGFS class object that have been stored 
-4) download the VIIRS NRT data and use thsat to narrow the ignition location ---> ingest/ngfs_helper.py
+3) 
+4) 
 5) Script to get older files from VIIRS and modis
 6) try to get standalone working for a case
 
@@ -32,24 +32,23 @@ import numpy as np
 import pandas as pd
 import pickle
 import csv
-import sys
+import os, sys
 import json
 import time
 from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 from datetime import timedelta, datetime
 #add src directory to path json time
-#sys.path.insert(1, 'src/')
-#sys.path.insert(1, 'src/ingest')
-from ingest.downloader import download_url
-from ingest.ngfs_dictionary import ngfs_dictionary
-import ingest.ngfs_helper as nh
+sys.path.insert(1, 'src/')
+sys.path.insert(1, 'src/ingest')
+from downloader import download_url
+#from ngfs_dictionary import ngfs_dictionary  <-- use to force csv data columns into a type
+import ngfs_helper as nh
 import utils
 #dictionary to convert between "CA" and "California", etc
 import state_names as sn
 import simple_forecast as sf
-
-#To add or change
+import ngfs_dictionary as nd
 
 ####### Classes  ######
 
@@ -170,6 +169,8 @@ class ngfs_incident():
       self.new = False
       self.started = False
       self.affected_population = 0
+      self.force = False
+      self.auto_start = False
    # def process_incident(self,data):
    #    #takes in DataFrame and fills in details about incident   <<<----- done below already ??
    #    pass
@@ -193,7 +194,6 @@ class ngfs_incident():
    def add_detections(self,df):
       self.data = self.data.append(df)
    def set_incident_start_time(self):
-      
       if self.data.shape[0] > 0:
          #self.incident_start_time = self.data.iloc[0,3]
          self.incident_start_time = min(self.data['incident_start_time'])
@@ -202,6 +202,21 @@ class ngfs_incident():
    def set_json_start_code(self,json_file,grid_code):
       self.json_start_code = './forecast.sh '+json_file+' &> logs/'+grid_code.replace(' ','_')+'.log &'      
    #def add_ignition(self):
+   # These attributes are set when viirs data finds detection pixels within the goes ignition pixel
+   def set_new_ign_latlon(self,new_ign_latlon):
+      self.new_ign_latlon = new_ign_latlon
+   def set_new_ign_utc(self,new_gn_utc):
+      self.new_ign_utc = new_ign_utc
+      if new_ign_utc < self.ign_utc:
+
+         print('new',new_ign_utc)
+         print('old',self.ign_utc)
+
+         print('Changing the time paramaters of the job for ealier detection information')
+         self.ign_utc = new_ign_utc
+         #the start and finish times of the simulation get adjusted too
+         self.start_utc = utils.round_time_to_hour(self.ign_utc - timedelta(minutes=30))
+         self.end_utc = self.start_utc + timedelta(hours=24)
 
    
    
@@ -232,9 +247,16 @@ class ngfs_incident():
       cfg['domains']['1']['stand_lon'] = self.ign_latlon[1]
       ignitions = cfg['ignitions']
       ign_dur = ignitions['1'][0]['duration_s']
-      cfg['ignitions'] = { '1' : [ { 'time_utc' : self.time_utc,
+      #change if there is a viirs detection to work with
+      #the domain stays the same otherwise so comparision between viirs and goes ignitions may be examined
+      if not hasattr(self,'new_ign_latlon'):
+         cfg['ignitions'] = { '1' : [ { 'time_utc' : self.time_utc,
+                                    'duration_s' : ign_dur,
+                                    'latlon' : self.ign_latlon } ] }
+      else:
+         cfg['ignitions'] = { '1' : [ { 'time_utc' : self.time_utc,
                                    'duration_s' : ign_dur,
-                                   'latlon' : self.ign_latlon } ] }
+                                   'latlon' : self.new_ign_latlon } ] }  # <<---- new 
       cfg['start_utc'] = utils.utc_to_esmf(self.start_utc)
       cfg['end_utc'] = utils.utc_to_esmf(self.end_utc)
          #print(cfg)
@@ -292,14 +314,14 @@ class ngfs_incident():
       idx = incident_data.index[0] #gets the first row, having earliest time
       #not all csv files have terrain correction, so far
       try:
-         self.ign_latlon = incident_data.lat_tc[idx], incident_data.lon_tc[idx]
+         self.ign_latlon = [incident_data.lat_tc[idx], incident_data.lon_tc[idx]]
       except:
          print('\tNo terrain corected lat/lon available')
-         self.ign_latlon = incident_data.lat[idx], incident_data.lon[idx]
+         self.ign_latlon = [incident_data.lat[idx], incident_data.lon[idx]]
       #reduce to only unique lat/lon pairs
       self.unique_latlon = np.unique(self.ign_latlon)
       
-      #search the entire csv for locations that have not been named yet
+      #search the entire csv for pixel locations that have not been assigned to the incident yet
       try:
          full_subset = full_data[full_data['lon_tc'] == self.ign_latlon[1]]
          full_subset = full_subset[full_subset['lat_tc'] == self.ign_latlon[0]]
@@ -325,37 +347,45 @@ class ngfs_incident():
       self.total_frp = max(incident_data.total_frp)
       #print('\ttotal frp: ',total_frp)
 
- #def autostart(job_json):
-      pass
+   #used for creating string used for system call to start simulation
+   def set_cmd_str(self,cmd_str):
+      self.cmd_str = cmd_str
 
 
       
 ####### Functions  #######
    
-def make_base_configuration():
+def make_base_configuration(force):
    #check to see if a  base ngfs configuration file exists
    if utils.file_exists('jobs/base_ngfs_cfg.json'):
-     print('Configuration found')
-     with open('jobs/base_ngfs_cfg.json','r') as openfile:
-        temp_cfg = json.load(openfile)
-     json_print = json.dumps(temp_cfg, indent=4)   
-     #print(json_print)
-     start_utc = utils.esmf_to_utc(temp_cfg['start_utc']) #esmf_to_utc
-     end_utc = utils.esmf_to_utc(temp_cfg['end_utc'])
-     forecast_length = end_utc-start_utc
-     print('\tForecast length: ',forecast_length)
-     print('\tIgnition duration: ',temp_cfg['ignitions']['1'][0]['duration_s'], 'seconds')
-     print('\tCell size: ', temp_cfg['domains']['1']['cell_size'])
-     print('\tDomain size: ', temp_cfg['domains']['1']['domain_size'])
-     print('\tNumber of cores: ',temp_cfg['ppn'])
-     print('\tNumber of nodes: ',temp_cfg['num_nodes'])
-     print('\tWall time: ',temp_cfg['wall_time_hrs'], 'hours')
-     sf.print_question('Use base configuration above? yes/no, default = [yes]')
-     use_base_cfg = sf.read_boolean('yes')
-     if use_base_cfg:
-        base_cfg = temp_cfg
-     else:
-        base_cfg = sf.questionnaire()   
+      print('Configuration found')
+      with open('jobs/base_ngfs_cfg.json','r') as openfile:
+         temp_cfg = json.load(openfile)
+      json_print = json.dumps(temp_cfg, indent=4)   
+      #print(json_print)
+      start_utc = utils.esmf_to_utc(temp_cfg['start_utc']) #esmf_to_utc
+      end_utc = utils.esmf_to_utc(temp_cfg['end_utc'])
+      forecast_length = end_utc-start_utc
+      print('\tForecast length: ',forecast_length)
+      print('\tIgnition duration: ',temp_cfg['ignitions']['1'][0]['duration_s'], 'seconds')
+      print('\tCell size: ', temp_cfg['domains']['1']['cell_size'])
+      print('\tDomain size: ', temp_cfg['domains']['1']['domain_size'])
+      print('\tNumber of cores: ',temp_cfg['ppn'])
+      print('\tNumber of nodes: ',temp_cfg['num_nodes'])
+      print('\tWall time: ',temp_cfg['wall_time_hrs'], 'hours')
+      
+
+      if force:
+         print('Using base configuration')
+         use_base_cfg = True
+      else:
+         sf.print_question('Use base configuration above? yes/no, default = [yes]')
+         use_base_cfg = sf.read_boolean('yes')
+
+      if use_base_cfg:
+         base_cfg = temp_cfg
+      else:
+         base_cfg = sf.questionnaire()   
    else:
       # standard configuration to be used by all forecasts
       base_cfg = sf.questionnaire()
@@ -442,19 +472,22 @@ def read_NGFS_csv_data(csv_file):
          'incident_type':'string'
       }
       data = pd.read_csv(csv_file[0], parse_dates=time_cols)
-      data = data.astype(null_columns)
+      data = data.astype(nd.ngfs_dictionary) # <--- force data to have specified dtypes
+      #data = data.astype(null_columns)
       print('Reading: ',csv_file[0])
       print('\tNumber of detections: ',data.shape[0])
       #read the rest csv files and merge
       for i in range(1,len(csv_file)):
          print('Merging with csv file: ', csv_file[i])
          data_read = pd.read_csv(csv_file[i], parse_dates=time_cols)
-         data_read = data_read.astype(null_columns)
+         data = data.astype(nd.ngfs_dictionary)
+         #data_read = data_read.astype(null_columns)
          print('\tNumber of detections in csv: ',data_read.shape[0])
          try:
             data = pd.merge(data,data_read, how = 'outer') 
-         except:
+         except Exception as e:
             print('Fail to merge with ',csv_file[i])
+            print(f"An exception occurred: {str(e)}")
             #data = pd.concat([data,data_read],axis=1,join ='outer')
          print('\tTotal number of detections: ',data.shape[0])
       #for naming purposes, get only first file name in list
@@ -495,6 +528,10 @@ def prioritize_incidents(incidents,new_idx,num_starts):
          #print('\t',incidents[i].json_start_code)
             if start_count < num_starts:
                print('\t Automatically starting this simulation')
+               os.system(incidents[i].cmd_str)
+               #print(incidents[i].cmd_str)
+               os.system('jobs')
+               time.sleep(3)
                incidents[i].set_started()
                started[i] = 1
                start_count += 1
@@ -536,15 +573,23 @@ if __name__ == '__main__':
    #setup automatic start of simulations
    if 'auto' in str(sys.argv):
       sf.print_question('Autostart detected. Is this what you want? yes/no, default = [no]')
+      force = False
       auto_start = sf.read_boolean('no')
       if auto_start:
-         sf.print_question('How many simulations to run at once? default = [4]')
-         num_starts = sf.read_integer(4)
+         sf.print_question('How many simulations to run at once? default = [10]')
+         num_starts = sf.read_integer(10)
       else:
          num_starts = -1
+   elif 'force' in str(sys.argv):
+      #this forces auto_start and avoids questions
+      force = True
+      auto_start = True
+      num_starts = 10    # <<<------------------------------- set to -1 for testing, change to 10
    else:
+      force = False
       auto_start = False
       num_starts = -1
+
    if auto_start:
       print('Simulations will be started automatically. Make sure you have the resources.')
       time.sleep(2)
@@ -554,7 +599,9 @@ if __name__ == '__main__':
    ##################################################################
    # configure the job(s), uses questionaire from simple_forecast.p #
    ##################################################################
-   base_cfg = make_base_configuration()
+   #if force = false, confirm base_cfg otherwise load it
+
+   base_cfg = make_base_configuration(force)
    
    ##################################################################
    # read the data from the csv file(s), get date string for naming #
@@ -575,17 +622,9 @@ if __name__ == '__main__':
    #print('Incidents in csv file')
    incident_names = data['incident_name'].unique()
    num_incidents = incident_names.shape[0]
-
-   #number of id_strings and incidents doesn't match
-   #id_strings = data['incident_id_string'].unique()
-   #print('Number of id_strings: ',id_strings.shape[0])
    
    #should belong to the ngfs_day class object
    new_idx = np.zeros((num_incidents,), dtype=int)
-
-   ### for testing of new incident making class functions   <<---------- safe to remove?
-   #test_incident = ngfs_incident('Testing')
-   #print('test inc is a ',test_incident)
    
    #should belong to the ngfs_day class object
    #make an array of incident objects
@@ -593,19 +632,17 @@ if __name__ == '__main__':
 
    print('Acquiring Polar data')
    polar = nh.polar_data(csv.timestamp)
-   if csv.today:
+   if csv.today:   ### <<<----------------------------------------------------------- Maybe download older data too?
       print('\tGetting the polar data for the previous 24 hours')
-      polar.add_firms_24('noaa_20')
-      polar.add_firms_24('suomi')
-      polar.fix_times('24_hour')
+      polar.add_firms_24(sat='noaa_20',csv_timestamp = csv.timestamp)
+      polar.add_firms_24(sat='suomi',csv_timestamp = csv.timestamp)
+      polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 2)
+      polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 2)
    else:
-      #print('Getting the polar data for ',csv_date_str,csv.timestamp)
-      polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp)
-      polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp)
+      print('Getting the polar data for ',csv_date_str,csv.timestamp.day_of_year)
+      polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 2)
+      polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 2)
 
-   #if som other day
-   #polar.add_firms_day('noaa_20',csv_date_str)
-   
       
    #polar.add_modis() #<<----------- different columns than the VIIIRS dat sets 
    
@@ -621,7 +658,14 @@ if __name__ == '__main__':
 
       #get polar data ignition estimate, if polar data exists
       if polar:
-         nh.best_ign_estimate(polar.data,incidents[i].ignition_pixel,incidents[i].bbox)
+         new_ign_latlon, new_ign_utc = polar.best_ign_estimate(incidents[i].ignition_pixel,incidents[i].bbox)
+         #print(type(new_ign_latlon))
+         if not np.any(np.isnan(new_ign_latlon)):
+            print('\tChanging ignition location to VIIRS data location')
+            # print(type(new_ign_latlon))
+            # print(type(incidents[i].ign_latlon))
+            incidents[i].set_new_ign_latlon(new_ign_latlon)
+            incidents[i].set_new_ign_utc(new_ign_utc)
       
       #detect a new incident from today Maybe this should go in the process stage
       if (incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
@@ -631,7 +675,11 @@ if __name__ == '__main__':
          incidents[i].make_incident_configuration(base_cfg)
          print('\tNew Incident From Today')
          json.dump(incidents[i].cfg, open(incidents[i].filename, 'w'), indent=4, separators=(',', ': '))
-         print(('INT to start the simulation, execute ./forecast.sh %s' % incidents[i].filename))
+         print('\tTo start the simulation, execute: ')
+         cmd_str = './forecast.sh ' + incidents[i].filename + ' &> logs/' + incidents[i].filename[5:-5] +'.log &'
+         incidents[i].set_cmd_str(cmd_str)   
+         #print(\n\t\t ./forecast.sh %s' % incidents[i].filename)
+         print(cmd_str)
 
       
          
