@@ -309,6 +309,24 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
 
         if not have_all_colmet:
             # this is also if we do not cache
+            use_wgrib2 = js.get('use_wgrib2', False)
+            if use_wgrib2:
+                logging.info('wgrib2 selected - cropping GRIB2 files before running UNGRIB')
+                from subprocess import check_call
+                lon0,lon1,lat0,lat1 = js.bounds['1']
+                grib_files = []
+                for orig_file in manifest.grib_files:
+                    subset_file = osp.basename(orig_file).split('.grib2')[0] + '_subset.grib2'
+                    args = [
+                        'wgrib2', orig_file, '-v0', '-small_grib', 
+                        '{}:{}'.format(lon0, lon1), '{}:{}'.format(lat0, lat1), subset_file
+                    ]
+                    stdout_file = open(osp.join(grib_dir, 'wgrib2_subset.stdout'), 'w')
+                    stderr_file = open(osp.join(grib_dir, 'wgrib2_subset.stderr'), 'w')
+                    check_call(args, cwd=grib_dir, stdout=stdout_file, stderr=stderr_file)
+                    grib_files.append(subset_file)
+                manifest.update({'grib_files': grib_files})
+                cache_colmet = False
             grib_source.symlink_gribs(manifest.grib_files, grib_dir)
 
             send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
@@ -334,7 +352,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             print((grib_dir + ':'))
             os.system('ls -l %s' % grib_dir)
 
-            if cache_colmet:
+            if cache_colmet and not use_wgrib2:
                 # move output to cache directory
                 make_dir(colmet_dir)
                 for f in manifest.colmet_files:
