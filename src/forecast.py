@@ -316,7 +316,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
                 lon0,lon1,lat0,lat1 = js.bounds['1']
                 grib_files = []
                 for orig_file in manifest.grib_files:
-                    subset_file = osp.basename(orig_file).split('.grib2')[0] + '_subset.grib2'
+                    subset_file = osp.join(grib_dir, osp.basename(orig_file).split('.grib2')[0] + '_subset.grib2')
                     args = [
                         'wgrib2', orig_file, '-v0', '-small_grib', 
                         '{}:{}'.format(lon0, lon1), '{}:{}'.format(lat0, lat1), subset_file
