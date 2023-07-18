@@ -40,8 +40,6 @@ import requests
 import socket
 import collections
 import six
-from six.moves import map
-from six.moves import zip
 from clamp2mesh import clamp2mesh
 
 class Dict(dict):

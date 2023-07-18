@@ -73,7 +73,6 @@ import traceback
 import pprint
 from cleanup import parallel_job_running, delete_visualization, local_rmdir
 import six
-from six.moves import range
 
 
 
@@ -316,15 +315,24 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
                 lon0,lon1,lat0,lat1 = js.bounds['1']
                 grib_files = []
                 for orig_file in manifest.grib_files:
-                    subset_file = osp.join(grib_dir, osp.basename(orig_file).split('.grib2')[0] + '_subset.grib2')
+                    subset_file = ensure_dir(osp.join(
+                        grib_dir, 
+                        grib_source.id.join(orig_file.split(grib_source.id + '/')[1:]).split('.grib2')[0] + '_subset.grib2'
+                    ))
+                    logging.info('wgrib2 running - from {} to {}'.format(orig_file, subset_file))
+                    logging.info('wgrib2 running - using bbox [{},{},{},{}]'.format(lon0,lon1,lat0,lat1))
                     args = [
                         'wgrib2', orig_file, '-v0', '-small_grib', 
                         '{}:{}'.format(lon0, lon1), '{}:{}'.format(lat0, lat1), subset_file
                     ]
                     stdout_file = open(osp.join(grib_dir, 'wgrib2_subset.stdout'), 'w')
                     stderr_file = open(osp.join(grib_dir, 'wgrib2_subset.stderr'), 'w')
+                    logging.debug('executing {}'.format(' '.join(args)))
+                    logging.debug('stdout {}'.format(stdout_file))
+                    logging.debug('stderr {}'.format(stderr_file))
                     check_call(args, cwd=grib_dir, stdout=stdout_file, stderr=stderr_file)
                     grib_files.append(subset_file)
+                manifest.update({'orig_grib_files': manifest['grib_files']})
                 manifest.update({'grib_files': grib_files})
                 cache_colmet = False
             grib_source.symlink_gribs(manifest.grib_files, grib_dir)
@@ -344,13 +352,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             grib_source.clone_vtables(grib_dir)
             symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
 
-            print((grib_dir + ':'))
-            os.system('ls -l %s' % grib_dir)
-
             Ungrib(grib_dir).execute().check_output()
-
-            print((grib_dir + ':'))
-            os.system('ls -l %s' % grib_dir)
 
             if cache_colmet and not use_wgrib2:
                 # move output to cache directory
@@ -366,7 +368,6 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             # move output
             for f in glob.glob(osp.join(grib_dir,grib_source.prefix + '*')):
                 move(f,wps_dir)
-
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
         logging.info('UNGRIB complete for %s' % grib_source.id)
@@ -788,7 +789,7 @@ def execute(args,job_args):
     # write subgrid coordinates in input files
     subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()]
     for in_path in subgrid_wrfinput_files:
-    	fill_subgrid(osp.join(js.wrf_dir, in_path))
+        fill_subgrid(osp.join(js.wrf_dir, in_path))
 
     logging.info('step 7b: if requested, do fuel moisture DA')
     logging.info('fmda = %s' % js.fmda)
@@ -1195,9 +1196,9 @@ def verify_inputs(args,sys_cfg):
     for key in sys_cfg:
         if key in args:
             if  sys_cfg[key] != args[key]:
-               logging_error('system configuration %s=%s attempted change to %s'
+                logging.error('system configuration %s=%s attempted change to %s'
                    % (key, sys_cfg[key], args[key]))
-               raise ValueError('System configuration values may not be overwritten.')
+                raise ValueError('System configuration values may not be overwritten.')
 
     # we don't check if job_id is a valid path
     if 'sat_only' in args and args['sat_only']:
