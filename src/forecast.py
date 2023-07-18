@@ -18,23 +18,19 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
 from wrf.wrf_cloner import WRFCloner
 from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
-from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
+from wrf.wps_domains import WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
-                  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
-                  json_join, number_minutes, serial_json, link2copy, append2file, delete
+                  timespec_to_utc, round_time_to_hour, Dict, make_clean_dir, process_create_time, \
+                  load_sys_cfg, ensure_dir, move, json_join, number_minutes, serial_json, link2copy
 from geo.write_geogrid import write_table
 from geo.geodriver import GeoDriver
 from vis.postprocessor import Postprocessor
 from vis.timeseries import Timeseries
-from vis.var_wisdom import get_wisdom_variables,_sat_prods
+from vis.var_wisdom import get_wisdom_variables, _sat_prods
 from clamp2mesh import fill_subgrid
 
 from ingest.NAM218 import NAM218
@@ -54,7 +50,7 @@ from fmda.fuel_moisture_da import assimilate_fm10_observations
 from ssh_shuttle import send_product_to_server, ssh_command
 
 import f90nml
-from datetime import datetime, timedelta
+from datetime import timedelta
 import time, re, json, sys, logging
 import os.path as osp
 import os
@@ -62,7 +58,6 @@ import stat
 from multiprocessing import Process, Queue
 import glob
 import netCDF4 as nc4
-import shutil
 import numpy as np
 
 import smtplib
@@ -70,10 +65,7 @@ from email.mime.text import MIMEText
 import hashlib
 
 import traceback
-import pprint
-from cleanup import parallel_job_running, delete_visualization, local_rmdir
-import six
-from six.moves import range
+from cleanup import parallel_job_running, delete_visualization
 
 
 
@@ -475,7 +467,7 @@ def vars_add_to_geogrid(js):
             if osp.exists(geogrid_tbl_json_path):
                 logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path, geogrid_tbl_json_path))
                 geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
-                for varname,vartable in six.iteritems(geogrid_tbl_json):
+                for varname,vartable in geogrid_tbl_json.items():
                     logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
                     if 'abs_path' in vartable.keys():
                         vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
@@ -489,7 +481,7 @@ def vars_add_to_geogrid(js):
                 raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
 
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
-    for var,tif_file in six.iteritems(geo_vars):
+    for var,tif_file in geo_vars.items():
         bbox = js.bounds[str(js.min_sub_dom)]
         logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
         try:
@@ -507,7 +499,7 @@ def vars_add_to_geogrid(js):
     geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
     logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
-    for varname,vartable in six.iteritems(geogrid_tbl_json):
+    for varname,vartable in geogrid_tbl_json.items():
         logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
         vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
         logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
@@ -558,7 +550,7 @@ def fmda_add_to_geogrid(js):
     logging.info('fmda_add_to_geogrid - updating GEOGRID.TBL at %s from %s' % 
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
-    for varname,vartable in six.iteritems(geogrid_tbl_json):
+    for varname,vartable in geogrid_tbl_json.items():
         vartable['abs_path'] = osp.join(js.wps_dir,fmda_geogrid_basename,osp.basename(vartable['abs_path']))
         vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
         logging.info('fmda_add_to_geogrid - GEOGRID abs_path=%s' % vartable['abs_path'])
@@ -786,7 +778,7 @@ def execute(args,job_args):
     # write subgrid coordinates in input files
     subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()]
     for in_path in subgrid_wrfinput_files:
-    	fill_subgrid(osp.join(js.wrf_dir, in_path))
+        fill_subgrid(osp.join(js.wrf_dir, in_path))
 
     logging.info('step 7b: if requested, do fuel moisture DA')
     logging.info('fmda = %s' % js.fmda)
@@ -895,7 +887,7 @@ def process_output(job_id):
     js.prod_name = js.get('prod_name', 'wfc-' + js.grid_code)
     pp = Postprocessor(js.pp_dir, js.prod_name)
     if 'tslist' in js.keys() and js.tslist is not None:
-        ts = Timeseries(js.pp_dir, prod_name, js.tslist, js.num_doms)
+        ts = Timeseries(js.pp_dir, js.prod_name, js.tslist, js.num_doms)
     else:
         ts = None
     js.manifest_filename= js.get('manifest_filename', 'wfc-' + js.grid_code + '.json')
@@ -1193,9 +1185,9 @@ def verify_inputs(args,sys_cfg):
     for key in sys_cfg:
         if key in args:
             if  sys_cfg[key] != args[key]:
-               logging_error('system configuration %s=%s attempted change to %s'
+                logging.error('system configuration %s=%s attempted change to %s'
                    % (key, sys_cfg[key], args[key]))
-               raise ValueError('System configuration values may not be overwritten.')
+                raise ValueError('System configuration values may not be overwritten.')
 
     # we don't check if job_id is a valid path
     if 'sat_only' in args and args['sat_only']:
@@ -1242,7 +1234,7 @@ def verify_inputs(args,sys_cfg):
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
-        for key,path in six.iteritems(args['precomputed']):
+        for key,path in args['precomputed'].items():
             if not osp.exists(path):
                 raise OSError('Precomputed entry %s points to non-existent file %s' % (key,path))
 
