@@ -1,11 +1,9 @@
-from __future__ import absolute_import
 import numpy as np
 import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
       u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
       smoke_concentration, transform_goes, fire_front
-from six.moves import range
 
 smoke_threshold_int = 10
 smoke_threshold = 1

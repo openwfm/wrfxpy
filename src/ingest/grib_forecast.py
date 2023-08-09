@@ -9,8 +9,6 @@ import os
 import os.path as osp
 import sys
 import logging
-from six.moves import map
-from six.moves import range
 
 class GribForecast(GribSource):
     """
@@ -178,8 +176,8 @@ class GribForecast(GribSource):
         g=self.grib_forecast_hours_periods
         fc_seq = [] 
         for i in range(0, len(g)):
-	        fc_seq += list(range(max(int(fc_start), 0 if i is 0 else g[i-1]['hours'] + g[i]['period']), 
-	        g[i]['hours'] + g[i]['period'], g[i]['period']))
+            fc_seq += list(range(max(int(fc_start), 0 if i == 0 else g[i-1]['hours'] + g[i]['period']), 
+            g[i]['hours'] + g[i]['period'], g[i]['period']))
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
         fc_list.append(fc_seq[len(fc_list)])

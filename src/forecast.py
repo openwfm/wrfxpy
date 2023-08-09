@@ -25,13 +25,20 @@ from wrf.wps_domains import WPSDomainConf
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
                   timespec_to_utc, round_time_to_hour, Dict, make_clean_dir, process_create_time, \
-                  load_sys_cfg, ensure_dir, move, json_join, number_minutes, serial_json, link2copy
+                  load_sys_cfg, ensure_dir, move, json_join, number_minutes, serial_json, link2copy, \
+                  force_copy, process_ignitions
 from geo.write_geogrid import write_table
 from geo.geodriver import GeoDriver
 from vis.postprocessor import Postprocessor
 from vis.timeseries import Timeseries
 from vis.var_wisdom import get_wisdom_variables, _sat_prods
-from clamp2mesh import fill_subgrid
+from clamp2mesh import get_subgrid_coordinates, fill_subgrid
+
+try: 
+    import fire_init
+    _fire_init_plugin = True
+except:
+    _fire_init_plugin = False
 
 from ingest.NAM218 import NAM218
 from ingest.HRRR import HRRR
@@ -56,7 +63,9 @@ import os.path as osp
 import os
 import stat
 from multiprocessing import Process, Queue
+from subprocess import check_call
 import glob
+import pickle
 import netCDF4 as nc4
 import numpy as np
 
@@ -224,6 +233,7 @@ def retrieve_satellite(js, sat_source, q):
     :param sat_source: the SatSource object
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
+    logging.info("step 2a: satellite retrieval")
     try:
         logging.info("retrieving satellite files from %s" % sat_source.id)
         # retrieve satellite granules intersecting the last domain
@@ -240,6 +250,7 @@ def retrieve_satellite(js, sat_source, q):
         logging.error('satellite retrieving step failed with exception %s' % repr(e))
         traceback.print_exc()
         q.put('FAILURE')
+
 
 def create_sat_manifest(js):
     sat_manifest = Dict({})
@@ -266,7 +277,71 @@ def create_sat_manifest(js):
         except:
             logging.warning('not able to recover previous satellite file')
     json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
-    return sat_manifest
+
+
+def retrieve_fire_init(js, q):
+    """
+    Retrieve fire real-time data for forecasting
+
+    It returns either 'SUCCESS' or 'FAILURE' on completion.
+
+    :param js: the JobState object containing the forecast configuration
+    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
+    """
+    logging.info("step 2b: fire real-time data retrieval")
+    try:
+        make_dir(js.fire_init_dir)
+        logging.info("running ArcGIS acquisition")
+        args = [osp.join(js.wrfxpy_dir, 'retrieve_arcgis.sh')] + \
+            '{},{},{},{}'.format(*js.bounds[str(js.max_dom)]).split(',') + [js.fire_init_dir]
+        stdout_path = osp.join(js.fire_init_dir, 'acq_arcgis.stdout')
+        stderr_path = osp.join(js.fire_init_dir, 'acq_arcgis.stderr')
+        stdout_file = open(stdout_path, 'w')
+        stderr_file = open(stderr_path, 'w')
+        check_call(args, cwd=js.fire_init_dir, stdout=stdout_file, stderr=stderr_file)
+        send_email(js, 'Fire real-time data acquisition', 'Job %s - Fire real-time data acquisition complete.' % js.job_id)
+        logging.info("Fire real-time data acquisition complete")
+        q.put('SUCCESS')
+    except Exception as e:
+        logging.error('Fire real-time data acquisition step failed with exception %s' % repr(e))
+        traceback.print_exc()
+        q.put('FAILURE')
+
+
+def run_fire_init(js, q):
+    """
+    This function processes fire information to create fire initialization.
+
+    It returns either 'SUCCESS' or 'FAILURE' on completion.
+
+    :param js: the JobState object containing the forecast configuration
+    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
+    """
+    try:
+        logging.info('step 5b: processing fire initialization...')
+        params = json.load(open(osp.join(js.sys_install_path, 'src/fire_init/params.json')))
+        params.update({
+            'perim1_path': osp.join(js.fire_init_dir, 'perim1.pkl'),
+            'perim2_path': osp.join(js.fire_init_dir, 'perim2.pkl'),
+            'wrf_path': osp.join(js.wps_dir, 'geo_em.d{:02d}.nc'.format(js.max_dom)),
+            'result_path': osp.join(js.fire_init_dir, 'results.pkl')
+        })
+        if 'prev_forecast' in js.keys():
+            prev_fire_init_results = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/results.pkl')
+            params.update({'prev_perims': prev_fire_init_results})
+
+        perims, params = fire_init.init_fire_info(**params)
+        if len(perims):
+            perim1 = perims['perim1'].coords
+            perim2 = perims['perim2'].coords
+            fxlon, fxlat = get_subgrid_coordinates(params['wrf_path'])
+            fire_init.perims_interp(perim1, perim2, fxlon, fxlat, **params)
+        q.put('SUCCESS')
+    except Exception as e:
+        logging.error('fire initialization step failed with exception %s' % repr(e))
+        traceback.print_exc()
+        q.put('FAILURE')
+
 
 def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     """
@@ -341,7 +416,6 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             for f in glob.glob(osp.join(grib_dir,grib_source.prefix() + '*')):
                 move(f,wps_dir)
 
-
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
         logging.info('UNGRIB complete for %s' % grib_source.id)
         q.put('SUCCESS')
@@ -359,6 +433,7 @@ def run_geogrid(js, q):
     :param js: the JobState object containing the forecast configuration
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
+    logging.info("step 3: execute geogrid")
     try:
         js.geo_cache = None
         logging.info("running GEOGRID")
@@ -371,6 +446,32 @@ def run_geogrid(js, q):
 
     except Exception as e:
         logging.error('GEOGRID step failed with exception %s' % repr(e))
+        q.put('FAILURE')
+
+
+def run_metgrid(js, q):
+    """
+    This function runs metgrid.
+
+    :param js: the JobState object containing the forecast configuration
+    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
+    """
+    logging.info("step 5: execute metgrid after ensuring all grids will be processed")
+    try:
+        update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
+        js.domain_conf.prepare_for_metgrid(js.wps_nml)
+        logging.info("namelist.wps for METGRID: %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': ')))
+        f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+
+        logging.info("running METGRID")
+        Metgrid(js.wps_dir).execute().check_output()
+        logging.info("METGRID complete")
+
+        send_email(js, 'metgrid', 'Job %s - metgrid complete.' % js.job_id)
+        q.put('SUCCESS')
+
+    except Exception as e:
+        logging.error('METGRID step failed with exception %s' % repr(e))
         q.put('FAILURE')
 
 
@@ -556,7 +657,6 @@ def fmda_add_to_geogrid(js):
         logging.info('fmda_add_to_geogrid - GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
 
-    
 def execute(args,job_args):
     """
     Executes a weather/fire simulation.
@@ -589,6 +689,16 @@ def execute(args,job_args):
     js.jobdir = jobdir
     if (js.clean_dir and not js.restart) or not osp.exists(osp.join(js.jobdir,'input.json')):
         make_clean_dir(js.jobdir)
+
+    if not _fire_init_plugin:
+        if js.use_realtime:
+            logging.warning('requested using real-time data, but fire_init package missing')
+        js.use_realtime = False
+    else:
+        if js.use_realtime:
+            logging.info('using real-time data requested, ignoring specified ignitions')
+            js.ignitions = {}
+            js.fire_init_dir = osp.abspath(osp.join(js.jobdir, 'fire_init'))
 
     js.num_doms = len(js.domains)
     json.dump(job_args, open(osp.join(js.jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
@@ -627,7 +737,7 @@ def execute(args,job_args):
                 sat_proc[satellite_source.id].join()
             proc_q.close()
             # create satellite manifest
-            sat_manifest = create_sat_manifest(js)
+            create_sat_manifest(js)
             # create satellite outputs
             process_sat_output(js.job_id)
             return
@@ -648,16 +758,12 @@ def execute(args,job_args):
     js.wps_dir = osp.abspath(osp.join(js.jobdir, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.jobdir, 'wrf'))
 
-    #check_obj(args,'args')
-    #check_obj(js,'Initial job state')
-
-    logging.info("step 1: clone WPS and WRF directories")
+    logging.info("step 1: clone WPS and WRF directories and process domain information and patch namelist for geogrid")
     logging.info("cloning WPS into %s" % js.wps_dir)
     cln = WRFCloner(js.args)
     cln.clone_wps(js.wps_dir, [])
     js.grib_source[0].clone_vtables(js.wps_dir)
-
-    logging.info("step 2: process domain information and patch namelist for geogrid")
+    logging.info("process domain information")
     js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * js.num_doms
     js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * js.num_doms
     js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']
@@ -675,27 +781,36 @@ def execute(args,job_args):
         sat_proc = {}
         for satellite_source in js.satellite_source:
             sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
+    else:
+        logging.info("step 2a: satellite retrieval [skipping]")
 
+    if js.use_realtime:
+        fire_init_proc = Process(target=retrieve_fire_init, args=(js, proc_q))
+    else:
+        logging.info("step 2b: fire real-time data retrieval [skipping]")
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
 
     grib_proc = {}
     for grib_source in js.grib_source:
         grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
-
-    logging.info('starting GEOGRID and GRIB2/UNGRIB')
+    
+    logging.info('execute: starting parallel GEOGRID, GRIB2/UNGRIB, and Satellite retrieval')
 
     if js.ungrib_only:
-        logging.info('ungrib_only set, skipping GEOGRID and SATELLITE, will exit after UNGRIB')
+        logging.info('ungrib_only set, skipping GEOGRID and Satellite retrieval, will exit after UNGRIB')
     else:
         geogrid_proc.start()
-        for satellite_source in js.satellite_source:
-            sat_proc[satellite_source.id].start()
+        if js.satellite_source:
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id].start()
+        if js.use_realtime:
+            fire_init_proc.start()
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].start()
 
     # wait until all tasks are done
-    logging.info('waiting until all tasks are done')
+    logging.info('execute: waiting until all tasks are done')
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
@@ -707,13 +822,20 @@ def execute(args,job_args):
         return
     else:
         geogrid_proc.join()
-        for satellite_source in js.satellite_source:
-            sat_proc[satellite_source.id].join()
+        if js.use_realtime:
+            fire_init_proc.join()
+        if js.satellite_source:
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id].join()
 
     if js.satellite_source:
         for satellite_source in js.satellite_source:
             if proc_q.get() != 'SUCCESS':
                 return
+
+    if js.use_realtime:
+        if proc_q.get() != 'SUCCESS':
+            return
 
     for grib_source in js.grib_source:
         if proc_q.get() != 'SUCCESS':
@@ -724,27 +846,47 @@ def execute(args,job_args):
 
     proc_q.close()
 
-    logging.info('execute: finished parallel GEOGRID, GRIB2/UNGRIB, and Satellite')
+    logging.info('execute: finished parallel GEOGRID, GRIB2/UNGRIB, and Satellite retrieval')
 
     if js.satellite_source:
         # create satellite manifiest
-        sat_manifest = create_sat_manifest(js)
+        create_sat_manifest(js)
 
-    logging.info("step 5: execute metgrid after ensuring all grids will be processed")
-    update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
-    js.domain_conf.prepare_for_metgrid(js.wps_nml)
-    logging.info("namelist.wps for METGRID: %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': ')))
-    f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+    # do steps 5 & 5b in parallel (two execution streams)
+    #  -> METGRID ->
+    #  -> fire init processing ->
+    proc_q = Queue()
 
-    logging.info("running METGRID")
-    Metgrid(js.wps_dir).execute().check_output()
+    metgrid_proc = Process(target=run_metgrid, args=(js, proc_q))
 
-    send_email(js, 'metgrid', 'Job %s - metgrid complete.' % js.job_id)
-    logging.info("METGRID complete")
+    if js.use_realtime:
+        fire_init_proc = Process(target=run_fire_init, args=(js, proc_q))
+    else:
+        logging.info("step 5b: fire init processing [skipping]")
 
-    logging.info("cloning WRF into %s" % js.wrf_dir)
+    logging.info('execute: starting parallel METGRID, and fire init processing')
+    metgrid_proc.start()
+    if js.use_realtime:
+        fire_init_proc.start()
+
+    logging.info('execute: waiting until all tasks are done')
+    metgrid_proc.join()
+    if js.use_realtime:
+        fire_init_proc.join()
+
+    if js.use_realtime:
+        if proc_q.get() != 'SUCCESS':
+            return
+
+    if proc_q.get() != 'SUCCESS':
+        return
+
+    proc_q.close()
+
+    logging.info('execute: finished parallel METGRID, and fire init processing')
 
     logging.info("step 6: clone wrf directory, symlink all met_em* files, make namelists")
+    logging.info("cloning WRF into %s" % js.wrf_dir)
     cln.clone_wrf(js.wrf_dir, [])
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
     time_ctrl = update_time_control(js.start_utc, js.end_utc, js.num_doms)
@@ -761,13 +903,12 @@ def execute(args,job_args):
         f90nml.write(js.ems_nml, osp.join(js.wrf_dir, 'namelist.fire_emissions'), force=True)
         js.wrf_nml['dynamics']['tracer_opt'] = [2] * js.num_doms
 
+    # make namelist input
     f90nml.write(js.wrf_nml, osp.join(js.wrf_dir, 'namelist.input'), force=True)
-
+    # make namelist fire
     f90nml.write(js.fire_nml, osp.join(js.wrf_dir, 'namelist.fire'), force=True)
 
-    # step 7: execute real.exe
-
-    logging.info("running REAL")
+    logging.info("step 7: running REAL")
     # try to run Real twice as it sometimes fails the first time
     # it's not clear why this error happens
     try:
@@ -788,12 +929,31 @@ def execute(args,job_args):
             logging.info('assimilate_fm10_observations for domain %s' % dom)
             assimilate_fm10_observations(osp.join(js.wrf_dir, 'wrfinput_d%02d' % int(dom)), None, js.fmda.token)
 
-    logging.info('step 8: execute wrf.exe on parallel backend')
+    logging.info('step 7c: fire initialization')
+    if js.use_realtime:
+        fire_init_path = osp.join(js.fire_init_path, 'results.pkl')
+        if osp.exists(fire_init_path):
+            fire_data = pickle.load(open(fire_init_path))
+            wrf_path = osp.join(js.wrf_dir, 'wrfinput_d{:02d}'.format(js.max_dom))
+            force_copy(wrf_path, wrf_path + '_orig')
+            outside_time = fire_data.get('outside_time', 360000.)
+            no_fuel_cat = js.fire_nml['fuel_scalars']['no_fuel_cat']
+            fire_init.integrate_init(wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], outside_time, no_fuel_cat)
+            if 'prev_forecast' in js.keys():
+                # implementation of adding smoke from previous forecast
+                pass
+        else:
+            logging.error('use_realtime is selected, but no fire information to start a fire simulation')
+            sys.exit(1)
+    else:
+        if 'ignitions' in js.args and len(js.ignitions):
+            process_ignitions(js)
+    
     logging.info('run_wrf = %s' % js.run_wrf)
     if js.run_wrf:
-        # step 8: execute wrf.exe on parallel backend
+        logging.info('step 8: execute wrf.exe on parallel backend')
         jobfile = wrf_execute(js.job_id)    
-        # step 9: post-process results from wrf simulation
+        logging.info('step 9: post-process results from wrf simulation')
         process_output(js.job_id)
     else:
         jobfile = jsub.jobfile
