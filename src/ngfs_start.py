@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import csv
-import os, sys
+import os, sys, glob
 import json
 import time
 from mpl_toolkits.basemap import Basemap
@@ -41,7 +41,7 @@ from datetime import timedelta, datetime
 #add src directory to path json time
 sys.path.insert(1, 'src/')
 sys.path.insert(1, 'src/ingest')
-from downloader import download_url
+from ingest.downloader import download_url
 #from ngfs_dictionary import ngfs_dictionary  <-- use to force csv data columns into a type
 import ngfs_helper as nh
 import utils
@@ -52,12 +52,18 @@ import ngfs_dictionary as nd
 
 ####### Classes  ######
 
+
 #class that keeps atrributes about the day's data
 class ngfs_day():
    #maybe add some attributes so that ongoing, new, and started incidents can be tracked
    def __init__(self,csv_date_str,today):
       self.date_str = csv_date_str # <<---------------------------------------- rename ????
-      self.timestamp = timestamp_from_string(csv_date_str)
+      if today:
+         self.timestamp = pd.Timestamp.now(tz='UTC')
+         print('CSV timestamp: ',self.timestamp)
+      else:
+         self.timestamp = timestamp_from_string(csv_date_str)
+
       self.today = today  # <--- Boolean as to whether script was called with 'now', maybe change name to 'now'
       #self.set_new = list()
       #self.started_incident = list()
@@ -104,6 +110,45 @@ class ngfs_day():
          pickle.dump(self,f)
       #make script to run through all saved files to plot
 
+   def save_incident_text(self):
+      #saves the ignition point information for all csv events as a csv file. Needs to add 
+      # additional fields to the csv file such as viirs pixel location and assumed ignition time
+      # use pd.to_csv() function
+      ign_pix = pd.DataFrame()
+        #print(self.ngfs_days)
+      new_ign_lat = np.array([])
+      new_ign_lon = np.array([])
+      new_ign_time = list()
+      viirs_pixel = list()
+      
+         #print(ngfs_day)
+      for inc in self.incidents:
+         #print(inc.name,inc.new)
+         #time.sleep(3)
+         if inc.new:
+            #print(inc.name,inc.new)
+            #print(inc.ignition_pixel)
+            ign_pix = ign_pix.append(inc.ignition_pixel)
+            #for adding columns to the csv file
+            try:
+               new_ign_lat = np.append(new_ign_lat,inc.new_ign_latlon[0])
+               new_ign_lon = np.append(new_ign_lon,inc.new_ign_latlon[1])
+               new_ign_time.append(inc.ign_utc)
+               viirs_pixel.append(True)
+            except:
+               new_ign_lat = np.append(new_ign_lat,inc.ign_latlon[0])
+               new_ign_lon = np.append(new_ign_lon,inc.ign_latlon[1])
+               new_ign_time.append(inc.ign_utc)
+               viirs_pixel.append(False)
+      #print('length of new vars',len(new_ign_lat),len(new_ign_lon),len(new_ign_time))
+      #print('dataframe shape',ign_pix.shape)
+      ign_pix['forecast_ign_lat'] = new_ign_lat
+      ign_pix['forecast_ign_lon'] = new_ign_lon
+      ign_pix['forecast_ign_UTC'] = new_ign_time
+      ign_pix['viirs_pixel_ign'] = viirs_pixel
+      print(ign_pix)
+      csv_save_str = 'ngfs/forecast_ignition_pixels_'+self.date_str+'.csv'
+      ign_pix.to_csv(csv_save_str,index=False)
 
    def print_base_map(self):
       print('Starting map making')
@@ -114,13 +159,14 @@ class ngfs_day():
       m.shadedrelief()
       m.drawstates()
       m.drawcountries()
-      m.drawcoastlines()
+      
  
       #for i in range(self.num_incidents()):
       #   print(i,self.incidents[i].name,self.incidents[i].started)
 
       #all incident ignition locations
       latlons = self.incident_ign_latlons()
+
 
       #get ongoing incidents
       ongoing_latlons = latlons[self.ongoing,:]
@@ -188,11 +234,11 @@ class ngfs_incident():
       self.county = county
    def set_population(self,pop):
       self.affected_population = int(pop)
-   def set_incident_id_string(self,id_string):
-      self.incident_id_string = id_string
+      
    #these are the columns of the csv file as pandas dataframe
-   def add_detections(self,df):
+   def add_data(self,df):
       self.data = self.data.append(df)
+
    def set_incident_start_time(self):
       if self.data.shape[0] > 0:
          #self.incident_start_time = self.data.iloc[0,3]
@@ -208,11 +254,9 @@ class ngfs_incident():
    def set_new_ign_utc(self,new_gn_utc):
       self.new_ign_utc = new_ign_utc
       if new_ign_utc < self.ign_utc:
-
-         print('new',new_ign_utc)
-         print('old',self.ign_utc)
-
-         print('Changing the time paramaters of the job for ealier detection information')
+         print('\tChanging the time paramaters of the job for ealier detection information')
+         print('\tNew UTC time:',new_ign_utc)
+         print('\tOld UTC time:',self.ign_utc)
          self.ign_utc = new_ign_utc
          #the start and finish times of the simulation get adjusted too
          self.start_utc = utils.round_time_to_hour(self.ign_utc - timedelta(minutes=30))
@@ -240,7 +284,7 @@ class ngfs_incident():
       #change the base configuration file to match the individual incidents parameters
       
       cfg = base_cfg
-      gc_string  = self.name+'_'+utils.utc_to_esmf(self.start_utc)+'_'+self.incident_id_string[1:-1]
+      gc_string  = self.incident_name+'_'+utils.utc_to_esmf(self.start_utc)+'_'+self.incident_id_string[1:-1]
       cfg['grid_code'] = gc_string.replace(' ','_')
       cfg['domains']['1']['center_latlon'] = self.ign_latlon
       cfg['domains']['1']['truelats'] = (self.ign_latlon[0], self.ign_latlon[0])
@@ -260,23 +304,40 @@ class ngfs_incident():
       cfg['start_utc'] = utils.utc_to_esmf(self.start_utc)
       cfg['end_utc'] = utils.utc_to_esmf(self.end_utc)
          #print(cfg)
-      descrip_string = self.name
+      descrip_string = self.incident_name
       cfg['postproc']['description'] = descrip_string
       self.filename = 'jobs/' + cfg['grid_code'] + '.json'
       self.set_json_start_code(self.filename,cfg['grid_code']) 
       self.cfg = cfg
+      #viewprint(cfg)
 
    def process_incident(self,incident_data,data,full_data):
 
       #sort data by observation time	
       incident_data = incident_data.sort_values(by='observation_time')
 
+      id_strings = incident_data['incident_id_string'].unique()
+      if id_strings.shape[0] > 1:
+         print('\tFound multiple id strings for named incident')
+         time.sleep(10)
+
+      #take the first id string and name from the list
+      self.incident_id_string = incident_data['incident_id_string'][incident_data.index[0]]
+      self.incident_name  = incident_data['incident_name'][incident_data.index[0]]
+      print(self.incident_name)
+
       self.det_count = incident_data.shape[0]
       print('\tNumber of detections: ',self.det_count) 
 
+      #get unique locations
+      self.unique_latlons = np.asarray(incident_data.loc[:,['lat_tc','lon_tc']].drop_duplicates())
+      print('\tNumber of unique detection locations: ',self.unique_latlons.shape[0])
+      #print(self.unique_latlons)
+
       #incident ignition pixel has corners of the pixel, etc
       self.ignition_pixel = incident_data.iloc[0]
-      #print(self.ignition_pixel)
+      #print('\tIgnition pixel: ')
+      #pixel_corners(self.ignition_pixel)
       
       #demographic data for incident
       #could span more than one county, state --> use unique to generate a list?
@@ -300,9 +361,9 @@ class ngfs_incident():
          print('\tIncident county population is ',self.affected_population)
       
       #add detections to the incidnet
-      self.add_detections(incident_data)
+      self.add_data(incident_data)
+
       self.set_incident_start_time()
-      self.set_incident_id_string(incident_data['incident_id_string'][incident_data.index[0]])
       print('\tNIFC incident start time : ', self.incident_start_time)
 
       #get the bounding box
@@ -319,6 +380,11 @@ class ngfs_incident():
          print('\tNo terrain corected lat/lon available')
          self.ign_latlon = [incident_data.lat[idx], incident_data.lon[idx]]
       #reduce to only unique lat/lon pairs
+
+      #look for swir pixel locations
+      # if abs(incident_data.
+      
+      
       self.unique_latlon = np.unique(self.ign_latlon)
       
       #search the entire csv for pixel locations that have not been assigned to the incident yet
@@ -332,6 +398,12 @@ class ngfs_incident():
          print('\tFound addtional, earlier detections')
          self.ign_utc = full_subset.observation_time[full_subset.index[0]]
          print('\tNew earliest pixel time: ',self.ign_utc)
+
+      #search also for the case where t multiple incident names may exist
+      id_subset = data[data['incident_id_string'] == self.incident_id_string]
+      if id_subset.shape[0] > self.data.shape[0]:
+         print('More data exists. Appending..')
+         time.sleep(10)
 
       #minimum of the earliest detection pixel and stated NIFC inceident start time
       self.ign_utc = min(incident_data.observation_time[idx],self.incident_start_time,incident_data.initial_observation_time[idx])
@@ -399,7 +471,7 @@ def timestamp_from_string(csv_date_str):
    csv_year = int(csv_date_str[0:4])
    csv_month = int(csv_date_str[5:7])
    csv_day = int(csv_date_str[8:10])
-   return pd.Timestamp(year=csv_year,month=csv_month,day=csv_day)
+   return pd.Timestamp(year=csv_year,month=csv_month,day=csv_day,tz='UTC')
    
     
 def get_ngfs_csv(days_previous,goes):
@@ -522,7 +594,8 @@ def prioritize_incidents(incidents,new_idx,num_starts):
       start_count = 0
       for i in sort_idx:
          if incidents[i].new:
-            print(incidents[i].name)
+            print(incidents[i].incident_name)
+            print(incidents[i].ign_latlon)
             print('\t Population affected: ',incidents[i].affected_population)
             print('\t',incidents[i].county,', ',incidents[i].state)
          #print('\t',incidents[i].json_start_code)
@@ -531,12 +604,31 @@ def prioritize_incidents(incidents,new_idx,num_starts):
                os.system(incidents[i].cmd_str)
                #print(incidents[i].cmd_str)
                os.system('jobs')
-               time.sleep(3)
+               #pause between jobs to help avoid crash in metgrid. Working ? <------------------
+               time.sleep(60)
                incidents[i].set_started()
                started[i] = 1
                start_count += 1
+            else:
+               print('\tNew incident, but unstarted simulation')
  
    return sort_idx, started
+
+def pixel_corners(csv_row):
+   #read the corners of the pixel and return an array
+   #csv_row is the entire rown from a csv data frame
+   corners = np.zeros([4,2])
+   corners[0,1] = csv_row.loc['lat_c1']
+   corners[1,1] = csv_row.loc['lat_c2']
+   corners[2,1] = csv_row.loc['lat_c3']
+   corners[3,1] = csv_row.loc['lat_c4']
+   corners[0,0] = csv_row.loc['lon_c1']
+   corners[1,0] = csv_row.loc['lon_c2']
+   corners[2,0] = csv_row.loc['lon_c3']
+   corners[3,0] = csv_row.loc['lon_c4']
+   print('\t',corners)
+   
+
 
 if __name__ == '__main__':
 
@@ -545,6 +637,31 @@ if __name__ == '__main__':
    
    print('Reading in county population data')
    pop_data = pd.read_csv('ingest/NGFS/Population_by_US_County_July_2022.txt',sep='\t',encoding = "ISO-8859-1")
+
+   print('Reading previous 3 (?) pickle files')
+   full_pick_list = glob.glob('ngfs/*.pkl')
+   full_pick_list.sort(key=os.path.getmtime)
+   pick_list = list()
+
+   for i in full_pick_list:
+      #print(i)
+      if 'GOES' not in i:
+         pick_list.append(i)
+   #print(pick_list)
+   time.sleep(10)
+   old_ngfs_incidents = list()
+   for i in range(-1,-5,-1):
+      #print(pick_list[i])
+      with open(pick_list[i],'rb') as f:
+         df = pickle.load(f)
+      old_ngfs_incidents.extend(df.incidents)
+
+   #for incs in old_ngfs_incidents:
+   #   print(incs.name,incs.incident_name,incs.started)
+
+
+   #print(old_ngfs_incidents)
+   time.sleep(10)
    
    #setup of automatic download of csv file
    #stores csv file(s) in the ingest/NGFS directory
@@ -558,7 +675,7 @@ if __name__ == '__main__':
       ngfs_dir = 'ingest/NGFS'
       
       #download the data
-      days_to_get = 2
+      days_to_get = 3
       csv_str, csv_path = download_csv_data(days_to_get)
       csv_file = csv_path ## <---- This can be a list of paths
       
@@ -576,17 +693,17 @@ if __name__ == '__main__':
       force = False
       auto_start = sf.read_boolean('no')
       if auto_start:
-         sf.print_question('How many simulations to run at once? default = [10]')
-         num_starts = sf.read_integer(10)
+         sf.print_question('How many simulations to run at once? default = [15]')
+         num_starts = sf.read_integer(15)
       else:
          num_starts = -1
    elif 'force' in str(sys.argv):
       #this forces auto_start and avoids questions
       force = True
       auto_start = True
-      num_starts = 10    # <<<------------------------------- set to -1 for testing, change to 10
+      num_starts = 15   # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
    else:
-      force = False
+      force = True  # <<<------------------------------- change this to require confirmation of forecast configuration
       auto_start = False
       num_starts = -1
 
@@ -607,53 +724,110 @@ if __name__ == '__main__':
    # read the data from the csv file(s), get date string for naming #
    ##################################################################
    data, csv_date_str = read_NGFS_csv_data(csv_file)
+   print('\tFull data shape: ',data.shape)
    
    ##################################################################
    #               initialize an object of the ngfs_day class       #
    ##################################################################
    csv = ngfs_day(csv_date_str,today)
-
+   csv.set_save_name()
 
    #filter out "null incidents"
    #maybe null incidents are what we are interested in?
    full_data = data
-   data = data.dropna(subset=['incident_name'])
+   #filter out the possible artifacts 'possible_instrument_artifact'
+   # idx = data.possible_instrument_artifact == 'Y'
+   # print('Found', sum(idx), ' artifact pixels')
+   data = data[data['possible_instrument_artifact'] == 'N']
+   #new data shape
+   print('\tNew data shape after filtering possible artifacts: ',data.shape)
+
+   data = data.dropna(subset=['incident_name'])  #  <------ change to use id_string?
 
    #print('Incidents in csv file')
    incident_names = data['incident_name'].unique()
-   num_incidents = incident_names.shape[0]
+   incident_id_strings = data['incident_id_string'].unique()
+   num_names = incident_names.shape[0]
+   num_id_strings = incident_id_strings.shape[0]
+   print('Found ',num_names, 'unique incident names')
+   print('Found ',num_id_strings, 'unique id strings')
+   time.sleep(5)
+
+
+   initialize_by_names  = False
+
+   if initialize_by_names:
+      print('\tInitializing incident object by incident names')
+      num_incidents = num_names
+   else:
+      print('\tInitializing incident object by incident id string')
+      num_incidents = num_id_strings
+
+
    
    #should belong to the ngfs_day class object
+   #array for recording which incidents are new
    new_idx = np.zeros((num_incidents,), dtype=int)
    
-   #should belong to the ngfs_day class object
+   
+   #incidents_names = [ngfs_incident(incident_names[i]) for i in range(num_names)] #  <------ change to use id_string?
+   #incidents_id_strings = [ngfs_incident(incident_id_strings[i]) for i in range(num_id_strings)]
+
    #make an array of incident objects
-   incidents  = [ngfs_incident(incident_names[i]) for i in range(num_incidents)]
+   if initialize_by_names:
+      incidents = [ngfs_incident(incident_names[i]) for i in range(num_names)]
+   else:
+      incidents = [ngfs_incident(incident_id_strings[i]) for i in range(num_id_strings)]
 
    print('Acquiring Polar data')
    polar = nh.polar_data(csv.timestamp)
-   if csv.today:   ### <<<----------------------------------------------------------- Maybe download older data too?
+
+   if csv.today:
       print('\tGetting the polar data for the previous 24 hours')
-      polar.add_firms_24(sat='noaa_20',csv_timestamp = csv.timestamp)
-      polar.add_firms_24(sat='suomi',csv_timestamp = csv.timestamp)
-      polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 2)
-      polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 2)
+      try:
+         polar.add_firms_24(sat='noaa_20',csv_timestamp = csv.timestamp)
+      except:
+         print('Error getting NOAA_20 24-hour data')
+      try:
+         polar.add_firms_24(sat='suomi',csv_timestamp = csv.timestamp)
+      except:
+         print('Error getting Suomi 24-hour data')
+      try:
+         polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 3)
+      except:
+         print('Error getting NOAA_20 date data')
+      try:
+         polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 3)
+      except:
+         print('Error getting Suomi date data')
    else:
       print('Getting the polar data for ',csv_date_str,csv.timestamp.day_of_year)
-      polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 2)
-      polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 2)
+      try:
+         polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 3)
+      except:
+         print('Error getting NOAA_20 date data')
+      try:
+         polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 3)
+      except:
+         print('Error getting Suomi date data')
 
       
    #polar.add_modis() #<<----------- different columns than the VIIIRS dat sets 
    
 
    for i in range(num_incidents):
+      print('')
       print(incidents[i].name)
+      
 
       #get only subset of detections from individual nifc incidents
-      incident_subset = data[data.incident_name == incident_names[i]]
+      if initialize_by_names:
+         incident_subset = data[data.incident_name == incident_names[i]]
+      else:
+         incident_subset = data[data.incident_id_string == incident_id_strings[i]]
 
       #process all the data for an individual incident
+      #print('Subsetting data for incident. Number of detections = ',incident_subset.shape[0])
       incidents[i].process_incident(incident_subset,data,full_data)
 
       #get polar data ignition estimate, if polar data exists
@@ -668,18 +842,31 @@ if __name__ == '__main__':
             incidents[i].set_new_ign_utc(new_ign_utc)
       
       #detect a new incident from today Maybe this should go in the process stage
-      if (incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
+      inc_started = False
+      for old_inc in old_ngfs_incidents:
+         if incidents[i].name == old_inc.name:
+            print('\tKnown incident from before')
+            print('\t\t',old_inc.ign_latlon)
+            print('\t\t',old_inc.ign_utc)
+            print('\t\t Incident started: ',old_inc.started)
+            if old_inc.started:
+               inc_started = True
+            #time.sleep(2)
+      #start new incidents to run
+      if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = 43) and not inc_started:
+         #(incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
          new_idx[i] = 1
          #change 'new' object attribute
          incidents[i].set_new()
          incidents[i].make_incident_configuration(base_cfg)
-         print('\tNew Incident From Today')
+         print('\tNew Incident From previous 24 hours')
          json.dump(incidents[i].cfg, open(incidents[i].filename, 'w'), indent=4, separators=(',', ': '))
          print('\tTo start the simulation, execute: ')
          cmd_str = './forecast.sh ' + incidents[i].filename + ' &> logs/' + incidents[i].filename[5:-5] +'.log &'
          incidents[i].set_cmd_str(cmd_str)   
          #print(\n\t\t ./forecast.sh %s' % incidents[i].filename)
          print(cmd_str)
+
 
       
          
@@ -697,16 +884,16 @@ if __name__ == '__main__':
    csv.add_data(data)
    csv.add_full_data(full_data)
    csv.add_incidents(incidents)
-   csv.set_save_name()
-   csv.set_new(new_idx)
-   #print('new',csv.new)
-   csv.set_started(started)
+   csv.set_new(new_idx.astype(bool))
+   csv.set_started(started.astype(bool))
    #print('started',csv.started)
    #detrmine ongoing events
    csv.set_ongoing()
    #print('ongoing',csv.ongoing)
 
    #save data and pictures
+   if csv.today:
+      csv.save_incident_text()
    csv.save_pickle()
    csv.print_base_map()
 
