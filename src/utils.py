@@ -449,7 +449,10 @@ def render_ignitions(js, max_dom):
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
                  'fire_viscosity' : [0] * max_dom }
     
-    if len(ign_specs):
+    if js.use_realtime:
+        fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
+        nml_fire.update({'fire_perimeter_time': fire_perimeter_time})
+    elif js.use_tign_ignition and len(ign_specs):
         ign_times = [(timespec_to_utc(ign['time_utc'], orig_start_time),ign['duration_s']) for dom_igns in ign_specs.values() for ign in dom_igns]
         fire_tign_in_time = max([int((ign_time - js.start_utc).total_seconds())+ign_dur for ign_time,ign_dur in ign_times])
         nml_fire.update({'fire_tign_in_time': fire_tign_in_time})
@@ -458,6 +461,8 @@ def render_ignitions(js, max_dom):
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
         nml_fire['ifire'][dom_id-1] = 1
+        if not (js.use_tign_ignition or js.use_realtime):
+            nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
         nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
         nml_fire['fmoist_run'][dom_id-1] = True # use the fuel moisture model
@@ -604,6 +609,7 @@ def load_sys_cfg():
     sys_cfg.ungrib_only = sys_cfg.get('ungrib_only',False)
     sys_cfg.sat_only = sys_cfg.get('sat_only',False)
     sys_cfg.use_realtime = sys_cfg.get('use_realtime',False)
+    sys_cfg.use_tign_ignition = sys_cfg.get('use_tign_ignition',False)
     return sys_cfg
 
 class response_object(object):

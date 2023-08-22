@@ -132,11 +132,12 @@ def interpolate_coords(lons,lats,srx,sry,extrap=True):
         return lonsr,latsr
 
 
-def get_subgrid_coordinates(nc_path):
+def get_subgrid_coordinates(nc_path, strip=True):
     """
     Get subgrid coordinates from NetCDF file
 
     :param nc_path: path to NetCDF file with WRF coordinate arrays
+    :param strip: return or not the strip
     """
 
     with nc4.Dataset(nc_path) as d:
@@ -145,13 +146,19 @@ def get_subgrid_coordinates(nc_path):
         if 'sr_x' in attrs and 'sr_y' in attrs:
             srx = d.getncattr('sr_x')
             sry = d.getncattr('sr_y')
-        else:
+        elif 'west_east_subgrid' in d.dimensions:
             srx = int(d.dimensions['west_east_subgrid'].size/(d.dimensions['west_east'].size+1))
-            sry = int(d.dimensions['south_north_subgrid'].size/(d.dimensions['south_north'].size+1))        
+            sry = int(d.dimensions['south_north_subgrid'].size/(d.dimensions['south_north'].size+1))     
+        else:
+            raise TypeError('subgrid dimensions not found in file, skipping')
         if 'FXLONG' in varis and 'FXLAT' in varis and array_filled(d.variables['FXLONG']) and array_filled(d.variables['FXLAT']):
-            lons = np.array(d.variables['FXLONG'][0])
-            lats = np.array(d.variables['FXLAT'][0])
-            return lons,lats
+            if strip:
+                lons = np.array(d.variables['FXLONG'][0])
+                lats = np.array(d.variables['FXLAT'][0])
+            else:
+                lons = np.array(d.variables['FXLONG'][0,:-sry,:-srx])
+                lats = np.array(d.variables['FXLAT'][0,:-sry,:-srx])
+            return lons, lats
         else:
             logging.info('get subgrid coordinates from netCDF file...')
             if 'XLONG_M' in varis and 'XLAT_M' in varis:
@@ -163,8 +170,10 @@ def get_subgrid_coordinates(nc_path):
             else:
                 raise TypeError('atmospheric coordinates not found in file, skipping')
             lons,lats = interpolate_coords(lons_atm,lats_atm,srx,sry)
-
-    return lons,lats
+    if strip:
+        return lons, lats
+    else:
+        return lons[:-sry, :-srx], lats[:-sry, :-srx]
 
 
 def fill_subgrid(nc_path):
@@ -179,7 +188,13 @@ def fill_subgrid(nc_path):
         if 'FXLONG' in varis and 'FXLAT' in varis and array_filled(d.variables['FXLONG']) and array_filled(d.variables['FXLAT']):
             logging.info('subgrid coordinates already defined')
             return
-        lons,lats = get_subgrid_coordinates(nc_path)
+        try:
+            lons,lats = get_subgrid_coordinates(nc_path)
+        except Exception as e:
+            logging.error('filling subgrid coordinates is not possible with error:')
+            logging.error(e)
+            return
+
         if 'FXLONG' in d.variables.keys():
             d['FXLONG'][:] = lons[np.newaxis,:,:]
             d['FXLAT'][:] = lats[np.newaxis,:,:]

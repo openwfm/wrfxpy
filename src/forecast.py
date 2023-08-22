@@ -103,7 +103,7 @@ class JobState(Dict):
             logging.info('job_id %s given in the job description' % args['job_id'])
             self.job_id = args['job_id']
         else:
-            logging.warning('job_id not given, creating.')
+            logging.info('job_id not given, creating.')
             self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(int(self.fc_hrs))
         if 'restart' in args:
             logging.info('restart %s given in the job description' % args['restart'])
@@ -324,18 +324,25 @@ def run_fire_init(js, q):
             'perim1_path': osp.join(js.fire_init_dir, 'perim1.pkl'),
             'perim2_path': osp.join(js.fire_init_dir, 'perim2.pkl'),
             'wrf_path': osp.join(js.wps_dir, 'geo_em.d{:02d}.nc'.format(js.max_dom)),
-            'result_path': osp.join(js.fire_init_dir, 'results.pkl')
+            'result_path': osp.join(js.fire_init_dir, 'results.pkl'),
+            'past_perims_path': osp.join(js.fire_init_dir, 'arcgis_past_perims.pkl'),
+            'scars_mask_path': osp.join(js.fire_init_dir, 'scars_mask.pkl')
         })
         if 'prev_forecast' in js.keys():
+            prev_scars_mask_path = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/scars_mask.pkl')
+            if osp.exists(prev_scars_mask_path):
+                force_copy(prev_scars_mask_path, params['scars_mask_path'])
             prev_fire_init_results = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/results.pkl')
-            params.update({'prev_perims': prev_fire_init_results})
+            if osp.exists(prev_fire_init_results):
+                params.update({'prev_perims': prev_fire_init_results})
 
         perims, params = fire_init.init_fire_info(**params)
         if len(perims):
             perim1 = perims['perim1'].coords
             perim2 = perims['perim2'].coords
-            fxlon, fxlat = get_subgrid_coordinates(params['wrf_path'])
+            fxlon, fxlat = get_subgrid_coordinates(params['wrf_path'], strip=False)
             fire_init.perims_interp(perim1, perim2, fxlon, fxlat, **params)
+        js.fire_perimeter_time = params.get('spinup_time', 7200.)
         q.put('SUCCESS')
     except Exception as e:
         logging.error('fire initialization step failed with exception %s' % repr(e))
@@ -697,7 +704,6 @@ def execute(args,job_args):
     else:
         if js.use_realtime:
             logging.info('using real-time data requested, ignoring specified ignitions')
-            js.ignitions = {}
             js.fire_init_dir = osp.abspath(osp.join(js.jobdir, 'fire_init'))
 
     js.num_doms = len(js.domains)
@@ -931,9 +937,9 @@ def execute(args,job_args):
 
     logging.info('step 7c: fire initialization')
     if js.use_realtime:
-        fire_init_path = osp.join(js.fire_init_path, 'results.pkl')
+        fire_init_path = osp.join(js.fire_init_dir, 'results.pkl')
         if osp.exists(fire_init_path):
-            fire_data = pickle.load(open(fire_init_path))
+            fire_data = pickle.load(open(fire_init_path, 'rb'))
             wrf_path = osp.join(js.wrf_dir, 'wrfinput_d{:02d}'.format(js.max_dom))
             force_copy(wrf_path, wrf_path + '_orig')
             outside_time = fire_data.get('outside_time', 360000.)
