@@ -13,35 +13,35 @@ import subprocess
 import sys
 
 sys_cfg = Dict(json.load(open('etc/conf.json')))
-cfg = Dict(json.load(open('wksp/hrrr_conf.json')))
+#cfg = Dict(json.load(open('wksp/hrrr_conf.json')))
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 5:
-        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <forecast_hours> <target_directory>' % sys.argv[0]))
+    if len(sys.argv) != 4:
+        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
         print(('Example: %s 2023-08-10_09:00:00 2023-08-10_10:00:00 1 ./ingest/HRRR' % sys.argv[0]))
         sys.exit(-1)
 
     fmt = "%Y-%m-%d_%H:%M:%S" # Time format that pandas can recognize
 
     print('Gathering HRRR data')
-    #starttime = datetime.strptime(sys.argv[1], fmt)
-    #endtime = datetime.strptime(sys.argv[3], fmt)
-    print('Start:'+str(cfg.start_time))
-    print(sys.argv[1])
-    print('End:'+str(cfg.end_time))
-    print(sys.argv[3])
+    start=datetime.strptime(sys.argv[1], fmt)
+    end=datetime.strptime(sys.argv[2], fmt)
+    print("Start: "+str(start))
+    print("End: "+str(end))
+    outpath=str(sys.argv[3])
+    print('Output Destination: '+outpath)
 
 
     # String to run with retrieve_gribs as subprocess
     base_str = "python src/ingest/retrieve_gribs.py HRRR "
 
     # Handle Date
-    starttime = datetime.strptime(cfg.start_time, fmt)
-    endtime = datetime.strptime(cfg.end_time, fmt)
-    dates = pd.date_range(start=starttime,end=endtime, freq="1H") # Series of dates in 1 hour increments
+    #starttime = datetime.strptime(cfg.start_time, fmt)
+    #endtime = datetime.strptime(cfg.end_time, fmt)
+    dates = pd.date_range(start=start,end=end, freq="1H") # Series of dates in 1 hour increments
 
-    for t in range(0, 2): # replace 2 with dates.shape[0]
+    for t in range(0, dates.shape[0]): 
         print('-'*30)
         
         # Format time
@@ -49,18 +49,10 @@ if __name__ == '__main__':
         tforecast = dates[t] + pd.DateOffset(hours = 1)
         tforecast = tforecast.strftime(fmt)
 
-        temppath = osp.join(cfg.dest_dir, "temp")
-        command = base_str + str(time) + " " + str(tforecast) + " " + temppath
+        #temppath = osp.join(cfg.dest_dir, "temp")
+        
+        command = base_str + str(time) + " " + str(tforecast) + " ~"
         print(command)
-        #subprocess.call(command,shell=True)
+        subprocess.call(command,shell=True)
 
 
-    # Temporarily download grib file at given time
-    #t0 = datetime.strftime(dates[0], "%Y-%m-%d_%H:%M:%S") # UTC date format used by wrfxpy
-    #tforecast = dates[0] + pd.DateOffset(hours = 1) # time to look forward to in forecast (confirm this is what is actually happening in retrieve_gribs)
-    #tforecast = datetime.strftime(tforecast, fmt)
-    #temppath = osp.join(cfg.dest_dir, "temp")
-    #command = base_str + str(t0) + " " + str(tforecast) + " " + temppath
-    
-    #print(command)
-    # subprocess.call(command,shell=True)
