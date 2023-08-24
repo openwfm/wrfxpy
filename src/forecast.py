@@ -759,7 +759,7 @@ def execute(args,job_args):
     time_ctrl = update_time_control(js.start_utc, js.end_utc, js.num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
     js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds
-    if js.args['iofields']:
+    if js.iofields and osp.exists('etc/iofields.cfg'):
         js.wrf_nml['time_control']['iofields_filename'] = [osp.abspath('etc/iofields.cfg')] * js.num_doms
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
