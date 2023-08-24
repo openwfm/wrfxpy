@@ -939,6 +939,7 @@ def execute(args,job_args):
     if js.use_realtime:
         fire_init_path = osp.join(js.fire_init_dir, 'results.pkl')
         if osp.exists(fire_init_path):
+            logging.info('integrating fire arrival time results')
             fire_data = pickle.load(open(fire_init_path, 'rb'))
             wrf_path = osp.join(js.wrf_dir, 'wrfinput_d{:02d}'.format(js.max_dom))
             force_copy(wrf_path, wrf_path + '_orig')
@@ -947,7 +948,18 @@ def execute(args,job_args):
             fire_init.integrate_init(wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], outside_time, no_fuel_cat)
             if 'prev_forecast' in js.keys():
                 # implementation of adding smoke from previous forecast
-                pass
+                wrfinput_paths = sorted(glob.glob(osp.join(js.wrf_path, 'wrfinput*')))
+                wrfout_paths = []
+                for wrfinput_path in wrfinput_paths:
+                    dom_str, = re.match(r'wrfinput_d(0[0-9])', osp.basename(wrfinput_path)).groups()
+                    wrfout_wildcard = js.start_utc.strftime('wrfout_d{:02d}_%Y-%m-%d_%H:%M:*'.format(dom_str))
+                    wrfout_wildcard_paths = osp.join(js.workspace_path, js.prev_forecast, 'wrf', wrfout_wildcard)
+                    prev_wrfout_paths = sorted(glob.glob(wrfout_wildcard_paths))
+                    if len(prev_wrfout_paths):
+                        wrfout_paths.append(prev_wrfout_paths[0])
+                if len(wrfinput_paths) == len(wrfout_paths):
+                    logging.info('integrating smoke from previous forecast')
+                    fire_init.add_smoke(wrfout_paths, wrfinput_paths)
         else:
             logging.error('use_realtime is selected, but no fire information to start a fire simulation')
             sys.exit(1)
