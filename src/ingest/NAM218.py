@@ -1,11 +1,4 @@
-from __future__ import absolute_import
-from ingest.grib_source import GribError
 from ingest.grib_forecast import GribForecast
-from datetime import datetime, timedelta
-import pytz
-import logging
-import os.path as osp
-from utils import Dict, timedelta_hours, readhead
 
 
 class NAM218(GribForecast):
@@ -63,15 +56,15 @@ class NAM218(GribForecast):
     # instance variables
     id = "NAM218"
     info_url = "https://www.nco.ncep.noaa.gov/pmb/products/nam/"
-    info_aws="https://registry.opendata.aws/noaa-nam/"
+    info_aws = "https://registry.opendata.aws/noaa-nam/"
     info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
     info = "North American Mesoscale (NAM) Forecast System Grid 218"
-    remote_url = ["s3://noaa-nam-pds/", "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/"]
-    browse_aws="https://noaa-nam-pds.s3.amazonaws.com/"
+    remote_url = ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/", "s3://noaa-nam-pds/"]
+    browse_aws = "https://noaa-nam-pds.s3.amazonaws.com/"
     cycle_hours = 6
     period_hours = 3    # for METGRID and WRF
     #    NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file
     #    every 3 hours, starting with 39 and ending with 84.
-    grib_forecast_hours_periods = [{'hours':84,'period':3}]
+    grib_forecast_hours_periods = [{'hours':84, 'period':3}]
 
 

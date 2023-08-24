@@ -1,11 +1,6 @@
-from __future__ import absolute_import
-from ingest.grib_source import GribError
 from ingest.grib_reanalysis import GribReanalysis
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
-import logging
-import os.path as osp
-from utils import Dict, timedelta_hours, readhead
 
 
 class NARR(GribReanalysis):
@@ -55,10 +50,10 @@ class NARR(GribReanalysis):
 
     # instance variables
     id = "NARR"
-    info_url = 'https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/north-american-regional-reanalysis-narr'
-    info_text = 'NCEP North American Regional Reanalysis (NARR)'
+    info_url = "https://www.ncdc.noaa.gov/data-access/model-data/model-datasets/north-american-regional-reanalysis-narr"
+    info_text = "NCEP North American Regional Reanalysis (NARR)"
     info = "North American Regional Reanalysis (NARR)"
-    remote_url = 'https://www.ncei.noaa.gov/data/north-american-regional-reanalysis/access/3-hourly'
+    remote_url = "https://www.ncei.noaa.gov/data/north-american-regional-reanalysis/access/3-hourly"
     period_hours = 3
     available_from_utc = datetime(1979,1,1,tzinfo=pytz.UTC)
     available_to_utc = datetime.now(pytz.UTC)

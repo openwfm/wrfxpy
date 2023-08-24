@@ -1,7 +1,7 @@
-from __future__ import absolute_import
 from ingest.grib_reanalysis import GribReanalysis
 from datetime import datetime
 import pytz
+
 
 class CFSR(GribReanalysis):
     """
@@ -89,8 +89,8 @@ class CFSR_P(CFSR):
 
     # instance variables
     id = "CFSR_P"
-    prefix = 'COLMET_P'
-    remote_url = ["s3://noaa-cfs-pds/", "https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-by-pressure"]
+    prefix = "COLMET_P"
+    remote_url = ["https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-by-pressure", "s3://noaa-cfs-pds/"]
 
 class CFSR_S(CFSR):
     """
@@ -129,7 +129,7 @@ class CFSR_S(CFSR):
 
     # instance variables
     id = "CFSR_S"
-    prefix = 'COLMET_S'
-    remote_url = ["s3://noaa-cfs-pds/", "https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux"]
+    prefix = "COLMET_S"
+    remote_url = ["https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux", "s3://noaa-cfs-pds/"]
 
 
