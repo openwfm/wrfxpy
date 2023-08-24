@@ -4,7 +4,7 @@ import json
 
 _var_wisdom = {
     'NFUEL_CAT_13' : {
-        'var_name': 'NFUEL_CAT',
+        'name': 'NFUEL_CAT',
         'units': "fuel category",
         'description': "Anderson 13 fire behavior categories",
         'type': "categorical", 
@@ -24,7 +24,7 @@ _var_wisdom = {
                     'halt_on_missing': 'no'}             
     },
     'NFUEL_CAT_40' : {
-        'var_name': 'NFUEL_CAT',
+        'name': 'NFUEL_CAT',
         'units': 'fuel category',
         'description': '40 Scott and Burgan fire behavior categories',
         'type': 'categorical', 
@@ -49,7 +49,7 @@ _var_wisdom = {
                     'halt_on_missing': 'no'}             
     },
     'NTREE_CAT' : {
-        'var_name': 'NTREE_CAT',
+        'name': 'NTREE_CAT',
         'units': 'tree type',
         'description': 'Existing 200 vegetation type categories',
         'type': 'categorical',
@@ -66,7 +66,7 @@ _var_wisdom = {
                     'halt_on_missing': 'no'}
     },
     'ZSF' : {
-        'var_name': 'ZSF',
+        'name': 'ZSF',
         'units': 'meters',
         'description': 'National Elevation Dataset 1/3 arcsecond resolution',
         'type': 'continuous',
@@ -82,7 +82,7 @@ _var_wisdom = {
                     'halt_on_missing': 'no'}
     },
     'CAN_TOP' : {
-        'var_name': 'CAN_TOP',
+        'name': 'CAN_TOP',
         'units': 'meters',
         'description': 'Forest Canopy Height from LANDFIRE',
         'type': 'continuous',
@@ -93,7 +93,7 @@ _var_wisdom = {
         'subgrid': 'yes',
     },
     'CAN_BOT' : {
-        'var_name': 'CAN_BOTTOM',
+        'name': 'CAN_BOTTOM',
         'units': 'meters',
         'description': 'Forest Canopy Base Height from LANDFIRE',
         'type': 'continuous',
@@ -104,7 +104,7 @@ _var_wisdom = {
         'subgrid': 'yes',
     },
     'CAN_BD' : {
-        'var_name': 'CAN_BULK_DENSITY',
+        'name': 'CAN_BULK_DENSITY',
         'units': 'kg m-3',
         'description': 'Forest Canopy Bulk Density from LANDFIRE',
         'type': 'continuous',
@@ -115,7 +115,7 @@ _var_wisdom = {
         'subgrid': 'yes',
     },
     'CAN_COV' : {
-        'var_name': 'CAN_COVER',
+        'name': 'CAN_COVER',
         'units': '%',
         'description': 'Forest Canopy Cover from LANDFIRE (%)',
         'type': 'continuous',
@@ -125,7 +125,7 @@ _var_wisdom = {
         'subgrid': 'yes',
     },
     'FMC_GC' : {
-        'var_name': 'FMC_GC',
+        'name': 'FMC_GC',
         'units': 'g/g',
         'description': '1h, 10h, 100h fuel moisture',
         'type': 'continuous',
@@ -134,7 +134,7 @@ _var_wisdom = {
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
     },
     'FMEP' : {
-        'var_name': 'FMEP',
+        'name': 'FMEP',
         'units': '1',
         'description': 'fuel moisture drying/wetting and rain equilibrium adjustments',
         'type': 'continuous',
@@ -143,7 +143,7 @@ _var_wisdom = {
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
     },
     'XLONG' : {
-        'var_name': 'XLONG',
+        'name': 'XLONG',
         'units': 'degrees',
         'description': 'Longitude in the domain',
         'type': 'continuous',
@@ -154,7 +154,7 @@ _var_wisdom = {
         'subgrid': 'no'
     },
     'XLAT' : {
-        'var_name': 'XLAT',
+        'name': 'XLAT',
         'units': 'degrees',
         'description': 'Latitude in the domain',
         'type': 'continuous',
@@ -165,7 +165,7 @@ _var_wisdom = {
         'subgrid': 'no'
     },
     'XI' : {
-        'var_name': 'XI',
+        'name': 'XI',
         'units': '1',
         'description': 'Indexes x-direction for testing WPS',
         'type': 'continuous',
@@ -176,7 +176,7 @@ _var_wisdom = {
         'subgrid': 'yes'
     },
     'YI' : {
-        'var_name': 'YI',
+        'name': 'YI',
         'units' : '1',
         'description': 'Indexes y-direction for testing WPS',
         'type': 'continuous',
@@ -196,8 +196,8 @@ class VarWisdom(dict):
         """
         Updates itself with d.
         """
-        self = _var_wisdom.copy()
         self.update(d)
+        self.update(_var_wisdom)
         custom_path = 'etc/vtables/geo_vars_custom.json'
         if osp.exists(custom_path):
             self.update(json.load(open(custom_path)))

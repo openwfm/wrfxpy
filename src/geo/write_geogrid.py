@@ -33,17 +33,18 @@ def write_table(file,lines_dict,mode='w',divider_char='=',divider_count=31,divid
         f.write(divider_char * divider_count + '\n')
     f.close()
 
-def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
+def write_geogrid_var(path_dir,var,array,index,bits=32,coord=None):
     """
     write geogrid dataset and index 
     """
     path_dir=osp.abspath(path_dir)
-    logging.info('write_geogrid_var path_dir=%s varname=%s array=%s index=%s' % (path_dir, varname, inq(array), str(index)))
+    logging.info('write_geogrid_var path_dir=%s varname=%s array=%s index=%s' % (path_dir, var, inq(array), str(index)))
     if not osp.exists(path_dir):
         os.makedirs(path_dir)
 
     # get information from src/geo/var_wisdom.py
-    wisdom = get_wisdom(varname).copy()
+    wisdom = get_wisdom(var).copy()
+    varname = wisdom.get('name', var)
 
     # write geogrid dataset
     geogrid_ds_path = osp.join(path_dir,varname)
@@ -128,7 +129,6 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
         geogrid_tbl = {}
     geogrid_tbl[varname]=geogrid_tbl_var 
     json.dump(index,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
-    
     
     json.dump(geogrid_tbl,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
 

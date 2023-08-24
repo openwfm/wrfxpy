@@ -786,7 +786,7 @@ def execute(args,job_args):
     # write subgrid coordinates in input files
     subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()]
     for in_path in subgrid_wrfinput_files:
-    	fill_subgrid(osp.join(js.wrf_dir, in_path))
+        fill_subgrid(osp.join(js.wrf_dir, in_path))
 
     logging.info('step 7b: if requested, do fuel moisture DA')
     logging.info('fmda = %s' % js.fmda)
