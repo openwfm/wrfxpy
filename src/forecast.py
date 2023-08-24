@@ -88,8 +88,9 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
-        self.grib_source = self.resolve_grib_source(self.get('grib_source',None),args)
-        self.satellite_source_list = args.get('satellite_source',[])
+        self.grib_source_name = self.get('grib_source', None)
+        self.grib_source = self.resolve_grib_source(self.grib_source_name, args)
+        self.satellite_source_list = args.get('satellite_source', [])
         self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
@@ -309,7 +310,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         if not have_all_colmet:
             # this is also if we do not cache
             use_wgrib2 = js.get('use_wgrib2', False)
-            if use_wgrib2:
+            if use_wgrib2 and js.grib_source_name not in ['CFSR', 'GFSA', 'GFSF']:
                 logging.info('wgrib2 selected - cropping GRIB2 files before running UNGRIB')
                 from subprocess import check_call
                 lon0,lon1,lat0,lat1 = js.bounds['1']
