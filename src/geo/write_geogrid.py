@@ -68,30 +68,25 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
     if index['type'] == 'categorical':
         fill = wisdom.get('fill',{})
         if isinstance(fill,str):
-            fill_str = fill
+            fill_path = fill
             fill = {}
-            if fill_str == 'from_file':
-                fill_path = 'etc/vtables/fill.json'
+            if osp.exists(fill_path):
                 try:
-                    fill_vars = json.load(open(fill_path,'r'))
-                except:
-                    logging.warning('write_geogrid_var fail reading fill file {}'.format(fill_path))
-                fill_file = fill_vars.get(varname,'')
-                if osp.exists(fill_file):
-                    try:
-                        df = pd.read_csv(fill_file,names=['from','to'],index_col=False)
-                        cfrom = np.array(df.loc[1:,'from'])
-                        cto = np.array(df.loc[1:,'to'])
-                        rest_val = df.loc[0,'from']
-                        unique = np.unique(array)
-                        rest_ind = np.array([u for u in unique if u not in cfrom])
-                        fill = Dict({tuple(rest_ind): rest_val})
-                        for k,key in enumerate(cfrom):
-                            fill.update({key: cto[k]})
-                    except Exception as e:
-                        logging.warning('write_geogrid_var fail reading fill CSV file {}'.format(fill_file))
-                        logging.warning('with exception {}'.format(e))
-        array = fill_categories(array,fill,coord)
+                    df = pd.read_csv(fill_path, names=['from','to'],index_col=False)
+                    cfrom = np.array(df.loc[1:,'from'])
+                    cto = np.array(df.loc[1:,'to'])
+                    rest_val = df.loc[0,'from']
+                    unique = np.unique(array)
+                    rest_ind = np.array([u for u in unique if u not in cfrom])
+                    fill = Dict({tuple(rest_ind): rest_val})
+                    for k,key in enumerate(cfrom):
+                        fill.update({key: cto[k]})
+                except Exception as e:
+                    logging.warning('write_geogrid_var fail reading fill CSV file {}'.format(fill_path))
+                    logging.warning('with exception {}'.format(e))
+            else:
+                logging.warning('write_geogrid_var fail reading fill CSV file {}'.format(fill_path))
+        array = fill_categories(array, fill, coord)
 
     write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale,uscale=uscale)
  
