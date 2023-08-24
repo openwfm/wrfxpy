@@ -1,0 +1,55 @@
+#!/bin/bash
+#SBATCH --time=%(wall_time_hrs)02d:00:00 # walltime, abbreviated by -t
+#SBATCH --ntasks=%(np)d   # number of MPI tasks, abbreviated by -n
+
+##SBATCH --nodes=%(nodes)d     # number of cluster nodes, abbreviated by -N  #KH: comment out
+##SBATCH -o  # name of the stdout
+# additional information for allocated clusters
+##SBATCH --account=kochanski-kp     # account - abbreviated by -A  #KH: comment out
+##SBATCH --partition=strong-kp  # partition, abbreviated by -p  #KH: comment out
+##SBATCH --job-name=WRFX  #KH: comment out
+
+# set data and working directories
+export WORKDIR=%(cwd)s 
+cd $WORKDIR
+
+#
+# load appropriate modules, in this case Intel compilers, MPICHa
+#module purge
+#module load chpc
+#module load intel/18 
+#module load impi
+#module load netcdf-c
+#module load netcdf-f
+
+###
+#Haguepeak:
+module load openmpi
+module load gcc
+module load aocl
+module load jemalloc
+
+# did not fix error while loading shared libraries:
+#export NETCDF="/data/WRF/Library/lib"
+#export JASPERLIB="/data/WRF/Library/lib"
+#export JASPERINC="/data/WRF/Library/include/jasper"
+#export LIBTIFF="/data/WRF/Library/lib"
+#export GEOTIFF="/data/WRF/Library/lib"
+#export WRFIO_NCD_LARGE_FILE_SUPPORT=1
+
+export LD_LIBRARY_PATH="/data/WRF/Library/lib:$LD_LIBRARY_PATH"
+
+###
+
+# for MPICH2 over Ethernet, set communication method to TCP
+# see below for network interface selection options for different MPI distributions
+#export MV2_ENABLE_AFFINITY=0  #KH:comment out for now
+
+env
+
+#setenv MPICH_NEMESIS_NETMOD tcp
+# run the program
+# see below for ways to do this for different MPI distributions
+##mpirun -np $SLURM_NTASKS ./wrf.exe  #KH: removed p option
+
+mpirun -n $SLURM_NTASKS ./wrf.exe

@@ -1,6 +1,9 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
-from osgeo import gdal, osr
+try:
+    from osgeo import gdal, osr
+except:
+    import gdal, osr
 import pyproj
 
 import os, logging, json, sys, glob, re, traceback

@@ -45,9 +45,10 @@ class GFSF(GribForecast):
     info_url = "https://www.nco.ncep.noaa.gov/pmb/products/gfs/#GFS"
     info_text = "NCEP GFS 0.25 Degree Global Forecast Grids Historical Archive"
     info = "Global Forecast System (GFS) Forecast"
-    remote_url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod"
+    remote_url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"
     cycle_hours = 6
     period_hours = 3 # for METGRID and WRF
+    hours_behind_real_time = 6 # choose forecast cycle at least one hour behind
     #    GFS provides hourly GRIB2 files up to hour 120 and then one GRIB2 file
     #    every 3 hours, starting with 123 and ending with 384.
     grib_forecast_hours_periods = [{'hours':384,'period':3}]
@@ -84,7 +85,7 @@ class GFSF_P(GFSF):
         :param fc_list: list of hours in the cycle when forecast will be donwloaded
         """
 
-        path_tmpl = 'gfs.%04d%02d%02d/%02d/gfs.t%02dz.pgrb2.0p25.f%03d'
+        path_tmpl = 'gfs.%04d%02d%02d/%02d/atmos/gfs.t%02dz.pgrb2.0p25.f%03d'
         grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, cycle_start.hour, x) for x in fc_list]
 
         return grib_files
@@ -123,7 +124,7 @@ class GFSF_S(GFSF):
         :param cycle_start: UTC time of cycle start
         :param fc_list: list of hours in the cycle when forecast will be donwloaded
         """
-        path_tmpl = 'gfs.%04d%02d%02d/%02d/gfs.t%02dz.sfluxgrbf%03d.grib2'
+        path_tmpl = 'gfs.%04d%02d%02d/%02d/atmos/gfs.t%02dz.sfluxgrbf%03d.grib2'
         grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, cycle_start.hour, x) for x in fc_list]
 
         return grib_files

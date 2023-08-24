@@ -53,7 +53,7 @@ def get_dList(url):
         listing.append(l.split()[-1])
     return listing
 
-def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def, appkey=None):
+def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def, token=None, min_size=1):
     """
     Download a remote URL to the location local_path with retries.
 
@@ -64,6 +64,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     :param url: the remote URL
     :param local_path: the path to the local file
     :param max_retries: how many times we may retry to download the file
+    :param token: key to use for the download or None if not
     """
     logging.info('download_url %s as %s' % (url, local_path))
     logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
@@ -74,18 +75,23 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     use_urllib2 = url[:6] == 'ftp://'
 
     try:
-        if appkey:
-            r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % appkey})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % appkey})   
+        if token:
+            r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % token})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % token})   
         else:
             r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
-        content_size = int(r.headers.get('content-length',0))
+        if 'content-length' in r.headers.keys():
+            content_size = int(r.headers.get('content-length',0))
+            if content_size == 0:
+                raise IOError('download_url content size is equal to 0')
+        else:
+            logging.warning('download_url not header contet-length information')
     except Exception as e:
         if max_retries > 0:
             # logging.error(str(e))
             logging.info('not found, download_url trying again, retries available %d' % max_retries)
             logging.info('download_url sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
-            download_url(url, local_path, max_retries = max_retries-1, appkey = appkey)
+            download_url(url, local_path, max_retries = max_retries-1, token = token, min_size = min_size)
         return
 
     logging.info('download_url %s as %s' % (url,local_path))
@@ -93,30 +99,38 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     command=[wget,'-O',ensure_dir(local_path),url]
     for opt in wget_options:
         command.insert(1,opt)
-    if appkey:
-        command.insert(1,'--header=\'Authorization: Bearer %s\'' % appkey)
+    command.insert(1,'--tries={}'.format(max_retries_def))
+    if token:
+        command.insert(1,'--header=\'Authorization: Bearer %s\'' % token)
     logging.info(' '.join(command))
     subprocess.call(' '.join(command),shell=True)
 
     file_size = osp.getsize(local_path)
 
     # content size may have changed during download
-    #if appkey:
-    #    r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % appkey})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % appkey})
-    #else:
-    #    r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
-    #content_size = int(r.headers.get('content-length',0))
+    if token:
+        r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % token})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % token})
+    else:
+        r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
+    if 'content-length' in r.headers.keys():
+        content_size = int(r.headers.get('content-length',0))
+        if content_size == 0:
+            raise IOError('download_url content size is equal to 0')
+    else:
+        content_size = None
+        logging.warning('download_url not header contet-length information')
 
-    logging.info('local file size %d remote content size %d' % (file_size, content_size))
+    logging.info('local file size {} remote content size {} minimum size {}'.format(file_size, content_size, min_size))
 
-    if int(file_size) != int(content_size):
+    # it should be != but for some reason content_size is wrong sometimes
+    if content_size is not None and int(file_size) < int(content_size) or int(file_size) < min_size:
         logging.warning('wrong file size, download_url trying again, retries available %d' % max_retries)
         if max_retries > 0:
             # call the entire function recursively, this will attempt to redownload the entire file
             # and overwrite previously downloaded data
             logging.info('download_url sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
-            download_url(url, local_path, max_retries = max_retries-1, appkey = appkey)
+            download_url(url, local_path, max_retries = max_retries-1, token = token, min_size = min_size)
             return  # success
         else:
             os.remove(local_path)
@@ -126,5 +140,5 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     # when re-using the GRIB2 file, we check its file size against this record
     # to avoid using partial files
     info_path = local_path + '.size'
-    open(ensure_dir(info_path), 'w').write(str(content_size))
+    open(ensure_dir(info_path), 'w').write(str(file_size))
 

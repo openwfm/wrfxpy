@@ -3,9 +3,9 @@
 #
 
 from __future__ import absolute_import
-from ingest.sat_source import SatSource
+from ingest.sat_source_cmr import SatSourceCMR
 
-class VIIRS(SatSource):
+class VIIRS(SatSourceCMR):
     """
     VIIRS (Visible Infrared Imaging Radiometer Suite) satellite source.
     """

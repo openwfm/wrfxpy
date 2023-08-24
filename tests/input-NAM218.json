@@ -2,9 +2,8 @@
     "job_id": "testing-NAM218",
     "wall_time_hrs": 12,
     "grib_source": "NAM218",
-    "start_utc": "2018-05-19_22:00:00",
-    "end_utc": "2018-05-20_22:00:00",
-    "cycle_start_utc": "2018-05-24_18:00:00",
+    "start_utc": "T-30",
+    "end_utc": "T+120",
     "download_whole_cycle": true,
     "wps_namelist_path": "etc/nlists/default.wps",
     "fire_namelist_path": "etc/nlists/default.fire",
@@ -108,7 +107,7 @@
     "ignitions": {
         "3": [
             {
-                "time_utc": "2018-05-05_19:47:00",
+                "time_utc": "T+30",
                 "latlon": [
                     40.0699,
                     -108.2909

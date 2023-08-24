@@ -16,10 +16,10 @@ In particular, the code enables the user to:
 * postprocess `netCDF files <http://www.unidata.ucar.edu/software/netcdf/>`_ to generate raster images or KMZ raster files
 * arrange simulation results into catalogs for display `wrfxweb <https://github.com/vejmelkam/wrfxweb>`_
 
-.. |docs| image:: https://readthedocs.org/projects/wrfxpy/badge/?version=latest
+.. |docs| image:: https://readthedocs.org/projects/wrfx/badge/?version=latest
     :alt: Documentation Status
     :scale: 100%
-    :target: https://wrfxpy.readthedocs.org/en/latest/
+    :target: https://wrfx.readthedocs.org/en/latest/
 
 
 

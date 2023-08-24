@@ -13,4 +13,4 @@ setenv TMPDIR /glade/scratch/$USER/temp
 mkdir -p $TMPDIR
 
 ### Run the executable
-mpiexec_mpt ./wrf.exe > wrf.log
+mpiexec_mpt dplace -s 1 ./wrf.exe

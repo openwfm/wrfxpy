@@ -36,7 +36,7 @@ except ImportError:
     # python 3
     from io import BytesIO as StringIO
 
-def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proportional',ticks=None,norm=None):
+def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proportional',ticks=None,norm=None,ticklabels=None):
     """
     Create a colorbar to accompany a raseter image.
 
@@ -73,12 +73,17 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proport
 
     # construct the colorbar and modify properties
     cb = mpl.colorbar.ColorbarBase(ax,**kwargs)
-    cb.set_label(cb_label,color='1',fontsize=8,labelpad=-40)
+    cb.set_label(cb_label,color='0',fontsize=8,labelpad=-40)
+    if ticklabels:
+        cb.set_ticklabels(ticklabels)
+        levels = ticklabels        
+    else:
+        levels = cb.get_ticks().tolist()
 
     # move ticks to left side
     ax.yaxis.set_ticks_position('left')
     for tick_lbl in ax.get_yticklabels():
-        tick_lbl.set_color('1')
+        tick_lbl.set_color('0')
         tick_lbl.set_fontsize(8)
 
     # save png to a StringIO
@@ -86,7 +91,7 @@ def make_colorbar(rng,orientation,size_in,cmap,cb_label,dpi=200,spacing='proport
     fig.savefig(str_io,dpi=dpi,format='png',transparent=True)
     plt.close()
 
-    return str_io.getvalue()
+    return str_io.getvalue(),levels
 
 
 def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=200):
@@ -123,12 +128,12 @@ def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=2
     cb = mpl.colorbar.ColorbarBase(ax,**kwargs)
     cb.ax.tick_params(length=0)
     cb.ax.set_yticklabels(labels)
-    cb.set_label(cb_label,color='1',fontsize=8,labelpad=-40)
+    cb.set_label(cb_label,color='0',fontsize=8,labelpad=-40)
 
     # move ticks to left side
     ax.yaxis.set_ticks_position('left')
     for tick_lbl in ax.get_yticklabels():
-        tick_lbl.set_color('1')
+        tick_lbl.set_color('0')
         tick_lbl.set_fontsize(5)
 
     # save png to a StringIO
@@ -153,9 +158,7 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None):
     m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],
                 llcrnrlon=lons[0],urcrnrlon=lons[1])
 
-    #vmin,vmax = np.nanmin(grid),np.nanmax(grid)
     masked_grid = np.ma.array(grid,mask=np.isnan(grid))
-    # logging.info('basemap_raster_mercator: not masked %s %s' % (grid.count(),masked_grid.count()))
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72)
     plt.axis('off')
     cmap = mpl.cm.get_cmap(cmap_name)
@@ -170,20 +173,29 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None):
     return str_io.getvalue(), float_bounds
 
 
-def basemap_barbs_mercator(u,v,lat,lon):
+def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,norm=None):
 
     # lon/lat extents
     lons = (np.amin(lon), np.amax(lon))
     lats = (np.amin(lat), np.amax(lat))
 
+    logging.info('basemap_barbs_mercator: bounding box %s %s %s %s' % (lons + lats))
+    
     # construct spherical mercator projection for region of interest
     m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],
                 llcrnrlon=lons[0],urcrnrlon=lons[1])
 
-    #vmin,vmax = np.nanmin(grid),np.nanmax(grid)
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
-    m.quiver(lon,lat,u,v,latlon=True)
+    # if cmap_name is set, create speed coloring using all the other parameters
+    if cmap_name is not None:
+        masked_grid = np.ma.array(grid,mask=np.isnan(grid))
+        if norm:
+            norm = norm(cmin,cmax)
+        cmap = mpl.cm.get_cmap(cmap_name)
+        m.quiver(lon,lat,u,v,masked_grid,latlon=True,norm=norm,cmap=cmap,clim=(cmin,cmax),edgecolor='k',linewidth=.2)
+    else:
+        m.quiver(lon,lat,u,v,latlon=True)
 
     str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
@@ -194,10 +206,14 @@ def basemap_barbs_mercator(u,v,lat,lon):
     return str_io.getvalue(), float_bounds
 
 
-def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
+def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's', linewidths = 0, text = False):
     # number of scatter elements
     N = len(val)	
+    border = .05
+    bounds = (bounds[0]-border, bounds[1]+border, bounds[2]-border, bounds[3]+border)
    
+    logging.info('basemap_scatter_mercator: bounding box {}'.format(bounds))
+
     # construct spherical mercator projection for region of interest
     m = Basemap(projection='merc',llcrnrlat=bounds[2], urcrnrlat=bounds[3],
                 		llcrnrlon=bounds[0],urcrnrlon=bounds[1])
@@ -205,7 +221,13 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap):
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
     for i in range(N):
-    	m.scatter(lon[i],lat[i],2,c=val[i],latlon=True,marker='s',cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=0)
+    	m.scatter(lon[i],lat[i],size,c=val[i],latlon=True,marker=marker,cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=linewidths,edgecolors='k')
+    if text:
+        for i in range(N):
+            for x1,x2,x3 in zip(lon[i],lat[i],val[i]):
+                x,y = m(x1+.05,x2+.05)
+                s = '{:.2f}'.format(x3)
+                plt.text(x,y,s,fontsize=size/7,fontweight='bold')
 
     # save png to a StringIO
     str_io = StringIO()

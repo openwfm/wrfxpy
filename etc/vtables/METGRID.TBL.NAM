@@ -583,3 +583,75 @@ name=T0
         missing_value=200.
         fill_missing=-20.
 ========================================
+name=FMC_GC
+        z_dim_name=fuel_moisture_classes
+        derived=yes
+        fill_lev =  0 : FMXLAT(200100)
+        fill_lev =  1 : FMXLON(200100)
+        fill_lev =  2 : FM100H(200100)
+        fill_lev =  3 : FM10H(200100)
+        fill_lev =  4 : FM1H(200100)
+========================================
+name=FM1H
+        output=no
+        interp_option=sixteen_pt+four_pt+average_4pt+search #four_pt+average_4pt
+        #masked=water
+        #interp_mask=LANDSEA(0)
+        fill_missing=0.
+        flag_in_output=FLAG_FM1H
+========================================
+name=FM10H
+        output=no
+        interp_option=sixteen_pt+four_pt+average_4pt+search #four_pt+average_4pt
+        #masked=water
+        #interp_mask=LANDSEA(0)
+        fill_missing=0.
+        flag_in_output=FLAG_FM10H
+========================================
+name=FM100H
+        output=no
+        interp_option=sixteen_pt+four_pt+average_4pt+search #four_pt+average_4pt
+        #masked=water
+        #interp_mask=LANDSEA(0)
+        fill_missing=0.
+        flag_in_output=FLAG_FM100H
+========================================
+name=FMXLON
+        output=no
+        interp_option=sixteen_pt+four_pt+average_4pt+search #four_pt+average_4pt
+        #masked=water
+        #interp_mask=LANDSEA(0)
+        #fill_missing=0.
+        flag_in_output=FLAG_FMXLON
+========================================
+name=FMXLAT
+        output=no
+        interp_option=sixteen_pt+four_pt+average_4pt+search #four_pt+average_4pt
+        #masked=water
+        #interp_mask=LANDSEA(0)
+        #fill_missing=0.
+        flag_in_output=FLAG_FMXLAT
+========================================
+name=FMEP
+        z_dim_name=fuel_moisture_extended_parameters
+        derived=yes
+        fill_lev =  0 : FMEP1(200100)
+        fill_lev =  1 : FMEP0(200100)
+        flag_in_output=FLAG_FMEP
+========================================
+name=FMEP0
+        output=no
+        interp_option=sixteen_pt+four_pt+average_4pt+search #four_pt+average_4pt
+        #masked=water
+        #interp_mask=LANDSEA(0)
+        fill_missing=0.
+        flag_in_output=FLAG_FMEP0
+========================================
+name=FMEP1
+        output=no
+        interp_option=sixteen_pt+four_pt+average_4pt+search #four_pt+average_4pt
+        #masked=water
+        #interp_mask=LANDSEA(0)
+        fill_missing=0.
+        flag_in_output=FLAG_FMEP1
+========================================
