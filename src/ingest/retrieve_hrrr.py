@@ -6,20 +6,45 @@ from __future__ import print_function
 from utils import Dict
 import json
 import os.path as osp
-# import xarray as xr
 from datetime import date, timedelta, datetime
 import pandas as pd
 import subprocess
 import sys
 
+# Packages added manually to wrfx environment
+import xarray as xr
+
 sys_cfg = Dict(json.load(open('etc/conf.json')))
-#cfg = Dict(json.load(open('wksp/hrrr_conf.json')))
+
+# Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def slice_hrrr(tempfile):
+
+    ds1=xr.open_dataset(
+            tempfile,
+            filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 'instant'}
+    )
+    ds2=xr.open_dataset(
+            tempfile,
+            filter_by_keys={'typeOfLevel': 'surface', 'stepType': 2}
+    )
+        
+    ds2=ds2.assign_coords({'heightAboveGround': np.float64(0)}) # Add height above ground field
+    ds3=xr.open_dataset(
+            tempfile,
+            filter_by_keys={'typeOfLevel': 'heightAboveGround', 'level': 10}
+        )
+
+
+    return ds1, ds2, ds3
+
+# Executed Code ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 if __name__ == '__main__':
 
     if len(sys.argv) != 4:
         print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
-        print(('Example: %s 2023-08-10_09:00:00 2023-08-10_10:00:00 1 ./ingest/HRRR' % sys.argv[0]))
+        print(('Example: %s 2023-08-10_09:00:00 2023-08-10_10:00:00 ./ingest/HRRR' % sys.argv[0]))
         sys.exit(-1)
 
     fmt = "%Y-%m-%d_%H:%M:%S" # Time format that pandas can recognize
@@ -37,9 +62,11 @@ if __name__ == '__main__':
     base_str = "python src/ingest/retrieve_gribs.py HRRR "
 
     # Handle Date
-    #starttime = datetime.strptime(cfg.start_time, fmt)
-    #endtime = datetime.strptime(cfg.end_time, fmt)
     dates = pd.date_range(start=start,end=end, freq="1H") # Series of dates in 1 hour increments
+
+    if dates.shape[0]>10: 
+            print('Dont run this many times yet, test more')
+            sys.exit(-1)
 
     for t in range(0, dates.shape[0]): 
         print('-'*30)
@@ -54,5 +81,13 @@ if __name__ == '__main__':
         command = base_str + str(time) + " " + str(tforecast) + " ~"
         print(command)
         subprocess.call(command,shell=True)
+
+        # Slice HRRR grib file into surface, 2m, and 10m respectively
+        hrrr_path="/home/hirschij/github/wrfxpy/ingest/HRRR/hrrr.20230113/conus/hrrr.t06z.wrfprsf00.grib2" # path to observed data, NOT THE RIGHT FILENAME CHANGE TO MATCH LOOP
+        ds1, ds2, ds3 = slice_hrrr(hrrr_path)
+
+
+
+
 
 
