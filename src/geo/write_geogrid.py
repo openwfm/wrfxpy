@@ -33,6 +33,31 @@ def write_table(file,lines_dict,mode='w',divider_char='=',divider_count=31,divid
         f.write(divider_char * divider_count + '\n')
     f.close()
 
+def wisdom_to_table(varname, wisdom):
+    # initialize table
+    table = {
+        'name': wisdom.get('name', varname),
+        'dest_type': wisdom.get('type','continuous'),
+        'interp_option': wisdom.get('interp_option','default:average_gcell(4.0)+four_pt+average_4pt'),
+        'priority': wisdom.get('priority',1)
+    }
+    # resolve path to data
+    if 'abs_path' in wisdom:
+        table.update({'abs_path': wisdom['abs_path']})
+    elif 'rel_path' in wisdom:
+        table.update({'rel_path': wisdom['rel_path']})
+    # some adds to the table
+    if 'fill_missing' in wisdom:
+        table['fill_missing'] = wisdom['fill_missing']
+    if 'smooth_option' in wisdom:
+        table['smooth_option'] = wisdom['smooth_option']
+    if 'subgrid' in wisdom:
+        table['subgrid'] = wisdom['subgrid']
+    if 'add_opts' in wisdom:
+        for key in wisdom['add_opts'].keys():
+            table[key] = wisdom['add_opts'][key]
+    return table
+
 def write_geogrid_var(path_dir,var,array,index,bits=32,coord=None):
     """
     write geogrid dataset and index 
@@ -100,22 +125,9 @@ def write_geogrid_var(path_dir,var,array,index,bits=32,coord=None):
     index_json[varname]=index
     json.dump(index_json,open(index_json_path,'w'), indent=4, separators=(',', ': ')) 
 
-    geogrid_tbl_var = {'name': varname,
-                   'dest_type': wisdom.get('type','continuous'),
-                   'interp_option': wisdom.get('interp_option','default:average_gcell(4.0)+four_pt+average_4pt'),
-                   'abs_path': geogrid_ds_path,
-                   'priority': wisdom.get('priority',1)}
-
-    # some adds to geogrid_tbl_var
-    if 'fill_missing' in wisdom:
-        geogrid_tbl_var['fill_missing'] = wisdom['fill_missing']
-    if 'smooth_option' in wisdom:
-        geogrid_tbl_var['smooth_option'] = wisdom['smooth_option']
-    if 'subgrid' in wisdom:
-        geogrid_tbl_var['subgrid'] = wisdom['subgrid']
-    if 'add_opts' in wisdom:
-        for key in wisdom['add_opts'].keys():
-            geogrid_tbl_var[key] = wisdom['add_opts'][key]
+    # add abs_path to wisdom and create table from wisdom
+    wisdom['abs_path'] = geogrid_ds_path
+    geogrid_tbl_var = wisdom_to_table(varname, wisdom)
 
     # write a segment of GEOGRID.TBL
     geogrid_tbl_path=osp.join(path_dir,'GEOGRID.TBL')

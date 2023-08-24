@@ -5,9 +5,9 @@ import json
 _var_wisdom = {
     'NFUEL_CAT_13' : {
         'name': 'NFUEL_CAT',
-        'units': "fuel category",
-        'description': "Anderson 13 fire behavior categories",
-        'type': "categorical", 
+        'units': 'fuel category',
+        'description': 'Anderson 13 fire behavior categories',
+        'type': 'categorical', 
         'category_range': [0,14],
         'fill_missing': 14,       
         'fill' : Dict({
@@ -29,7 +29,7 @@ _var_wisdom = {
         'description': '40 Scott and Burgan fire behavior categories',
         'type': 'categorical', 
         'category_range': [0,41],
-        'fill_missing': 41,       
+        'fill_missing': 41,
         'fill' : Dict({
             101: 1, 102: 2, 103: 3, 104: 4, 105: 5, 106: 6, 107: 7, 108: 8,
             109: 9, 121: 10, 122: 11, 123: 12, 124: 13, 141: 14, 142: 15,
@@ -47,6 +47,27 @@ _var_wisdom = {
         'add_opts': {'dominant_only': 'NFUEL_CAT',
                     'z_dim_name': 'fuel_cat',
                     'halt_on_missing': 'no'}             
+    },
+    'NFUEL_CAT_13_MODIS_20': {
+        'name': 'NFUEL_CAT',
+        'units': 'fuel category',
+        'description': 'Anderson 13 fire behavior categories from MODIS landuse 20 class',
+        'type': 'categorical', 
+        'category_range': [0,14],
+        'fill_missing': 14,
+        'fill' : Dict({
+            0: 14, 1: 2, 2: 8, 3: 2, 4: 8, 5: 10, 7: 5, 8: 7, 9: 3, 10: 1, 
+            11: 14, 12: 5, 13: 14, 14: 1, range(15,18): 14, 18: 11, range(19,22): 14
+        }),
+        'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:nearest_neighbor+average_16pt+search',
+        'rel_path': 'default:modis_landuse_20class_30s_with_lakes/',
+        'subgrid': 'yes',
+        'add_opts': {'dominant_only': 'NFUEL_CAT',
+                    'z_dim_name': 'fuel_cat',
+                    'halt_on_missing': 'no'} 
     },
     'NTREE_CAT' : {
         'name': 'NTREE_CAT',
@@ -76,6 +97,23 @@ _var_wisdom = {
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'smooth_option': 'smth-desmth_special; smooth_passes=1',
+        'subgrid': 'yes',
+        'add_opts': {'df_dx': 'DZDXF',
+                    'df_dy': 'DZDYF',
+                    'halt_on_missing': 'no'}
+    },
+    'ZSF_MODIS_20' : {
+        'name': 'ZSF',
+        'units': 'meters',
+        'description': 'National Elevation Dataset 1/3 arcsecond resolution from MODIS landuse 20 class',
+        'type': 'continuous',
+        'fill_missing': 0,
+        'scale': 1.,
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'smooth_option': 'smth-desmth_special; smooth_passes=1',
+        'rel_path': 'default:topo_gmted2010_30s/',
         'subgrid': 'yes',
         'add_opts': {'df_dx': 'DZDXF',
                     'df_dy': 'DZDYF',
