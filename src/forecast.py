@@ -309,7 +309,7 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
 
         if not have_all_colmet:
             # this is also if we do not cache
-            use_wgrib2 = js.get('use_wgrib2', False)
+            use_wgrib2 = js.get('use_wgrib2', True)
             if use_wgrib2 and js.grib_source_name not in ['CFSR', 'GFSA', 'GFSF']:
                 logging.info('wgrib2 selected - cropping GRIB2 files before running UNGRIB')
                 from subprocess import check_call
