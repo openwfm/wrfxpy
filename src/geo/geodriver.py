@@ -122,7 +122,7 @@ class GeoDriver(object):
         # get bounding box in projection of the GeoTIFF
         ref_corners = ((bbox[0],bbox[2]),(bbox[0],bbox[3]),(bbox[1],bbox[3]),(bbox[1],bbox[2]))
         if vparse(pyproj.__version__) < vparse('2.2'):
-            proj_corners = [pyproj.transform(ref_proj,self.pyproj,c[0],c[1]) for c in ref_corners]
+            proj_corners = [pyproj.transform(self.ref_proj,self.pyproj,c[0],c[1]) for c in ref_corners]
         else:
             proj_corners = [pyproj.Transformer.from_crs(self.ref_proj4,self.proj4,always_xy=True).transform(c[0],c[1]) for c in ref_corners]
         x_min = min([c[0] for c in proj_corners])

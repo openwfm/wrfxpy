@@ -1,16 +1,9 @@
-from __future__ import absolute_import
 from ingest.grib_source import GribError, GribSource
-from utils import ensure_dir, symlink_unless_exists, timedelta_hours, readhead, Dict
-from .downloader import download_url, DownloadError
-from datetime import datetime, timedelta
+from utils import readhead, Dict
+from datetime import timedelta
 import pytz
-import requests
-import os
 import os.path as osp
-import sys
 import logging
-from six.moves import map
-
 
 class GribReanalysis(GribSource):
     """
@@ -73,7 +66,10 @@ class GribReanalysis(GribSource):
                 url_bases = [url_bases]
             for url_base in url_bases:
                 logging.info('Retrieving CFSR GRIBs from %s' % url_base)
-                unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
+                if url_base[:5] == 's3://':
+                    unavailables = [x for x in nonlocals if readhead(osp.join(self.browse_aws, x)).status_code != 200]
+                else:
+                    unavailables = [x for x in nonlocals if readhead(osp.join(url_base, x)).status_code != 200]
                 if len(unavailables) == 0:
                     break
             if len(unavailables) > 0:
@@ -83,7 +79,7 @@ class GribReanalysis(GribSource):
             list(map(lambda x: self.download_grib(url_base, x), nonlocals))
 
         # return manifest
-        return Dict({'grib_files': grib_files, 
+        return Dict({'grib_files': [osp.join(self.ingest_dir, x) for x in grib_files], 
             'colmet_files_utc': colmet_files_utc, 
             'colmet_prefix': colmet_prefix, 
             'colmet_files': colmet_files,
