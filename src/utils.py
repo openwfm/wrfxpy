@@ -17,10 +17,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
 from datetime import datetime, timedelta
 import pytz
 import os
@@ -39,8 +35,13 @@ import psutil
 import requests
 import socket
 import collections
-import six
 from clamp2mesh import clamp2mesh
+
+try:
+    from fire_init.geometry import process_ignitions_to_tign, process_burn_plot_boundary
+    _fire_init_plugin = True
+except:
+    _fire_init_plugin = False
 
 class Dict(dict):
     """
@@ -175,8 +176,8 @@ def delete(dir):
         try:
             shutil.rmtree(dir)
         except Exception as e:
+            # This is often caused by hidden files on NSF mounted volumes, which is harmless.
             logging.warning(str(e))
-            #logging.warning('This is often caused by hidden files on NSF mounted volumes, which is harmless.')
 
 def make_clean_dir(dir):
     """
@@ -207,7 +208,6 @@ def symlink_unless_exists(link_tgt, link_loc):
     :param link_tgt: link target
     :param link_loc: link location
     """
-
     logging.info('Linking %s -> %s' % (link_loc, link_tgt))
     if osp.isfile(link_tgt) or osp.isdir(link_tgt):
         if not osp.lexists(link_loc):
@@ -409,7 +409,6 @@ def update_time_control(start_utc, end_utc, num_domains):
 
     return tc_dict
 
-
 def update_namelist(nml, with_keys):
     """
     Update namelist with keys from the nested dictionary with_keys.  Each key is overwritten.
@@ -419,7 +418,7 @@ def update_namelist(nml, with_keys):
     :param nml: the namelist to update
     :param with_keys: the nested dictionary with update instructions
     """
-    for section, section_dict in six.iteritems(with_keys):
+    for section, section_dict in with_keys.items():
         nml[section].update(section_dict)
 
 
@@ -449,12 +448,21 @@ def render_ignitions(js, max_dom):
                  'fmoist_run' : [False] * max_dom, 'fmoist_interp' : [False] * max_dom,
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
                  'fire_viscosity' : [0] * max_dom }
+    
+    if js.use_realtime:
+        fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
+        nml_fire.update({'fire_perimeter_time': fire_perimeter_time})
+    elif js.use_tign_ignition and len(ign_specs):
+        ign_times = [(timespec_to_utc(ign['time_utc'], orig_start_time),ign['duration_s']) for dom_igns in ign_specs.values() for ign in dom_igns]
+        fire_tign_in_time = max([int((ign_time - js.start_utc).total_seconds())+ign_dur for ign_time,ign_dur in ign_times])
+        nml_fire.update({'fire_tign_in_time': fire_tign_in_time})
 
-    for dom_str, dom_igns in six.iteritems(ign_specs):
+    for dom_str, dom_igns in ign_specs.items():
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
         nml_fire['ifire'][dom_id-1] = 1
-        nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
+        if not (js.use_tign_ignition or js.use_realtime):
+            nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
         nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
         nml_fire['fmoist_run'][dom_id-1] = True # use the fuel moisture model
@@ -483,6 +491,60 @@ def render_ignitions(js, max_dom):
 
     return { 'fire' : nml_fire }
 
+def process_ignitions(js):
+    """
+    Use fire_init package to process ignitions from user defined fire ignition points and lines.
+
+    :param js: the job state
+    """
+    orig_start_time = js.orig_start_utc
+    for dom,igns in js.ignitions.items():
+        wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % int(dom))
+        fire_data = {'points': [], 'lines': []}
+        points = []
+        lines = []
+        for ign in igns:
+            if 'line_id' in ign.keys():
+                lines.append(ign)
+            else:
+                points.append(ign)
+        line_ids = [ign['line_id'] for ign in lines]
+        if len(line_ids):
+            for line_id in np.unique(line_ids):
+                line_points = [ign for ign in lines if ign['line_id'] == line_id]
+                line_data = {
+                    'times': [], 'lons': [], 'lats': [], 
+                    'duration': [], 'radius': [], 'ros': []
+                }
+                for line_point in line_points:
+                    time_utc = timespec_to_utc(line_point['time_utc'], orig_start_time)
+                    time = int((time_utc - js.start_utc).total_seconds())
+                    lat,lon = line_point['latlon']
+                    duration = line_point.get('duration_s',240)
+                    radius = line_point.get('radius',200)
+                    ros = ign.get('ros',1)
+                    line_data['times'].append(time) 
+                    line_data['lons'].append(lon)
+                    line_data['lats'].append(lat)
+                    line_data['duration'].append(duration)
+                    line_data['radius'].append(radius)
+                    line_data['ros'].append(ros)
+                fire_data['lines'].append(line_data)
+        if len(points):
+            for point in points:
+                time_utc = timespec_to_utc(ign['time_utc'], orig_start_time)
+                start_time = int((time_utc - js.start_utc).total_seconds())
+                lat,lon = point['latlon']
+                lon,lat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(js.max_dom)))[0], float(lon), float(lat))
+                duration = point.get('duration_s',240)
+                radius = point.get('radius',200)
+                point_data = [start_time, lon, lat, duration, radius]
+                fire_data['points'].append(point_data)
+        process_ignitions_to_tign(wrf_path, fire_data)   
+    if js.burn_plot_boundary is not None:
+        coords = [c[::-1] for c in js.burn_plot_boundary]
+        wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % js.max_dom)
+        process_burn_plot_boundary(wrf_path, coords)  
 
 def timespec_to_utc(ts_str, from_time = None):
     """
@@ -504,11 +566,6 @@ def timespec_to_utc(ts_str, from_time = None):
         return from_time + timedelta(minutes = min_shift)
     else:
         return esmf_to_utc(ts_str)
-
-
-#
-#  Geospatial utilities
-#
 
 def great_circle_distance(lon1, lat1, lon2, lat2):
     """
@@ -552,6 +609,8 @@ def load_sys_cfg():
     sys_cfg.ungrib_only = sys_cfg.get('ungrib_only',False)
     sys_cfg.use_wgrib2 = sys_cfg.get('use_wgrib2',False)
     sys_cfg.sat_only = sys_cfg.get('sat_only',False)
+    sys_cfg.use_realtime = sys_cfg.get('use_realtime',False)
+    sys_cfg.use_tign_ignition = sys_cfg.get('use_tign_ignition',False)
     return sys_cfg
 
 class response_object(object):
@@ -599,7 +658,6 @@ def checkip():
     ip = r.text[i:j]
     logging.info('Your public IP address is %s' % ip)
     return ip
-   #
 
 def get_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
