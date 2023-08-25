@@ -118,6 +118,7 @@ class JobState(Dict):
         self.wrfxpy_dir = args['sys_install_path']
         self.clean_dir = args.get('clean_dir', True)
         self.run_wrf = args.get('run_wrf', True)
+        self.iofields = args.get('iofields', False)
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
 
@@ -778,11 +779,22 @@ def execute(args,job_args):
     time_ctrl = update_time_control(js.start_utc, js.end_utc, js.num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
     js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds
+    if js.iofields and osp.exists('etc/iofields.cfg'):
+        js.wrf_nml['time_control']['iofields_filename'] = [osp.abspath('etc/iofields.cfg')] * js.num_doms
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     if 'ignitions' in js.args:
         update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
     if 'fmda_geogrid_path' in js.args:
-        js.fire_nml['moisture']['fmc_gc_initialization'] = [0,0,0,2,1]
+        moisture_classes = js.fire_nml['moisture'].get('moisture_classes', 5)
+        fmc_gc_initialization = []
+        for mc in moisture_classes:
+            if mc < 4:
+                fmc_gc_initialization.append(0)
+            elif mc == 4:
+                fmc_gc_initialization.append(2)
+            else:
+                fmc_gc_initialization.append(1)
+        js.fire_nml['moisture']['fmc_gc_initialization'] = fmc_gc_initialization
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
         logging.debug('namelist.fire_emissions given, turning on tracers')

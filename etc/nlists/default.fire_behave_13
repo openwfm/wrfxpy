@@ -1,0 +1,114 @@
+&fuel_scalars                      ! scalar fuel constants
+fire_wind_height = 6.096           ! height to interpolate wind to (m), 6.096 Behave, 0 to use fwh in each category
+cmbcnst  = 1.8605e+07              ! J/kg combustion heat dry fuel
+hfgl     = 17.e4                   ! W/m^2 heat flux to ignite canopy
+fuelmc_g = 0.40                    ! ground fuel moisture, set = 0 for dry
+fuelmc_c = 1.00                    ! canopy fuel moisture, set = 0 for dry
+nfuelcats = 13                     ! number of fuel categories used
+no_fuel_cat = 14                   ! extra category for no fuel
+no_fuel_cat2 = 100                  ! all categories up to here are no fuel
+ibeh = 4                           ! ROS formula: 0 =  MacArthur, 1 = Rothermel, 2 = Balbi, 3 = WIRC, 4 = Behave
+/
+
+&fuel_categories                 
+ fuel_name = 
+'1: Short grass (1 ft)',
+'2: Timber (grass and understory)',
+'3: Tall grass (2.5 ft)',
+'4: Chaparral (6 ft)',
+'5: Brush (2 ft) ',
+'6: Dormant brush, hardwood slash',
+'7: Southern rough',
+'8: Closed timber litter',
+'9: Hardwood litter',
+'10: Timber (litter + understory)',
+'11: Light logging slash',
+'12: Medium logging slash',
+'13: Heavy logging slash',
+'14: no fuel'
+ 
+ ! Wind height to interpolate vertically to (m).
+ windrf = 0.36, 0.36, 0.44, 0.55, 0.42, 0.44, 0.44,
+          0.36, 0.36, 0.36, 0.36, 0.43, 0.46, 1e-7
+ 
+ ! Initial total mass of surface fuel (kg/m^2). A combination of all fuel moisture classes.
+ fgi = 0.166, 0.897, 0.675, 2.468, 0.785, 1.345, 1.092,
+       1.121, 0.780, 2.694, 2.582, 7.749, 13.024, 1.e-7
+
+ ! Fuel depth (m).
+ fueldepthm = 0.305, 0.305, 0.762, 1.829, 0.61,  0.762, 0.762, 
+              0.061, 0.061, 0.305, 0.305, 0.701, 0.914, 0.00305
+
+ ! Surface area to volume ratio (1/ft). A combination of all fuel moisture classes.
+ savr = 3500., 2784., 1500., 1739., 1683., 1564., 1562.,  
+        1889., 2484., 1764., 1182., 1145., 1159., 3500.
+
+ ! Fuel moisture content of extinction (g/g).
+ fuelmce = 0.12, 0.15, 0.25, 0.20, 0.20, 0.25, 0.40,  
+           0.30, 0.25, 0.25, 0.15, 0.20, 0.25, 0.12
+
+ ! Fuel density (lb/ft^3). If solid 32 and if rotten 19.
+ fueldens = 32., 32., 32., 32., 32., 32., 32.,
+            32., 32., 32., 32., 32., 32., 32.
+
+ ! Fuel particle total mineral content (kg minerals/kg wood).
+ st = 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555,
+      0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555
+
+ ! Fuel particle effective mineral content ((kg minerals - kg silica)/kg wood).
+ se = 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010,
+      0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 
+
+ ! Weighting parameter that determines the slope of the mass loss curve. 
+ ! Range from 5 (fast burnup) to 1000 (40% decrease in mass over 10 minutes).
+ weight = 7.,   7.,   7.,   180., 100., 100., 100.,  
+          900., 900., 900., 900., 900., 900., 7.
+
+ ! Chaparral flag. 
+ ichap = 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+ ! Fuel fraction consumed in the flaming zone
+ ffw = 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
+       0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9
+
+ ! Multiplicative adjustment of backing spread rate.
+ adjr0 = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+ ! Multiplicative adjustment of wind contribution to spread rate.
+ adjrw = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+ ! Multiplicative adjustment of slope contribution to spread rate.
+ adjrs = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+ /
+
+&moisture
+ moisture_class_name =
+'1 hour fine fuel',
+'10 hour fine fuel',
+'100 hour fine fuel',
+'1000 hour fine fuel',
+'Live Herbaceous',
+'Live Woody'
+
+ ! Number of fuel moisture classes
+ moisture_classes = 6
+ ! Fuel moisture class is dead or live (1 if is dead and 0 if is live)
+ is_dead = 1, 1, 1, 1, 0, 0
+ ! Number of fuel moisture model (only 1=equilibrium moisture Van Wagner (1972) per Viney (1991) allowed at this moment)
+ drying_model = 1, 1, 1, 1, 1, 1
+ ! Drying timelag for each fuel moisture class
+ drying_lag = 1.0, 10.0, 100.0, 1000.0, 1e9, 1e9
+ ! Number of fuel moisture model (only 1=equilibrium moisture Van Wagner (1972) per Viney (1991) allowed at this moment)
+ wetting_model = 1, 1, 1, 1, 1, 1  ! number of model - only 1= allowed at this moment
+ ! Wetting timelag for each fuel moisture class (14 is callibrated to VanWagner&Pickett 1985, Canadian fire danger rating system)
+ wetting_lag = 1.4, 14.0, 140.0, 1400.0, 1e9, 1e9
+ ! Saturation fuel moisture contents (g/g) in rain
+ saturation_moisture = 2.5, 2.5, 2.5, 2.5, 2.5, 2.5
+ ! Saturation rain (mm/h). Stronger rain matters only in duration.
+ saturation_rain = 8.0, 8.0, 8.0, 8.0, 8.0, 8.0
+ ! Rain threshold (mm/h). Rain intensity smaller than that is same as nothing.
+ rain_threshold = 0.05, 0.05, 0.05, 0.05, 0.05, 0.05
+ ! Initialization of fuel moisture (0=from wrfinput, 1=from fuelmc_g, 2=from equilibrium)
+ fmc_gc_initialization = 2, 2, 2, 2, 1, 1
+/
