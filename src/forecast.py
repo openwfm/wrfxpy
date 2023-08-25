@@ -599,7 +599,7 @@ def vars_add_to_geogrid(js):
             topo_path = osp.join(js.args['wps_geog_path'],'topo_fire','ned_data.tif')
             if osp.exists(nfuel_path) and osp.exists(topo_path) and nfuelcats == 13:
                 geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
-        for var,tif_file in six.iteritems(geo_vars):
+        for var,tif_file in geo_vars.items():
             if var == 'NFUEL_CAT':
                 var = 'NFUEL_CAT_13'
             if 'NFUEL_CAT' in var and var != 'NFUEL_CAT_{}'.format(nfuelcats): 
@@ -937,10 +937,10 @@ def execute(args,job_args):
     if 'fmda_geogrid_path' in js.args:
         moisture_classes = js.fire_nml['moisture'].get('moisture_classes', 5)
         fmc_gc_initialization = []
-        for mc in moisture_classes:
-            if mc < 4:
+        for mc in range(moisture_classes):
+            if mc < 3:
                 fmc_gc_initialization.append(0)
-            elif mc == 4:
+            elif mc == 3:
                 fmc_gc_initialization.append(2)
             else:
                 fmc_gc_initialization.append(1)
