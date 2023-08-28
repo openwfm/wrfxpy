@@ -42,7 +42,7 @@ class polar_data():
         self.timestamp = csv_timestamp
         self.csv_date_str = str(csv_timestamp.year)+'_'+str(csv_timestamp.month)+'_'+str(csv_timestamp)
         self.firms_path = 'ingest/FIRMS/'
-        self.satlist = ['noaa_20','suomi','modis']
+        self.satlist = ['noaa_20','suomi','modis','landsat']
     
     #add nrt data, filter out low confidence detections
     def sort_data_bytime(self):
