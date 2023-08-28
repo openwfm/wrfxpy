@@ -87,6 +87,8 @@ class polar_data():
         suomi_file = 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv'
         modis_dir =   'modis-c6.1/csv/'
         modis_file = 'MODIS_C6_1_USA_contiguous_and_Hawaii_24h.csv'
+        landsat_dir = 'landsat/csv/'
+        landsat_file = 'LANDSAT_USA_contiguous_and_Hawaii_24h.csv'
         if sat == 'noaa_20':
             csv_url = url_base + noaa_20_dir + noaa_20_file
             csv_local = self.firms_path + noaa_20_file
@@ -96,6 +98,9 @@ class polar_data():
         if sat == 'modis':
             csv_url = url_base + modis_dir + modis_file
             csv_local = self.firms_path + modis_file
+        if sat == 'landsat':
+            csv_url = url_base + landsat_dir + landsat_file
+            csv_local = self.firms_path + landsat_file
         #download if the csv file doesn't exist or is older than 7200 seconds = 2 hours
         if not os.path.exists(csv_local):
                 self.download_url(csv_url,self.firms_path)
