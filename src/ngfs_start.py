@@ -277,7 +277,7 @@ class ngfs_incident():
          max_lat = max(max(self.data['lat_c1']),max(self.data['lat_c2']),max(self.data['lat_c3']),max(self.data['lat_c4']))
          min_lon = min(min(self.data['lon_c1']),min(self.data['lon_c2']),min(self.data['lon_c3']),min(self.data['lon_c4']))
          max_lon = max(max(self.data['lon_c1']),max(self.data['lon_c2']),max(self.data['lon_c3']),max(self.data['lon_c4']))
-      self.bbox = min_lon,min_lat,max_lon,max_lat
+      self.bbox = min_lon,max_lon,min_lat,max_lat
       print('\tBounding box: ' , self.bbox)
    
    def make_incident_configuration(self,base_cfg):
@@ -375,7 +375,13 @@ class ngfs_incident():
       idx = incident_data.index[0] #gets the first row, having earliest time
       #not all csv files have terrain correction, so far
       try:
-         self.ign_latlon = [incident_data.lat_tc[idx], incident_data.lon_tc[idx]]
+         tc_ign_latlon = [incident_data.lat_tc[idx], incident_data.lon_tc[idx]]
+         swir_ign_latlon = [incident_data.lat_tc_swir[idx], incident_data.lon_tc_swir[idx]]
+         if max(abs(tc_ign_latlon[0]- swir_ign_latlon[0]),abs(tc_ign_latlon[1]- swir_ign_latlon[1]))<0.01:
+            self.ign_latlon = swir_ign_latlon
+            print('\tUsing SWIR ignition location')
+         else:
+            self.ign_latlon = tc_ign_latlon
       except:
          print('\tNo terrain corected lat/lon available')
          self.ign_latlon = [incident_data.lat[idx], incident_data.lon[idx]]
@@ -517,7 +523,7 @@ def download_csv_data(days_to_get):
       if i == 0:
          print('NGFS data from today')
       else:
-         print('NGFS data from yesterday')
+         print('NGFS data from yesterday or before')
       #GOES-18
       s1, s2 = get_ngfs_csv(i,18)
       csv_str.append(s1)
@@ -693,15 +699,15 @@ if __name__ == '__main__':
       force = False
       auto_start = sf.read_boolean('no')
       if auto_start:
-         sf.print_question('How many simulations to run at once? default = [15]')
-         num_starts = sf.read_integer(15)
+         sf.print_question('How many simulations to run at once? default = [25')
+         num_starts = sf.read_integer(25)
       else:
          num_starts = -1
    elif 'force' in str(sys.argv):
       #this forces auto_start and avoids questions
       force = True
       auto_start = True
-      num_starts = 15   # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
+      num_starts = 25   # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
    else:
       force = True  # <<<------------------------------- change this to require confirmation of forecast configuration
       auto_start = False
@@ -730,7 +736,7 @@ if __name__ == '__main__':
    #               initialize an object of the ngfs_day class       #
    ##################################################################
    csv = ngfs_day(csv_date_str,today)
-   csv.set_save_name()
+   
 
    #filter out "null incidents"
    #maybe null incidents are what we are interested in?
@@ -793,6 +799,10 @@ if __name__ == '__main__':
       except:
          print('Error getting Suomi 24-hour data')
       try:
+         polar.add_firms_24(sat='landsat',csv_timestamp = csv.timestamp)
+      except:
+         print('Error getting Landsat 24-hour data')
+      try:
          polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 3)
       except:
          print('Error getting NOAA_20 date data')
@@ -800,6 +810,7 @@ if __name__ == '__main__':
          polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 3)
       except:
          print('Error getting Suomi date data')
+   #archived data
    else:
       print('Getting the polar data for ',csv_date_str,csv.timestamp.day_of_year)
       try:
@@ -884,6 +895,7 @@ if __name__ == '__main__':
    csv.add_data(data)
    csv.add_full_data(full_data)
    csv.add_incidents(incidents)
+   csv.set_save_name()
    csv.set_new(new_idx.astype(bool))
    csv.set_started(started.astype(bool))
    #print('started',csv.started)
