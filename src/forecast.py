@@ -341,6 +341,7 @@ def run_fire_init(js, q):
 
         perims, params = fire_init.init_fire_info(**params)
         if len(perims):
+            params['perims'] = perims
             perim1 = perims['perim1'].coords
             perim2 = perims['perim2'].coords
             fxlon, fxlat = get_subgrid_coordinates(params['wrf_path'], strip=False)
