@@ -1,0 +1,11 @@
+--2023-08-24 13:56:35--  https://tgftp.nws.noaa.gov/SL.us008001/ST.opnl/DF.gr2/DC.ndgd/GT.rtma/AR.conus//RT.19/ds.precipa.bin
+Resolving tgftp.nws.noaa.gov (tgftp.nws.noaa.gov)... 140.90.101.79
+Connecting to tgftp.nws.noaa.gov (tgftp.nws.noaa.gov)|140.90.101.79|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 457996 (447K) [application/octet-stream]
+Saving to: 'ingest/rtma/20230824/19/precipa.grib'
+
+               ingest/rtma/20   0%[                                                  ]       0  --.-KB/s                             ingest/rtma/202  70%[==================================>               ] 313.88K  1.51MB/s               ingest/rtma/20230824/19/preci 100%[=================================================>] 447.26K  1.78MB/s    in 0.2s    
+
+2023-08-24 13:56:35 (1.78 MB/s) - 'ingest/rtma/20230824/19/precipa.grib' saved [457996/457996]
+

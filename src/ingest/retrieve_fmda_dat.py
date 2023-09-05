@@ -1,4 +1,6 @@
-## NOTE: replace hrrr_conf json with argv. Using argv fails below
+# Set of functions and executable code for retrieving a range of data used for FMDA. 
+# Given a start date, end date, and model (currently only tested with HRRR), loop through the dates abnd
+# execute retrieve_gribs from the main code repo, then extract and combine relevant fields to given output dir
 
 # setup environment
 from __future__ import absolute_import
@@ -42,24 +44,24 @@ def slice_hrrr(tempfile):
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 4:
-        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
-        print(('Example: %s 2023-08-10_09:00:00 2023-08-10_10:00:00 ./ingest/HRRR' % sys.argv[0]))
+    if len(sys.argv) != 5:
+        print(('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
+        print(('Example: %s HRRR 2023-08-10_09:00:00 2023-08-10_10:00:00 ./ingest/HRRR' % sys.argv[0]))
         sys.exit(-1)
 
     fmt = "%Y-%m-%d_%H:%M:%S" # Time format that pandas can recognize
 
-    print('Gathering HRRR data')
-    start=datetime.strptime(sys.argv[1], fmt)
-    end=datetime.strptime(sys.argv[2], fmt)
+    print('Gathering '+str(sys.argv[1])+' data')
+    start=datetime.strptime(sys.argv[2], fmt)
+    end=datetime.strptime(sys.argv[3], fmt)
     print("Start: "+str(start))
     print("End: "+str(end))
-    outpath=str(sys.argv[3])
+    outpath=str(sys.argv[4])
     print('Output Destination: '+outpath)
 
 
     # String to run with retrieve_gribs as subprocess
-    base_str = "python src/ingest/retrieve_gribs.py HRRR "
+    base_str = "python src/ingest/retrieve_gribs.py " + str(sys.argv[1]) + " "
 
     # Handle Date
     dates = pd.date_range(start=start,end=end, freq="1H") # Series of dates in 1 hour increments
