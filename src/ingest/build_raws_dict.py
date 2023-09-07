@@ -87,7 +87,13 @@ def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M"):
     }
     return dict1
 
-def build_hrrr(tstart_str, tend_str, lon, lat):
+def build_atm(tstart_str, tend_str, lon, lat, atmpath, atm_source="HRRR"):
+
+    if atm_source == "HRRR": atm1 = build_hrrr(tstart_str, tend_str, lon, lat, atmpath)
+
+    return atm1
+
+def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath):
     # NOT IMPLEMENTED YET, HERE FOR FORMATTING
 
     hrrr1 = {
@@ -102,19 +108,19 @@ def build_hrrr(tstart_str, tend_str, lon, lat):
     
     return hrrr1
 
-def build_dictionary(tstart_str, tend_str, stid, datapath, dict_name = "test_dict", fmt = "%Y%m%d%H%M"):
-    dict1 = build_raws(tstart_str, tend_str, stid, datapath, fmt)
+def build_dictionary(tstart_str, tend_str, stid, rawspath, atmpath, dict_name = "test_dict", fmt = "%Y%m%d%H%M"):
+    dict1 = build_raws(tstart_str, tend_str, stid, rawspath, fmt)
     
-    hrrr1 = build_hrrr(tstart_str, tend_str, dict1['lon'], dict1['lat'])
+    atm1 = build_atm(tstart_str, tend_str, dict1['lon'], dict1['lat'], atmpath)
     
     dict1['id'] = dict_name
-    dict1['rain'] = hrrr1['rain'],
-    dict1['rh'] = hrrr1['rh'],
-    dict1['temp'] = hrrr1['temp'],
-    dict1['Ed'] = hrrr1['Ed'],
-    dict1['Ew'] = hrrr1['Ew'],
-    dict1['wind'] = hrrr1['wind_speed'],
-    dict1['solar'] = hrrr1['solar']
+    dict1['rain'] = atm1['rain'],
+    dict1['rh'] = atm1['rh'],
+    dict1['temp'] = atm1['temp'],
+    dict1['Ed'] = atm1['Ed'],
+    dict1['Ew'] = atm1['Ew'],
+    dict1['wind'] = atm1['wind_speed'],
+    dict1['solar'] = atm1['solar']
 
     return dict1
 
@@ -122,23 +128,24 @@ def build_dictionary(tstart_str, tend_str, stid, datapath, dict_name = "test_dic
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 7:
-        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <STID> <datapath> <target_directory> <filename>' % sys.argv[0]))
+    if len(sys.argv) != 8:
+        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <STID> <rawspath> <atmpath> <target_directory> <filename>' % sys.argv[0]))
         sys.exit(-1)
     start = sys.argv[1]
     end = sys.argv[2]
     stid = sys.argv[3]
-    datapath = sys.argv[4]
-    outpath = sys.argv[5]
+    rawspath = sys.argv[4] # path for raws data
+    atmpath = sys.argv[5] # path for atmospheric data
+    outpath = sys.argv[6]
 
     print('Building RAWS Training Dictionary')
     print('Start: ' + str(start))
     print('End: ' + str(end))
 
-    dict1 = build_dictionary(start, end, stid, datapath)
+    dict1 = build_dictionary(start, end, stid, rawspath, atmpath)
     
     print(dict1)
 
     print('Writing json to: ' + outpath)
-    print('to_json('+sys.argv[6]+')')
+    print('to_json('+sys.argv[7]+')')
 
