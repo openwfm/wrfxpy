@@ -377,6 +377,11 @@ class ngfs_incident():
       try:
          tc_ign_latlon = [incident_data.lat_tc[idx], incident_data.lon_tc[idx]]
          swir_ign_latlon = [incident_data.lat_tc_swir[idx], incident_data.lon_tc_swir[idx]]
+         mean_ign_latlon = [np.mean(incident_data.lat_tc), np.mean(incident_data.lon_tc)]
+         print('\tStandard ign_latlon: ',tc_ign_latlon)
+         print('\tSWIR ign_latlon : ',swir_ign_latlon)
+         print('\tMean ign_latlon : ',mean_ign_latlon)
+
          if max(abs(tc_ign_latlon[0]- swir_ign_latlon[0]),abs(tc_ign_latlon[1]- swir_ign_latlon[1]))<0.01:
             self.ign_latlon = swir_ign_latlon
             print('\tUsing SWIR ignition location')
@@ -385,8 +390,13 @@ class ngfs_incident():
       except:
          print('\tNo terrain corected lat/lon available')
          self.ign_latlon = [incident_data.lat[idx], incident_data.lon[idx]]
+         mean_ign_latlon = [np.mean(incident_data.lat_tc), np.mean(incident_data.lon_tc)]
       #reduce to only unique lat/lon pairs
 
+      mean_ign = False
+      if mean_ign:
+         self.ign_latlon = mean_ign_latlon
+         print('\tUsing mean ignition point')
       #look for swir pixel locations
       # if abs(incident_data.
       
