@@ -17,16 +17,13 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from __future__ import absolute_import
-from __future__ import print_function
 from fmda.fuel_moisture_da import execute_da_step, retrieve_mesowest_observations
 from fmda.fuel_moisture_model import FuelMoistureModel
-from ingest.grib_file import GribFile, GribMessage
+from ingest.grib_file import GribFile
 from ingest.rtma_source import RTMA
 from utils import Dict, ensure_dir, utc_to_esmf, delete, force_copy, move
 from vis.postprocessor import scalar_field_to_raster, scatter_to_raster
 from ssh_shuttle import send_product_to_server
-
 
 import netCDF4
 import numpy as np
@@ -35,11 +32,9 @@ import sys
 import logging
 import os
 import os.path as osp
-import glob
 
 from datetime import datetime, timedelta
 import pytz
-import six
 
 # setup environment
 sys_cfg = Dict(json.load(open('etc/conf.json')))
@@ -673,7 +668,7 @@ if __name__ == '__main__':
     if dont_have_vars:
         logging.warning('CYCLER could not find useable cycle.')
         logging.warning('CYCLER copying previous post-processing.')
-        for region_id,region_cfg in six.iteritems(cfg.regions):
+        for region_id,region_cfg in cfg.regions.items():
             wrapped_cfg = Dict(region_cfg)
             wrapped_cfg.update({'region_id': region_id})
             try:
@@ -691,7 +686,7 @@ if __name__ == '__main__':
     logging.info('Have RTMA data for cycle %s.' % str(cycle))
       
     # check for each region, if we are up to date w.r.t. RTMA data available
-    for region_id,region_cfg in six.iteritems(cfg.regions):
+    for region_id,region_cfg in cfg.regions.items():
         wrapped_cfg = Dict(region_cfg)
         wrapped_cfg.update({'region_id': region_id})
         #if 1:   # to run every time for debugging
