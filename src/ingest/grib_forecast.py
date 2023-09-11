@@ -140,7 +140,7 @@ class GribForecast(GribSource):
         if (from_utc - cycle_start).total_seconds() < 0:
             raise GribError('cycle start %s is after forecast start %s' % (str(cycle_start), str(from_utc)))
         if (to_utc - from_utc).total_seconds() < 3600:
-            raise GribError('forecast from %s to %s is less than one hour' % (str(from_utc), str(to_utc)))
+            logging.warning('forecast from %s to %s is less than one hour' % (str(from_utc), str(to_utc)))
 
         fc_hours = timedelta_hours(to_utc - cycle_start)
 
