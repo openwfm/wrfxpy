@@ -451,11 +451,13 @@ def render_ignitions(js, max_dom):
     
     if js.use_realtime:
         fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
-        nml_fire.update({'fire_perimeter_time': fire_perimeter_time})
+        nml_fire.update({'fire_perimeter_time': [0] * max_dom})
+        nml_fire['fire_perimeter_time'][max_dom-1] = fire_perimeter_time
     elif js.use_tign_ignition and len(ign_specs):
         ign_times = [(timespec_to_utc(ign['time_utc'], orig_start_time),ign['duration_s']) for dom_igns in ign_specs.values() for ign in dom_igns]
         fire_tign_in_time = max([int((ign_time - js.start_utc).total_seconds())+ign_dur for ign_time,ign_dur in ign_times])
-        nml_fire.update({'fire_tign_in_time': fire_tign_in_time})
+        nml_fire.update({'fire_tign_in_time': [0] * max_dom})
+        nml_fire['fire_tign_in_time'][max_dom-1] = fire_tign_in_time
 
     for dom_str, dom_igns in ign_specs.items():
         dom_id = int(dom_str)

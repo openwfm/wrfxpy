@@ -115,7 +115,7 @@ class JobState(Dict):
             logging.info('restart not in arguments, default restart option %s' % self.restart)
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
-        self.ignitions = args.get('ignitions', None)
+        self.ignitions = args.get('ignitions', {})
         self.fmda = args.get('fuel_moisture_da', None)
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
@@ -933,7 +933,7 @@ def execute(args,job_args):
     if js.iofields and osp.exists('etc/iofields.cfg'):
         js.wrf_nml['time_control']['iofields_filename'] = [osp.abspath('etc/iofields.cfg')] * js.num_doms
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
-    if 'ignitions' in js.args:
+    if 'ignitions' in js.keys():
         update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
     if 'fmda_geogrid_path' in js.args:
         moisture_classes = js.fire_nml['moisture'].get('moisture_classes', 5)
@@ -1007,7 +1007,7 @@ def execute(args,job_args):
             logging.error('use_realtime is selected, but no fire information to start a fire simulation')
             sys.exit(1)
     else:
-        if 'ignitions' in js.args and len(js.ignitions):
+        if 'ignitions' in js.keys() and len(js.ignitions) and js.use_tign_ignition:
             process_ignitions(js)
     
     logging.info('run_wrf = %s' % js.run_wrf)
