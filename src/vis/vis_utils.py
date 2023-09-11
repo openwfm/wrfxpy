@@ -1,9 +1,7 @@
-from __future__ import absolute_import
 import numpy as np
 import logging
 from utils import Dict
 from geo.geo_utils import fill_categories
-from six.moves import range
 
 def print_stats(varname,v,unit):
       """
@@ -309,3 +307,14 @@ def transform_goes(d):
       fill = Dict({(150., 151., 152., 153.): 3, (100.): 5, (15., 35.): 7, (14., 34.): 8, (10., 11., 12., 13., 30., 31., 32., 33.): 9})
       array = d.variables['Mask'][:]
       return fill_categories(array, fill)
+
+def fire_front(d,t,var):
+      """
+      Plot variable only at the fire front
+      """
+      dt = 15.*60.
+      v = d.variables[var][t,:,:]
+      lfn = d.variables['LFN'][t,:,:]
+      m = np.logical_and(lfn > 60.,lfn <= dt)
+      v[~m] = np.nan
+      return v

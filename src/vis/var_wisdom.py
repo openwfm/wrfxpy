@@ -1,11 +1,9 @@
-from __future__ import absolute_import
 import numpy as np
 import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
       u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
-      smoke_concentration, transform_goes
-from six.moves import range
+      smoke_concentration, transform_goes, fire_front
 
 smoke_threshold_int = 10
 smoke_threshold = 1
@@ -89,10 +87,10 @@ def v8p_ft(d,t,level_ft):
        return v8p_m(d,t,convert_value('ft','m',level_ft))
 
 def is_windvec(name):
-       return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC']
+       return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC','WINDVEC_mph_D']
 
 def is_fire_var(name):
-       return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FLINEINT_btupftps','FIRE_HFX','F_ROS','F_ROS_chsph','F_INT','NFUEL_CAT','ZSF','FMC_G']
+       return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FLINEINT_btupftps','FIRE_HFX','F_ROS','F_ROS_chsph','ROS_chsph','F_INT','NFUEL_CAT','ZSF','FMC_G']
 
 _discrete_wisdom = {
     'all' : {'values': (3,5,7,8,9),
@@ -699,8 +697,16 @@ _var_wisdom = {
         'native_unit' : 'W/m',
         'colorbar' : 'BTU/ft/s',
         'colormap' : 'jet',
-        'scale' : 'original',
-        'retrieve_as' : lambda d,t: d.variables['FLINEINT'][t,:,:],
+        'norm_opt' : 'boundary',
+        'bounds' : [0.,346413.9231,1732069.615,3464139.231,17320696.15,
+                    34641392.31,173206961.5,346413920.],
+        'colors' : np.array([(77,155,255),(145,184,77),(214,230,76),
+                             (255,228,77),(255,169,77),(255,103,77),
+                             (250,38,2),(165,2,250)])/255.,
+        'spacing' : 'uniform',
+        'labels': ['100','500','1k','5k','10k','50k','100k'],
+        'scale' : [0., 350000000.],
+        'retrieve_as' : lambda d,t: fire_front(d,t,'FLINEINT'),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
       },
      'RH_FIRE' : {
@@ -748,6 +754,23 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: d.variables['F_ROS'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
       },
+     'ROS_chsph' : {
+        'name' : 'fire spread rate at front',
+        'native_unit' : 'm/s',
+        'colorbar' : 'chains/h',
+        'colormap' : 'jet',
+        'norm_opt' : 'boundary',
+        'bounds' : [0.,0.011175999,0.027939997,0.11175999,0.279399974,
+                    0.558799948,0.838199922,2.79399974],
+        'colors' : np.array([(77,155,255),(145,184,77),(214,230,76),
+                             (255,228,77),(255,169,77),(255,103,77),
+                             (250,38,2),(165,2,250)])/255.,
+        'spacing' : 'uniform',
+        'labels' : ['2','5','20','50','100','150','500'],
+        'scale' : [0., 3.],
+        'retrieve_as' : lambda d,t: fire_front(d,t,'ROS'),
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+      },
     'PSFC' : {
         'name' : 'surface pressure',
         'native_unit' : 'Pa',
@@ -775,10 +798,43 @@ _var_wisdom = {
         'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
       },
+     'WINDSPD_mph_D' : {
+        'name' : 'wind speed at 10m',
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
+        'colormap' : 'jet',
+        'norm_opt' : 'boundary',
+        'bounds' : [0,2.2352,4.4704,13.4112,17.8816,22.352,26.8224,31.2928],
+        'colors' : np.array([(26,152,80),(102,189,99),(166,217,106),
+                             (217,239,139),(254,224,139),(253,174,97),
+                             (244,109,67),(215,48,39)])/255.,
+        'spacing' : 'uniform',
+        'labels' : ['5','10','30','40','50','60','70'],
+        'scale' : [0.,32.],
+        'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+      },
     'WINDVEC' : {
         'name' : 'wind speed at 10m',
         'components' : [ 'U10', 'V10' ],
         'native_unit' : 'm/s',
+        'scale' : 'original',
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'WINDVEC_mph_D' : {
+        'name' : 'wind speed at 10m',
+        'components' : [ 'U10', 'V10' ],
+        'native_unit' : 'm/s',
+        'colorbar' : 'mph',
+        'colormap' : 'jet',
+        'norm_opt' : 'boundary',
+        'bounds' : [0,2.2352,4.4704,13.4112,17.8816,22.352,26.8224,31.2928],
+        'colors' : np.array([(26,152,80),(102,189,99),(166,217,106),
+                             (217,239,139),(254,224,139),(253,174,97),
+                             (244,109,67),(215,48,39)])/255.,
+        'spacing' : 'uniform',
+        'labels' : ['5','10','30','40','50','60','70'],
+        'speed_scale' : [0.,32.],
         'scale' : 'original',
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
