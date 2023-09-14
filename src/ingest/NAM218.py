@@ -60,7 +60,7 @@ class NAM218(GribForecast):
     info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
     info = "North American Mesoscale (NAM) Forecast System Grid 218"
     remote_url = ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/", "s3://noaa-nam-pds/"]
-    browse_aws = "https://noaa-nam-pds.s3.amazonaws.com/"
+    browse_aws = "https://noaa-nam-pds.s3.amazonaws.com/index.html"
     cycle_hours = 6
     period_hours = 3    # for METGRID and WRF
     #    NAM218 provides hourly GRIB2 files up to hour 36 and then one GRIB2 file

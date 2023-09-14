@@ -35,10 +35,11 @@ import psutil
 import requests
 import socket
 import collections
-from clamp2mesh import clamp2mesh
+from clamp2mesh import nearest_idx, get_subgrid_coordinates, clamp2mesh
 
 try:
     from fire_init.geometry import process_ignitions_to_tign, process_burn_plot_boundary
+    from fire_init.tools import integrate_init
     _fire_init_plugin = True
 except:
     _fire_init_plugin = False
@@ -453,12 +454,15 @@ def render_ignitions(js, max_dom):
         fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
         nml_fire.update({'fire_perimeter_time': [0] * max_dom})
         nml_fire['fire_perimeter_time'][max_dom-1] = fire_perimeter_time
-    elif js.use_tign_ignition and len(ign_specs):
+        ign_specs = {k: [] for k in ign_specs.keys()}
+    elif js.use_tign_ignition:
         ign_times = [(timespec_to_utc(ign['time_utc'], orig_start_time),ign['duration_s']) for dom_igns in ign_specs.values() for ign in dom_igns]
-        fire_tign_in_time = max([int((ign_time - js.start_utc).total_seconds())+ign_dur for ign_time,ign_dur in ign_times])
-        nml_fire.update({'fire_tign_in_time': [0] * max_dom})
-        nml_fire['fire_tign_in_time'][max_dom-1] = fire_tign_in_time
-
+        if len(ign_times):
+            fire_tign_in_time = max([int((ign_time - js.start_utc).total_seconds())+ign_dur for ign_time,ign_dur in ign_times])
+            nml_fire.update({'fire_tign_in_time': [0] * max_dom})
+            nml_fire['fire_tign_in_time'][max_dom-1] = fire_tign_in_time
+        ign_specs = {k: [] for k in ign_specs.keys()}
+    
     for dom_str, dom_igns in ign_specs.items():
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
@@ -480,13 +484,13 @@ def render_ignitions(js, max_dom):
             ros = ign.get('ros',1)
             if 'latlon' in ign.keys():
                 lat,lon = ign['latlon']
-                nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+                nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
                 vals = [ nlat, nlat, nlon, nlon, start, start+dur, radius, ros]
             elif 'start_latlon' in ign.keys() and 'end_latlon' in ign.keys():
                 lat,lon = ign['start_latlon']
-                slon,slat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+                slon,slat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
                 lat,lon = ign['end_latlon']
-                elon,elat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+                elon,elat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
                 vals = [ slat, elat, slon, elon, start, start+dur, radius, ros]
             kv = dict(list(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals])))
             nml_fire.update(kv)
@@ -499,9 +503,13 @@ def process_ignitions(js):
 
     :param js: the job state
     """
+    duration_default = 240.
+    radius_default = 200.
+    ros_default = 1.
     orig_start_time = js.orig_start_utc
     for dom,igns in js.ignitions.items():
         wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % int(dom))
+        fxlon,fxlat = get_subgrid_coordinates(wrf_path, strip=False)
         fire_data = {'points': [], 'lines': []}
         points = []
         lines = []
@@ -515,38 +523,52 @@ def process_ignitions(js):
             for line_id in np.unique(line_ids):
                 line_points = [ign for ign in lines if ign['line_id'] == line_id]
                 line_data = {
-                    'times': [], 'lons': [], 'lats': [], 
-                    'duration': [], 'radius': [], 'ros': []
+                    'time': [], 'ix': [], 'iy': [],
+                    'lon': [], 'lat': [],  'duration': [], 
+                    'radius': [], 'ros': []
                 }
                 for line_point in line_points:
                     time_utc = timespec_to_utc(line_point['time_utc'], orig_start_time)
                     time = int((time_utc - js.start_utc).total_seconds())
                     lat,lon = line_point['latlon']
-                    duration = line_point.get('duration_s',240)
-                    radius = line_point.get('radius',200)
-                    ros = ign.get('ros',1)
-                    line_data['times'].append(time) 
-                    line_data['lons'].append(lon)
-                    line_data['lats'].append(lat)
+                    iy,ix = nearest_idx(fxlon, fxlat, float(lon), float(lat))
+                    lon = fxlon[iy, ix]
+                    lat = fxlat[iy, ix]
+                    duration = line_point.get('duration_s', duration_default)
+                    radius = line_point.get('radius', radius_default)
+                    ros = line_point.get('ros', ros_default)
+                    line_data['time'].append(time)
+                    line_data['ix'].append(ix)
+                    line_data['iy'].append(iy)
+                    line_data['lon'].append(lon)
+                    line_data['lat'].append(lat)
                     line_data['duration'].append(duration)
                     line_data['radius'].append(radius)
                     line_data['ros'].append(ros)
                 fire_data['lines'].append(line_data)
         if len(points):
             for point in points:
-                time_utc = timespec_to_utc(ign['time_utc'], orig_start_time)
-                start_time = int((time_utc - js.start_utc).total_seconds())
+                time_utc = timespec_to_utc(point['time_utc'], orig_start_time)
+                time = int((time_utc - js.start_utc).total_seconds())
                 lat,lon = point['latlon']
-                lon,lat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(js.max_dom)))[0], float(lon), float(lat))
-                duration = point.get('duration_s',240)
-                radius = point.get('radius',200)
-                point_data = [start_time, lon, lat, duration, radius]
+                ix,iy = nearest_idx(fxlon, fxlat, float(lon), float(lat))
+                duration = point.get('duration_s', duration_default)
+                radius = point.get('radius', radius_default)
+                ros = point.get('ros', ros_default)
+                point_data = {
+                    'time': time, 'ix': ix, 'iy': iy, 
+                    'lon': lon, 'lat': lat, 'duration': duration, 
+                    'radius': radius, 'ros': ros
+                }
                 fire_data['points'].append(point_data)
-        process_ignitions_to_tign(wrf_path, fire_data)   
+        TIGN_G = process_ignitions_to_tign(wrf_path, fire_data)   
     if js.burn_plot_boundary is not None:
         coords = [c[::-1] for c in js.burn_plot_boundary]
+        if coords[0] != coords[-1]:
+            coords.append(coords[0])
         wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % js.max_dom)
-        process_burn_plot_boundary(wrf_path, coords)  
+        FUEL_MASK = process_burn_plot_boundary(wrf_path, [[coords]])  
+    integrate_init(wrf_path, TIGN_G, FUEL_MASK, no_fuel_cat=js.fire_nml['fuel_scalars']['no_fuel_cat'])
 
 def timespec_to_utc(ts_str, from_time = None):
     """

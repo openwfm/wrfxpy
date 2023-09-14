@@ -48,7 +48,7 @@ class HRRR(GribForecast):
     info_text = "NOAA HRRR 3-km CONUS High-Resolution Rapid Refresh Forecast"
     info = "The High-Resolution Rapid Refresh (HRRR)"
     remote_url = ["s3://noaa-hrrr-bdp-pds/", "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"]
-    browse_aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
+    browse_aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/index.html"
     cycle_hours = 1
     period_hours = 1
     hours_behind_real_time = 1     # choose forecast cycle at least one hour behind

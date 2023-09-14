@@ -64,7 +64,7 @@ class GFSA(GribReanalysis):
     info_text = "Global Forecast System (GFS) Analysis"
     info = "Global Forecast System (GFS) Analysis"
     remote_url = ["https://www.ncei.noaa.gov/data/global-forecast-system/access/historical/analysis", "https://www.ncei.noaa.gov/data/global-forecast-system/access/grid-004-0.5-degree/analysis", "s3://noaa-gfs-bdp-pds/"]
-    browse_aws = "https://noaa-gfs-bdp-pds.s3.amazonaws.com/"
+    browse_aws = "https://noaa-gfs-bdp-pds.s3.amazonaws.com/index.html"
     period_hours = 6
     available_from_utc = datetime(2004,3,1,tzinfo=pytz.UTC)
     available_to_utc = datetime.now(pytz.UTC)

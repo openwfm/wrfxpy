@@ -50,7 +50,7 @@ class NAM227(GribForecast):
     info_text = "NAM NEST over CONUS (5 km Resolution - Grid 227)"
     info = "North American Mesoscale (NAM) Forecast System Grid 227"
     remote_url = ["s3://noaa-nam-pds/", "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/"]
-    browse_aws = "https://noaa-nam-pds.s3.amazonaws.com/"
+    browse_aws = "https://noaa-nam-pds.s3.amazonaws.com/index.html"
     cycle_hours = 6
     period_hours = 3    # for METGRID and WRF
     #    NAM227 provides hourly GRIB2 files up to 60.
