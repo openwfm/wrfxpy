@@ -382,11 +382,16 @@ class ngfs_incident():
          print('\tSWIR ign_latlon : ',swir_ign_latlon)
          print('\tMean ign_latlon : ',mean_ign_latlon)
 
-         if max(abs(tc_ign_latlon[0]- swir_ign_latlon[0]),abs(tc_ign_latlon[1]- swir_ign_latlon[1]))<0.01:
+         # Calculate the absolute differences
+         lat_diff = abs(tc_ign_latlon[0] - swir_ign_latlon[0])
+         lon_diff = abs(tc_ign_latlon[1] - swir_ign_latlon[1])
+
+         if max(lat_diff, lon_diff) < 0.01:
             self.ign_latlon = swir_ign_latlon
             print('\tUsing SWIR ignition location')
          else:
             self.ign_latlon = tc_ign_latlon
+
       except:
          print('\tNo terrain corected lat/lon available')
          self.ign_latlon = [incident_data.lat[idx], incident_data.lon[idx]]
@@ -397,8 +402,7 @@ class ngfs_incident():
       if mean_ign:
          self.ign_latlon = mean_ign_latlon
          print('\tUsing mean ignition point')
-      #look for swir pixel locations
-      # if abs(incident_data.
+   
       
       
       self.unique_latlon = np.unique(self.ign_latlon)
@@ -677,7 +681,7 @@ if __name__ == '__main__':
 
 
    #print(old_ngfs_incidents)
-   time.sleep(10)
+   #time.sleep(10)
    
    #setup of automatic download of csv file
    #stores csv file(s) in the ingest/NGFS directory
