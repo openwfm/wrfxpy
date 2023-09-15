@@ -615,7 +615,8 @@ def prioritize_incidents(incidents,new_idx,num_starts):
       for i in sort_idx:
          if incidents[i].new:
             print(incidents[i].incident_name)
-            print(incidents[i].ign_latlon)
+            print('\t',incidents[i].ign_latlon)
+            print('\t',incidents[i].ign_utc)
             print('\t Population affected: ',incidents[i].affected_population)
             print('\t',incidents[i].county,', ',incidents[i].state)
          #print('\t',incidents[i].json_start_code)
@@ -668,9 +669,9 @@ if __name__ == '__main__':
       if 'GOES' not in i:
          pick_list.append(i)
    #print(pick_list)
-   time.sleep(10)
+   #time.sleep(10)
    old_ngfs_incidents = list()
-   for i in range(-1,-5,-1):
+   for i in range(-1,-8,-1):
       #print(pick_list[i])
       with open(pick_list[i],'rb') as f:
          df = pickle.load(f)
@@ -878,7 +879,7 @@ if __name__ == '__main__':
                inc_started = True
             #time.sleep(2)
       #start new incidents to run
-      if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = 43) and not inc_started:
+      if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = 163) and not inc_started:
          #(incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
          new_idx[i] = 1
          #change 'new' object attribute
