@@ -246,16 +246,16 @@ def build_dictionary(tstart_str, tend_str, stid, rawspath, atmpath, dict_name = 
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 8:
-        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <STID> <rawspath> <atmpath> <target_directory> <filename>' % sys.argv[0]))
-        print("Example: python src/ingest/build_raws_dict.py 202106070800 202106300900 KAFF /storage/math/NSF1/jmandel/RAWSData/haguespeak/meso /home/hirschij/data/hrrr/geotiff_files/ ~ testfile.json")
+    if len(sys.argv) != 7:
+        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <STID> <rawspath> <atmpath> <target_file>' % sys.argv[0]))
+        print("Example: python src/ingest/build_raws_dict.py 202106070800 202106300900 KAFF /storage/math/NSF1/jmandel/RAWSData/haguespeak/meso /home/hirschij/data/hrrr/geotiff_files/ ~/testfile.pickle")
         sys.exit(-1)
     start = sys.argv[1]
     end = sys.argv[2]
     stid = sys.argv[3]
     rawspath = sys.argv[4] # path for raws data
     atmpath = sys.argv[5] # path for atmospheric data
-    outpath = sys.argv[6]
+    outfile = sys.argv[6]
 
     print('Building RAWS Training Dictionary')
     print('Start: ' + str(start))
@@ -265,6 +265,7 @@ if __name__ == '__main__':
     
     print(dict1)
 
-    print('Writing json to: ' + outpath)
-    print('to_json('+sys.argv[7]+')')
+    print('Writing json to: ' + outfile)
+    with open(outfile, 'wb') as handle:
+        pickle.dump(dict1, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
