@@ -1192,7 +1192,7 @@ def process_output(job_id):
         line = wrf_out.readline().strip()
         if not line:
             if wait_lines > 10 and not parallel_job_running(js):
-                logging.warning('WRF did not run to completion.')
+                logging.error('WRF did not run to completion.')
                 break
             if not wait_lines:
                 logging.info('Waiting for more output lines')

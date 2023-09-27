@@ -430,6 +430,10 @@ def render_ignitions(js, max_dom):
     :param js: the job state
     :param max_dom: the maximum number of domains
     """
+    duration_default = 60.
+    radius_default = 60.
+    ros_default = 1.
+    
     def set_ignition_val(dom_id, v):
         dvals = [0] * max_dom
         dvals[dom_id-1] = v
@@ -479,9 +483,9 @@ def render_ignitions(js, max_dom):
         for ndx,ign in enumerate(dom_igns):
             start_time = timespec_to_utc(ign['time_utc'], orig_start_time)
             start = int((start_time - js.start_utc).total_seconds())
-            dur = ign.get('duration_s',240)
-            radius = ign.get('radius',200)
-            ros = ign.get('ros',1)
+            dur = ign.get('duration_s', duration_default)
+            radius = ign.get('radius', radius_default)
+            ros = ign.get('ros', ros_default)
             if 'latlon' in ign.keys():
                 lat,lon = ign['latlon']
                 nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
@@ -503,8 +507,8 @@ def process_ignitions(js):
 
     :param js: the job state
     """
-    duration_default = 240.
-    radius_default = 200.
+    duration_default = 60.
+    radius_default = 60.
     ros_default = 1.
     orig_start_time = js.orig_start_utc
     for dom,igns in js.ignitions.items():
