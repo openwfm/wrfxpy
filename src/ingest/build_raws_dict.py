@@ -55,7 +55,6 @@ def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M"):
     # Remove stations.pkl file
     mask = ~df['File'].str.contains('stations')
     df = df[mask]
-    
     # Extract times from file name
     df['t0']=df['File'].apply(lambda f: Path(f).stem.split('_')[0])
     df['t1']=df['File'].apply(lambda f: Path(f).stem.split('_')[1])
@@ -71,7 +70,6 @@ def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M"):
     # Find Files that cover given time period
     # latest date before/equal to tstart to
     # earliest date after/equal to tend
-    
     ind1=np.where(df['d0'].eq(df['d0'][df['d0'] <= tstart].max()))[0][0]
     ind2=np.where(df['d0'].eq(df['d0'][df['d0'] >= tend].min()))[0][0] + 1
     
@@ -93,13 +91,14 @@ def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M"):
         # Add to dataframe for given stid
         raws1 = pd.concat([raws1, data[data["STID"].eq(stid)]])
     
+    raws1 = raws1.drop_duplicates()
     # Get Station data
     f = open(osp.join(datapath, 'stations.pkl'), 'br')
     st = pickle.load(f)
     st = st[st.index == stid]
 
     dict1 = {
-        'time': raws1['datetime'].to_numpy(),
+        'time_raws': raws1['datetime'].to_numpy(),
         'STID' : raws1['STID'].unique()[0],
         'fm' : raws1['fm10'].to_numpy(),
         'title' : 'RAWS Station '+stid,
@@ -146,7 +145,7 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
     tstart = datetime.strptime(tstart_str, fmt)
     tend = datetime.strptime(tend_str, fmt)
     dates = pd.date_range(start=tstart,end=tend, freq="1H")
-    dates = dates[0:100] ### NOTE: THIS LINE IS ONLY FOR TESTING
+    # dates = dates[0:100] ### NOTE: THIS LINE IS ONLY FOR TESTING
 
     # Assemble time series
     bandnum=585 # Start with gust Band, then reuse those projection calculations later
@@ -184,13 +183,15 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
     
     # Get wind (separate to not reload/transform data)
     wind_speed = np.zeros(len(dates)) # Array filled in loop
+    time_hrrr = [""]*len(dates) # Initialize empty string list
     for i in range(0, len(dates)):
         d = dates[i]
         day_file = d.strftime("%Y%m%d") # HRRR data stash is in this format
         hour = d.strftime("%H")
         tpath = osp.join(hrrrpath, day_file, f"hrrr.t{hour}z.wrfprsf00.{bandnum}.tif")
         wind_speed[i] = get_vals(tpath, pixel_x, pixel_y)
-    
+        time_hrrr[i]=datetime.strftime(datetime.strptime(day_file, "%Y%m%d").replace(hour = int(hour)), "%Y-%m-%d %H:%M:%S")
+
     # Get other fields
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def build_timeseries(bandnum):
@@ -223,6 +224,7 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
     
 
     hrrr1 = {
+        'time_hrrr': time_hrrr,
         'rain' : rain,
         'rh' : rh,
         'temp' : temp,
@@ -242,6 +244,7 @@ def build_dictionary(tstart_str, tend_str, stid, rawspath, atmpath, dict_name = 
     
     atm1 = build_atm(tstart_str, tend_str, dict1['lon'], dict1['lat'], atmpath)
     
+    dict1['time_hrrr'] = atm1['time_hrrr'] ## MAKE flexible to do other data sources besides HRRR
     dict1['id'] = dict_name
     dict1['rain'] = atm1['rain']
     dict1['rh'] = atm1['rh']
