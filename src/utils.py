@@ -38,8 +38,7 @@ import collections
 from clamp2mesh import nearest_idx, get_subgrid_coordinates, clamp2mesh
 
 try:
-    from fire_init.geometry import process_ignitions_to_tign, process_burn_plot_boundary
-    from fire_init.tools import integrate_init
+    import fire_init
     _fire_init_plugin = True
 except:
     _fire_init_plugin = False
@@ -513,6 +512,9 @@ def process_ignitions(js):
 
     :param js: the job state
     """
+    if not _fire_init_plugin: 
+        logging.error('fire_init plugin not installed')
+        raise Exception('fire_init plugin is required for selected ignitions')
     duration_default = 60.
     radius_default = 60.
     ros_default = 1.
@@ -571,14 +573,14 @@ def process_ignitions(js):
                     'radius': radius, 'ros': ros
                 }
                 fire_data['points'].append(point_data)
-        TIGN_G = process_ignitions_to_tign(wrf_path, fire_data)   
+        TIGN_G = fire_init.process_ignitions_to_tign(wrf_path, fire_data)   
     if js.burn_plot_boundary is not None:
         coords = [c[::-1] for c in js.burn_plot_boundary]
         if coords[0] != coords[-1]:
             coords.append(coords[0])
         wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % js.max_dom)
-        FUEL_MASK = process_burn_plot_boundary(wrf_path, [[coords]])  
-    integrate_init(wrf_path, TIGN_G, FUEL_MASK, no_fuel_cat=js.fire_nml['fuel_scalars']['no_fuel_cat'])
+        FUEL_MASK = fire_init.process_burn_plot_boundary(wrf_path, [[coords]])  
+    fire_init.integrate_init(wrf_path, TIGN_G, FUEL_MASK, no_fuel_cat=js.fire_nml['fuel_scalars']['no_fuel_cat'])
 
 def timespec_to_utc(ts_str, from_time = None):
     """
