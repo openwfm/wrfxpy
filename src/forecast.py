@@ -622,9 +622,9 @@ def vars_add_to_geogrid(js):
         logging.warning('Problems processing GeoTIFF files for NFUEL_CAT and ZSF'.format(geo_vars_path))
         logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path))
         if nfuelcats == 13:
-            varnames = ['NFUEL_CAT_13_MODIS_20', 'ZSF_13_MODIS_20']
+            varnames = ['NFUEL_CAT_13_MODIS_20', 'ZSF_MODIS_20']
         elif nfuelcats == 40:
-            varnames = ['NFUEL_CAT_40_MODIS_20', 'ZSF_40_MODIS_20']
+            varnames = ['NFUEL_CAT_40_MODIS_20', 'ZSF_MODIS_20']
         else:
             raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
         geogrid_tbl_json = {}
