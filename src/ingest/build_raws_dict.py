@@ -71,7 +71,7 @@ def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M"):
     # latest date before/equal to tstart to
     # earliest date after/equal to tend
     ind1=np.where(df['d0'].eq(df['d0'][df['d0'] <= tstart].max()))[0][0]
-    ind2=np.where(df['d0'].eq(df['d0'][df['d0'] >= tend].min()))[0][0] + 1
+    ind2=np.where(df['d0'].eq(df['d0'][df['d0'] >= tend].min()))[0][0]
     
     df2=df.iloc[ind1:ind2]
     df2=df2.reset_index()
@@ -280,7 +280,9 @@ if __name__ == '__main__':
 
     dict1 = build_dictionary(start, end, stid, rawspath, atmpath)
     
-    print(dict1)
+    # print(dict1)
+    print('RAWS Shape:'+str(dict1['fm'].shape))
+    print('HRRR Shape:'+str(dict1['rh'].shape))
 
     print('Writing json to: ' + outfile)
     with open(outfile, 'wb') as handle:
