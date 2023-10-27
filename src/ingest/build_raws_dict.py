@@ -122,11 +122,20 @@ def interp_l1(x, y):
 
 
 def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%Y%m%d%H%M"):
+    # tstart_str    start time as string 
+    # tend_str      end time as string
+    # lon, lat      scalars, coordinates to interpolate to
+    # hrrrpath      path to stored GRIB data, bands stored as geotiff files
+    # method        only l1=nearest neighbor
+    # fmt           date string format of tstart_str, tend_str
+
     # method (str): interpolation method (NOTE: currently only L1 nearest neighbors aka rounding) 
     # Internal Functions, will only reasonably be used within here
 
     def get_vals(tpath, pixel_x, pixel_y, method='l1'):
         # tpath (str): absolute path to tiff file
+        # pixel_x, pixel_y grid coordinates after geotransform (would be index if at node)
+
         ds = gdal.Open(tpath)
         if(ds.RasterCount>1):
             print('Not Implemented for multiple Raster bands')
