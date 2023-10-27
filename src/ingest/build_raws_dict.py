@@ -239,7 +239,7 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
     
     return hrrr1
 
-def build_dictionary(tstart_str, tend_str, stid, rawspath, atmpath, dict_name = "test_dict", fmt = "%Y%m%d%H%M"):
+def build_dictionary(tstart_str, tend_str, stid, rawspath, atmpath, dict_name = "test_dict", h2=200, fmt = "%Y%m%d%H%M"):
     dict1 = build_raws(tstart_str, tend_str, stid, rawspath, fmt)
     
     atm1 = build_atm(tstart_str, tend_str, dict1['lon'], dict1['lat'], atmpath)
@@ -256,6 +256,7 @@ def build_dictionary(tstart_str, tend_str, stid, rawspath, atmpath, dict_name = 
     dict1['solarDL'] = atm1['solarDL']
     dict1['solarUS'] = atm1['solarUS']
     dict1['solarUL'] = atm1['solarUL']
+    dict1['h2']=h2 # default number of hours for training period, we have been testing h2=200
 
     return dict1
 
@@ -280,11 +281,14 @@ if __name__ == '__main__':
 
     dict1 = build_dictionary(start, end, stid, rawspath, atmpath)
     
-    # print(dict1)
-    print('RAWS Shape:'+str(dict1['fm'].shape))
-    print('HRRR Shape:'+str(dict1['rh'].shape))
+    # Dictionary must be nested with case names in this way
+    # TODO: make this script flexible to get more STIDs without horrible inputs
+    out_dict = {}
+    out_dict['case1']=dict1
+    
+    print(out_dict.keys())
 
     print('Writing json to: ' + outfile)
     with open(outfile, 'wb') as handle:
-        pickle.dump(dict1, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(out_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
