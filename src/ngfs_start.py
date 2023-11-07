@@ -49,6 +49,7 @@ import utils
 import state_names as sn
 import simple_forecast as sf
 import ngfs_dictionary as nd
+import v2_to_v1_dict as v2d
 
 ####### Classes  ######
 
@@ -465,6 +466,7 @@ def make_base_configuration(force):
       print('\tNumber of cores: ',temp_cfg['ppn'])
       print('\tNumber of nodes: ',temp_cfg['num_nodes'])
       print('\tWall time: ',temp_cfg['wall_time_hrs'], 'hours')
+      print('\tTime step: ',temp_cfg['domains']['1']['time_step'], 'seconds')
       
 
       if force:
@@ -521,7 +523,15 @@ def get_ngfs_csv(days_previous,goes):
   print('\tDownloading: ',csv_str)
   csv_path = ngfs_dir+'/'+csv_str
   #downloading
-  download_url(csv_url,csv_path)
+  if days_previous < 2:
+     download_url(csv_url,csv_path)
+  else:
+     if os.path.exists(csv_path):
+        print('\tUsing older data in ingest path')
+     else:
+        download_url(csv_url,csv_path)
+        
+
   return csv_str, csv_path
    
 def download_csv_data(days_to_get):
@@ -555,6 +565,7 @@ def read_NGFS_csv_data(csv_file):
    
    #columns with critical time information
    time_cols = ['incident_start_time','observation_time','initial_observation_time']
+   time_cols2 = ['acq_date_time','pixel_date_time']
    if type(csv_file) is list:
       #read the first csv file in the list
       #how to interpret the columns with all NULL ?
@@ -563,16 +574,32 @@ def read_NGFS_csv_data(csv_file):
          'incident_conf':'string',
          'incident_type':'string'
       }
-      data = pd.read_csv(csv_file[0], parse_dates=time_cols)
-      data = data.astype(nd.ngfs_dictionary) # <--- force data to have specified dtypes
+      try:
+         data = pd.read_csv(csv_file[0], parse_dates=time_cols)
+      except:
+         data = pd.read_csv(csv_file[0], parse_dates=time_cols2)
+         data.rename(columns=v2d.v2_to_v1, inplace=True)
+         data['initial_observation_time'] = data[time_cols[0]]
+      try:
+         data = data.astype(nd.ngfs_dictionary) # <--- force data to have specified dtypes
+      except:
+         print('\t Error mapping data by dictionary') 
       #data = data.astype(null_columns)
       print('Reading: ',csv_file[0])
       print('\tNumber of detections: ',data.shape[0])
       #read the rest csv files and merge
       for i in range(1,len(csv_file)):
          print('Merging with csv file: ', csv_file[i])
-         data_read = pd.read_csv(csv_file[i], parse_dates=time_cols)
-         data = data.astype(nd.ngfs_dictionary)
+         try:
+            data_read = pd.read_csv(csv_file[0], parse_dates=time_cols)
+         except:
+            data_read = pd.read_csv(csv_file[0], parse_dates=time_cols2)
+            data_read.rename(columns=v2d.v2_to_v1, inplace=True)
+            data_read['initial_observation_time'] = data_read[time_cols[0]]
+         try:
+            data_read = data_read.astype(nd.ngfs_dictionary)
+         except:
+            print('\t Error mapping data by dictionary')
          #data_read = data_read.astype(null_columns)
          print('\tNumber of detections in csv: ',data_read.shape[0])
          try:
@@ -586,11 +613,21 @@ def read_NGFS_csv_data(csv_file):
       #assumes standard  filename for all detections in day
       csv_date_str = csv_file[0][-18:-8]
    else:
-      data = pd.read_csv(csv_file, parse_dates=time_cols)
+      #print('\tReading :',csv_file)
+      #time.sleep(30)
+      try:
+         data = pd.read_csv(csv_file, parse_dates=time_cols)
+      except:
+         data = pd.read_csv(csv_file, parse_dates=time_cols2)
+         data.rename(columns=v2d.v2_to_v1, inplace=True)
+         data['initial_observation_time'] = data[time_cols[0]]
       csv_date_str = csv_file[-18:-8]
    
    #make sure the times are UTC
-   data[time_cols[0]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols[0]])).tz_localize('UTC')
+   try:
+      data[time_cols[0]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols[0]])).tz_localize('UTC')
+   except:
+      print('\tData column has correct timezone already')
    
    return data, csv_date_str
 
@@ -626,7 +663,7 @@ def prioritize_incidents(incidents,new_idx,num_starts):
                #print(incidents[i].cmd_str)
                os.system('jobs')
                #pause between jobs to help avoid crash in metgrid. Working ? <------------------
-               time.sleep(60)
+               time.sleep(120)
                incidents[i].set_started()
                started[i] = 1
                start_count += 1
@@ -759,9 +796,12 @@ if __name__ == '__main__':
    #filter out the possible artifacts 'possible_instrument_artifact'
    # idx = data.possible_instrument_artifact == 'Y'
    # print('Found', sum(idx), ' artifact pixels')
-   data = data[data['possible_instrument_artifact'] == 'N']
-   #new data shape
-   print('\tNew data shape after filtering possible artifacts: ',data.shape)
+   try:
+      data = data[data['possible_instrument_artifact'] == 'N']
+      #new data shape
+      print('\tNew data shape after filtering possible artifacts: ',data.shape)
+   except:
+      print('\tNo filter for possible artifact applied')
 
    data = data.dropna(subset=['incident_name'])  #  <------ change to use id_string?
 
