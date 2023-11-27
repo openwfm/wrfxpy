@@ -467,8 +467,8 @@ def render_ignitions(js, max_dom):
         for ndx,ign in enumerate(dom_igns):
             start_time = timespec_to_utc(ign['time_utc'], orig_start_time)
             start = int((start_time - js.start_utc).total_seconds())
-            dur = ign.get('duration_s',240)
-            radius = ign.get('radius',200)
+            dur = ign.get('duration_s',1200)
+            radius = ign.get('radius',50)
             ros = ign.get('ros',1)
             if 'latlon' in ign.keys():
                 lat,lon = ign['latlon']
