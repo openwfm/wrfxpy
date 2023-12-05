@@ -49,7 +49,7 @@ import utils
 import state_names as sn
 import simple_forecast as sf
 import ngfs_dictionary as nd
-import v2_to_v1_dict as v2d
+#import v2_to_v1_dict as v2d
 
 ####### Classes  ######
 
@@ -272,7 +272,7 @@ class ngfs_incident():
          max_lat = max(max(self.data['lat_tc_c1']),max(self.data['lat_tc_c2']),max(self.data['lat_tc_c3']),max(self.data['lat_tc_c4']))
          min_lon = min(min(self.data['lon_tc_c1']),min(self.data['lon_tc_c2']),min(self.data['lon_tc_c3']),min(self.data['lon_tc_c4']))
          max_lon = max(max(self.data['lon_tc_c1']),max(self.data['lon_tc_c2']),max(self.data['lon_tc_c3']),max(self.data['lon_tc_c4'])) 
-      except:
+      except:  #not in the v2 csv at all
          print('\tNo terrain corrected corners')
          min_lat = min(min(self.data['lat_c1']),min(self.data['lat_c2']),min(self.data['lat_c3']),min(self.data['lat_c4']))
          max_lat = max(max(self.data['lat_c1']),max(self.data['lat_c2']),max(self.data['lat_c3']),max(self.data['lat_c4']))
@@ -315,7 +315,7 @@ class ngfs_incident():
    def process_incident(self,incident_data,data,full_data):
 
       #sort data by observation time	
-      incident_data = incident_data.sort_values(by='observation_time')
+      incident_data = incident_data.sort_values(by='actual_image_time')
 
       id_strings = incident_data['incident_id_string'].unique()
       if id_strings.shape[0] > 1:
@@ -378,7 +378,15 @@ class ngfs_incident():
       try:
          tc_ign_latlon = [incident_data.lat_tc[idx], incident_data.lon_tc[idx]]
          swir_ign_latlon = [incident_data.lat_tc_swir[idx], incident_data.lon_tc_swir[idx]]
-         mean_ign_latlon = [np.mean(incident_data.lat_tc), np.mean(incident_data.lon_tc)]
+         #average of all detections within three hours of first detection
+         time_msk = incident_data.actual_image_time - incident_data.actual_image_time[idx] < timedelta(hours = 0.5)
+         swir_msk = abs(incident_data.lon_tc_swir) < 180.0
+
+         if sum(time_msk & swir_msk) > 1:
+            mean_ign_latlon = [np.mean(incident_data.lat_tc_swir[time_msk & swir_msk]), np.mean(incident_data.lon_tc_swir[time_msk & swir_msk])]
+            print('\tAveraging SWIR pixels from first half hour')
+         else:
+            mean_ign_latlon = [np.mean(incident_data.lat_tc), np.mean(incident_data.lon_tc)]
          print('\tStandard ign_latlon: ',tc_ign_latlon)
          print('\tSWIR ign_latlon : ',swir_ign_latlon)
          print('\tMean ign_latlon : ',mean_ign_latlon)
@@ -416,7 +424,7 @@ class ngfs_incident():
          full_subset = full_data[full_data['lon'] == self.ign_latlon[1]]
          full_subset = full_subset[full_subset['lat'] == self.ign_latlon[0]]
       if full_subset.shape[0] > incident_data.shape[0]:
-         print('\tFound addtional, earlier detections')
+         print('\tFound additional, earlier detections')
          self.ign_utc = full_subset.observation_time[full_subset.index[0]]
          print('\tNew earliest pixel time: ',self.ign_utc)
 
@@ -426,7 +434,7 @@ class ngfs_incident():
          print('More data exists. Appending..')
          time.sleep(10)
 
-      #minimum of the earliest detection pixel and stated NIFC inceident start time
+      #minimum of the earliest detection pixel and stated NIFC incident start time
       self.ign_utc = min(incident_data.observation_time[idx],self.incident_start_time,incident_data.initial_observation_time[idx])
       
       #date to start the simulation, 30 minutes before the ignition
@@ -437,7 +445,10 @@ class ngfs_incident():
       print('\tLocation of earliest GOES pixel in csv: ',self.ign_latlon)
       print('\tUTC ignition time: ', self.time_utc)
       #need to learn more about the FRP and how it's made
-      self.total_frp = max(incident_data.total_frp)
+      try:
+         self.total_frp = max(incident_data.frp)
+      except:
+         self.total_frp = max(incident_data.total_frp)
       #print('\ttotal frp: ',total_frp)
 
    #used for creating string used for system call to start simulation
@@ -563,51 +574,50 @@ def read_NGFS_csv_data(csv_file):
    #parameter csv_file can be a string with a path or a list of strings
    #reads csv file(s) and merges them. Assigns a date to them too
    
-   #columns with critical time information
-   time_cols = ['incident_start_time','observation_time','initial_observation_time']
+   #columns with critical time information from v1 and v2 csv files
+   time_cols =  ['actual_image_time','incident_start_time','observation_time','initial_observation_time']
    time_cols2 = ['acq_date_time','pixel_date_time']
    if type(csv_file) is list:
       #read the first csv file in the list
-      #how to interpret the columns with all NULL ?
+      #how to interpret the columns with all NULL, prevent reading of null data into type float when it should be a string?
       null_columns = {
          'incident_name':'string',
          'incident_conf':'string',
          'incident_type':'string'
       }
-      try:
-         data = pd.read_csv(csv_file[0], parse_dates=time_cols)
-      except:
-         data = pd.read_csv(csv_file[0], parse_dates=time_cols2)
-         data.rename(columns=v2d.v2_to_v1, inplace=True)
-         data['initial_observation_time'] = data[time_cols[0]]
-      try:
-         data = data.astype(nd.ngfs_dictionary) # <--- force data to have specified dtypes
-      except:
-         print('\t Error mapping data by dictionary') 
-      #data = data.astype(null_columns)
-      print('Reading: ',csv_file[0])
-      print('\tNumber of detections: ',data.shape[0])
-      #read the rest csv files and merge
-      for i in range(1,len(csv_file)):
-         print('Merging with csv file: ', csv_file[i])
+      #initialize an empty DataFrame, to be appended with NGFS csv file(s)
+      data = pd.DataFrame()
+      
+      for i in range(len(csv_file)):
+         
          try:
-            data_read = pd.read_csv(csv_file[0], parse_dates=time_cols)
-         except:
-            data_read = pd.read_csv(csv_file[0], parse_dates=time_cols2)
-            data_read.rename(columns=v2d.v2_to_v1, inplace=True)
-            data_read['initial_observation_time'] = data_read[time_cols[0]]
-         try:
+            data_read = pd.read_csv(csv_file[i], parse_dates=time_cols)
+            data_read[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data_read[time_cols[1]])).tz_localize('UTC')
+            #force csv data to adhere to a specific type
             data_read = data_read.astype(nd.ngfs_dictionary)
          except:
-            print('\t Error mapping data by dictionary')
+            data_read = pd.read_csv(csv_file[i], parse_dates=time_cols2)
+            #rename v2 variables as v1 counterparts as much as possible
+            data_read.rename(columns=nd.v2_to_v1, inplace=True)
+            data_read['initial_observation_time'] = data_read[time_cols[2]]
+            data_read['incident_start_time'] = data_read[time_cols[2]]
+            #force csv data to adhere to a specific type
+            data_read = data_read.astype(nd.v2_dict)
+         #make sure the times are UTCread
+
          #data_read = data_read.astype(null_columns)
+         if len(data) == 0:
+            print('Reading first csv: ',csv_file[i])
+            data = data_read
+         else:
+            print('Merging with csv file: ', csv_file[i])
+            try:
+               data = pd.merge(data,data_read, how = 'outer')
+            except Exception as e:
+               print('Fail to merge with ',csv_file[i])
+               print(f"An exception occurred: {str(e)}")
+               #data = pd.concat([data,data_read],axis=1,join ='outer')
          print('\tNumber of detections in csv: ',data_read.shape[0])
-         try:
-            data = pd.merge(data,data_read, how = 'outer') 
-         except Exception as e:
-            print('Fail to merge with ',csv_file[i])
-            print(f"An exception occurred: {str(e)}")
-            #data = pd.concat([data,data_read],axis=1,join ='outer')
          print('\tTotal number of detections: ',data.shape[0])
       #for naming purposes, get only first file name in list
       #assumes standard  filename for all detections in day
@@ -617,15 +627,18 @@ def read_NGFS_csv_data(csv_file):
       #time.sleep(30)
       try:
          data = pd.read_csv(csv_file, parse_dates=time_cols)
+         data = data.astype(nd.ngfs_dictionary)
       except:
          data = pd.read_csv(csv_file, parse_dates=time_cols2)
-         data.rename(columns=v2d.v2_to_v1, inplace=True)
-         data['initial_observation_time'] = data[time_cols[0]]
+         data.rename(columns=nd.v2_to_v1, inplace=True)
+         data['initial_observation_time'] = data[time_cols[2]]
+         data['incident_start_time'] = data[time_cols[2]]
+         data = data.astype(nd.v2_dict)
       csv_date_str = csv_file[-18:-8]
    
-   #make sure the times are UTC
+   #make sure the times are UTC, seems to be take care of already, above
    try:
-      data[time_cols[0]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols[0]])).tz_localize('UTC')
+      data[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols[1]])).tz_localize('UTC')
    except:
       print('\tData column has correct timezone already')
    
@@ -708,7 +721,7 @@ if __name__ == '__main__':
    #print(pick_list)
    #time.sleep(10)
    old_ngfs_incidents = list()
-   for i in range(-1,-8,-1):
+   for i in range(-1,-10,-1):
       #print(pick_list[i])
       with open(pick_list[i],'rb') as f:
          df = pickle.load(f)
@@ -739,9 +752,10 @@ if __name__ == '__main__':
       
    else:
       # csv file passed as system argument
-      csv_file = sys.argv[1]  ## <--- A single file path
+      csv_file = list()
+      csv_file.append(sys.argv[1])  ## <--- A single file path
       print('Using existing csv file:')
-      print('\t',csv_file) 
+      print('\t',csv_file[0]) 
       today = False
    
    # this belongs in the ngfs_day class
@@ -751,7 +765,7 @@ if __name__ == '__main__':
       force = False
       auto_start = sf.read_boolean('no')
       if auto_start:
-         sf.print_question('How many simulations to run at once? default = [25')
+         sf.print_question('How many simulations to run at once? default = [25]')
          num_starts = sf.read_integer(25)
       else:
          num_starts = -1
@@ -796,12 +810,12 @@ if __name__ == '__main__':
    #filter out the possible artifacts 'possible_instrument_artifact'
    # idx = data.possible_instrument_artifact == 'Y'
    # print('Found', sum(idx), ' artifact pixels')
-   try:
-      data = data[data['possible_instrument_artifact'] == 'N']
+   #try:
+      # data = data[data['possible_instrument_artifact'] == 'N']
       #new data shape
-      print('\tNew data shape after filtering possible artifacts: ',data.shape)
-   except:
-      print('\tNo filter for possible artifact applied')
+      #print('\tNew data shape after filtering possible artifacts: ',data.shape)
+   # except:
+      #print('\tNo filter for possible artifact applied')
 
    data = data.dropna(subset=['incident_name'])  #  <------ change to use id_string?
 
@@ -845,6 +859,7 @@ if __name__ == '__main__':
 
    if csv.today:
       print('\tGetting the polar data for the previous 24 hours')
+      ###current data
       try:
          polar.add_firms_24(sat='noaa_20',csv_timestamp = csv.timestamp)
       except:
@@ -857,6 +872,7 @@ if __name__ == '__main__':
          polar.add_firms_24(sat='landsat',csv_timestamp = csv.timestamp)
       except:
          print('Error getting Landsat 24-hour data')
+      ###archived data
       try:
          polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 3)
       except:
@@ -915,11 +931,12 @@ if __name__ == '__main__':
             print('\t\t',old_inc.ign_latlon)
             print('\t\t',old_inc.ign_utc)
             print('\t\t Incident started: ',old_inc.started)
+            incidents[i].incident_start_time = min(incidents[i].incident_start_time,old_inc.ign_utc)
             if old_inc.started:
                inc_started = True
             #time.sleep(2)
-      #start new incidents to run
-      if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = 163) and not inc_started:
+      #start new incidents to run  change the hours back to 163
+      if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = 96) and not inc_started:
          #(incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
          new_idx[i] = 1
          #change 'new' object attribute
@@ -934,9 +951,7 @@ if __name__ == '__main__':
          print(cmd_str)
 
 
-      
-         
-
+   
       
    print('Number of incidents in csv file: ',num_incidents)
    print('Number of new incidents: ',sum(new_idx))
@@ -947,8 +962,8 @@ if __name__ == '__main__':
 
    #update the ngfs_day object
    #maybe some of these could be called inside each other??
-   csv.add_data(data)
-   csv.add_full_data(full_data)
+   csv.add_data(data) #only csv rows with an incident name or id
+   csv.add_full_data(full_data) #all csv data rows
    csv.add_incidents(incidents)
    csv.set_save_name()
    csv.set_new(new_idx.astype(bool))
