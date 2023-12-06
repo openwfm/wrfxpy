@@ -575,8 +575,8 @@ def read_NGFS_csv_data(csv_file):
    #reads csv file(s) and merges them. Assigns a date to them too
    
    #columns with critical time information from v1 and v2 csv files
-   time_cols =  ['actual_image_time','incident_start_time','observation_time','initial_observation_time']
-   time_cols2 = ['acq_date_time','pixel_date_time']
+   time_cols =  ['incident_start_time','observation_time','initial_observation_time']
+   time_cols2 = ['acq_date_time','pixel_date_time'] #for v2 csv files
    if type(csv_file) is list:
       #read the first csv file in the list
       #how to interpret the columns with all NULL, prevent reading of null data into type float when it should be a string?
@@ -590,12 +590,7 @@ def read_NGFS_csv_data(csv_file):
       
       for i in range(len(csv_file)):
          
-         try:
-            data_read = pd.read_csv(csv_file[i], parse_dates=time_cols)
-            data_read[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data_read[time_cols[1]])).tz_localize('UTC')
-            #force csv data to adhere to a specific type
-            data_read = data_read.astype(nd.ngfs_dictionary)
-         except:
+         try: #read v2 csv
             data_read = pd.read_csv(csv_file[i], parse_dates=time_cols2)
             #rename v2 variables as v1 counterparts as much as possible
             data_read.rename(columns=nd.v2_to_v1, inplace=True)
@@ -603,6 +598,13 @@ def read_NGFS_csv_data(csv_file):
             data_read['incident_start_time'] = data_read[time_cols[2]]
             #force csv data to adhere to a specific type
             data_read = data_read.astype(nd.v2_dict)
+            
+         except:
+            data_read = pd.read_csv(csv_file[i], parse_dates=time_cols)
+            #data_read[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data_read[time_cols[1]])).tz_localize('UTC')
+            #force csv data to adhere to a specific type
+            data_read['actual_image_time'] = data_read['observation_time']
+            data_read = data_read.astype(nd.ngfs_dictionary)
          #make sure the times are UTCread
 
          #data_read = data_read.astype(null_columns)
