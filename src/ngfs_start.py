@@ -588,17 +588,17 @@ def read_NGFS_csv_data(csv_file):
       #initialize an empty DataFrame, to be appended with NGFS csv file(s)
       data = pd.DataFrame()
       
-      for i in range(len(csv_file)):
-         
+      for i in range(len(csv_file)): 
          try: #read v2 csv
+         #if True:
             data_read = pd.read_csv(csv_file[i], parse_dates=time_cols2)
             #rename v2 variables as v1 counterparts as much as possible
-            data_read.rename(columns=nd.v2_to_v1, inplace=True)
-            data_read['initial_observation_time'] = data_read[time_cols[2]]
-            data_read['incident_start_time'] = data_read[time_cols[2]]
+            data_read['initial_observation_time'] = data_read[time_cols2[1]]
+            data_read['incident_start_time'] = data_read[time_cols2[1]]
             #force csv data to adhere to a specific type
+            data_read.rename(columns=nd.v2_to_v1, inplace=True)
             data_read = data_read.astype(nd.v2_dict)
-            
+             
          except:
             data_read = pd.read_csv(csv_file[i], parse_dates=time_cols)
             #data_read[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data_read[time_cols[1]])).tz_localize('UTC')
@@ -606,7 +606,7 @@ def read_NGFS_csv_data(csv_file):
             data_read['actual_image_time'] = data_read['observation_time']
             data_read = data_read.astype(nd.ngfs_dictionary)
          #make sure the times are UTCread
-
+         
          #data_read = data_read.astype(null_columns)
          if len(data) == 0:
             print('Reading first csv: ',csv_file[i])
