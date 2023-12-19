@@ -97,6 +97,8 @@ def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M"):
     st = pickle.load(f)
     st = st[st.index == stid]
 
+    print(st)
+    
     dict1 = {
         'time_raws': raws1['datetime'].to_numpy(),
         'STID' : raws1['STID'].unique()[0],
@@ -275,7 +277,7 @@ if __name__ == '__main__':
 
     if len(sys.argv) != 7:
         print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <STID> <rawspath> <atmpath> <target_file>' % sys.argv[0]))
-        print("Example: python src/ingest/build_raws_dict.py 202106070800 202106300900 KAFF /storage/math/NSF1/jmandel/RAWSData/haguespeak/meso /home/hirschij/data/hrrr/geotiff_files/ ~/testfile.pickle")
+        print("Example: python src/ingest/build_hrrr_dict.py 202106070800 202106300900 NWRU1 /storage/math/NSF1/jmandel/RAWSData/haguespeak/meso /home/hirschij/data/hrrr/geotiff_files/ ~/testfile.pickle")
         sys.exit(-1)
     start = sys.argv[1]
     end = sys.argv[2]
