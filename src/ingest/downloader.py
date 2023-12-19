@@ -53,6 +53,39 @@ def get_dList(url):
         listing.append(l.split()[-1])
     return listing
 
+def request_url(url, token):
+    use_urllib2 = url[:6] == 'ftp://'
+    use_aws = url[:5] == 's3://'
+    if token:
+        if use_urllib2:
+            r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % token}))
+        elif use_aws:
+            r = subprocess.check_output('aws s3 ls {}'.format(url), shell=True)
+        else:
+            r = requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % token})
+    else:
+        if use_urllib2:
+            r = six.moves.urllib.request.urlopen(url)
+        elif use_aws:
+            r = subprocess.check_output('aws s3 ls {} --no-sign-request'.format(url), shell=True)
+        else:
+            r = requests.get(url, stream=True)
+    if use_aws:
+        lines = r.decode().split('\n')
+        for line in lines:
+            if line.endswith(osp.basename(url)):
+                content_size = int(line.split()[2])
+                if content_size == 0:
+                    raise DownloadError('download_url content size is equal to 0')
+    else:
+        if 'content-length' in r.headers.keys():
+            content_size = int(r.headers.get('content-length',0))
+            if content_size == 0:
+                raise DownloadError('download_url content size is equal to 0')
+        else:
+            logging.warning('download_url not header contet-length information')
+    return content_size
+
 def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def, token=None, min_size=1):
     """
     Download a remote URL to the location local_path with retries.
@@ -72,23 +105,14 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     logging.info('download_url sleeping %s seconds' % sec)
     time.sleep(sec)
 
-    use_urllib2 = url[:6] == 'ftp://'
+    use_aws = url[:5] == 's3://'
 
     try:
-        if token:
-            r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % token})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % token})   
-        else:
-            r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
-        if 'content-length' in r.headers.keys():
-            content_size = int(r.headers.get('content-length',0))
-            if content_size == 0:
-                raise IOError('download_url content size is equal to 0')
-        else:
-            logging.warning('download_url not header contet-length information')
+        content_size = request_url(url, token)
     except Exception as e:
         if max_retries > 0:
-            # logging.error(str(e))
             logging.info('not found, download_url trying again, retries available %d' % max_retries)
+            logging.warning(e)
             logging.info('download_url sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
             download_url(url, local_path, max_retries = max_retries-1, token = token, min_size = min_size)
@@ -96,30 +120,24 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
 
     logging.info('download_url %s as %s' % (url,local_path))
     remove(local_path)
-    command=[wget,'-O',ensure_dir(local_path),url]
-    for opt in wget_options:
-        command.insert(1,opt)
-    command.insert(1,'--tries={}'.format(max_retries_def))
-    if token:
-        command.insert(1,'--header=\'Authorization: Bearer %s\'' % token)
+    if use_aws:
+        command=['aws','s3','cp',url,ensure_dir(local_path)]
+        if token is None:
+            command.append('--no-sign-request')
+    else:
+        command=[wget,'-O',ensure_dir(local_path),url]
+        for opt in wget_options:
+            command.insert(1,opt)
+        command.insert(1,'--tries={}'.format(max_retries_def))
+        if token:
+            command.insert(1,'--header=\'Authorization: Bearer %s\'' % token)
     logging.info(' '.join(command))
     subprocess.call(' '.join(command),shell=True)
 
     file_size = osp.getsize(local_path)
 
     # content size may have changed during download
-    if token:
-        r = six.moves.urllib.request.urlopen(six.moves.urllib.request.Request(url,headers={"Authorization": "Bearer %s" % token})) if use_urllib2 else requests.get(url, stream=True, headers={"Authorization": "Bearer %s" % token})
-    else:
-        r = six.moves.urllib.request.urlopen(url) if use_urllib2 else requests.get(url, stream=True)
-    if 'content-length' in r.headers.keys():
-        content_size = int(r.headers.get('content-length',0))
-        if content_size == 0:
-            raise IOError('download_url content size is equal to 0')
-    else:
-        content_size = None
-        logging.warning('download_url not header contet-length information')
-
+    content_size = request_url(url, token)
     logging.info('local file size {} remote content size {} minimum size {}'.format(file_size, content_size, min_size))
 
     # it should be != but for some reason content_size is wrong sometimes

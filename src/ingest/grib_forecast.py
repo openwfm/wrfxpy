@@ -1,16 +1,9 @@
-from __future__ import absolute_import
 from ingest.grib_source import GribError, GribSource
-from utils import ensure_dir, symlink_unless_exists, timedelta_hours, readhead, Dict
-from .downloader import download_url, DownloadError
+from utils import timedelta_hours, readhead, Dict
 from datetime import datetime, timedelta
 import pytz
-import requests
-import os
 import os.path as osp
-import sys
 import logging
-from six.moves import map
-from six.moves import range
 
 class GribForecast(GribSource):
     """
@@ -97,7 +90,10 @@ class GribForecast(GribSource):
                     url_bases = [url_bases]
                 for url_base in url_bases:
                     logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
-                    unavailables = [x for x in nonlocals if readhead(url_base + '/' + x).status_code != 200]
+                    if url_base[:5] == 's3://':
+                        unavailables = [x for x in nonlocals if readhead(osp.join(osp.dirname(self.browse_aws), x), msg_level=0).status_code != 200]
+                    else:
+                        unavailables = [x for x in nonlocals if readhead(osp.join(url_base, x), msg_level=0).status_code != 200]
                     if len(unavailables) == 0:
                         break
                 if len(unavailables) > 0:
@@ -111,10 +107,10 @@ class GribForecast(GribSource):
 
             # return manifest
 
-            return Dict({'grib_files': grib_files, 
+            return Dict({'grib_files': [osp.join(self.ingest_dir, x) for x in grib_files], 
                 'colmet_files_utc': colmet_files_utc, 
                 'colmet_prefix': colmet_prefix, 
-                'colmet_files': colmet_files, 
+                'colmet_files': colmet_files,
                 'colmet_missing': colmet_missing})
 
         raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
@@ -178,8 +174,8 @@ class GribForecast(GribSource):
         g=self.grib_forecast_hours_periods
         fc_seq = [] 
         for i in range(0, len(g)):
-	        fc_seq += list(range(max(int(fc_start), 0 if i is 0 else g[i-1]['hours'] + g[i]['period']), 
-	        g[i]['hours'] + g[i]['period'], g[i]['period']))
+            fc_seq += list(range(max(int(fc_start), 0 if i == 0 else g[i-1]['hours'] + g[i]['period']), 
+            g[i]['hours'] + g[i]['period'], g[i]['period']))
         # get all time points up to fc_hours plus one (we must cover entire timespan)
         fc_list = [x for x in fc_seq if x < fc_hours]
         fc_list.append(fc_seq[len(fc_list)])

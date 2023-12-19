@@ -69,3 +69,6 @@ etc/conf.json
 etc/tokens.json
 etc/clusters.json
 
+# Apple
+.DS_Store
+*.swp
