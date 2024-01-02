@@ -1,7 +1,11 @@
 # geodriver.py
 # Angel Farguell, March 2020
 
-from osgeo import gdal, osr
+try:
+    from osgeo import gdal, osr
+except:
+    import gdal, osr
+from packaging.version import parse as vparse
 import pyproj
 import logging
 from utils import Dict
@@ -58,6 +62,9 @@ class GeoDriver(object):
         self.proj4 = self.crs.ExportToProj4()
         # get pyproj element for tif file
         self.pyproj = pyproj.Proj(self.proj4)
+        # get pyproj element for reference lat-long coordinates
+        self.ref_proj = self.pyproj.to_latlong()
+        self.ref_proj4 = self.ref_proj.definition_string()
         # projection short string
         proj_list = [p for p in self.proj4.split(' ') if 'proj' in p]
         if len(proj_list):
@@ -112,11 +119,12 @@ class GeoDriver(object):
         x0,dx,_,y0,_,dy = self.gt
         xx = np.arange(x0,x0+dx*self.nx,dx)
         yy = np.arange(y0,y0+dy*self.ny,dy)
-        # get pyproj element for WGS84
-        ref_proj = pyproj.Proj(proj='longlat',ellps='WGS84',datum='WGS84',no_defs=True)
         # get bounding box in projection of the GeoTIFF
         ref_corners = ((bbox[0],bbox[2]),(bbox[0],bbox[3]),(bbox[1],bbox[3]),(bbox[1],bbox[2]))
-        proj_corners = [pyproj.transform(ref_proj,self.pyproj,c[0],c[1]) for c in ref_corners]
+        if vparse(pyproj.__version__) < vparse('2.2'):
+            proj_corners = [pyproj.transform(self.ref_proj,self.pyproj,c[0],c[1]) for c in ref_corners]
+        else:
+            proj_corners = [pyproj.Transformer.from_crs(self.ref_proj4,self.proj4,always_xy=True).transform(c[0],c[1]) for c in ref_corners]
         x_min = min([c[0] for c in proj_corners])
         x_max = max([c[0] for c in proj_corners])
         y_min = min([c[1] for c in proj_corners])
@@ -181,11 +189,12 @@ class GeoDriver(object):
         # known points in the center of the array (unstaggered mesh from 0 at origin)
         known_x_uns = known_x-.5
         known_y_uns = known_y-.5
-        # get pyproj element for reference lat-long coordinates
-        ref_proj = self.pyproj.to_latlong()
         # lat/lon known points
         posX, posY = gdal.ApplyGeoTransform(self.gt,known_x_uns,known_y_uns)
-        known_lon,known_lat = pyproj.transform(self.pyproj,ref_proj,posX,posY) 
+        if vparse(pyproj.__version__) < vparse('2.2'):
+            known_lon,known_lat = pyproj.transform(self.pyproj,self.ref_proj,posX,posY) 
+        else:
+            known_lon,known_lat = pyproj.Transformer.from_crs(self.proj4,self.ref_proj4,always_xy=True).transform(posX,posY) 
         # print center lon-lat coordinates to check with gdalinfo
         if not self.resampled:
             logging.info('GeoTIFF.geogrid_index - center lon/lat coordinates using pyproj.transform: %s' % coord2str(known_lon,known_lat)) 

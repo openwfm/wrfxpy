@@ -1,11 +1,9 @@
-from __future__ import absolute_import
 import numpy as np
 import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
       u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
       smoke_concentration, transform_goes, fire_front
-from six.moves import range
 
 smoke_threshold_int = 10
 smoke_threshold = 1
@@ -555,7 +553,7 @@ _var_wisdom = {
         'colorbar' : None,
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_integrated_transparent],
-        'scale' : [0, 2],
+        'scale' : [smoke_integrated_transparent, 2],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKE_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
       },

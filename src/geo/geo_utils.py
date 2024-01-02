@@ -1,9 +1,14 @@
+# geo_utls.py
+# Angel Farguell, March 2020
+
 from scipy import spatial
 import numpy as np
 import logging
-from osgeo import osr
+try:
+    from osgeo import osr
+except:
+    import osr
 import pyproj
-import os.path as osp
 
 def fill_categories(array,fill,coord=None):
     """

@@ -1,9 +1,7 @@
-from __future__ import absolute_import
 import numpy as np
 import logging
 from utils import Dict
 from geo.geo_utils import fill_categories
-from six.moves import range
 
 def print_stats(varname,v,unit):
       """

@@ -285,6 +285,10 @@ class ngfs_incident():
       #change the base configuration file to match the individual incidents parameters
       
       cfg = base_cfg
+      try:
+         print('\tGrib source: ',cfg['grib_source'])
+      except:
+         print('\tGrib source is unset')
       gc_string  = self.incident_name+'_'+utils.utc_to_esmf(self.start_utc)+'_'+self.incident_id_string[1:-1]
       cfg['grid_code'] = gc_string.replace(' ','_')
       cfg['domains']['1']['center_latlon'] = self.ign_latlon
@@ -302,8 +306,19 @@ class ngfs_incident():
          cfg['ignitions'] = { '1' : [ { 'time_utc' : self.time_utc,
                                    'duration_s' : ign_dur,
                                    'latlon' : self.new_ign_latlon } ] }  # <<---- new 
+
       cfg['start_utc'] = utils.utc_to_esmf(self.start_utc)
       cfg['end_utc'] = utils.utc_to_esmf(self.end_utc)
+
+      #HRR needs special data handling because 48 hour forecasts are only issued 
+      #   at t00z, t06z, t12z, and t18z
+      cycle_start = self.start_utc
+      if cfg['grib_source'] == 'HRRR':
+         print('\tComputing start of grib cycle')
+         cycle_hour = np.int8(np.trunc(self.start_utc.hour/6))*6
+         cycle_start = cycle_start.replace(hour = cycle_hour)
+      cfg['cycle_start_utc'] = utils.utc_to_esmf(cycle_start)
+      cfg['download_whole_cycle'] = 'true'
 
          #print(cfg)
       descrip_string = self.incident_name
