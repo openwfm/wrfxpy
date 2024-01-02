@@ -252,7 +252,7 @@ class ngfs_incident():
    # These attributes are set when viirs data finds detection pixels within the goes ignition pixel
    def set_new_ign_latlon(self,new_ign_latlon):
       self.new_ign_latlon = new_ign_latlon
-   def set_new_ign_utc(self,new_gn_utc):
+   def set_new_ign_utc(self,new_ign_utc):
       self.new_ign_utc = new_ign_utc
       if new_ign_utc < self.ign_utc:
          print('\tChanging the time paramaters of the job for ealier detection information')
@@ -304,6 +304,7 @@ class ngfs_incident():
                                    'latlon' : self.new_ign_latlon } ] }  # <<---- new 
       cfg['start_utc'] = utils.utc_to_esmf(self.start_utc)
       cfg['end_utc'] = utils.utc_to_esmf(self.end_utc)
+
          #print(cfg)
       descrip_string = self.incident_name
       cfg['postproc']['description'] = descrip_string
@@ -525,10 +526,10 @@ def get_ngfs_csv(days_previous,goes):
   
   #join strings to have name and url of the csv file
   if goes == 18:
-   csv_str = 'NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_'+str(yyyy)+'_'+str(mm).zfill(2)+'_'+str(dd).zfill(2)+'_'+str(day_of_year)+'.csv'
+   csv_str = 'NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_'+str(yyyy)+'_'+str(mm).zfill(2)+'_'+str(dd).zfill(2)+'_'+str(day_of_year).zfill(3)+'.csv'
    csv_url = 'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-WEST/CONUS/'+csv_str
   else:
-   csv_str = 'NGFS_FIRE_DETECTIONS_GOES-16_ABI_CONUS_'+str(yyyy)+'_'+str(mm).zfill(2)+'_'+str(dd).zfill(2)+'_'+str(day_of_year)+'.csv'
+   csv_str = 'NGFS_FIRE_DETECTIONS_GOES-16_ABI_CONUS_'+str(yyyy)+'_'+str(mm).zfill(2)+'_'+str(dd).zfill(2)+'_'+str(day_of_year).zfill(3)+'.csv'
    csv_url = 'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-EAST/CONUS/'+csv_str
   
   print('\tDownloading: ',csv_str)
