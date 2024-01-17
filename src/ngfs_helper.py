@@ -36,7 +36,7 @@ from datetime import timedelta, datetime
 
 class polar_data():
     # get the csv files above 
-    #combine into large pandas data frame
+    # combine into large pandas data frame
     def __init__(self,csv_timestamp):
         self.data = pd.DataFrame()
         self.timestamp = csv_timestamp
@@ -54,7 +54,7 @@ class polar_data():
             print('Trying with tokens')
             str1 = 'wget -e robots=off -m -np -R .html,.tmp -nd '
 
-            token_string = ' --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJBUFMgT0F1dGgyIEF1dGhlbnRpY2F0b3IiLCJpYXQiOjE2ODY5MjIwMjQsIm5iZiI6MTY4NjkyMjAyNCwiZXhwIjoxNzAyNDc0MDI0LCJ1aWQiOiJqaGFsZXkiLCJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.dsvczMWdYHnowYZ-k_wG5KKXIvJJQfzdaxd0lL6hj6M" '
+            token_string = ' --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" '
             local_str = ' -P ' + local_path
 
             cmd = str1 + url + token_string + local_str
@@ -80,15 +80,15 @@ class polar_data():
         if sat not in self.satlist:
             print('Unknownn satellite named', sat)
             return
-        url_base = 'https://firms2.modaps.eosdis.nasa.gov/data/active_fire/'
+        url_base = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire/'
         noaa_20_dir = 'noaa-20-viirs-c2/csv/'
-        noaa_20_file = 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv'
+        noaa_20_file = 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'
         suomi_dir =   'suomi-npp-viirs-c2/csv/'
-        suomi_file = 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv'
+        suomi_file = 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'
         modis_dir =   'modis-c6.1/csv/'
-        modis_file = 'MODIS_C6_1_USA_contiguous_and_Hawaii_24h.csv'
+        modis_file = 'MODIS_C6_1_USA_contiguous_and_Hawaii_48h.csv'
         landsat_dir = 'landsat/csv/'
-        landsat_file = 'LANDSAT_USA_contiguous_and_Hawaii_24h.csv'
+        landsat_file = 'LANDSAT_USA_contiguous_and_Hawaii_48h.csv'
         if sat == 'noaa_20':
             csv_url = url_base + noaa_20_dir + noaa_20_file
             csv_local = self.firms_path + noaa_20_file
@@ -164,10 +164,10 @@ class polar_data():
             print('Getting polar data from ',day_of_year - i,'th day of ',year)
 
             if sat == 'noaa_20':
-                csv_file = 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_VJ114IMGTDL_NRT_'+str(year)+str(day_of_year - i)+'.txt'
+                csv_file = 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_VJ114IMGTDL_NRT_'+str(year)+str(day_of_year - i).zfill(3)+'.txt'
                 csv_dir = 'noaa-20-viirs-c2/USA_contiguous_and_Hawaii/'
             if sat == 'suomi':
-                csv_file = 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_VNP14IMGTDL_NRT_'+str(year)+str(day_of_year - i)+'.txt'
+                csv_file = 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_VNP14IMGTDL_NRT_'+str(year)+str(day_of_year - i).zfill(3)+'.txt'
                 csv_dir = 'suomi-npp-viirs-c2/USA_contiguous_and_Hawaii/'   
             if sat == 'modis':
                 #csv_url = url_base + modis_dir + modis_file
@@ -180,8 +180,8 @@ class polar_data():
             #downloading not working, files are all in place
             if not os.path.exists(csv_local):
                  print('updating VIIRS data cache',csv_local)
-                 cmd_str_suomi = 'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJBUFMgT0F1dGgyIEF1dGhlbnRpY2F0b3IiLCJpYXQiOjE2ODcyOTM2NDcsIm5iZiI6MTY4NzI5MzY0NywiZXhwIjoxNzAyODQ1NjQ3LCJ1aWQiOiJqaGFsZXkiLCJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.xkfYsX9vQXFvLdnl5mnV4cJH4o5NkVkSvaKxem2rN2g" -P ingest/FIRMS'
-                 cmd_str_noaa_20 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-20-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJBUFMgT0F1dGgyIEF1dGhlbnRpY2F0b3IiLCJpYXQiOjE2ODcyOTM2NDcsIm5iZiI6MTY4NzI5MzY0NywiZXhwIjoxNzAyODQ1NjQ3LCJ1aWQiOiJqaGFsZXkiLCJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.xkfYsX9vQXFvLdnl5mnV4cJH4o5NkVkSvaKxem2rN2g" -P ingest/FIRMS'
+                 cmd_str_suomi = 'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
+                 cmd_str_noaa_20 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-20-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
                  os.system(cmd_str_suomi)
                  os.system(cmd_str_noaa_20)
             # else:
