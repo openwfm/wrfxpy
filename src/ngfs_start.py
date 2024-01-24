@@ -395,7 +395,7 @@ class ngfs_incident():
          tc_ign_latlon = [incident_data.lat_tc[idx], incident_data.lon_tc[idx]]
          swir_ign_latlon = [incident_data.lat_tc_swir[idx], incident_data.lon_tc_swir[idx]]
          #average of all detections within three hours of first detection
-         time_msk = incident_data.actual_image_time - incident_data.actual_image_time[idx] < timedelta(hours = 0.5)
+         time_msk = incident_data.actual_image_time - incident_data.actual_image_time[idx] < timedelta(hours = 3.0)
          swir_msk = abs(incident_data.lon_tc_swir) < 180.0
 
          if sum(time_msk & swir_msk) > 1:
@@ -422,8 +422,9 @@ class ngfs_incident():
          self.ign_latlon = [incident_data.lat[idx], incident_data.lon[idx]]
          mean_ign_latlon = [np.mean(incident_data.lat_tc), np.mean(incident_data.lon_tc)]
       #reduce to only unique lat/lon pairs
-
-      mean_ign = False
+      
+      #if mean_ign is true, the ignition point will be estimated from average location of initial detections
+      mean_ign = True
       if mean_ign:
          self.ign_latlon = mean_ign_latlon
          print('\tUsing mean ignition point')
