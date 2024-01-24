@@ -216,6 +216,11 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
         return loop_arr
 
     temp = build_timeseries(616) # temp
+    # Convert to Kelvin if in C, HRRR documentation says it should be in K but many series are not
+    # Checking whether any value in temp array is less than 150, which is not a feasible K temp (equals -123 C)
+    if np.any(temp < 150): 
+        print("Converting temp from C to K")
+        temp += 273.15
 
     rh = build_timeseries(620) # rh
     
@@ -295,7 +300,7 @@ if __name__ == '__main__':
     # Dictionary must be nested with case names in this way
     # TODO: make this script flexible to get more STIDs without horrible inputs
     out_dict = {}
-    out_dict['case1']=dict1
+    out_dict[stid]=dict1
     
     print(out_dict.keys())
 
