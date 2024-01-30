@@ -142,7 +142,7 @@ def ts_at(interp_x, interp_y, values, method = "linear"):
         grid[:,1]]
     value9=value9.reshape(3,3)
     
-    print(f"Using method: {method}")
+    # print(f"Using method: {method}")
 
     interp = RegularGridInterpolator([np.array([center_y-1, center_y, center_y+1]),np.array([center_x-1, center_x, center_x+1])], value9)
     
