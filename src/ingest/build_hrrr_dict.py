@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 import sys
 from osgeo import gdal, osr
+from scipy.interpolate import griddata, RegularGridInterpolator
 
 sys_cfg = Dict(json.load(open('etc/conf.json')))
 
@@ -123,6 +124,30 @@ def interp_l1(x, y):
     return x, y
 
 
+def ts_at(interp_x, interp_y, values, method = "linear"):
+    # Python implementation on regular grid of Jan methodology from https://github.com/openwfm/wrf-fire-matlab/blob/master/vis/ts_at.m
+    interp_pts = np.array([interp_y, interp_x])
+    
+    # Get nearest neighbor
+    center_x = round(interp_x)
+    center_y = round(interp_y)
+    
+    # Build 3x3 grid around center, NOTE: xy flip in GDAL
+    grid = np.meshgrid(np.array([center_y-1, center_y, center_y+1]),
+            np.array([center_x-1, center_x, center_x+1]))
+    grid = np.array([grid[0].flatten(), grid[1].flatten()]).T
+    # Subset values
+    value9 = values[
+        grid[:,0], 
+        grid[:,1]]
+    value9=value9.reshape(3,3)
+    
+    print(f"Using method: {method}")
+
+    interp = RegularGridInterpolator([np.array([center_y-1, center_y, center_y+1]),np.array([center_x-1, center_x, center_x+1])], value9)
+    
+    return interp(interp_pts, method=method)
+
 def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%Y%m%d%H%M"):
     # tstart_str    start time as string 
     # tend_str      end time as string
@@ -134,7 +159,7 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
     # method (str): interpolation method (NOTE: currently only L1 nearest neighbors aka rounding) 
     # Internal Functions, will only reasonably be used within here
 
-    def get_vals(tpath, pixel_x, pixel_y, method='l1'):
+    def get_vals(tpath, pixel_x, pixel_y, method='linear'):
         # tpath (str): absolute path to tiff file
         # pixel_x, pixel_y grid coordinates after geotransform (would be index if at node)
 
@@ -146,10 +171,9 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
         data = band.ReadAsArray()
         
         # Interpolate
-        if method == "l1":
-            x, y = interp_l1(pixel_x, pixel_y)
+        vals = ts_at(pixel_x, pixel_y, data, method = method)
         
-        return data[y, x]
+        return vals
     
 
     # Get dates
