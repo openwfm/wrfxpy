@@ -38,7 +38,42 @@ band_df_hrrr = pd.DataFrame({
 
 # Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M"):
+def extract_raws_stash(t, stash_path = "/storage/math/NSF1/farguella/MesoDB.tar.gz", dest_path = "wksp"):
+    # Given time string in UTC, extract RAWS stash pickle file to temporary path.
+    # Inputs:
+    # t: (pandas Timestamp) time in UTC, output of pandas date_range
+    # stash_path: (str) absolute path to RAWS stash
+    # dest_path: (str) path to extract files, default the wrfxpy/wksp folder
+    # Returns: file path of extracted pickle file
+    
+    ## Format database stash file
+    year = str(t.year)
+    day = f"{t.timetuple().tm_yday:03d}" # stash organized with day of year out of 365
+    hour = t.strftime("%H")
+    stash_file = osp.join("MesoDB", year, day, f"{year}{day}{hour}.pkl") # build target file relative to stash path
+    
+    ## Extract stations file if not present
+    if not osp.exists(osp.join(dest_path, "MesoDB/stations.pkl")):
+        command = f"tar -xzvf {stash_path} -C {dest_path} MesoDB/stations.pkl" # Format tar subprocess
+        subprocess.call(command, shell=True)
+        print(f"Executing command: {command}")
+
+    ## If file does not exist, extract
+    r = osp.join(dest_path, stash_file)
+    if not osp.exists(r):
+        if stash_path.endswith("tar.gz"):
+            command = f"tar -xzvf {stash_path} -C {dest_path} {stash_file}" # Format tar subprocess
+            print(f"Executing command: {command}")
+            subprocess.call(command, shell=True)
+            print(f"Checking file {stash_file} exists at {dest_path}")
+            osp.exists(r)
+        else: raise ValueError("Invalid file path. The file must end with '.tar.gz'.")
+
+    return r
+
+
+
+def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M", temppath = "wksp"):
     # Given times, stid, and path, return a dictionary of RAWS data fields (fm10, time, lat/lon, elevation) 
 
     print('~'*25)
@@ -49,66 +84,36 @@ def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M"):
     tend = datetime.strptime(tend_str, fmt)
     dates = pd.date_range(start=tstart,end=tend, freq="1H")
     
-    # Given datapath of RAWS stach files, create Dataframe with file path, time 1 and time 2
-    df=pd.DataFrame({
-        'File': os.listdir(datapath)
-        })
-    # Remove stations.pkl file
-    mask = ~df['File'].str.contains('stations')
-    df = df[mask]
-    # Extract times from file name
-    df['t0']=df['File'].apply(lambda f: Path(f).stem.split('_')[0])
-    df['t1']=df['File'].apply(lambda f: Path(f).stem.split('_')[1])
-    
-    # Convert to Datetime
-    df['d0']=df['t0'].apply(lambda t: datetime.strptime(t, fmt))
-    df['d1']=df['t1'].apply(lambda t: datetime.strptime(t, fmt))
-   
-    # Arrange dataframe by date
-    df = df.sort_values(by=['d0'])
-    df = df.reset_index()
+    if not (tstart <= tend): 
+        ValueError("Invalid time strings, start not before end.")
 
-    # Find Files that cover given time period
-    # latest date before/equal to tstart to
-    # earliest date after/equal to tend
-    ind1=np.where(df['d0'].eq(df['d0'][df['d0'] <= tstart].max()))[0][0]
-    ind2=np.where(df['d0'].eq(df['d0'][df['d0'] >= tend].min()))[0][0]
+    # Initialize FM array as NaN
+    fm = np.full(len(dates), np.nan, dtype=np.float64) # initialize fm array as NaN type float 64
+    times0 = dates.strftime('%Y-%m-%dT%H:%M:%SZ').to_numpy() # passed to output dict
+    times = dates.strftime('%Y-%m-%dT%H:%M:%SZ').to_numpy() # initialize actual RAWS time as dates, replaced with actual time if available 
+    for i in range(0, len(dates)):
+        d = dates[i]
+        p = extract_raws_stash(d) # extract RAWS stash pickle file from DB
+        dat = pd.read_pickle(p) # Read hourly pickle file
+        dat = dat[dat.STID == stid] # limit to target STID
+        if (dat.shape[0] == 1):
+                fm[i] = dat["fm10"][0]
+                times[i] = dat["datetime"][0].strftime('%Y-%m-%dT%H:%M:%SZ')
     
-    df2=df.iloc[ind1:ind2]
-    df2=df2.reset_index()
-    
-    ## Open Pickle Files
-    p = osp.join(datapath, df2['File'][0])
-    f = open(p, 'br')
-    data = pickle.load(f)
-
-    ## Subset to given stid
-    raws1 = data[data["STID"].eq(stid)]
-
-    for i in range(1, len(df2)):
-        p = osp.join(datapath, df2['File'][i])
-        f = open(p, 'br')
-        data = pickle.load(f)
-        # Add to dataframe for given stid
-        raws1 = pd.concat([raws1, data[data["STID"].eq(stid)]])
-    
-    raws1 = raws1.drop_duplicates()
-    # Get Station data
-    f = open(osp.join(datapath, 'stations.pkl'), 'br')
-    st = pickle.load(f)
-    st = st[st.index == stid]
-
-    print(st)
+    ## Read STID Info
+    st = pd.read_pickle(osp.join(temppath, "MesoDB/stations.pkl"))
+    st = st.loc[stid]
     
     dict1 = {
-        'time_raws': raws1['datetime'].to_numpy(),
-        'STID' : raws1['STID'].unique()[0],
-        'fm' : raws1['fm10'].to_numpy(),
+        'time': times0,
+        'time_raws': times,
+        'STID' : stid,
+        'fm' : fm,
         'title' : 'RAWS Station '+stid,
-        'hours':len(raws1['datetime']),
-        'lat' : st['LATITUDE'].to_numpy()[0],
-        'lon' : st['LONGITUDE'].to_numpy()[0],
-        'other': {'elev': st['ELEVATION']}
+        'hours':len(fm),
+        'lat' : st['LATITUDE'],
+        'lon' : st['LONGITUDE'],
+        'elec': st["ELEVATION"]
     }
     return dict1
 
@@ -156,7 +161,7 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
     # method        only l1=nearest neighbor
     # fmt           date string format of tstart_str, tend_str
 
-    # method (str): interpolation method (NOTE: currently only L1 nearest neighbors aka rounding) 
+    # method (str): interpolation method, passed to RegularGridInterpolator 
     # Internal Functions, will only reasonably be used within here
 
     def get_vals(tpath, pixel_x, pixel_y, method='linear'):
@@ -306,7 +311,7 @@ if __name__ == '__main__':
 
     if len(sys.argv) != 7:
         print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <STID> <rawspath> <atmpath> <target_file>' % sys.argv[0]))
-        print("Example: python src/ingest/build_hrrr_dict.py 202106070800 202106300900 NWRU1 /storage/math/NSF1/jmandel/RAWSData/haguespeak/meso /home/hirschij/data/hrrr/geotiff_files/ ~/testfile.pickle")
+        print("Example: python src/ingest/build_hrrr_dict.py 202106070800 202106300900 NWRU1 /storage/math/NSF1/farguella/ /home/hirschij/data/hrrr/geotiff_files/ ~/testfile.pickle")
         sys.exit(-1)
     start = sys.argv[1]
     end = sys.argv[2]
