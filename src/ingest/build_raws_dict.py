@@ -110,14 +110,16 @@ def format_raws(stn, fixnames = True):
     # Add lat/lon
     raws_dat['LATITUDE'] = stn['LATITUDE']
     raws_dat['LONGITUDE'] = stn['LONGITUDE']
-    
+    # Add Elevation
+    raws_dat['ELEVATION'] = stn["ELEVATION"]
+
     # Simplify names 
     if fixnames:
         var_mapping = {
                 'date_time': 'time', 'precip_accum': 'precipa', 'rain':'rain', 'solar_radiation': 'solar',
             'fuel_moisture': 'fm', 'relative_humidity': 'rh',
             'air_temp': 'temp', 'Ed': 'Ed', 'Ew': 'Ew', 'STID': 'STID',
-            'LONGITUDE': 'lon', 'LATITUDE': 'lat'
+            'LONGITUDE': 'lon', 'LATITUDE': 'lat', 'ELEVATION': 'elev'
             }
         old_keys = [*raws_dat.keys()]
         old_keys = [k.replace("_set_1", "") for k in old_keys]

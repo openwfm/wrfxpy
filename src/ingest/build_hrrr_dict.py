@@ -113,7 +113,7 @@ def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M", temppat
         'hours':len(fm),
         'lat' : st['LATITUDE'],
         'lon' : st['LONGITUDE'],
-        'elec': st["ELEVATION"]
+        'elev': st["ELEVATION"]
     }
     return dict1
 
@@ -122,11 +122,6 @@ def build_atm(tstart_str, tend_str, lon, lat, atmpath, atm_source="HRRR"):
     if atm_source == "HRRR": atm1 = build_hrrr(tstart_str, tend_str, lon, lat, atmpath)
 
     return atm1
-
-def interp_l1(x, y):
-    x = round(x)
-    y = round(y)
-    return x, y
 
 
 def ts_at(interp_x, interp_y, values, method = "linear"):
@@ -153,7 +148,7 @@ def ts_at(interp_x, interp_y, values, method = "linear"):
     
     return interp(interp_pts, method=method)
 
-def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%Y%m%d%H%M"):
+def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'linear', fmt = "%Y%m%d%H%M"):
     # tstart_str    start time as string 
     # tend_str      end time as string
     # lon, lat      scalars, coordinates to interpolate to
@@ -164,7 +159,7 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
     # method (str): interpolation method, passed to RegularGridInterpolator 
     # Internal Functions, will only reasonably be used within here
 
-    def get_vals(tpath, pixel_x, pixel_y, method='linear'):
+    def get_vals(tpath, pixel_x, pixel_y, method=method):
         # tpath (str): absolute path to tiff file
         # pixel_x, pixel_y grid coordinates after geotransform (would be index if at node)
 
@@ -185,11 +180,14 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
     tstart = datetime.strptime(tstart_str, fmt)
     tend = datetime.strptime(tend_str, fmt)
     dates = pd.date_range(start=tstart,end=tend, freq="1H")
-    # dates = dates[0:100] ### NOTE: THIS LINE IS ONLY FOR TESTING
 
-    # Assemble time series
-    bandnum=585 # Start with gust Band, then reuse those projection calculations later
-    tpath = osp.join(hrrrpath, "20210304",f"hrrr.t00z.wrfprsf00.{bandnum}.tif")
+
+    # Assemble time series, Start with gust Band, then reuse those projection calculations later
+    bandnum=585 
+    d = dates[0]
+    day_file = d.strftime("%Y%m%d") # HRRR data stash is in this format
+    hour = d.strftime("%H")
+    tpath = osp.join(hrrrpath, day_file, f"hrrr.t{hour}z.wrfprsf00.{bandnum}.tif")
     print("Opening: "+tpath)
     ds = gdal.Open(tpath)
     gt = ds.GetGeoTransform()
@@ -224,7 +222,10 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'l1', fmt = "%
     # Get wind (separate to not reload/transform data)
     wind_speed = np.zeros(len(dates)) # Array filled in loop
     time_hrrr = [""]*len(dates) # Initialize empty string list
-    for i in range(0, len(dates)):
+    wind_speed[0] = get_vals(tpath, pixel_x, pixel_y)
+    time_hrrr[0]=datetime.strftime(datetime.strptime(day_file, "%Y%m%d").replace(hour = int(hour)), "%Y-%m-%d %H:%M:%S")
+    
+    for i in range(1, len(dates)):
         d = dates[i]
         day_file = d.strftime("%Y%m%d") # HRRR data stash is in this format
         hour = d.strftime("%H")
