@@ -57,6 +57,7 @@ def extract_raws_stash(t, stash_path = "/storage/math/NSF1/farguella/MesoDB.tar.
         command = f"tar -xzvf {stash_path} -C {dest_path} MesoDB/stations.pkl" # Format tar subprocess
         subprocess.call(command, shell=True)
         print(f"Executing command: {command}")
+    
 
     ## If file does not exist, extract
     r = osp.join(dest_path, stash_file)
@@ -94,12 +95,15 @@ def build_raws(tstart_str, tend_str, stid, datapath, fmt = "%Y%m%d%H%M", temppat
     for i in range(0, len(dates)):
         d = dates[i]
         p = extract_raws_stash(d) # extract RAWS stash pickle file from DB
+        #print(p)
         dat = pd.read_pickle(p) # Read hourly pickle file
         dat = dat[dat.STID == stid] # limit to target STID
+        #print(f"TEST: {dat}")
         if (dat.shape[0] == 1):
-                fm[i] = dat["fm10"][0]
-                times[i] = dat["datetime"][0].strftime('%Y-%m-%dT%H:%M:%SZ')
-    
+                #fm[i] = dat["fm10"][0]
+                fm[i] = np.float64(dat.fm10.iloc[0])
+                #times[i] = dat["datetime"][0].strftime('%Y-%m-%dT%H:%M:%SZ')
+                times[i] = dat.datetime.iloc[0].strftime('%Y-%m-%dT%H:%M:%SZ')
     ## Read STID Info
     st = pd.read_pickle(osp.join(temppath, "MesoDB/stations.pkl"))
     st = st.loc[stid]
@@ -330,7 +334,10 @@ if __name__ == '__main__':
     # Dictionary must be nested with case names in this way
     # TODO: make this script flexible to get more STIDs without horrible inputs
     out_dict = {}
-    out_dict[stid]=dict1
+    d0 = datetime.strptime(start, "%Y%m%d%H%M")
+    title = f"hrrr_{stid}_{d0.year}{d0.month}"
+    print(f"Dictionary title: {title}")
+    out_dict[title]=dict1
     
     print(out_dict.keys())
 
