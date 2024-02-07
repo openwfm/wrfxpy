@@ -320,6 +320,20 @@ class ngfs_incident():
       cfg['cycle_start_utc'] = utils.utc_to_esmf(cycle_start)
       cfg['download_whole_cycle'] = 'true'
 
+      
+           #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
+      # /data/WRFXPY/wksp_fmda/CONUS/202307/
+      if 'fmda_geogrid_path' in cfg:
+         print('Will use FMDA for fuel moisture')
+         fmda_year = cfg['start_utc'][:4]
+         fmda_month = cfg['start_utc'][5:7]
+         fmda_day = cfg['start_utc'][8:10]
+         fmda_hour = cfg['start_utc'][11:13]
+         base_folder = '/data/WRFXPY/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
+         date_folder = 'fmda-CONUS-'+fmda_year+fmda_month+fmda_day+'-'+fmda_hour+'.geo'
+         cfg['fmda_geogrid_path'] = base_folder + date_folder
+
+
          #print(cfg)
       descrip_string = self.incident_name
       cfg['postproc']['description'] = descrip_string
@@ -503,7 +517,7 @@ def make_base_configuration(force):
          fmda_year = temp_cfg['start_utc'][:4]
          fmda_month = temp_cfg['start_utc'][5:7]
          fmda_day = temp_cfg['start_utc'][8:10]
-         fmda_hour = fmda_day = temp_cfg['start_utc'][11:13]
+         fmda_hour = temp_cfg['start_utc'][11:13]
          base_folder = '/data/WRFXPY/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
          date_folder = 'fmda-CONUS-'+fmda_year+fmda_month+fmda_day+'-'+fmda_hour+'.geo'
          temp_cfg['fmda_geogrid_path'] = base_folder + date_folder
