@@ -496,6 +496,17 @@ def make_base_configuration(force):
       print('\tWall time: ',temp_cfg['wall_time_hrs'], 'hours')
       print('\tTime step: ',temp_cfg['domains']['1']['time_step'], 'seconds')
       
+      #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
+      # /data/WRFXPY/wksp_fmda/CONUS/202307/
+      if 'fmda_geogrid_path' in temp_cfg:
+         print('Will use FMDA for fuel moisture')
+         fmda_year = temp_cfg['start_utc'][:4]
+         fmda_month = temp_cfg['start_utc'][5:7]
+         fmda_day = temp_cfg['start_utc'][8:10]
+         fmda_hour = fmda_day = temp_cfg['start_utc'][11:13]
+         base_folder = '/data/WRFXPY/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
+         date_folder = 'fmda-CONUS-'+fmda_year+fmda_month+fmda_day+'-'+fmda_hour+'.geo'
+         temp_cfg['fmda_geogrid_path'] = base_folder + date_folder
 
       if force:
          print('Using base configuration')
