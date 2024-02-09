@@ -219,7 +219,6 @@ def build_hrrr(tstart_str, tend_str, lon, lat, hrrrpath, method = 'linear', fmt 
     pixel_x, pixel_y = gdal.ApplyGeoTransform(gt_inv, mapx, mapy)
     print(f"Projected pixel: ({pixel_x}, {pixel_y})")
 
-    
     band = ds.GetRasterBand(1)
     data = band.ReadAsArray()
     
@@ -316,7 +315,7 @@ if __name__ == '__main__':
 
     if len(sys.argv) != 7:
         print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <STID> <rawspath> <atmpath> <target_file>' % sys.argv[0]))
-        print("Example: python src/ingest/build_hrrr_dict.py 202106070800 202106300900 NWRU1 /storage/math/NSF1/farguella/ /home/hirschij/data/hrrr/geotiff_files/ ~/testfile.pickle")
+        print("Example: python src/ingest/build_hrrr_dict.py 202106070800 202106300900 NWRU1 /home/hirschij/data /home/hirschij/data/hrrr/geotiff_files/ ~/testfile.pickle")
         sys.exit(-1)
     start = sys.argv[1]
     end = sys.argv[2]
