@@ -187,7 +187,39 @@ def build_raws_dict(stid, tstart, tend, rawspath=rawspath, hrrrpath=hrrrpath):
     dates = pd.date_range(start=tstart,end=tend, freq="1H")
     raws["time"]=dates.strftime('%Y-%m-%dT%H:%M:%SZ').to_numpy()
     
+    ## Standardize Inputs
+    if "precip_accum" in raws.keys():
+        raws["precip_accum"] = format_precip(raws["precip_accum"])
+    
+    name_mapping = {"air_temp":"temp", "fuel_moisture":"fm", "relative_humidity":"rh", "precip_accum":"rain","solar_radiation":"solar", "wind_speed":"wind_speed"}
+    
+    old_keys = [*raws.keys()]
+    new_keys = []
+    for key in old_keys:
+        new_keys.append(name_mapping.get(key, key))
+    old_keys = [*raws.keys()]
+    new_keys = []
+    for key in old_keys:
+        new_keys.append(name_mapping.get(key, key))
+    raws = dict(zip(new_keys, list(raws.values())))
+
+    
+    ## Calculate Equilibria if available
+    if {"rain", "temp"} & set(raws.keys()):
+        print("Calculating Equilibrium Moisture from RAWS data")
+        raws['Ed'] = 0.924*raws['rh']**0.679 + 0.000499*np.exp(0.1*raws['rh']) + 0.18*(21.1 + 273.15 - raws['temp'])*(1 - np.exp(-0.115*raws['rh']))
+        raws['Ew'] = 0.618*raws['rh']**0.753 + 0.000454*np.exp(0.1*raws['rh']) + 0.18*(21.1 + 273.15 - raws['temp'])*(1 - np.exp(-0.115*raws['rh']))
+    
     return loc, raws
+
+def format_precip(precipa):
+    rain=np.array(precipa, dtype = 'float64')
+    rain = np.diff(rain) # first difference to convert accumulated to hourly
+    rain = np.insert(rain, 0, [np.NaN]) # add NaN entry to account for diff
+    # Highest ever recorded hourly rainfall in inches is about 16: https://www.weather.gov/owp/hdsc_world_record
+    rain[rain > 100] = np.NaN # filter out erroneously high
+    rain[rain < 0] = np.NaN # filter out negative, results from diff function after precipa goes to zero
+    return rain
 
 def ts_at(interp_x, interp_y, values, method = "linear"):
     # Python implementation on regular grid of Jan methodology from https://github.com/openwfm/wrf-fire-matlab/blob/master/vis/ts_at.m
@@ -332,6 +364,7 @@ def build_hrrr_dict(tstart, tend, lon, lat, hrrrpath=hrrrpath, method = 'linear'
     solarUL = build_timeseries(664) # upward long wave solar
 
     # calculate Equilibriums from rh and temp
+    print("Calculating Equilibrium Moisture from HRRR data")
     Ed = 0.924*rh**0.679 + 0.000499*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - temp)*(1 - np.exp(-0.115*rh))
     Ew = 0.618*rh**0.753 + 0.000454*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - temp)*(1 - np.exp(-0.115*rh))
 
