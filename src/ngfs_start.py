@@ -321,7 +321,7 @@ class ngfs_incident():
       cfg['download_whole_cycle'] = 'true'
 
       
-           #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
+      #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
       # /data/WRFXPY/wksp_fmda/CONUS/202307/
       if 'fmda_geogrid_path' in cfg:
          print('Will use FMDA for fuel moisture')
@@ -416,7 +416,8 @@ class ngfs_incident():
             mean_ign_latlon = [np.mean(incident_data.lat_tc_swir[time_msk & swir_msk]), np.mean(incident_data.lon_tc_swir[time_msk & swir_msk])]
             print('\tAveraging SWIR pixels from first half hour')
          else:
-            mean_ign_latlon = [np.mean(incident_data.lat_tc), np.mean(incident_data.lon_tc)]
+            mean_ign_latlon = [np.mean(incident_data.lat_tc[time_msk]), np.mean(incident_data.lon_tc[time_msk])]
+         
          print('\tStandard ign_latlon: ',tc_ign_latlon)
          print('\tSWIR ign_latlon : ',swir_ign_latlon)
          print('\tMean ign_latlon : ',mean_ign_latlon)
@@ -765,7 +766,7 @@ if __name__ == '__main__':
    #print(pick_list)
    #time.sleep(10)
    old_ngfs_incidents = list()
-   for i in range(-1,-10,-1):
+   for i in range(-1,-15,-1):
       #print(pick_list[i])
       with open(pick_list[i],'rb') as f:
          df = pickle.load(f)
@@ -980,13 +981,14 @@ if __name__ == '__main__':
                inc_started = True
             #time.sleep(2)
       #start new incidents to run  change the hours back to 163
-      if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = 96) and not inc_started:
+      lookback_time = 96
+      if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = lookback_time) and not inc_started:
          #(incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
          new_idx[i] = 1
          #change 'new' object attribute
          incidents[i].set_new()
          incidents[i].make_incident_configuration(base_cfg)
-         print('\tNew Incident From previous 24 hours')
+         print('\tNew Incident From previous ' + str(lookback_time) + ' hours')
          json.dump(incidents[i].cfg, open(incidents[i].filename, 'w'), indent=4, separators=(',', ': '))
          print('\tTo start the simulation, execute: ')
          cmd_str = './forecast.sh ' + incidents[i].filename + ' &> logs/' + incidents[i].filename[5:-5] +'.log &'
