@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --time=%(wall_time_hrs)02d:00:00 # walltime, abbreviated by -t
 #SBATCH --ntasks=%(np)d   # number of MPI tasks, abbreviated by -n
-#SBATCH --exclude=c001     # number of cluster nodes, abbreviated by -N  #KH: comment out
 #SBATCH --job-name=WRFX  # job name
 
 # set data and working directories

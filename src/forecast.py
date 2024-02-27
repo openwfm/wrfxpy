@@ -596,19 +596,25 @@ def vars_add_to_geogrid(js):
         else:
             logging.warning('Any {} specified for NFUEL_CAT and ZSF GeoTIFF location'.format(geo_vars_path))
             logging.info('Trying default NFUEL_CAT and ZSF from {}.'.format(js.args['wps_geog_path']))
-            nfuel_path = osp.join(js.args['wps_geog_path'],'fuel_cat_fire','lf_data.tif')
-            topo_path = osp.join(js.args['wps_geog_path'],'topo_fire','ned_data.tif')
+            nfuel_path = osp.join(js.args['wps_geog_path'], 'fuel_cat_fire', 'lf_data.tif')
+            topo_path = osp.join(js.args['wps_geog_path'], 'topo_fire', 'ned_data.tif')
             if osp.exists(nfuel_path) and osp.exists(topo_path) and nfuelcats == 13:
                 geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
         for var,tif_file in geo_vars.items():
             if var == 'NFUEL_CAT':
                 var = 'NFUEL_CAT_13'
-            if 'NFUEL_CAT' in var and var != 'NFUEL_CAT_{}'.format(nfuelcats): 
+            wisdom = get_wisdom(var)
+            if (
+                wisdom['name'] == 'NFUEL_CAT'
+                and 'category_range' in wisdom
+                and nfuelcats != wisdom['category_range'][1] - 1
+            ):
+                logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
                 continue
             bbox = js.bounds[str(js.min_sub_dom)]
             logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
             try:
-                GeoDriver.from_file(tif_file).to_geogrid(geo_data_path,var,bbox)
+                GeoDriver.from_file(tif_file).to_geogrid(geo_data_path, var, bbox)
             except Exception as e:
                 if 'NFUEL_CAT' in var or 'ZSF' in var:
                     logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
@@ -621,12 +627,7 @@ def vars_add_to_geogrid(js):
     except:
         logging.warning('Problems processing GeoTIFF files for NFUEL_CAT and ZSF'.format(geo_vars_path))
         logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path))
-        if nfuelcats == 13:
-            varnames = ['NFUEL_CAT_13_MODIS_20', 'ZSF_MODIS_20']
-        elif nfuelcats == 40:
-            varnames = ['NFUEL_CAT_40_MODIS_20', 'ZSF_MODIS_20']
-        else:
-            raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
+        varnames = ['NFUEL_CAT_{}_MODIS_20'.format(nfuelcats), 'ZSF_MODIS_20']
         geogrid_tbl_json = {}
         for varname in varnames:
             logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
