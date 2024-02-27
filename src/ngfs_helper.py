@@ -326,6 +326,6 @@ class polar_data():
             print('\tBest viirs ignition estimate location: \n\t\t',new_ign_latlon,new_ign_utc)
         else:
             new_ign_latlon = [float('NaN'),float('NaN')]
-            new_ign_utc = self.data.loc[0,pd.Nat]  # << -------- return something of correct data type
+            new_ign_utc = self.data.loc[0,pd.NaT]  # << -------- return something of correct data type
 
         return new_ign_latlon, new_ign_utc            
