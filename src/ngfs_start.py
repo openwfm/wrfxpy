@@ -317,8 +317,8 @@ class ngfs_incident():
          print('\tComputing start of grib cycle')
          cycle_hour = np.int8(np.trunc(self.start_utc.hour/6))*6
          cycle_start = cycle_start.replace(hour = cycle_hour)
-      cfg['cycle_start_utc'] = utils.utc_to_esmf(cycle_start)
-      cfg['download_whole_cycle'] = 'true'
+         cfg['cycle_start_utc'] = utils.utc_to_esmf(cycle_start)
+         cfg['download_whole_cycle'] = 'true'
 
       
       #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
@@ -394,14 +394,15 @@ class ngfs_incident():
       #add detections to the incidnet
       self.add_data(incident_data)
 
+      print('\tFinding start time and ignition location')
+
+      #estimate the start time of the incident from the data
       self.set_incident_start_time()
-      print('\tNIFC incident start time : ', self.incident_start_time)
+      print('\tEstimated incident start time : ', self.incident_start_time)
 
       #get the bounding box
       self.set_incident_bounding_box()
 
-
-      print('\tFinding start time and ignition location')
          
       idx = incident_data.index[0] #gets the first row, having earliest time
       #not all csv files have terrain correction, so far
@@ -414,7 +415,7 @@ class ngfs_incident():
 
          if sum(time_msk & swir_msk) > 1:
             mean_ign_latlon = [np.mean(incident_data.lat_tc_swir[time_msk & swir_msk]), np.mean(incident_data.lon_tc_swir[time_msk & swir_msk])]
-            print('\tAveraging SWIR pixels from first half hour')
+            print('\tAveraging SWIR pixels from first three hours')
          else:
             mean_ign_latlon = [np.mean(incident_data.lat_tc[time_msk]), np.mean(incident_data.lon_tc[time_msk])]
          
@@ -637,7 +638,7 @@ def read_NGFS_csv_data(csv_file):
             data_read = pd.read_csv(csv_file[i], parse_dates=time_cols2)
             #rename v2 variables as v1 counterparts as much as possible
             data_read['initial_observation_time'] = data_read[time_cols2[1]]
-            data_read['incident_start_time'] = data_read[time_cols2[1]]
+            data_read['incident_start_time'] = data_read[time_cols2[1]]  #pixel_date_time in csv v2
             #force csv data to adhere to a specific type
             data_read.rename(columns=nd.v2_to_v1, inplace=True)
             data_read = data_read.astype(nd.v2_dict)
@@ -694,16 +695,25 @@ def incident_demographics(data, pop_data):
    
 ####### put inside of the ngfs_day object
 def prioritize_incidents(incidents,new_idx,num_starts):
-   #prioritizes the new incidents to be run by county population
+   #prioritizes the new incidents to be run by county population or by total population
    #new_idx is boolean mask
    #nums_start is number of the new simulations to start set tpo be -1 
+   priority_by_population = False
+   filter_rx = True
+   frp_cutoff = 1e4
    n = len(new_idx)
    started = np.zeros(n,dtype=int)
    pop = np.zeros(n)
+   frp = np.zeros(n)
    for i in range(n):
       pop[i] = incidents[i].affected_population
+      frp[i] = np.sum(incidents[i].data.frp)  # <<--------------------------------- Could be double counting if both GOES see it?
    #to get decreasing list, sort its negative
-   sort_idx = np.argsort(-pop)
+   if priority_by_population:
+      sort_idx = np.argsort(-pop)
+   else:
+      sort_idx = np.argsort(-frp)
+
    if num_starts > 0:
       print('New incidents by priority')
       start_count = 0
@@ -712,10 +722,16 @@ def prioritize_incidents(incidents,new_idx,num_starts):
             print(incidents[i].incident_name)
             print('\t',incidents[i].ign_latlon)
             print('\t',incidents[i].ign_utc)
+            print('\t Total FRP: ',np.sum(incidents[i].data.frp))
             print('\t Population affected: ',incidents[i].affected_population)
             print('\t',incidents[i].county,', ',incidents[i].state)
+            if 'RX' in incidents[i].incident_name:
+               rx = True
+            else:
+               rx = False
+            
          #print('\t',incidents[i].json_start_code)
-            if start_count < num_starts:
+            if start_count < num_starts and (not rx or np.sum(incidents[i].data.frp) > frp_cutoff):
                print('\t Automatically starting this simulation')
                os.system(incidents[i].cmd_str)
                #print(incidents[i].cmd_str)
@@ -726,7 +742,9 @@ def prioritize_incidents(incidents,new_idx,num_starts):
                started[i] = 1
                start_count += 1
             else:
-               print('\tNew incident, but unstarted simulation')
+               print('\t New incident, but unstarted simulation')
+               if rx:
+                  print('\t Skipping low-FRP RX incident')
  
    return sort_idx, started
 
@@ -818,7 +836,7 @@ if __name__ == '__main__':
       #this forces auto_start and avoids questions
       force = True
       auto_start = True
-      num_starts = 25   # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
+      num_starts = 25  # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
    else:
       force = True  # <<<------------------------------- change this to require confirmation of forecast configuration
       auto_start = False
