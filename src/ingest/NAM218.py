@@ -46,12 +46,22 @@ class NAM218(GribForecast):
         #cc is the model cycle runtime (i.e. 00, 06, 12, 18)
         #YYYYMMDD is the Year Month Day Hour of model runtime
         #fh is the forecast hour (i.e. 00, 03, 06, ..., 84)
+            
+        grib_files = [
+            [
+                'nam.{0:04d}{1:02d}{2:02d}/nam.t{3:02d}z.awphys{4:02d}.tm00.grib2'.format(
+                    cycle_start.year, cycle_start.month, 
+                    cycle_start.day, cycle_start.hour, x
+                ),
+                '{0:04d}{1:02d}/{0:04d}{1:02d}{2:02d}/nam_218_{0:04d}{1:02d}{2:02d}_{3:02d}00_{4:03d}.grb2'.format(
+                    cycle_start.year, cycle_start.month, 
+                    cycle_start.day, cycle_start.hour, x
+                )
+            ] 
+            for x in fc_list
+        ]
 
-        path_tmpl = 'nam.%04d%02d%02d/nam.t%02dz.awphys%02d.tm00.grib2'
-        grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, x) for x in fc_list]
-
-
-        return grib_files
+        return [self.available_online(grib_file) for grib_file in grib_files]
 
     # instance variables
     id = "NAM218"
@@ -59,7 +69,12 @@ class NAM218(GribForecast):
     info_aws = "https://registry.opendata.aws/noaa-nam/"
     info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
     info = "North American Mesoscale (NAM) Forecast System Grid 218"
-    remote_url = ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/", "s3://noaa-nam-pds/"]
+    remote_url = [
+        "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/", 
+        "s3://noaa-nam-pds/", 
+        "https://www.ncei.noaa.gov/data/north-american-mesoscale-model/access/forecast/",
+        "https://www.ncei.noaa.gov/thredds/fileServer/model-nam218-old/"
+    ]
     browse_aws = "https://noaa-nam-pds.s3.amazonaws.com/index.html"
     cycle_hours = 6
     period_hours = 3    # for METGRID and WRF
