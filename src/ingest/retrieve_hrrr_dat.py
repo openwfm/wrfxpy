@@ -1,5 +1,5 @@
-# Set of functions and executable code for retrieving a range of data used for FMDA. 
-# Given a start date, end date, and model (currently only tested with HRRR), loop through the dates abnd
+# Set of functions and executable code for retrieving a range of data from HRRR used for FMDA. 
+# Given a start date, end date, loop through the dates and
 # execute retrieve_gribs from the main code repo, then extract and combine relevant fields to given output dir
 
 # setup environment
@@ -25,31 +25,33 @@ geotiff_func_path = "/home/hirschij/github/notebooks/fmda/data/grib_to_geotiff.p
 ## Note there is a surface temp, but no surface RH. 
 ## Sticking with 2m temp and rh for consistency since those are combined to EQ
 band_df_hrrr = pd.DataFrame({
-    'Band': [585, 616, 620, 628, 629, 661, 662, 663, 664],
-    'hrrr_name': ['GUST', 'TMP', 'RH', 'PRATE', 'APCP',
-                  'DSWRF', 'DLWRF', 'USWRF', 'ULWRF'],
-    'descr': ['surface Wind Speed (Gust) [m/s]',
-              '2 m Temperature [K]', 
-              '2 m Relative Humidity [%]', 
+    'Band': [616, 620, 624, 628, 629, 661, 561, 612, 643],
+    'hrrr_name': ['TMP', 'RH', "WIND", 'PRATE', 'APCP',
+                  'DSWRF', 'SOILW', 'CNWAT', 'GFLUX'],
+    'dict_name': ["temp", "rh", "wind", "rain", "precip_accum",
+                 "solar", "soilm", "canopyw", "groundflux"],
+    'descr': ['2m Temperature [K]', 
+              '2m Relative Humidity [%]', 
+              '10m Wind Speed [m/s]'
               'surface Precip. Rate [kg/m^2/s]',
               'surface Total Precipitation [kg/m^2]',
               'surface Downward Short-Wave Radiation Flux [W/m^2]',
-              'surface Downward Long-Wave Rad. Flux [W/m^2]',
-              'surface Upward Short-Wave Radiation Flux [W/m^2]',
-              'Upward Long-Wave Rad. Flux [W/m^2]']
+              'surface Total Precipitation [kg/m^2]',
+              '0.0m below ground Volumetric Soil Moisture Content [Fraction]',
+              'Plant Canopy Surface Water [kg/m^2]',
+              'surface Ground Heat Flux [W/m^2]']
 })
 
 # Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def slice_gribs(grib_file, outpath, grib_source_name):
+def slice_gribs(grib_file, outpath):
     
-    if grib_source_name == "HRRR": band_df = band_df_hrrr
 
     filename = osp.join(outpath, Path(osp.basename(grib_path)).stem)
     command = "python " + geotiff_func_path + " " + grib_file + " " + filename
 
-    for i in range(0, band_df.shape[0]):
-        band = int(band_df['Band'][i])
+    for i in range(0, band_df_hrrr.shape[0]):
+        band = int(band_df_hrrr['Band'][i])
         subprocess.call(command + " " + str(band),shell=True)
     return
 
@@ -58,33 +60,34 @@ def slice_gribs(grib_file, outpath, grib_source_name):
 if __name__ == '__main__':
 
     if len(sys.argv) != 5:
-        print(('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
-        print(('Example: %s HRRR 2023-08-10_09:00:00 2023-08-10_10:00:00 ./ingest/HRRR' % sys.argv[0]))
+        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <forecast_hours> <target_directory>' % sys.argv[0]))
+        print(('Example: %s 2024-01-01_00:00:00 2024-01-01_01:00:00 1 ./ingest/HRRR' % sys.argv[0]))
         sys.exit(-1)
 
     fmt = "%Y-%m-%d_%H:%M:%S" # Time format that pandas can recognize
     
-
-    grib_source = sys.argv[1]
-    print('Gathering '+str(grib_source)+' data')
-    start=datetime.strptime(sys.argv[2], fmt)
-    end=datetime.strptime(sys.argv[3], fmt)
-    print("Start: "+str(start))
-    print("End: "+str(end))
+    grib_source = "HRRR"
+    print('Gathering HRRR data')
+    start=datetime.strptime(sys.argv[1], fmt)
+    end=datetime.strptime(sys.argv[2], fmt)
+    print(f"Start Time: {start}")
+    print(f"End Time: {end}")
+    forecast_hours = sys.argv[3]
+    print(f"HRRR Forecast Hours: {forecast_hours}")
     outpath=str(sys.argv[4])
     print('Output Destination: '+outpath)
 
 
     # String to run with retrieve_gribs as subprocess
-    base_str = "python src/ingest/retrieve_gribs.py " + str(sys.argv[1]) + " "
+    base_str = f"python src/ingest/retrieve_gribs.py {grib_source} "
 
     # Handle Date
     dates = pd.date_range(start=start,end=end, freq="1H") # Series of dates in 1 hour increments
 
-    print('Number of hours:'+str(dates.shape[0]))
+    print(f'Number of analysis hours: {dates.shape[0]}')
 
     for t in range(0, dates.shape[0]): 
-        print('-'*30)
+        print('~'*30)
         
         # Format time
         time=dates[t].strftime(fmt)
@@ -103,16 +106,18 @@ if __name__ == '__main__':
         # Slice grib file to get needed bands
         grib_path = osp.join(sys_cfg.sys_install_path, "ingest", grib_source, grib_source.lower()+'.'+dates[t].strftime("%Y%m%d"),'conus', grib_source.lower()+'.t'+dates[t].strftime('%H')+'z.wrfprsf00.grib2')
         print("Grib Path: " + grib_path)
-        slice_gribs(grib_path, temppath, grib_source)
-        
+        if os.path.exists(grib_path):
+            slice_gribs(grib_path, temppath)
+        else:
+            print(f"File does not exist: {grib_path}")
         # Remove gribs file for space cleanup
         ## NOTE: leaving associated .size there as paper trail 
-        if os.path.exists(grib_path):
+        #if os.path.exists(grib_path):
             #os.remove(grib_path) # remove grib2 file
-            grib_path2 = grib_path.replace("wrfprsf00", "wrfprsf01") # get file name for 1 hr forecast
+            #grib_path2 = grib_path.replace("wrfprsf00", "wrfprsf01") # get file name for 1 hr forecast
             #os.remove(grib_path2) # remove 1 hr forecast file
-        else:
-            print("The file "+ grib_path +" does not exist")
+        #else:
+            #print("The file "+ grib_path +" does not exist")
 
 
 
