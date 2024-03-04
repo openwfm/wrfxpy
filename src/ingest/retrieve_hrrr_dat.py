@@ -108,9 +108,9 @@ if __name__ == '__main__':
         # Remove gribs file for space cleanup
         ## NOTE: leaving associated .size there as paper trail 
         if os.path.exists(grib_path):
-            os.remove(grib_path) # remove grib2 file
+            #os.remove(grib_path) # remove grib2 file
             grib_path2 = grib_path.replace("wrfprsf00", "wrfprsf01") # get file name for 1 hr forecast
-            os.remove(grib_path2) # remove 1 hr forecast file
+            #os.remove(grib_path2) # remove 1 hr forecast file
         else:
             print("The file "+ grib_path +" does not exist")
 
