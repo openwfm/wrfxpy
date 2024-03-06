@@ -350,7 +350,7 @@ def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
     # NOTE: this assumes simple celcius temps, which is what we have seen in HRRR 
         # But weather data may come in other formats
         # we should check the original grib files gdalinfo for temp being units C within the code
-    # Then, Calculate Equilibria Moisture from HRRR Data
+    # Then, Calculate Equilibria Moisture from HRRR Data and add description field
     print("~"*50)
     print("Calculating moisture Equilibria from rh and temp")
     for k in dat:
@@ -363,6 +363,7 @@ def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
                 print("Converting HRRR data temp from C to K") 
         dat[k]["HRRR"]["Ed"] = 0.924*rh**0.679 + 0.000499*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - temp)*(1 - np.exp(-0.115*rh))
         dat[k]["HRRR"]["Ew"] = 0.618*rh**0.753 + 0.000454*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - temp)*(1 - np.exp(-0.115*rh))    
+        dat[k]["HRRR"]["descr"] = f"Source: HRRR data from 3d pressure model, linear grid interpolated to RAWS location"
     
     return dat
 
