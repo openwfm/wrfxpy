@@ -87,14 +87,14 @@ def retrieve_raws_stash(stid, tstart, tend):
     else:
         raise ValueError(f"Station {stid} not found in MesoDB/stations.pkl")
     
-    ## Get hourly timestamps given input dates
-    dates = pd.date_range(start=tstart,end=tend, freq="1H")
+    ## Get hourly timestamps given input times
+    times = pd.date_range(start=tstart,end=tend, freq="1H")
 
     # Initialize FM array as NaN
-    fm = np.full(len(dates), np.nan, dtype=np.float64) # initialize fm array as NaN type float 64
-    times = dates.strftime('%Y-%m-%dT%H:%M:%SZ').to_numpy() # initialize actual RAWS time as dates, replaced with actual time if data present
-    for i in range(0, len(dates)):
-        di = dates[i]
+    fm = np.full(len(times), np.nan, dtype=np.float64) # initialize fm array as NaN type float 64
+    times = times.strftime('%Y-%m-%dT%H:%M:%SZ').to_numpy() # initialize actual RAWS time as dates, replaced with actual time if data present
+    for i in range(0, len(times)):
+        di = times[i]
         dat = read_raws_stash(stid, di)
         dat = dat[dat.STID == stid] # limit to target STID
         #print(f"TEST: {dat}")
@@ -174,8 +174,8 @@ def format_raws_df(df, tstart, tend):
     raws = dict(zip(new_keys, list(raws.values())))
 
     ## Add array of times requested, often different from returned time by a couple mins
-    dates = pd.date_range(start=tstart,end=tend, freq="1H")
-    raws["time"]=dates.strftime('%Y-%m-%dT%H:%M:%SZ').to_numpy()
+    times = pd.date_range(start=tstart,end=tend, freq="1H")
+    raws["time"]=times.strftime('%Y-%m-%dT%H:%M:%SZ').to_numpy()
 
     ## Calculate Equilibria if available
     if {"rh", "temp"} & set(raws.keys()):
@@ -290,13 +290,13 @@ def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
     # dat: (dict) dictionary, output of build_raws_dict
     # method: (str) interpolation method, passed to ts_at
     
-    # Get dates array
-    dates = pd.date_range(start=tstart,end=tend, freq="1H")
+    # Get times array
+    times = pd.date_range(start=tstart,end=tend, freq="1H")
 
     # Get Projection data from first band from band_df_hrrr,
     # reuse projection info for other bands
     # NOTE: this results in 1 extra read of geotiff files, but doing it for clarity
-    d = dates[0]
+    d = times[0]
     band = band_df_hrrr.Band[0]
     tpath = build_hrrr_path(d, band)
     print(f"Opening: {tpath}")
@@ -311,9 +311,9 @@ def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
     # Format HRRR subdictionary with key for each band in band_df_hrrr, np.nan as placeholder
     # Add pixel_x and pixel_y to loc subdirectory to use with interpolation
     for k in dat.keys():
-        dat[k]["HRRR"] = {"time": dates.strftime(utc_format).to_numpy()} # Initialize HRRR subdir with dates
+        dat[k]["HRRR"] = {"time": times.strftime(utc_format).to_numpy()} # Initialize HRRR subdir with times
         for name in band_df_hrrr.dict_name:
-            dat[k]["HRRR"][name] = np.full(len(dates), np.nan, dtype=np.float64) # Initialize time series with np.nan
+            dat[k]["HRRR"][name] = np.full(len(times), np.nan, dtype=np.float64) # Initialize time series with np.nan
         lon = dat[k]["loc"]["lon"]
         lat = dat[k]["loc"]["lat"]
         print(f"Interpolating to RAWS {dat[k]['loc']['STID']}, target lat/lon {lat, lon}")
@@ -330,8 +330,8 @@ def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
         band = row["Band"]
         dict_name = row["dict_name"]
         print(f"Building Time Series for band: {band}, {row['descr']}")
-        for i in range(0, len(dates)):
-            d = dates[i]
+        for i in range(0, len(times)):
+            d = times[i]
             print(f"Collecting Data for date: {d}")
             tpath = build_hrrr_path(d, band)
             print(f"Opening: {tpath}")
