@@ -19,9 +19,11 @@ from synoptic.services import stations_timeseries, stations_metadata
 
 # Script used to generate starndardized dictionaries with fields necessary to run FMDA 
 # User inputs location in the form of a lat/lon bounding box, start time, and end time
-# Currently, combines 1) RAWS observations from either stash or MesoWest 2) HRRR data interpolated to station lat lon
-# Future, add satellite data fields 
+# Currently, combines 1) RAWS observations from either stash or SynopticPy 2) HRRR data interpolated to station lat lon
+# Future Work: add satellite data fields 
 
+# NOTE: bbox format in SynopticPy is [lonmin,latmin,lonmax,latmax]
+#       bbox format in wrfxpy rtma_cycler_all is [latmin, lonmin, latmax, lonmax]
 
 # Variables used throughout
 sys_cfg = Dict(json.load(open('etc/conf.json')))
@@ -152,9 +154,10 @@ def format_raws_df(df, tstart, tend):
     raws["hours"]=len(times)
     
     ## Convert C to K 
-    if df.attrs["UNITS"]["air_temp"] == "Celsius":
-        print("Converting RAWS temp from C to K")
-        raws["air_temp"] = raws["air_temp"]+273.15
+    if "air_temp" in df.columns:
+        if df.attrs["UNITS"]["air_temp"] == "Celsius":
+            print("Converting RAWS temp from C to K")
+            raws["air_temp"] = raws["air_temp"]+273.15
     
     ## Calculate Hourly Precipitation from accumulated
     if "precip_accum" in df.columns:
@@ -382,6 +385,7 @@ def parse_bbox(box_str):
             raise ValueError("Invalid bounding box format")
     except (SyntaxError, ValueError) as e:
         print("Error parsing bounding box:", e)
+        sys.exit(-1)
         return None
 
 # Executed Code ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -391,7 +395,8 @@ if __name__ == '__main__':
     if len(sys.argv) != 5:
         print(f"Invalid arguments. {len(sys.argv)} was given but 5 expected")
         print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <bbox> <target_file>' % sys.argv[0]))
-        print("Example: python src/ingest/build_fmda_dicts.py 202401010000 202401010200 '[-105,37,-103,39]' ~/testfile.pickle")
+        print("Example: python src/ingest/build_fmda_dicts.py 202401010000 202401010200 '[37,-105,39,-103]' ~/testfile.pickle")
+        print("bbox format should match rtma_cycler: [latmin, lonmin, latmax, lonmax]")
         sys.exit(-1)
     
     start = sys.argv[1]
@@ -412,7 +417,9 @@ if __name__ == '__main__':
     print(band_df_hrrr)
     print("~"*50)
     
-    sts = stations_metadata(bbox=bbox,vars=["fuel_moisture"])
+    # Convert bbox from wrfxpy format to synoptic
+    bbox2 = [bbox[1], bbox[0], bbox[3], bbox[2]]
+    sts = stations_metadata(bbox=bbox2,vars=["fuel_moisture"])
     print(f"Number of Stations within bbox: {sts.shape[0]}")
     # Parameter dictionary used within SynopticPy
     params = dict(
