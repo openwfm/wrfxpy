@@ -176,13 +176,15 @@ def format_raws_df(df, tstart, tend):
     ## Add array of times requested, often different from returned time by a couple mins
     times = pd.date_range(start=tstart,end=tend, freq="1H")
     raws["time"]=times.strftime('%Y-%m-%dT%H:%M:%SZ').to_numpy()
-
+    
     ## Calculate Equilibria if available
-    if {"rh", "temp"} & set(raws.keys()):
+    if 'rh' in raws and 'temp' in raws:
         print("Calculating Equilibrium Moisture from RAWS data")
         raws['Ed'] = 0.924*raws['rh']**0.679 + 0.000499*np.exp(0.1*raws['rh']) + 0.18*(21.1 + 273.15 - raws['temp'])*(1 - np.exp(-0.115*raws['rh']))
         raws['Ew'] = 0.618*raws['rh']**0.753 + 0.000454*np.exp(0.1*raws['rh']) + 0.18*(21.1 + 273.15 - raws['temp'])*(1 - np.exp(-0.115*raws['rh']))
-    
+    else:
+        print(f"Fields needed to calculate Equilibrium missing: {set(key for key in ['rh', 'temp'] if key not in raws)}")
+        print("Equilibrium Moisture not calculated")
 
     return loc, raws
 
@@ -204,6 +206,7 @@ def build_raws_dict(sts, tstart, tend):
     out_dict = {} # set up return dictionary
 
     for st in sts:
+
         print("~"*50)
         print(f"Collecting RAWS data for {st}")
         params["stid"] = [st]
