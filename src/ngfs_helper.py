@@ -269,7 +269,7 @@ class polar_data():
                                     [lon_tc_c4, lat_tc_c4]])
 
         #setup incident polygon, easier construction for square box
-        incident_polygon = box(inc_bb[0],inc_bb[2],inc_bb[3],inc_bb[3])
+        incident_polygon = box(inc_bb[0],inc_bb[2],inc_bb[1],inc_bb[3])
         
         #brute force way to get at it, loop through list of all viirs detections
         new_ign_pts = np.empty([0,2])
