@@ -634,7 +634,6 @@ def read_NGFS_csv_data(csv_file):
    #columns with critical time information from v1 and v2 csv files
    time_cols =  ['incident_start_time','observation_time','initial_observation_time']
    time_cols2 = ['acq_date_time','pixel_date_time'] #for v2 csv files
-   import pandas as pd
 
    # Check if csv_file is a list, if not convert it to a list
    if not isinstance(csv_file, list):
@@ -686,78 +685,6 @@ def read_NGFS_csv_data(csv_file):
    # Get the date string from the first file name in the list
    csv_date_str = csv_file[0][-18:-8]
 
-
-   '''
-   if type(csv_file) is not list:
-      csv_file = [csv_file]
-
-   
-   if type(csv_file) is list:
-      #read the first csv file in the list
-      #how to interpret the columns with all NULL, prevent reading of null data into type float when it should be a string?
-      null_columns = {
-         'incident_name':'string',
-         'incident_conf':'string',
-         'incident_type':'string'
-      }
-      #initialize an empty DataFrame, to be appended with NGFS csv file(s)
-      data = pd.DataFrame()
-      
-      for i in range(len(csv_file)): 
-         try: #read v2 csv
-         #if True:
-            data_read = pd.read_csv(csv_file[i], parse_dates=time_cols2)
-            #rename v2 variables as v1 counterparts as much as possible
-            data_read['initial_observation_time'] = data_read[time_cols2[1]]
-            data_read['incident_start_time'] = data_read[time_cols2[1]]  #pixel_date_time in csv v2
-            #force csv data to adhere to a specific type
-            data_read.rename(columns=nd.v2_to_v1, inplace=True)
-            data_read = data_read.astype(nd.v2_dict)
-             
-         except:
-            data_read = pd.read_csv(csv_file[i], parse_dates=time_cols)
-            #data_read[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data_read[time_cols[1]])).tz_localize('UTC')
-            #force csv data to adhere to a specific type
-            data_read['actual_image_time'] = data_read['observation_time']
-            try:
-               data_read = data_read.astype(nd.ngfs_dictionary)
-            except:
-               print('Trouble parsing data types, probably early ngfs version')
-               del data_read
-               data_read = pd.DataFrame()
-         #make sure the times are UTCread
-         
-         #data_read = data_read.astype(null_columns)
-         if len(data) == 0:
-            print('Reading first csv: ',csv_file[i])
-            data = data_read
-         else:
-            print('Merging with csv file: ', csv_file[i])
-            try:
-               data = pd.merge(data,data_read, how = 'outer')
-            except Exception as e:
-               print('Fail to merge with ',csv_file[i])
-               print(f"An exception occurred: {str(e)}")
-               #data = pd.concat([data,data_read],axis=1,join ='outer')
-         print('\tNumber of detections in csv: ',data_read.shape[0])
-         print('\tTotal number of detections: ',data.shape[0])
-      #for naming purposes, get only first file name in list
-      #assumes standard  filename for all detections in day
-      csv_date_str = csv_file[0][-18:-8]
-   else:
-      #print('\tReading :',csv_file)
-      #time.sleep(30)
-      try:
-         data = pd.read_csv(csv_file, parse_dates=time_cols)
-         data = data.astype(nd.ngfs_dictionary)
-      except:
-         data = pd.read_csv(csv_file, parse_dates=time_cols2)
-         data.rename(columns=nd.v2_to_v1, inplace=True)
-         data['initial_observation_time'] = data[time_cols[2]]
-         data['incident_start_time'] = data[time_cols[2]]
-         data = data.astype(nd.v2_dict)
-      csv_date_str = csv_file[-18:-8]
-   '''
    #make sure the times are UTC, seems to be take care of already, above
    try:
       data[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols[1]])).tz_localize('UTC')
