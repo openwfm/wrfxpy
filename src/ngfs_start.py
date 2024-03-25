@@ -755,14 +755,12 @@ def pixel_corners(csv_row):
    #read the corners of the pixel and return an array
    #csv_row is the entire rown from a csv data frame
    corners = np.zeros([4,2])
-   corners[0,1] = csv_row.loc['lat_c1']
-   corners[1,1] = csv_row.loc['lat_c2']
-   corners[2,1] = csv_row.loc['lat_c3']
-   corners[3,1] = csv_row.loc['lat_c4']
-   corners[0,0] = csv_row.loc['lon_c1']
-   corners[1,0] = csv_row.loc['lon_c2']
-   corners[2,0] = csv_row.loc['lon_c3']
-   corners[3,0] = csv_row.loc['lon_c4']
+
+   # Fill corners array with latitude and longitude values
+   for i in range(4):
+        corners[i, 1] = csv_row[f'lat_c{i+1}']
+        corners[i, 0] = csv_row[f'lon_c{i+1}']
+
    print('\t',corners)
    
 
@@ -918,6 +916,29 @@ if __name__ == '__main__':
    print('Acquiring Polar data')
    polar = nh.polar_data(csv.timestamp)
 
+   def add_firms_data(satellite, csv_timestamp, days_to_get):   #<<------ move into the NGFS_helper module?
+    try:
+        polar.add_firms_24(sat=satellite, csv_timestamp=csv_timestamp)
+    except:
+        print(f'Error getting {satellite} 24-hour data')
+
+    try:
+        polar.add_firms_dates(sat=satellite, csv_timestamp=csv_timestamp, days_to_get=days_to_get)
+    except:
+        print(f'Error getting {satellite} date data')
+
+   if csv.today:
+      print('\tGetting the polar data for the previous 24 hours')
+      satellites = ['noaa_20', 'suomi', 'landsat']
+      for satellite in satellites:
+         add_firms_data(satellite, csv.timestamp, 3)
+   else:
+      print(f'Getting the polar data for {csv_date_str}, {csv.timestamp.day_of_year}')
+      satellites = ['noaa_20', 'suomi']
+      for satellite in satellites:
+         add_firms_data(satellite, csv.timestamp, 3)
+
+   '''
    if csv.today:
       print('\tGetting the polar data for the previous 24 hours')
       ###current data
@@ -953,7 +974,7 @@ if __name__ == '__main__':
          polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 3)
       except:
          print('Error getting Suomi date data')
-
+   '''
       
    #polar.add_modis() #<<----------- different columns than the VIIIRS dat sets 
    
