@@ -565,42 +565,47 @@ def timestamp_from_string(csv_date_str):
    
     
 def get_ngfs_csv(days_previous,goes):
-  #downloads NGFS csv files from 0 to 4 days previous to now
-  #   to download today's csv: get_ngfs_csv(0)
-  #example csv name:
-  #   NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
+   #downloads NGFS csv files from 0 to 4 days previous to now
+   #   to download today's csv: get_ngfs_csv(0)
+   #example csv name:
+   #   NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
    
-  ngfs_dir = 'ingest/NGFS'
-  print('\tWill download to: ',utils.make_dir(ngfs_dir))
-   
-  #name the csv file
-  csv_day = datetime.now() - timedelta(days = days_previous)
-  day_of_year = csv_day.timetuple().tm_yday
-  yyyy = csv_day.timetuple().tm_year
-  mm = csv_day.timetuple().tm_mon
-  dd = csv_day.timetuple().tm_mday
-  
-  #join strings to have name and url of the csv file
-  if goes == 18:
-   csv_str = 'NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_'+str(yyyy)+'_'+str(mm).zfill(2)+'_'+str(dd).zfill(2)+'_'+str(day_of_year).zfill(3)+'.csv'
-   csv_url = 'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-WEST/CONUS/'+csv_str
-  else:
-   csv_str = 'NGFS_FIRE_DETECTIONS_GOES-16_ABI_CONUS_'+str(yyyy)+'_'+str(mm).zfill(2)+'_'+str(dd).zfill(2)+'_'+str(day_of_year).zfill(3)+'.csv'
-   csv_url = 'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-EAST/CONUS/'+csv_str
-  
-  print('\tDownloading: ',csv_str)
-  csv_path = ngfs_dir+'/'+csv_str
-  #downloading
-  if days_previous < 2:
-     download_url(csv_url,csv_path)
-  else:
-     if os.path.exists(csv_path):
-        print('\tUsing older data in ingest path')
-     else:
-        download_url(csv_url,csv_path)
-        
+   ngfs_dir = 'ingest/NGFS'
+   print('\tWill download to: ',utils.make_dir(ngfs_dir))
 
-  return csv_str, csv_path
+   #name the csv file
+   # Get the date components
+   csv_day = datetime.now() - timedelta(days=days_previous)
+   day_of_year = csv_day.timetuple().tm_yday
+   yyyy, mm, dd = csv_day.year, csv_day.month, csv_day.day
+
+ 
+   #join strings to have name and url of the csv file
+   # Define the base of the csv_str
+   base_str = 'NGFS_FIRE_DETECTIONS_GOES-{}_ABI_CONUS_{}_{}_{}_{}.csv'
+
+   # Determine the satellite
+   satellite = '18' if goes == 18 else '16'
+
+   # Format the csv_str using satellite and other variables
+   csv_str = base_str.format(satellite, yyyy, str(mm).zfill(2), str(dd).zfill(2), str(day_of_year).zfill(3))
+
+   # Define the csv_url using csv_str
+   csv_url = f'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-{"WEST" if goes == 18 else "EAST"}/CONUS/{csv_str}'
+
+  
+   print('\tDownloading: ',csv_str)
+   csv_path = ngfs_dir+'/'+csv_str
+   #downloading
+   if days_previous < 2:
+      download_url(csv_url,csv_path)
+   else:
+      if os.path.exists(csv_path):
+         print('\tUsing older data in ingest path')
+      else:
+         download_url(csv_url,csv_path)
+         
+   return csv_str, csv_path
    
 def download_csv_data(days_to_get):
    #downloads csv data by ftp, returns list of csv files obtained
@@ -937,44 +942,6 @@ if __name__ == '__main__':
       satellites = ['noaa_20', 'suomi']
       for satellite in satellites:
          add_firms_data(satellite, csv.timestamp, 3)
-
-   '''
-   if csv.today:
-      print('\tGetting the polar data for the previous 24 hours')
-      ###current data
-      try:
-         polar.add_firms_24(sat='noaa_20',csv_timestamp = csv.timestamp)
-      except:
-         print('Error getting NOAA_20 24-hour data')
-      try:
-         polar.add_firms_24(sat='suomi',csv_timestamp = csv.timestamp)
-      except:
-         print('Error getting Suomi 24-hour data')
-      try:
-         polar.add_firms_24(sat='landsat',csv_timestamp = csv.timestamp)
-      except:
-         print('Error getting Landsat 24-hour data')
-      ###archived data
-      try:
-         polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 3)
-      except:
-         print('Error getting NOAA_20 date data')
-      try:
-         polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 3)
-      except:
-         print('Error getting Suomi date data')
-   #archived data
-   else:
-      print('Getting the polar data for ',csv_date_str,csv.timestamp.day_of_year)
-      try:
-         polar.add_firms_dates(sat='noaa_20',csv_timestamp = csv.timestamp,days_to_get = 3)
-      except:
-         print('Error getting NOAA_20 date data')
-      try:
-         polar.add_firms_dates(sat='suomi',csv_timestamp = csv.timestamp,days_to_get = 3)
-      except:
-         print('Error getting Suomi date data')
-   '''
       
    #polar.add_modis() #<<----------- different columns than the VIIIRS dat sets 
    
