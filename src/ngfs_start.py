@@ -50,7 +50,8 @@ import state_names as sn
 import simple_forecast as sf
 import ngfs_dictionary as nd
 #import v2_to_v1_dict as v2d
-
+#from shapely.geometry import Point, LineString, Polygon
+#import geopandas as gpd
 ####### Classes  ######
 
 
@@ -76,7 +77,7 @@ class ngfs_day():
       self.sats = self.data['satellite_name'].unique()
       print('Data from: ',self.sats) 
    def add_full_data(self,full_data):
-      self.full_data = full_data # this is the csv file will entries in place
+      self.full_data = full_data # this is the csv file with all entries in place
    def num_incidents(self):
       return len(self.incidents)
    #boolen arrays that show status of incidents
@@ -306,6 +307,18 @@ class ngfs_incident():
          cfg['ignitions'] = { '1' : [ { 'time_utc' : self.time_utc,
                                    'duration_s' : ign_dur,
                                    'latlon' : self.new_ign_latlon } ] }  # <<---- new 
+         cfg['domains']['1']['center_latlon'] = self.new_ign_latlon
+         cfg['domains']['1']['truelats'] = (self.new_ign_latlon[0], self.new_ign_latlon[0])
+         cfg['domains']['1']['stand_lon'] = self.new_ign_latlon[1]
+
+      #check to see if domain will cover the the detection footprint
+      #make a geoseries  of the ingition point and construct a buffer around it
+      #see if buffer contains the bounding box, increas the size of the domain if not
+      '''
+      ctr_pt = Point(cfg['domains']['1']['center_latlon'][0],cfg['domains']['1']['center_latlon'][1])
+      pt_series = gpd.GeoSeries([ctr_pt])
+      '''
+
 
       cfg['start_utc'] = utils.utc_to_esmf(self.start_utc)
       cfg['end_utc'] = utils.utc_to_esmf(self.end_utc)
@@ -318,7 +331,7 @@ class ngfs_incident():
          cycle_hour = np.int8(np.trunc(self.start_utc.hour/6))*6
          cycle_start = cycle_start.replace(hour = cycle_hour)
          cfg['cycle_start_utc'] = utils.utc_to_esmf(cycle_start)
-         cfg['download_whole_cycle'] = 'true'
+         #cfg['download_whole_cycle'] = 'true' for 
 
       
       #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
@@ -621,6 +634,64 @@ def read_NGFS_csv_data(csv_file):
    #columns with critical time information from v1 and v2 csv files
    time_cols =  ['incident_start_time','observation_time','initial_observation_time']
    time_cols2 = ['acq_date_time','pixel_date_time'] #for v2 csv files
+   import pandas as pd
+
+   # Check if csv_file is a list, if not convert it to a list
+   if not isinstance(csv_file, list):
+      csv_file = [csv_file]
+
+   # Define null_columns dictionary
+   null_columns = {
+      'incident_name': 'string',
+      'incident_conf': 'string',
+      'incident_type': 'string'
+   }
+
+   # Initialize an empty DataFrame
+   data = pd.DataFrame()
+
+   # Loop through each csv file
+   for file_path in csv_file:
+      try:
+         # Try reading v2 csv file
+         data_read = pd.read_csv(file_path, parse_dates=time_cols2)
+         data_read['initial_observation_time'] = data_read[time_cols2[1]]
+         data_read['incident_start_time'] = data_read[time_cols2[1]]
+         data_read.rename(columns=nd.v2_to_v1, inplace=True)
+         data_read = data_read.astype(nd.v2_dict)
+      except:
+         # Read the csv file assuming it's an early ngfs version
+         data_read = pd.read_csv(file_path, parse_dates=time_cols)
+         data_read['actual_image_time'] = data_read['observation_time']
+         try:
+               data_read = data_read.astype(nd.ngfs_dictionary)
+         except:
+               print('Trouble parsing data types, probably early ngfs version')
+               data_read = pd.DataFrame()
+
+      # Merge the current data with existing data
+      if data.empty:
+         print('Reading first csv:', file_path)
+         data = data_read
+      else:
+         print('Merging with csv file:', file_path)
+         try:
+               data = pd.merge(data, data_read, how='outer')
+         except Exception as e:
+               print(f"Failed to merge with {file_path}: {str(e)}")
+
+      print('\tNumber of detections in csv:', data_read.shape[0])
+      print('\tTotal number of detections:', data.shape[0])
+
+   # Get the date string from the first file name in the list
+   csv_date_str = csv_file[0][-18:-8]
+
+
+   '''
+   if type(csv_file) is not list:
+      csv_file = [csv_file]
+
+   
    if type(csv_file) is list:
       #read the first csv file in the list
       #how to interpret the columns with all NULL, prevent reading of null data into type float when it should be a string?
@@ -648,7 +719,12 @@ def read_NGFS_csv_data(csv_file):
             #data_read[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data_read[time_cols[1]])).tz_localize('UTC')
             #force csv data to adhere to a specific type
             data_read['actual_image_time'] = data_read['observation_time']
-            data_read = data_read.astype(nd.ngfs_dictionary)
+            try:
+               data_read = data_read.astype(nd.ngfs_dictionary)
+            except:
+               print('Trouble parsing data types, probably early ngfs version')
+               del data_read
+               data_read = pd.DataFrame()
          #make sure the times are UTCread
          
          #data_read = data_read.astype(null_columns)
@@ -681,7 +757,7 @@ def read_NGFS_csv_data(csv_file):
          data['incident_start_time'] = data[time_cols[2]]
          data = data.astype(nd.v2_dict)
       csv_date_str = csv_file[-18:-8]
-   
+   '''
    #make sure the times are UTC, seems to be take care of already, above
    try:
       data[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols[1]])).tz_localize('UTC')
@@ -700,7 +776,7 @@ def prioritize_incidents(incidents,new_idx,num_starts):
    #nums_start is number of the new simulations to start set tpo be -1 
    priority_by_population = False
    filter_rx = True
-   frp_cutoff = 1e4
+   frp_cutoff = 5e3
    n = len(new_idx)
    started = np.zeros(n,dtype=int)
    pop = np.zeros(n)
@@ -776,7 +852,7 @@ if __name__ == '__main__':
    full_pick_list = glob.glob('ngfs/*.pkl')
    full_pick_list.sort(key=os.path.getmtime)
    pick_list = list()
-
+   #filters  out pickle files generated by running only a specific csv file
    for i in full_pick_list:
       #print(i)
       if 'GOES' not in i:
@@ -815,8 +891,7 @@ if __name__ == '__main__':
       
    else:
       # csv file passed as system argument
-      csv_file = list()
-      csv_file.append(sys.argv[1])  ## <--- A single file path
+      csv_file = [sys.argv[1]]  ## <--- A single file path
       print('Using existing csv file:')
       print('\t',csv_file[0]) 
       today = False
@@ -891,7 +966,7 @@ if __name__ == '__main__':
    print('Found ',num_id_strings, 'unique id strings')
    time.sleep(5)
 
-
+   #id strings seem to be less mutable thn the names
    initialize_by_names  = False
 
    if initialize_by_names:
@@ -906,12 +981,8 @@ if __name__ == '__main__':
    #should belong to the ngfs_day class object
    #array for recording which incidents are new
    new_idx = np.zeros((num_incidents,), dtype=int)
-   
-   
-   #incidents_names = [ngfs_incident(incident_names[i]) for i in range(num_names)] #  <------ change to use id_string?
-   #incidents_id_strings = [ngfs_incident(incident_id_strings[i]) for i in range(num_id_strings)]
 
-   #make an array of incident objects
+   #make an array of ngfs_incident objects
    if initialize_by_names:
       incidents = [ngfs_incident(incident_names[i]) for i in range(num_names)]
    else:
