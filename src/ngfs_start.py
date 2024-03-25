@@ -917,15 +917,15 @@ if __name__ == '__main__':
    polar = nh.polar_data(csv.timestamp)
 
    def add_firms_data(satellite, csv_timestamp, days_to_get):   #<<------ move into the NGFS_helper module?
-    try:
-        polar.add_firms_24(sat=satellite, csv_timestamp=csv_timestamp)
-    except:
-        print(f'Error getting {satellite} 24-hour data')
+      try:
+         polar.add_firms_24(sat=satellite, csv_timestamp=csv_timestamp)
+      except:
+         print(f'Error getting {satellite} 24-hour data')
 
-    try:
-        polar.add_firms_dates(sat=satellite, csv_timestamp=csv_timestamp, days_to_get=days_to_get)
-    except:
-        print(f'Error getting {satellite} date data')
+      try:
+         polar.add_firms_dates(sat=satellite, csv_timestamp=csv_timestamp, days_to_get=days_to_get)
+      except:
+         print(f'Error getting {satellite} date data')
 
    if csv.today:
       print('\tGetting the polar data for the previous 24 hours')
