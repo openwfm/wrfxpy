@@ -268,20 +268,26 @@ class ngfs_incident():
    
    def set_incident_bounding_box(self):
       #returns bounding box 
+
       try:
-         min_lat = min(min(self.data['lat_tc_c1']),min(self.data['lat_tc_c2']),min(self.data['lat_tc_c3']),min(self.data['lat_tc_c4']))
-         max_lat = max(max(self.data['lat_tc_c1']),max(self.data['lat_tc_c2']),max(self.data['lat_tc_c3']),max(self.data['lat_tc_c4']))
-         min_lon = min(min(self.data['lon_tc_c1']),min(self.data['lon_tc_c2']),min(self.data['lon_tc_c3']),min(self.data['lon_tc_c4']))
-         max_lon = max(max(self.data['lon_tc_c1']),max(self.data['lon_tc_c2']),max(self.data['lon_tc_c3']),max(self.data['lon_tc_c4'])) 
-      except:  #not in the v2 csv at all
+         lat_columns = [f'lat_tc_c{i}' for i in range(1, 5)]
+         lon_columns = [f'lon_tc_c{i}' for i in range(1, 5)]
+         min_lat = min(min(self.data[col]) for col in lat_columns)
+         max_lat = max(max(self.data[col]) for col in lat_columns)
+         min_lon = min(min(self.data[col]) for col in lon_columns)
+         max_lon = max(max(self.data[col]) for col in lon_columns)
+      except:
          print('\tNo terrain corrected corners')
-         min_lat = min(min(self.data['lat_c1']),min(self.data['lat_c2']),min(self.data['lat_c3']),min(self.data['lat_c4']))
-         max_lat = max(max(self.data['lat_c1']),max(self.data['lat_c2']),max(self.data['lat_c3']),max(self.data['lat_c4']))
-         min_lon = min(min(self.data['lon_c1']),min(self.data['lon_c2']),min(self.data['lon_c3']),min(self.data['lon_c4']))
-         max_lon = max(max(self.data['lon_c1']),max(self.data['lon_c2']),max(self.data['lon_c3']),max(self.data['lon_c4']))
-      self.bbox = min_lon,max_lon,min_lat,max_lat
-      print('\tBounding box: ' , self.bbox)
-   
+         lat_columns = [f'lat_c{i}' for i in range(1, 5)]
+         lon_columns = [f'lon_c{i}' for i in range(1, 5)]
+         min_lat = min(min(self.data[col]) for col in lat_columns)
+         max_lat = max(max(self.data[col]) for col in lat_columns)
+         min_lon = min(min(self.data[col]) for col in lon_columns)
+         max_lon = max(max(self.data[col]) for col in lon_columns)
+
+      self.bbox = min_lon, max_lon, min_lat, max_lat
+      print('\tBounding box:', self.bbox)
+ 
    def make_incident_configuration(self,base_cfg):
       #change the base configuration file to match the individual incidents parameters
       
@@ -1028,7 +1034,3 @@ if __name__ == '__main__':
       csv.save_incident_text()
    csv.save_pickle()
    csv.print_base_map()
-
-   
-   
-   
