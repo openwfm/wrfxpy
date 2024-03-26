@@ -42,7 +42,7 @@ class polar_data():
         self.timestamp = csv_timestamp
         self.csv_date_str = str(csv_timestamp.year)+'_'+str(csv_timestamp.month)+'_'+str(csv_timestamp)
         self.firms_path = 'ingest/FIRMS/'
-        self.satlist = ['noaa_20','suomi','modis','landsat']
+        self.satlist = ['noaa_20','noaa_21','suomi','modis','landsat']
     
     #add nrt data, filter out low confidence detections
     def sort_data_bytime(self):
@@ -76,31 +76,25 @@ class polar_data():
         return data_read
     
     def add_firms_24(self,sat,csv_timestamp):
-        
+    
+        # Dictionary mapping satellite names to directory and file names
+        satellite_info = {
+            'noaa_20': ('noaa-20-viirs-c2/csv/', 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'),
+            'noaa_21': ('noaa-21-viirs-c2/csv/', 'J2_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'),
+            'suomi': ('suomi-npp-viirs-c2/csv/', 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'),
+            'modis': ('modis-c6.1/csv/', 'MODIS_C6_1_USA_contiguous_and_Hawaii_48h.csv'),
+            'landsat': ('landsat/csv/', 'LANDSAT_USA_contiguous_and_Hawaii_48h.csv')
+        }
+
         if sat not in self.satlist:
-            print('Unknownn satellite named', sat)
+            print('Unknown satellite named', sat)
             return
-        url_base = 'https://firms.modaps.eosdis.nasa.gov/data/active_fire/'
-        noaa_20_dir = 'noaa-20-viirs-c2/csv/'
-        noaa_20_file = 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'
-        suomi_dir =   'suomi-npp-viirs-c2/csv/'
-        suomi_file = 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'
-        modis_dir =   'modis-c6.1/csv/'
-        modis_file = 'MODIS_C6_1_USA_contiguous_and_Hawaii_48h.csv'
-        landsat_dir = 'landsat/csv/'
-        landsat_file = 'LANDSAT_USA_contiguous_and_Hawaii_48h.csv'
-        if sat == 'noaa_20':
-            csv_url = url_base + noaa_20_dir + noaa_20_file
-            csv_local = self.firms_path + noaa_20_file
-        if sat == 'suomi':
-            csv_url = url_base + suomi_dir + suomi_file
-            csv_local = self.firms_path + suomi_file
-        if sat == 'modis':
-            csv_url = url_base + modis_dir + modis_file
-            csv_local = self.firms_path + modis_file
-        if sat == 'landsat':
-            csv_url = url_base + landsat_dir + landsat_file
-            csv_local = self.firms_path + landsat_file
+
+        # Constructing csv_url and csv_local using satellite_info dictionary
+        sat_dir, sat_file = satellite_info[sat]
+        csv_url = f'https://firms.modaps.eosdis.nasa.gov/data/active_fire/{sat_dir}{sat_file}'
+        csv_local = self.firms_path + sat_file
+
         #download if the csv file doesn't exist or is older than 7200 seconds = 2 hours
         if not os.path.exists(csv_local):
                 self.download_url(csv_url,self.firms_path)
@@ -137,7 +131,7 @@ class polar_data():
             self.data = data_read
 
     def add_firms_dates(self,sat,csv_timestamp,days_to_get):
-        #sat is string with sateliite name, modis is not included yet
+        #sat is string with sateliite name, modis is not included 
         #csv_datestamp is a pandas.timestamp object
         #gets firms nrt for specific dates, maybe requires tokens
         #wget -e robots=off -m -np -R .html,.tmp -nH --cut-dirs=3 "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/README.pdf" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJBUFMgT0F1dGgyIEF1dGhlbnRpY2F0b3IiLCJpYXQiOjE2ODY5MjIwMjQsIm5iZiI6MTY4NjkyMjAyNCwiZXhwIjoxNzAyNDc0MDI0LCJ1aWQiOiJqaGFsZXkiLCJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.dsvczMWdYHnowYZ-k_wG5KKXIvJJQfzdaxd0lL6hj6M" -P .
@@ -157,33 +151,67 @@ class polar_data():
             return
         
         #same for all satellites
-        url_base = 'https://nrt3.modaps.eosdis.nasa.gov/archive/FIRMS/'
+        url_base = 'https://nrt4.modaps.eosdis.nasa.gov/archive/FIRMS/'
+
+        satellite_info = {
+            'noaa_20': {
+                'csv_file_pattern': 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_VJ114IMGTDL_NRT_{0}{1:03d}.txt',
+                'csv_dir': 'noaa-20-viirs-c2/USA_contiguous_and_Hawaii/'
+            },
+            'noaa_21': {
+                'csv_file_pattern': 'J2_VIIRS_C2_USA_contiguous_and_Hawaii_VJ214IMGTDL_NRT_{0}{1:03d}.txt',
+                'csv_dir': 'noaa-21-viirs-c2/USA_contiguous_and_Hawaii/'
+            },
+            'suomi': {
+                'csv_file_pattern': 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_VNP14IMGTDL_NRT_{0}{1:03d}.txt',
+                'csv_dir': 'suomi-npp-viirs-c2/USA_contiguous_and_Hawaii/'
+            },
+            'landsat': {
+                'csv_file_pattern': '',
+                'csv_dir' : ''
+            }
+        }
 
         #particulars for individual satellites
         for i in range(days_to_get):
             print('Getting polar data from ',day_of_year - i,'th day of ',year)
-
+            '''
             if sat == 'noaa_20':
                 csv_file = 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_VJ114IMGTDL_NRT_'+str(year)+str(day_of_year - i).zfill(3)+'.txt'
                 csv_dir = 'noaa-20-viirs-c2/USA_contiguous_and_Hawaii/'
             if sat == 'suomi':
                 csv_file = 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_VNP14IMGTDL_NRT_'+str(year)+str(day_of_year - i).zfill(3)+'.txt'
                 csv_dir = 'suomi-npp-viirs-c2/USA_contiguous_and_Hawaii/'   
+            if sat == 'noaa_21':
+                csv_file = 'J2_VIIRS_C2_USA_contiguous_and_Hawaii_VJ214IMGTDL_NRT_'+str(year)+str(day_of_year - i).zfill(3)+'.txt'
+                csv_dir = 'noaa-21-viirs-c2/USA_contiguous_and_Hawaii/'
             if sat == 'modis':
                 #csv_url = url_base + modis_dir + modis_file
                 pass
-            
+            '''
+            if sat in satellite_info:
+                satellite_data = satellite_info[sat]
+                csv_file = satellite_data['csv_file_pattern'].format(year, day_of_year - i)
+                csv_dir = satellite_data['csv_dir']
+            else:
+                print('Unknown or unprogrammed satellite named', sat)
+                return
+
+
             #remote and local locations of the csv file
             csv_url = url_base + csv_dir + csv_file
             csv_local = self.firms_path + csv_file
 
             #downloading not working, files are all in place
             if not os.path.exists(csv_local):
-                 print('updating VIIRS data cache',csv_local)
-                 cmd_str_suomi = 'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
-                 cmd_str_noaa_20 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-20-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
-                 os.system(cmd_str_suomi)
-                 os.system(cmd_str_noaa_20)
+                print('updating VIIRS data cache',csv_local)
+                cmd_str_suomi = 'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt4.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
+                cmd_str_noaa_20 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt4.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-20-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
+                cmd_str_noaa_21 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt4.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-21-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
+                #self.download_url(csv_url,self.firms_path)
+                os.system(cmd_str_suomi)
+                os.system(cmd_str_noaa_20)
+                os.system(cmd_str_noaa_21)
             # else:
             #     print('\tPolar data for',sat, 'already in place')
             if not os.path.exists(csv_local):
@@ -192,7 +220,7 @@ class polar_data():
             else:
                 print('\tReading',csv_local)
                 data_read = pd.read_csv(csv_local)
-                #make the acq_date into a utc timestamp
+                #make the acq_date into a utc timestampjobs 
                 data_read['acq_date'] = pd.to_datetime(data_read['acq_date'], utc = True)
                 #print(data_read['acq_date'].iloc[0])
                 #make sure the "acq_time" column is a string"
@@ -252,7 +280,11 @@ class polar_data():
         print('\tFinding best viirs pixel for the incident GOES ignition point')
         print('\tTime of GOES imaging: ',ignition_pixel.loc['observation_time'])
 
-        #setup pixel polygon
+        #setup ignition pixel polygon
+
+        vertices = [(ignition_pixel[f'lon_tc_c{i}'], ignition_pixel[f'lat_tc_c{i}']) for i in range(1, 5)]
+        ignition_polygon = Polygon(vertices)
+        '''
         lon_tc_c1 = ignition_pixel['lon_tc_c1']
         lat_tc_c1 = ignition_pixel['lat_tc_c1']
         lon_tc_c2 = ignition_pixel['lon_tc_c2']
@@ -267,7 +299,7 @@ class polar_data():
                                     [lon_tc_c2, lat_tc_c2], 
                                     [lon_tc_c3, lat_tc_c3], 
                                     [lon_tc_c4, lat_tc_c4]])
-
+        '''
         #setup incident polygon, easier construction for square box
         incident_polygon = box(inc_bb[0],inc_bb[2],inc_bb[1],inc_bb[3])
         
