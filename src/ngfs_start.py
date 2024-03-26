@@ -940,12 +940,12 @@ if __name__ == '__main__':
 
    if csv.today:
       print('\tGetting the polar data for the previous 24 hours')
-      satellites = ['noaa_20', 'suomi', 'landsat']
+      satellites = ['noaa_20', 'noaa_21','suomi', 'landsat']
       for satellite in satellites:
          add_firms_data(satellite, csv.timestamp, 3)
    else:
       print(f'Getting the polar data for {csv_date_str}, {csv.timestamp.day_of_year}')
-      satellites = ['noaa_20', 'suomi']
+      satellites = ['noaa_20', 'noaa_21', 'suomi']
       for satellite in satellites:
          add_firms_data(satellite, csv.timestamp, 3)
       
