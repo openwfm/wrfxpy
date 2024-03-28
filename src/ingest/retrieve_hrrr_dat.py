@@ -14,6 +14,7 @@ import pandas as pd
 import subprocess
 import sys
 from pathlib import Path
+import numpy as np
 
 # Objects ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -39,13 +40,13 @@ band_df_hrrr = pd.DataFrame({
               'surface Total Precipitation [kg/m^2]',
               '0.0m below ground Volumetric Soil Moisture Content [Fraction]',
               'Plant Canopy Surface Water [kg/m^2]',
-              'surface Ground Heat Flux [W/m^2]']
+              'surface Ground Heat Flux [W/m^2]'],
+    'notes': "Precipitation data for HRRR is always 0 at time 0"
 })
 
 # Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def slice_gribs(grib_file, outpath):
-    
 
     filename = osp.join(outpath, Path(osp.basename(grib_path)).stem)
     command = "python " + geotiff_func_path + " " + grib_file + " " + filename
@@ -54,6 +55,20 @@ def slice_gribs(grib_file, outpath):
         band = int(band_df_hrrr['Band'][i])
         subprocess.call(command + " " + str(band),shell=True)
     return
+
+def ftimes(n):
+    # Helper function to generate list of strings used to identify forecast times
+    # Input: integer n of number of forecast hours
+    # Output: list of strings of form ["00", "01", "02", ...]
+    
+    # Generate numbers from 0 to n
+    n = int(n)
+    numbers = np.arange(n + 1)
+    # Convert numbers to strings with leading zeros
+    strings = np.char.zfill(numbers.astype(str), 2)
+    # Convert NumPy array to a Python list
+    l = strings.tolist()
+    return l
 
 # Executed Code ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -83,6 +98,8 @@ if __name__ == '__main__':
 
     # Handle Date
     dates = pd.date_range(start=start,end=end, freq="1H") # Series of dates in 1 hour increments
+    # Forecast hour format
+    ft = ftimes(forecast_hours)
 
     print(f'Number of analysis hours: {dates.shape[0]}')
 
@@ -90,26 +107,37 @@ if __name__ == '__main__':
         print('~'*30)
         
         # Format time
-        time=dates[t].strftime(fmt)
-        tforecast = dates[t] + pd.DateOffset(hours = 1)
+        time=dates[t].strftime(fmt) # start time for retrieve_gribs
+        tforecast = dates[t] + pd.DateOffset(hours = int(forecast_hours)) # end time for retrieve_gribs
         tforecast = tforecast.strftime(fmt)
-
-        #temppath = osp.join(cfg.dest_dir, "temp")
         
+        # Call retrieve_gribs via subprocess
         command = base_str + str(time) + " " + str(tforecast) + " ~"
         print(command)
         subprocess.call(command,shell=True)
-        
+        # Set up destination file path
         temppath = osp.join(outpath, dates[t].strftime("%Y%m%d"))
         os.makedirs(temppath, exist_ok=True)
 
+        # Loop over analysis/forecast hours and slice_gribs to get needed HRRR bands
+        ft = ftimes(forecast_hours)
+        for ts in ft:
+            grib_path = osp.join(sys_cfg.sys_install_path, "ingest", grib_source, grib_source.lower()+'.'+dates[t].strftime("%Y%m%d"),'conus', f"{grib_source.lower()}.t{dates[t].strftime('%H')}z.wrfprsf{ts}.grib2")
+            print("Grib Path: " + grib_path)
+            if os.path.exists(grib_path):
+                slice_gribs(grib_path, temppath)
+            else:
+                print(f"File does not exist: {grib_path}")
+
+
+
         # Slice grib file to get needed bands
-        grib_path = osp.join(sys_cfg.sys_install_path, "ingest", grib_source, grib_source.lower()+'.'+dates[t].strftime("%Y%m%d"),'conus', grib_source.lower()+'.t'+dates[t].strftime('%H')+'z.wrfprsf00.grib2')
-        print("Grib Path: " + grib_path)
-        if os.path.exists(grib_path):
-            slice_gribs(grib_path, temppath)
-        else:
-            print(f"File does not exist: {grib_path}")
+        #grib_path = osp.join(sys_cfg.sys_install_path, "ingest", grib_source, grib_source.lower()+'.'+dates[t].strftime("%Y%m%d"),'conus', grib_source.lower()+'.t'+dates[t].strftime('%H')+'z.wrfprsf00.grib2')
+        #print("Grib Path: " + grib_path)
+        #if os.path.exists(grib_path):
+        #    slice_gribs(grib_path, temppath)
+        #else:
+        #    print(f"File does not exist: {grib_path}")
         # Remove gribs file for space cleanup
         ## NOTE: leaving associated .size there as paper trail 
         #if os.path.exists(grib_path):
