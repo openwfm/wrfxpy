@@ -345,6 +345,7 @@ def run_fire_init(js, q):
             perim1 = perims['perim1'].coords
             perim2 = perims['perim2'].coords
             fxlon, fxlat = get_subgrid_coordinates(params['wrf_path'], strip=False)
+            params['bbox'] = [fxlon.min(),fxlon.max(),fxlat.min(),fxlat.max()]
             fire_init.perims_interp(perim1, perim2, fxlon, fxlat, **params)
         js.fire_perimeter_time = params.get('spinup_time', 7200.)
         q.put('SUCCESS')
@@ -565,11 +566,13 @@ def read_namelist(path):
 def ensure_abs_path(path,js,max_char=20):
     if len(path) > max_char:
         hexhash = hashlib.sha224(js.job_id.encode()).hexdigest()[:6]
-        geo_path = osp.join(js.wrfxpy_dir,'cache/geo_data.{}'.format(hexhash))
+        geo_path = osp.join(js.wrfxpy_dir, 'cache/geo_data.{}'.format(hexhash))
         js.geo_cache = geo_path
         make_dir(geo_path)
-        new_path = osp.join(geo_path,osp.basename(path))
-        symlink_unless_exists(path,new_path)
+        new_path = osp.join(geo_path, osp.basename(path))
+        if osp.exists(new_path):
+            os.remove(new_path)
+        symlink_unless_exists(path, new_path)
         return new_path
     else:
         return path
@@ -739,7 +742,11 @@ def execute(args,job_args):
             logging.info('using real-time data requested, ignoring specified ignitions')
             js.fire_init_dir = osp.abspath(osp.join(js.jobdir, 'fire_init'))
 
-    js.num_doms = len(js.domains)
+    # Parse and setup the domain configuration
+    js.domain_conf = WPSDomainConf(js.domains)
+    js.num_doms = len(js.domain_conf)
+    logging.info("number of domains defined is %d." % js.num_doms)
+
     json.dump(job_args, open(osp.join(js.jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
     jsub = make_job_file(js)
     json.dump(jsub, open(jsub.jobfile,'w'), indent=4, separators=(',', ': '))
@@ -747,11 +754,6 @@ def execute(args,job_args):
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     sys.stdout.flush()
     send_email(js, 'start', 'Job %s started.' % js.job_id)
-
-    # Parse and setup the domain configuration
-    js.domain_conf = WPSDomainConf(js.domains)
-    js.num_doms = len(js.domain_conf)
-    logging.info("number of domains defined is %d." % js.num_doms)
 
     js.bounds = Dict({})
     for k,domain in enumerate(js.domain_conf.domains):
@@ -967,7 +969,11 @@ def execute(args,job_args):
         logging.error('Real step failed with exception %s, retrying ...' % str(e))
         Real(js.wrf_dir).execute().check_output()
     # write subgrid coordinates in input files
-    subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()]
+    subgrid_wrfinput_files = [
+        'wrfinput_d{:02d}'.format(int(d)) 
+            for d,_ in args.domains.items() 
+                if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()
+    ]
     for in_path in subgrid_wrfinput_files:
         fill_subgrid(osp.join(js.wrf_dir, in_path))
 
@@ -989,7 +995,10 @@ def execute(args,job_args):
             force_copy(wrf_path, wrf_path + '_orig')
             outside_time = fire_data.get('outside_time', 360000.)
             no_fuel_cat = js.fire_nml['fuel_scalars']['no_fuel_cat']
-            fire_init.integrate_init(wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], outside_time, no_fuel_cat)
+            fire_init.integrate_init(
+                wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], 
+                outside_time=outside_time, no_fuel_cat=no_fuel_cat
+            )
             if 'prev_forecast' in js.keys():
                 # implementation of adding smoke from previous forecast
                 wrfinput_paths = sorted(glob.glob(osp.join(js.wrf_path, 'wrfinput*')))
