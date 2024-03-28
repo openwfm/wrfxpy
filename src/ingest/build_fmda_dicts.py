@@ -34,18 +34,27 @@ hrrrpath = "/home/hirschij/data/hrrr/geotiff_files" # path for atmospheric data 
 # Downward shortwave is expected theoretically to be the most useful solar field 
 # RAWS have downward shortwave sensors, so these could be compared to model fields
 band_df_hrrr = pd.DataFrame({
-    'Band': [585, 616, 620, 628, 629, 661],
-    'hrrr_name': ['GUST', 'TMP', 'RH', 'PRATE', 'APCP',
-                  'DSWRF'],
-    'dict_name': ["wind", "temp", "rh", "rain", "precip_accum",
-                 "solar"],
-    'descr': ['surface Wind Speed (Gust) [m/s]',
-              '2 m Temperature [K]', 
-              '2 m Relative Humidity [%]', 
+    'Band': [616, 620, 624, 628, 629, 661, 561, 612, 643],
+    'hrrr_name': ['TMP', 'RH', "WIND", 'PRATE', 'APCP',
+                  'DSWRF', 'SOILW', 'CNWAT', 'GFLUX'],
+    'dict_name': ["temp", "rh", "wind", "rain", "precip_accum",
+                 "solar", "soilm", "canopyw", "groundflux"],
+    'descr': ['2m Temperature [K]', 
+              '2m Relative Humidity [%]', 
+              '10m Wind Speed [m/s]'
               'surface Precip. Rate [kg/m^2/s]',
               'surface Total Precipitation [kg/m^2]',
-              'surface Downward Short-Wave Radiation Flux [W/m^2]']
+              'surface Downward Short-Wave Radiation Flux [W/m^2]',
+              'surface Total Precipitation [kg/m^2]',
+              '0.0m below ground Volumetric Soil Moisture Content [Fraction]',
+              'Plant Canopy Surface Water [kg/m^2]',
+              'surface Ground Heat Flux [W/m^2]']
 })
+
+# These are the variables I could find that correspond to the HRRR vars above, look into "variables()" from SynopticPy for more
+# RAWS var 'Vertical Heat_Flux' might correspond to ground flux?
+# Soil moisture has sparse availability and might never show up in final dictioanries
+raws_vars = ["air_temp", "relative_humidity", "precip_accum", "fuel_moisture", "wind_speed", "solar_radiation", "soil_moisture"]
 
 utc_format = "%Y-%m-%dT%H:%M:%SZ" # date format for UTC
 
@@ -165,7 +174,7 @@ def format_raws_df(df, tstart, tend):
         raws["rain"] = format_precip(raws["precip_accum"])
 
     ## Format Names
-    name_mapping = {"air_temp":"temp", "fuel_moisture":"fm", "relative_humidity":"rh", "precip_accum":"rain","solar_radiation":"solar", "wind_speed":"wind", "precip_accum":"precip_accum"}
+    name_mapping = {"air_temp":"temp", "fuel_moisture":"fm", "relative_humidity":"rh", "precip_accum":"rain","solar_radiation":"solar", "wind_speed":"wind", "precip_accum":"precip_accum", "soil_moisture":"soil_moisture"}
     old_keys = [*raws.keys()]
     new_keys = []
     for key in old_keys:
@@ -424,7 +433,7 @@ if __name__ == '__main__':
     # Parameter dictionary used within SynopticPy
     params = dict(
         stid=["PLACEHOLDER"], # change this in the loop
-        vars=["air_temp", "relative_humidity", "precip_accum", "fuel_moisture", "wind_speed", "solar_radiation"],
+        vars=raws_vars,
         start=t0,
         end= t1+timedelta(hours=1) # add an hour since it doesn't include end date exactly
     )
