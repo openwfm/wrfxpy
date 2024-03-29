@@ -289,31 +289,49 @@ def get_projection_info(ds, epsg = 4326):
 
     return ct, gt_inv
 
-def build_hrrr_path(d, band):
+def build_hrrr_path(d, band, fhour):
     # Inputs:
     # d: (datetime)
     # band: (int) HRRR band number
+    # fhour: (int) forecast hour, eg "00" or "01"
     # Returns: (str) filepath to geotiff file
     day_file = d.strftime("%Y%m%d") # HRRR data stash is in this format
     hour = d.strftime("%H")
-    tpath = osp.join(hrrrpath, day_file, f"hrrr.t{hour}z.wrfprsf00.{band}.tif")
+    tpath = osp.join(hrrrpath, day_file, f"hrrr.t{hour}z.wrfprsf{fhour}.{band}.tif")
     return tpath
 
-def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
+def ftimes(n):
+    # Helper function to generate list of strings used to identify forecast times
+    # Input: integer n of number of forecast hours
+    # Output: list of strings of form ["00", "01", "02", ...]
+    
+    # Generate numbers from 0 to n
+    n = int(n)
+    numbers = np.arange(n + 1)
+    # Convert numbers to strings with leading zeros
+    strings = np.char.zfill(numbers.astype(str), 2)
+    # Convert NumPy array to a Python list
+    l = strings.tolist()
+    return l
+
+def build_hrrr_dict(tstart, tend, dat, fhours, method = 'linear'):
     # tstart: (datetime)    start time
     # tend: (datetime)     end time
     # dat: (dict) dictionary, output of build_raws_dict
+    # fhours: (int) number of hours into forecast
     # method: (str) interpolation method, passed to ts_at
     
     # Get times array
     times = pd.date_range(start=tstart,end=tend, freq="1H")
+    # Forecast hours string formatting
+    ft = ftimes(fhours)
 
     # Get Projection data from first band from band_df_hrrr,
     # reuse projection info for other bands
     # NOTE: this results in 1 extra read of geotiff files, but doing it for clarity
     d = times[0]
     band = band_df_hrrr.Band[0]
-    tpath = build_hrrr_path(d, band)
+    tpath = build_hrrr_path(d, band, "00")
     print(f"Opening: {tpath}")
     if not osp.exists(tpath): 
         raise FileNotFoundError(f"The file '{tpath}' does not exist.")
@@ -327,8 +345,10 @@ def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
     # Add pixel_x and pixel_y to loc subdirectory to use with interpolation
     for k in dat.keys():
         dat[k]["HRRR"] = {"time": times.strftime(utc_format).to_numpy()} # Initialize HRRR subdir with times
-        for name in band_df_hrrr.dict_name:
-            dat[k]["HRRR"][name] = np.full(len(times), np.nan, dtype=np.float64) # Initialize time series with np.nan
+        for ts in ft:
+            dat[k]["HRRR"][f"f{ts}"]={}
+            for name in band_df_hrrr.dict_name:
+                dat[k]["HRRR"][f"f{ts}"][name] = np.full(len(times), np.nan, dtype=np.float64) # Initialize time series with np.nan
         lon = dat[k]["loc"]["lon"]
         lat = dat[k]["loc"]["lat"]
         print(f"Interpolating to RAWS {dat[k]['loc']['STID']}, target lat/lon {lat, lon}")
@@ -339,7 +359,7 @@ def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
         dat[k]["loc"]["pixel_y"] = pixel_y
         print("")
     
-    # Loop over bands, build time series for each station in dictionary
+    # Loop over bands and forecast hours, build time series for each station in dictionary
     for index, row in band_df_hrrr.iterrows():
         print("~"*50)
         band = row["Band"]
@@ -348,18 +368,19 @@ def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
         for i in range(0, len(times)):
             d = times[i]
             print(f"Collecting Data for date: {d}")
-            tpath = build_hrrr_path(d, band)
-            print(f"Opening: {tpath}")
-            ds = gdal.Open(tpath)
-            data = ds.GetRasterBand(1).ReadAsArray()
-            # Loop over dictionary keys to interpolte for each station loc
-            for k in dat:
-                pixel_x = dat[k]["loc"]["pixel_x"]
-                pixel_y = dat[k]["loc"]["pixel_y"]
-                interp_val = ts_at(pixel_x, pixel_y, data, method = method)
-                # Fill appropriate array value with interpolated value
-                dat[k]["HRRR"][dict_name][i] = interp_val
-            ds = None # close connection
+            for ts in ft:
+                tpath = build_hrrr_path(d, band, ts)
+                print(f"Opening: {tpath}")
+                ds = gdal.Open(tpath)
+                data = ds.GetRasterBand(1).ReadAsArray()
+                # Loop over dictionary keys to interpolte for each station loc
+                for k in dat:
+                    pixel_x = dat[k]["loc"]["pixel_x"]
+                    pixel_y = dat[k]["loc"]["pixel_y"]
+                    interp_val = ts_at(pixel_x, pixel_y, data, method = method)
+                    # Fill appropriate array value with interpolated value
+                    dat[k]["HRRR"][f"f{ts}"][dict_name][i] = interp_val
+                ds = None # close connection
             
     # Convert temp C to K
     # NOTE: this assumes simple celcius temps, which is what we have seen in HRRR 
@@ -369,17 +390,17 @@ def build_hrrr_dict(tstart, tend, dat, method = 'linear'):
     print("~"*50)
     print("Calculating moisture Equilibria from rh and temp")
     for k in dat:
-        rh = dat[k]["HRRR"]["rh"]
-        temp = dat[k]["HRRR"]["temp"]
-        if np.any(temp < 150):
-            temp += 273.15
-            # Below if statement to only print once
-            if k == [*out_dict.keys()][0]:
-                print("Converting HRRR data temp from C to K") 
-        dat[k]["HRRR"]["Ed"] = 0.924*rh**0.679 + 0.000499*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - temp)*(1 - np.exp(-0.115*rh))
-        dat[k]["HRRR"]["Ew"] = 0.618*rh**0.753 + 0.000454*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - temp)*(1 - np.exp(-0.115*rh))    
-        dat[k]["HRRR"]["descr"] = f"Source: HRRR data from 3d pressure model, linear grid interpolated to RAWS location"
-    
+        for ts in ft:
+            rh = dat[k]["HRRR"][f"f{ts}"]["rh"]
+            temp = dat[k]["HRRR"][f"f{ts}"]["temp"]
+            if np.any(temp < 150):
+                temp += 273.15
+                # Below if statement to only print once
+                if k == [*out_dict.keys()][0]:
+                    print("Converting HRRR data temp from C to K") 
+            dat[k]["HRRR"][f"f{ts}"]["Ed"] = 0.924*rh**0.679 + 0.000499*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - temp)*(1 - np.exp(-0.115*rh))
+            dat[k]["HRRR"][f"f{ts}"]["Ew"] = 0.618*rh**0.753 + 0.000454*np.exp(0.1*rh) + 0.18*(21.1 + 273.15 - temp)*(1 - np.exp(-0.115*rh))    
+            dat[k]["HRRR"][f"f{ts}"]["descr"] = f"Source: HRRR data from 3d pressure model, linear grid interpolated to RAWS location"
     return dat
 
 def parse_bbox(box_str):
@@ -401,7 +422,7 @@ def parse_bbox(box_str):
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 6:
         print(f"Invalid arguments. {len(sys.argv)} was given but 5 expected")
         print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <bbox> <target_file>' % sys.argv[0]))
         print("Example: python src/ingest/build_fmda_dicts.py 202401010000 202401010200 '[37,-105,39,-103]' ~/testfile.pickle")
@@ -411,13 +432,15 @@ if __name__ == '__main__':
     start = sys.argv[1]
     end = sys.argv[2]
     bbox = parse_bbox(sys.argv[3])
-    outfile = sys.argv[4]
+    forecast_hours = sys.argv[4]
+    outfile = sys.argv[5]
     
     # Build empty dictionary to fill with functions below
     t0 = datetime.strptime(start, "%Y%m%d%H%M")
     t1 = datetime.strptime(end, "%Y%m%d%H%M")
-    
+
     print(f"Building FMDA Dictionary for RAWS Sites within {bbox}, from {t0} to {t1}")
+    print(f"Number of Forecast Hours: {forecast_hours}")
     print("~"*50)
     print("Hard-coded paths in the code. (Make more flexible in the future)")
     print(f"RAWS Stash location: {rawspath}")
@@ -443,7 +466,7 @@ if __name__ == '__main__':
 
     print("~"*50)
     print("Retrieving HRRR Data and Interpolating")
-    out_dict = build_hrrr_dict(t0, t1, out_dict)
+    out_dict = build_hrrr_dict(t0, t1, out_dict, forecast_hours)
     
     print(f"Writing output to {outfile}")
     # print(f"Output hash: {hash2(out_dict)}") 
