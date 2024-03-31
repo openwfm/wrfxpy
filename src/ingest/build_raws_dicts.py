@@ -281,7 +281,7 @@ if __name__ == '__main__':
     # Get station availability within bbox
     # NOTE: SynopticPy has bug where stations_metadata where it doesn't properly use time parameters for station availability in a bbox. See Issue #55 SynopticPy on github
     url = f"https://api.synopticdata.com/v2/stations/metadata?bbox={bbox2[0]},{bbox2[1]},{bbox2[2]},{bbox2[3]}&vars=fuel_moisture&obrange={start},{end}&token={meso_token}"
-    print(f"Attempting Synoptic retrieval from URL: https://api.synopticdata.com/v2/stations/metadata?bbox={bbox2[0]},{bbox2[1]}, {bbox2[2]},{bbox2[3]}&vars=fuel_moisture&obrange={start},{end}&token=HIDDEN")
+    print(f"Attempting Synoptic retrieval from URL: https://api.synopticdata.com/v2/stations/metadata?bbox={bbox2[0]},{bbox2[1]},{bbox2[2]},{bbox2[3]}&vars=fuel_moisture&obrange={start},{end}&token=HIDDEN")
     command = f"curl -X GET '{url}'"
     #print(command)
     #subprocess.call(command,shell=True)
