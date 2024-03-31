@@ -129,25 +129,8 @@ if __name__ == '__main__':
             else:
                 print(f"File does not exist: {grib_path}")
 
-
-
-        # Slice grib file to get needed bands
-        #grib_path = osp.join(sys_cfg.sys_install_path, "ingest", grib_source, grib_source.lower()+'.'+dates[t].strftime("%Y%m%d"),'conus', grib_source.lower()+'.t'+dates[t].strftime('%H')+'z.wrfprsf00.grib2')
-        #print("Grib Path: " + grib_path)
-        #if os.path.exists(grib_path):
-        #    slice_gribs(grib_path, temppath)
-        #else:
-        #    print(f"File does not exist: {grib_path}")
-        # Remove gribs file for space cleanup
-        ## NOTE: leaving associated .size there as paper trail 
-        #if os.path.exists(grib_path):
-            #os.remove(grib_path) # remove grib2 file
-            #grib_path2 = grib_path.replace("wrfprsf00", "wrfprsf01") # get file name for 1 hr forecast
-            #os.remove(grib_path2) # remove 1 hr forecast file
-        #else:
-            #print("The file "+ grib_path +" does not exist")
-
-
-
-
+            # Remove gribs file for space cleanup
+            ## NOTE: leaving associated .size there as paper trail 
+            if os.path.exists(grib_path):
+                os.remove(grib_path) # remove grib2 file
 
