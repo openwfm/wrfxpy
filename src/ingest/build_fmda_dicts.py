@@ -424,8 +424,8 @@ if __name__ == '__main__':
 
     if len(sys.argv) != 6:
         print(f"Invalid arguments. {len(sys.argv)} was given but 5 expected")
-        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <bbox> <target_file>' % sys.argv[0]))
-        print("Example: python src/ingest/build_fmda_dicts.py 202401010000 202401010200 '[37,-105,39,-103]' ~/testfile.pickle")
+        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <bbox> <forecast_hours> <target_file>' % sys.argv[0]))
+        print("Example: python src/ingest/build_fmda_dicts.py 202401010000 202401010200 '[37,-105,39,-103]' 1 ~/testfile.pickle")
         print("bbox format should match rtma_cycler: [latmin, lonmin, latmax, lonmax]")
         sys.exit(-1)
     
