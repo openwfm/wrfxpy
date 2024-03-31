@@ -28,6 +28,8 @@ from synoptic.services import stations_timeseries, stations_metadata
 
 # Variables used throughout
 sys_cfg = Dict(json.load(open('etc/conf.json')))
+tokens = Dict(json.load(open('etc/tokens.json')))
+meso_token = tokens.mesowest
 rawspath = "/home/hirschij/data" # path for raws data stash
 
 # These are the variables I could find that correspond to the HRRR vars above, look into "variables()" from SynopticPy for more
@@ -233,6 +235,20 @@ def parse_bbox(box_str):
         sys.exit(-1)
         return None
 
+def call_curl(url):
+    try:
+        # Run the curl command and capture its output
+        result = subprocess.run(['curl', url], capture_output=True, text=True, check=True)
+        # Decode the JSON output
+        json_data = json.loads(result.stdout)
+        return json_data
+    except subprocess.CalledProcessError as e:
+        print("Error executing curl command:", e)
+        return None
+    except json.JSONDecodeError as e:
+        print("Error decoding JSON:", e)
+        return None
+
 # Executed Code ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 if __name__ == '__main__':
@@ -259,15 +275,24 @@ if __name__ == '__main__':
     print("~"*50)
     print("Hard-coded paths in the code. (Make more flexible in the future)")
     print(f"RAWS Stash location: {rawspath}")
-    print(f"HRRR FMDA Bands Stash location: {hrrrpath}")
-    print("Target HRRR Data Info:")
-    print(band_df_hrrr)
-    print("~"*50)
     
     # Convert bbox from wrfxpy format to synoptic
     bbox2 = [bbox[1], bbox[0], bbox[3], bbox[2]]
-    sts = stations_metadata(bbox=bbox2,vars=["fuel_moisture"])
-    print(f"Number of Stations within bbox: {sts.shape[0]}")
+    # Get station availability within bbox
+    # NOTE: SynopticPy has bug where stations_metadata where it doesn't properly use time parameters for station availability in a bbox. See Issue #55 SynopticPy on github
+    url = f"https://api.synopticdata.com/v2/stations/metadata?bbox={bbox2[0]},{bbox2[1]},{bbox2[2]},{bbox2[3]}&vars=fuel_moisture&obrange={start},{end}&token={meso_token}"
+    print(f"Attempting Synoptic retrieval from URL: https://api.synopticdata.com/v2/stations/metadata?bbox={bbox2[0]},{bbox2[1]}, {bbox2[2]},{bbox2[3]}&vars=fuel_moisture&obrange={start},{end}&token=HIDDEN")
+    command = f"curl -X GET '{url}'"
+    #print(command)
+    #subprocess.call(command,shell=True)
+    sts_json = call_curl(url)
+    sts = pd.DataFrame(sts_json["STATION"], index=[i["STID"] for i in sts_json["STATION"]])
+    print(sts)
+    sts = sts.transpose()
+    #sts = stations_metadata(bbox=bbox2,vars=["fuel_moisture"])
+    #print(f"Number of Stations within bbox: {sts.shape[0]}")
+    
+    
     # Parameter dictionary used within SynopticPy
     params = dict(
         stid=["PLACEHOLDER"], # change this in the loop
