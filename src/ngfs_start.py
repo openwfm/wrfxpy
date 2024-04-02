@@ -18,11 +18,11 @@
 #        NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
 '''
 to do list:
-1) 
-2) 
+1) dynamic sizing of domain 
+2) feature tracking id awareness
 3) 
 4) 
-5) Script to get older files from VIIRS and modis
+5) 
 6) try to get standalone working for a case
 
 '''
@@ -31,6 +31,7 @@ from __future__ import print_function
 import numpy as np
 import pandas as pd
 import pickle
+import copy
 import csv
 import os, sys, glob
 import json
@@ -51,7 +52,7 @@ import simple_forecast as sf
 import ngfs_dictionary as nd
 #import v2_to_v1_dict as v2d
 #from shapely.geometry import Point, LineString, Polygon
-#import geopandas as gpd
+import geopandas as gpd
 ####### Classes  ######
 
 
@@ -291,7 +292,7 @@ class ngfs_incident():
    def make_incident_configuration(self,base_cfg):
       #change the base configuration file to match the individual incidents parameters
       
-      cfg = base_cfg
+      cfg = copy.deepcopy(base_cfg)
       try:
          print('\tGrib source: ',cfg['grib_source'])
       except:
@@ -321,7 +322,26 @@ class ngfs_incident():
       #make a geoseries  of the ingition point and construct a buffer around it
       #see if buffer contains the bounding box, increas the size of the domain if not
       '''
-      ctr_pt = Point(cfg['domains']['1']['center_latlon'][0],cfg['domains']['1']['center_latlon'][1])
+
+      sized_ok = False
+      x = self.ign_latlon[1]
+      y = self.ign_latlon[0]
+      ctr_pt = Point(x,y)
+      ctr_pt = gpd.points_from_xy([x],[y])
+      df = pd.DataFrame()
+      gdf = gpd.GeoDataFrame(df,geometry = ctr_pt,crs = 'epsg:4326')
+#crs = 'epsg:4326' 
+      gdf_a = gdf.to_crs(3857)
+      
+      buff_a = gdf_a.buffer(15*1000  # make a 15km radius around the center
+      buff = buff_a.to_crs(4326)
+
+
+      dets = gpd.points_from_xy(self.unique_latlons[:,1],self.unique_latlons[:,0])
+      det_df = gpd.GeoDataFrame(df,geometry = dets)
+      det_ds = gpd.GeoSeries(dets)
+
+      cfg['domains']['1']['domain_size']
       pt_series = gpd.GeoSeries([ctr_pt])
       '''
 
@@ -713,9 +733,12 @@ def prioritize_incidents(incidents,new_idx,num_starts):
    #new_idx is boolean mask
    #nums_start is number of the new simulations to start set tpo be -1 
    priority_by_population = False
-   filter_rx = True
-   frp_cutoff = 5e3
+   
    n = len(new_idx)
+   if n > num_starts:
+      frp_cutoff = 5e3 # will filter out low-frp incidents
+   else:
+      frp_cutoff = 0
    started = np.zeros(n,dtype=int)
    pop = np.zeros(n)
    frp = np.zeros(n)
@@ -945,7 +968,7 @@ if __name__ == '__main__':
          add_firms_data(satellite, csv.timestamp, 3)
    else:
       print(f'Getting the polar data for {csv_date_str}, {csv.timestamp.day_of_year}')
-      satellites = ['noaa_20', 'noaa_21', 'suomi']
+      satellites = ['noaa_20', 'noaa_21', 'suomi','landsat']
       for satellite in satellites:
          add_firms_data(satellite, csv.timestamp, 3)
       
