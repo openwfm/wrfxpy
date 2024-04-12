@@ -50,9 +50,10 @@ import utils
 import state_names as sn
 import simple_forecast as sf
 import ngfs_dictionary as nd
-#import v2_to_v1_dict as v2d
-#from shapely.geometry import Point, LineString, Polygon
-import geopandas as gpd
+#import shapely
+from shapely.geometry import Point, LineString, Polygon
+from pyproj import Proj, transform
+#import geopandas as gpd
 ####### Classes  ######
 
 
@@ -94,7 +95,8 @@ class ngfs_day():
       if self.today:
          self.sat_name = 'GOES 16 & 18'
          self.map_save_str = 'ngfs/NGFS_'+csv_date_str+'.png'
-         self.pickle_save_str = 'ngfs/pkl_ngfs_day_'+csv_date_str+'.pkl'
+         time_str = str(time.gmtime().tm_hour).zfill(2) + '_' + str(time.gmtime().tm_min).zfill(2)
+         self.pickle_save_str = 'ngfs/pkl_ngfs_day_'+csv_date_str+'_'+time_str+'.pkl'
       else:
          self.sat_name = self.sats[0].replace('-','_')
          self.map_save_str = 'ngfs/NGFS_'+csv_date_str+'_'+self.sat_name+'.png'
@@ -150,7 +152,8 @@ class ngfs_day():
       ign_pix['forecast_ign_UTC'] = new_ign_time
       ign_pix['viirs_pixel_ign'] = viirs_pixel
       print(ign_pix)
-      csv_save_str = 'ngfs/forecast_ignition_pixels_'+self.date_str+'.csv'
+      time_str = str(time.localtime().tm_hour).zfill(2) + '_' + str(time.localtime().tm_min).zfill(2)
+      csv_save_str = 'ngfs/forecast_ignition_pixels_'+self.date_str+'_'+time_str+'.csv'
       ign_pix.to_csv(csv_save_str,index=False)
 
    def print_base_map(self):
@@ -201,6 +204,7 @@ class ngfs_day():
       plt.legend(loc ="lower left")
 
       #title and save the figure
+      time_str = str(time.gmtime().tm_hour).zfill(2) + ':' + str(time.gmtime().tm_min).zfill(2) + '  UTC'
       t_str = 'NIFC Fire Incidents \n' + csv_date_str + '\n ' + self.sat_name
       plt.title(t_str)
 
@@ -321,29 +325,62 @@ class ngfs_incident():
       #check to see if domain will cover the the detection footprint
       #make a geoseries  of the ingition point and construct a buffer around it
       #see if buffer contains the bounding box, increas the size of the domain if not
-      '''
-
-      sized_ok = False
+      def make_detection_buffer(x,y,r):
+      #make a buffer region arounf the ignition pixel
+         #ctr_pt = Point(x,y)
+         
+         #convert the x,y to met units
+         inProj = Proj(init='epsg:4326')
+         outProj = Proj(init='epsg:3857')
+         xp,yp = transform(inProj,outProj,x,y)
+         #make a Point gemoetry and buffer around it
+         pt = Point(xp,yp)
+         b = pt.buffer(r)
+         #transform the buffer back to lat/lot in degrees
+         xb,yb = transform(outProj,inProj,b.exterior.coords.xy[0],b.exterior.coords.xy[1])
+         buff = Polygon(zip(xb,yb))
+         '''
+         #depends on geopandas, not in the wrfx environment
+         ctr_pt = gpd.points_from_xy([x],[y])
+         df = pd.DataFrame()
+         gdf = gpd.GeoDataFrame(df,geometry = ctr_pt,crs = 'epsg:4326')
+         #crs = 'epsg:4326' 
+         gdf_a = gdf.to_crs(3857)
+         buff_a = gdf_a.buffer(r)  # make a 15km radius around the center
+         buff = buff_a.to_crs(4326) #convert back to la/lon
+         '''
+         return buff
+      
       x = self.ign_latlon[1]
       y = self.ign_latlon[0]
-      ctr_pt = Point(x,y)
-      ctr_pt = gpd.points_from_xy([x],[y])
-      df = pd.DataFrame()
-      gdf = gpd.GeoDataFrame(df,geometry = ctr_pt,crs = 'epsg:4326')
-#crs = 'epsg:4326' 
-      gdf_a = gdf.to_crs(3857)
+      r = 15*1000  #15 km <-- change this to take parameters from the configuration file
+      size_increase = 0 # number of time the size of the domain has doubled
+      buff = make_detection_buffer(x,y,r)
+
+      #look through the other detections and resize the domain if detections are not within the buffer region
+      #dets = gpd.points_from_xy(self.unique_latlons[:,1],self.unique_latlons[:,0])
+      dets = tuple(zip(self.unique_latlons[:,1],self.unique_latlons[:,0]))
+      for d in dets:
+         if not Point(d).within(buff):
+            r = 2*r
+            buff = make_detection_buffer(x,y,r)
+            size_increase += 1
+      #double the domain size in each dimension and quadruple the proccessor count
+      #example domain size [31,31] --> [61,61]
+      if size_increase > 0 and size_increase < 5:
+         sz = cfg['domains']['1']['domain_size'][0] - 1
+         new_sz = sz*2**size_increase + 1
+         cfg['domains']['1']['domain_size'] = [new_sz,new_sz]
+         sr = cfg['domains']['1']['subgrid_ratio'][0]
+         new_sr = int(sr*(1/2)**(size_increase-1))
+         cfg['domains']['1']['subgrid_ratio'] = [new_sr,new_sr]
+         ppn = cfg['ppn']
+         cfg['ppn'] = min(400,ppn*2**(size_increase*2))
+         print('Resizing domain, doublings = ',size_increase)
+
+      #if size_increase > 2:
+      #   print('Domain too large to forecast')
       
-      buff_a = gdf_a.buffer(15*1000  # make a 15km radius around the center
-      buff = buff_a.to_crs(4326)
-
-
-      dets = gpd.points_from_xy(self.unique_latlons[:,1],self.unique_latlons[:,0])
-      det_df = gpd.GeoDataFrame(df,geometry = dets)
-      det_ds = gpd.GeoSeries(dets)
-
-      cfg['domains']['1']['domain_size']
-      pt_series = gpd.GeoSeries([ctr_pt])
-      '''
 
 
       cfg['start_utc'] = utils.utc_to_esmf(self.start_utc)
@@ -379,6 +416,7 @@ class ngfs_incident():
       self.filename = 'jobs/' + cfg['grid_code'] + '.json'
       self.set_json_start_code(self.filename,cfg['grid_code']) 
       self.cfg = cfg
+      del cfg
       #viewprint(cfg)
 
    def process_incident(self,incident_data,data,full_data):
@@ -755,7 +793,7 @@ def prioritize_incidents(incidents,new_idx,num_starts):
       print('New incidents by priority')
       start_count = 0
       for i in sort_idx:
-         if incidents[i].new:
+         if incidents[i].new and not incidents[i].started:
             print(incidents[i].incident_name)
             print('\t',incidents[i].ign_latlon)
             print('\t',incidents[i].ign_utc)
@@ -782,6 +820,9 @@ def prioritize_incidents(incidents,new_idx,num_starts):
                print('\t New incident, but unstarted simulation')
                if rx:
                   print('\t Skipping low-FRP RX incident')
+            # note started incident that is new within time frame but previously started
+         if incidents[i].started:
+               started[i] = 1
  
    return sort_idx, started
 
@@ -870,7 +911,7 @@ if __name__ == '__main__':
       #this forces auto_start and avoids questions
       force = True
       auto_start = True
-      num_starts = 25  # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
+      num_starts = 25 # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
    else:
       force = True  # <<<------------------------------- change this to require confirmation of forecast configuration
       auto_start = False
@@ -962,7 +1003,7 @@ if __name__ == '__main__':
          print(f'Error getting {satellite} date data')
 
    if csv.today:
-      print('\tGetting the polar data for the previous 24 hours')
+      print('\tGetting the polar data for the previous 48 hours')
       satellites = ['noaa_20', 'noaa_21','suomi', 'landsat']
       for satellite in satellites:
          add_firms_data(satellite, csv.timestamp, 3)
@@ -1012,22 +1053,25 @@ if __name__ == '__main__':
             incidents[i].incident_start_time = min(incidents[i].incident_start_time,old_inc.ign_utc)
             if old_inc.started:
                inc_started = True
+               incidents[i].set_started()
             #time.sleep(2)
       #start new incidents to run  change the hours back to 163
       lookback_time = 96
-      if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = lookback_time) and not inc_started:
+      if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = lookback_time): #
          #(incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
+         print('\tNew Incident From previous ' + str(lookback_time) + ' hours')
          new_idx[i] = 1
          #change 'new' object attribute
          incidents[i].set_new()
-         incidents[i].make_incident_configuration(base_cfg)
-         print('\tNew Incident From previous ' + str(lookback_time) + ' hours')
-         json.dump(incidents[i].cfg, open(incidents[i].filename, 'w'), indent=4, separators=(',', ': '))
-         print('\tTo start the simulation, execute: ')
-         cmd_str = './forecast.sh ' + incidents[i].filename + ' &> logs/' + incidents[i].filename[5:-5] +'.log &'
-         incidents[i].set_cmd_str(cmd_str)   
-         #print(\n\t\t ./forecast.sh %s' % incidents[i].filename)
-         print(cmd_str)
+         #if the incident is not started already, make new configuration
+         if not inc_started:
+            incidents[i].make_incident_configuration(base_cfg)
+            json.dump(incidents[i].cfg, open(incidents[i].filename, 'w'), indent=4, separators=(',', ': '))
+            print('\tTo start the simulation, execute: ')
+            cmd_str = './forecast.sh ' + incidents[i].filename + ' &> logs/' + incidents[i].filename[5:-5] +'.log &'
+            incidents[i].set_cmd_str(cmd_str)   
+            #print(\n\t\t ./forecast.sh %s' % incidents[i].filename)
+            print(cmd_str)
 
 
    
