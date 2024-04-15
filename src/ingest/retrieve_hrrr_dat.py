@@ -46,6 +46,7 @@ band_df_hrrr = pd.DataFrame({
 
 # Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
 def slice_gribs(grib_file, outpath):
 
     filename = osp.join(outpath, Path(osp.basename(grib_path)).stem)
@@ -70,6 +71,35 @@ def ftimes(n):
     l = strings.tolist()
     return l
 
+# Function to check whether desired files already exist to not download unnecessarily
+def hrrr_exists(t, fhour, outpath):
+    existing_files = []
+    needed_files = []
+    
+    # Loop over bands, build filename and return
+    for band in band_df_hrrr.Band:
+        tpath = build_hrrr_path(t, band, fhour, outpath)
+        #print(osp.join(tpath))
+        if osp.exists(tpath):
+            existing_files.append(tpath)
+        else:
+            needed_files.append(tpath)
+    return existing_files, needed_files
+
+# Helper function to format file names for HRRR data files, matching naming convention from HRRR
+def build_hrrr_path(d, band, fhour, outpath):
+    # Inputs:
+    # d: (datetime)
+    # band: (int) HRRR band number
+    # fhour: (int) forecast hour, eg "00" or "01"
+    # Returns: (str) filepath to geotiff file
+    day_file = d.strftime("%Y%m%d") # HRRR data stash is in this format
+    hour = d.strftime("%H")
+    tpath = osp.join(outpath, day_file, f"hrrr.t{hour}z.wrfprsf{fhour}.{band}.tif")
+    return tpath
+
+    
+    
 # Executed Code ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 if __name__ == '__main__':
@@ -110,6 +140,23 @@ if __name__ == '__main__':
         time=dates[t].strftime(fmt) # start time for retrieve_gribs
         tforecast = dates[t] + pd.DateOffset(hours = int(forecast_hours)) # end time for retrieve_gribs
         tforecast = tforecast.strftime(fmt)
+        # array of forecast times
+        ft = ftimes(forecast_hours)
+
+        # Check which files need to be downloaded
+        print(f"Checking if files exist at {time}")
+        exists = []
+        needed = []
+        for ts in ft:
+            print(f"Checking forecast hour {ts}")
+            exists_tmp, needed_tmp = hrrr_exists(dates[t], ts, outpath)
+            exists.extend(exists_tmp)
+            needed.extend(needed_tmp)
+        print(f"These bands already exist: {[osp.basename(path) for path in exists]}")
+        print(f"These files need to get downloaded: {[osp.basename(path) for path in needed]}")
+        if len(needed)==0:
+            print(f"All files for {time} already in {outpath}, skipping to next time")
+            continue
         
         # Call retrieve_gribs via subprocess
         command = base_str + str(time) + " " + str(tforecast) + " ~"
@@ -120,7 +167,6 @@ if __name__ == '__main__':
         os.makedirs(temppath, exist_ok=True)
 
         # Loop over analysis/forecast hours and slice_gribs to get needed HRRR bands
-        ft = ftimes(forecast_hours)
         for ts in ft:
             grib_path = osp.join(sys_cfg.sys_install_path, "ingest", grib_source, grib_source.lower()+'.'+dates[t].strftime("%Y%m%d"),'conus', f"{grib_source.lower()}.t{dates[t].strftime('%H')}z.wrfprsf{ts}.grib2")
             print("Grib Path: " + grib_path)
