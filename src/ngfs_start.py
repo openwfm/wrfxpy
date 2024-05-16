@@ -52,7 +52,7 @@ import simple_forecast as sf
 import ngfs_dictionary as nd
 #import shapely
 from shapely.geometry import Point, LineString, Polygon
-from pyproj import Proj, transform
+from pyproj import Proj, transform, Transformer
 #import geopandas as gpd
 ####### Classes  ######
 
@@ -86,7 +86,7 @@ class ngfs_day():
    def set_ongoing(self):
       #print('started',self.started,type(self.started))
       #print('new',self.new,type(self.new))
-      self.ongoing = np.logical_not(self.new + self.started)
+      self.ongoing = np.logical_not(self.new) # + self.started)
    def set_new(self,new):
       self.new = new
    def set_started(self,started):
@@ -98,7 +98,10 @@ class ngfs_day():
          time_str = str(time.gmtime().tm_hour).zfill(2) + '_' + str(time.gmtime().tm_min).zfill(2)
          self.pickle_save_str = 'ngfs/pkl_ngfs_day_'+csv_date_str+'_'+time_str+'.pkl'
       else:
-         self.sat_name = self.sats[0].replace('-','_')
+         try:
+            self.sat_name = self.sats[0].replace('-','_')
+         except:
+            self.sat_name = 'No_Incidents'
          self.map_save_str = 'ngfs/NGFS_'+csv_date_str+'_'+self.sat_name+'.png'
          self.pickle_save_str = 'ngfs/pkl_ngfs_day_'+csv_date_str+'_'+self.sat_name+'.pkl'
 
@@ -187,7 +190,7 @@ class ngfs_day():
       x_new, y_new = m(new_lon,new_lat)
 
       #started incidents
-      started_latlons = latlons[self.started,:]
+      started_latlons = latlons[self.started*self.new,:]
       started_lon = started_latlons[:,1]
       started_lat= started_latlons[:,0]
       x_started, y_started = m(started_lon,started_lat)
@@ -330,14 +333,20 @@ class ngfs_incident():
          #ctr_pt = Point(x,y)
          
          #convert the x,y to met units
-         inProj = Proj(init='epsg:4326')
-         outProj = Proj(init='epsg:3857')
-         xp,yp = transform(inProj,outProj,x,y)
+         #inProj = Proj(init='epsg:4326')
+         #outProj = Proj(init='epsg:3857')
+         #xp,yp = transform(inProj,outProj,x,y)
+         tf = Transformer.from_crs("EPSG:4326", "EPSG:3857")
+         yp,xp = tf.transform(y,x)
+         print('\tProjected coords: ',xp,yp)
+         #see https://pyproj4.github.io/pyproj/stable/gotchas.html#upgrading-to-pyproj-2-from-pyproj-1
          #make a Point gemoetry and buffer around it
          pt = Point(xp,yp)
          b = pt.buffer(r)
          #transform the buffer back to lat/lot in degrees
-         xb,yb = transform(outProj,inProj,b.exterior.coords.xy[0],b.exterior.coords.xy[1])
+         tg = Transformer.from_crs("EPSG:3857","EPSG:4326")
+         #xb,yb = transform(outProj,inProj,b.exterior.coords.xy[0],b.exterior.coords.xy[1])
+         yb,xb = tg.transform(b.exterior.coords.xy[1],b.exterior.coords.xy[0])
          buff = Polygon(zip(xb,yb))
          '''
          #depends on geopandas, not in the wrfx environment
@@ -628,7 +637,7 @@ def timestamp_from_string(csv_date_str):
    return pd.Timestamp(year=csv_year,month=csv_month,day=csv_day,tz='UTC')
    
     
-def get_ngfs_csv(days_previous,goes):
+def get_ngfs_csv(days_previous,goes,domain):
    #downloads NGFS csv files from 0 to 4 days previous to now
    #   to download today's csv: get_ngfs_csv(0)
    #example csv name:
@@ -642,20 +651,22 @@ def get_ngfs_csv(days_previous,goes):
    csv_day = datetime.now() - timedelta(days=days_previous)
    day_of_year = csv_day.timetuple().tm_yday
    yyyy, mm, dd = csv_day.year, csv_day.month, csv_day.day
+   #domain = {'CONUS','Full-Disk'}
 
  
    #join strings to have name and url of the csv file
    # Define the base of the csv_str
-   base_str = 'NGFS_FIRE_DETECTIONS_GOES-{}_ABI_CONUS_{}_{}_{}_{}.csv'
+   #base_str = 'NGFS_FIRE_DETECTIONS_GOES-{}_ABI_CONUS_{}_{}_{}_{}.csv'
+   base_str = 'NGFS_FIRE_DETECTIONS_GOES-{}_ABI_{}_{}_{}_{}_{}.csv'
 
    # Determine the satellite
    satellite = '18' if goes == 18 else '16'
 
    # Format the csv_str using satellite and other variables
-   csv_str = base_str.format(satellite, yyyy, str(mm).zfill(2), str(dd).zfill(2), str(day_of_year).zfill(3))
+   csv_str = base_str.format(satellite,domain,yyyy, str(mm).zfill(2), str(dd).zfill(2), str(day_of_year).zfill(3))
 
    # Define the csv_url using csv_str
-   csv_url = f'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-{"WEST" if goes == 18 else "EAST"}/CONUS/{csv_str}'
+   csv_url = f'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-{"WEST" if goes == 18 else "EAST"}/{domain}/{csv_str}'
 
   
    print('\tDownloading: ',csv_str)
@@ -686,11 +697,15 @@ def download_csv_data(days_to_get):
       else:
          print('NGFS data from yesterday or before')
       #GOES-18
-      s1, s2 = get_ngfs_csv(i,18)
+      s1, s2 = get_ngfs_csv(i,18,'CONUS')
+      csv_str.append(s1)
+      csv_path.append(s2)
+      #GOES-18 Full-Disk
+      s1, s2 = get_ngfs_csv(i,18,'Full-Disk')
       csv_str.append(s1)
       csv_path.append(s2)
       #GOES-16
-      s1, s2 = get_ngfs_csv(i,16)
+      s1, s2 = get_ngfs_csv(i,16,'CONUS')
       csv_str.append(s1)
       csv_path.append(s2)
    return csv_str, csv_path
@@ -773,7 +788,7 @@ def prioritize_incidents(incidents,new_idx,num_starts):
    priority_by_population = False
    
    n = len(new_idx)
-   if n > num_starts:
+   if n > num_starts+20:
       frp_cutoff = 5e3 # will filter out low-frp incidents
    else:
       frp_cutoff = 0
@@ -966,7 +981,7 @@ if __name__ == '__main__':
    print('Found ',num_id_strings, 'unique id strings')
    time.sleep(5)
 
-   #id strings seem to be less mutable thn the names
+   #id strings seem to be less mutable thaqst   n the names
    initialize_by_names  = False
 
    if initialize_by_names:
@@ -1004,12 +1019,12 @@ if __name__ == '__main__':
 
    if csv.today:
       print('\tGetting the polar data for the previous 48 hours')
-      satellites = ['noaa_20', 'noaa_21','suomi', 'landsat']
+      satellites = ['noaa_20', 'noaa_21','suomi', 'landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
       for satellite in satellites:
          add_firms_data(satellite, csv.timestamp, 3)
    else:
       print(f'Getting the polar data for {csv_date_str}, {csv.timestamp.day_of_year}')
-      satellites = ['noaa_20', 'noaa_21', 'suomi','landsat']
+      satellites = ['noaa_20', 'noaa_21', 'suomi','landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
       for satellite in satellites:
          add_firms_data(satellite, csv.timestamp, 3)
       
@@ -1056,7 +1071,7 @@ if __name__ == '__main__':
                incidents[i].set_started()
             #time.sleep(2)
       #start new incidents to run  change the hours back to 163
-      lookback_time = 96
+      lookback_time = 24
       if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = lookback_time): #
          #(incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
          print('\tNew Incident From previous ' + str(lookback_time) + ' hours')
