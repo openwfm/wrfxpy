@@ -253,9 +253,9 @@ def call_curl(url):
 
 if __name__ == '__main__':
 
-    if len(sys.argv) != 6:
-        print(f"Invalid arguments. {len(sys.argv)} was given but 6 expected")
-        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <bbox> <forecast_hours> <target_file>' % sys.argv[0]))
+    if len(sys.argv) != 5:
+        print(f"Invalid arguments. {len(sys.argv)} was given but 5 expected")
+        print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <bbox> <target_file>' % sys.argv[0]))
         print("Example: python src/ingest/build_fmda_dicts.py 202401010000 202401010200 '[37,-105,39,-103]' 1 ~/testfile.pickle")
         print("bbox format should match rtma_cycler: [latmin, lonmin, latmax, lonmax]")
         sys.exit(-1)
@@ -263,15 +263,16 @@ if __name__ == '__main__':
     start = sys.argv[1]
     end = sys.argv[2]
     bbox = parse_bbox(sys.argv[3])
-    forecast_hours = sys.argv[4]
-    outfile = sys.argv[5]
+    outfile = sys.argv[4]
     
     # Build empty dictionary to fill with functions below
     t0 = datetime.strptime(start, "%Y%m%d%H%M")
     t1 = datetime.strptime(end, "%Y%m%d%H%M")
+    if t1<=t0:
+        raise ValueError(f"End date ({t1}) cannot be before start date ({t0}).")
+        sys.exit(-1)
 
     print(f"Building FMDA Dictionary for RAWS Sites within {bbox}, from {t0} to {t1}")
-    print(f"Number of Forecast Hours: {forecast_hours}")
     print("~"*50)
     print("Hard-coded paths in the code. (Make more flexible in the future)")
     print(f"RAWS Stash location: {rawspath}")
@@ -286,6 +287,8 @@ if __name__ == '__main__':
     #print(command)
     #subprocess.call(command,shell=True)
     sts_json = call_curl(url)
+    print("DEBUG**************")
+    print(sts_json)
     sts = pd.DataFrame(sts_json["STATION"], index=[i["STID"] for i in sts_json["STATION"]])
     print(sts)
     sts = sts.transpose()
