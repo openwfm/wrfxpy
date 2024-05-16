@@ -244,7 +244,7 @@ if __name__ == '__main__':
     if len(sys.argv) != 2:
         print(f"Invalid arguments. {len(sys.argv)} was given but 1 expected")
         print(('Usage: %s <path_to_dict> ' % sys.argv[0]))
-        print("Example: python src/ingest/get_hrrr_arrays.py ~/testfile.pickle ~/hrrr_arrays.pkl")
+        print("Example: python src/ingest/get_hrrr_arrays.py ~/data/rnn_data_dicts/test_CA_202401.pkl")
         sys.exit(-1)
     
     dpath = sys.argv[1]
