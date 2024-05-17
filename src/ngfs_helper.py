@@ -42,7 +42,7 @@ class polar_data():
         self.timestamp = csv_timestamp
         self.csv_date_str = str(csv_timestamp.year)+'_'+str(csv_timestamp.month)+'_'+str(csv_timestamp)
         self.firms_path = 'ingest/FIRMS/'
-        self.satlist = ['noaa_20','noaa_21','suomi','modis','landsat']
+        self.satlist = ['noaa_20','noaa_21','suomi','modis','landsat','noaa_20_Alaska','noaa_21_Alaska','suomi_Alaska']
     
     #add nrt data, filter out low confidence detections
     def sort_data_bytime(self):
@@ -54,7 +54,7 @@ class polar_data():
             print('Trying with tokens')
             str1 = 'wget -e robots=off -m -np -R .html,.tmp -nd '
 
-            token_string = ' --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" '
+            token_string = ' --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" '
             local_str = ' -P ' + local_path
 
             cmd = str1 + url + token_string + local_str
@@ -83,7 +83,10 @@ class polar_data():
             'noaa_21': ('noaa-21-viirs-c2/csv/', 'J2_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'),
             'suomi': ('suomi-npp-viirs-c2/csv/', 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'),
             'modis': ('modis-c6.1/csv/', 'MODIS_C6_1_USA_contiguous_and_Hawaii_48h.csv'),
-            'landsat': ('landsat/csv/', 'LANDSAT_USA_contiguous_and_Hawaii_48h.csv')
+            'landsat': ('landsat/csv/', 'LANDSAT_USA_contiguous_and_Hawaii_48h.csv'),
+            'noaa_20_Alaska': ('noaa-20-viirs-c2/csv/', 'J1_VIIRS_C2_Alaska_48h.csv'),
+            'noaa_21_Alaska': ('noaa-21-viirs-c2/csv/', 'J2_VIIRS_C2_Alaska_48h.csv'),
+            'suomi_Alaska': ('suomi-npp-viirs-c2/csv/', 'SUOMI_VIIRS_C2_Alaska_48h.csv')
         }
 
         if sat not in self.satlist:
@@ -151,8 +154,8 @@ class polar_data():
             return
         
         #same for all satellites
-        url_base = 'https://nrt4.modaps.eosdis.nasa.gov/archive/FIRMS/'
-
+        url_base = 'https://nrt3.modaps.eosdis.nasa.gov/archive/FIRMS/'
+        #https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/landsat/USA_contiguous_and_Hawaii/LANDSAT_USA_contiguous_and_Hawaii__2022312.txt
         satellite_info = {
             'noaa_20': {
                 'csv_file_pattern': 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_VJ114IMGTDL_NRT_{0}{1:03d}.txt',
@@ -166,9 +169,21 @@ class polar_data():
                 'csv_file_pattern': 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_VNP14IMGTDL_NRT_{0}{1:03d}.txt',
                 'csv_dir': 'suomi-npp-viirs-c2/USA_contiguous_and_Hawaii/'
             },
+                'noaa_20_Alaska': {
+                'csv_file_pattern': 'J1_VIIRS_C2_Alaska_VJ114IMGTDL_NRT_{0}{1:03d}.txt',
+                'csv_dir': 'noaa-20-viirs-c2/Alaska/'
+            },
+                'noaa_21_Alaska': {
+                'csv_file_pattern': 'J2_VIIRS_C2_Alaska_VJ214IMGTDL_NRT_{0}{1:03d}.txt',
+                'csv_dir': 'noaa-21-viirs-c2/Alaska/'
+            },
+            'suomi_Alaska': {
+                'csv_file_pattern': 'SUOMI_VIIRS_C2_Alaska_VNP14IMGTDL_NRT_{0}{1:03d}.txt',
+                'csv_dir': 'suomi-npp-viirs-c2/Alaska/'
+            },
             'landsat': {
-                'csv_file_pattern': '',
-                'csv_dir' : ''
+                'csv_file_pattern': 'LANDSAT_USA_contiguous_and_Hawaii__{0}{1:03d}.txt',
+                'csv_dir' : 'landsat/USA_contiguous_and_Hawaii/'
             }
         }
 
@@ -201,17 +216,31 @@ class polar_data():
             #remote and local locations of the csv file
             csv_url = url_base + csv_dir + csv_file
             csv_local = self.firms_path + csv_file
+            #viirs data fields
+            #latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight
+            #landsat data fields
+            #latitude,longitude,path,row,scan,track,acq_date,acq_time,satellite,confidence,daynight
 
             #downloading not working, files are all in place
             if not os.path.exists(csv_local):
                 print('updating VIIRS data cache',csv_local)
-                cmd_str_suomi = 'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt4.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
-                cmd_str_noaa_20 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt4.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-20-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
-                cmd_str_noaa_21 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt4.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-21-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwiaXNzIjoiQVBTIE9BdXRoMiBBdXRoZW50aWNhdG9yIiwiaWF0IjoxNzA1NTE4MDk0LCJuYmYiOjE3MDU1MTgwOTQsImV4cCI6MTg2MzE5ODA5NCwidWlkIjoiamhhbGV5IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.IwnL5LIjzPzJRGXUSGw2VeuRs48Hhnuf-gpJNCHAwvs" -P ingest/FIRMS'
+                cmd_str_suomi = 'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
+                cmd_str_noaa_20 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-20-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
+                cmd_str_noaa_21 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-21-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
+                cmd_str_landsat =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/landsat/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
+                cmd_str_suomi_Alaska = 'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/Alaska" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
+                cmd_str_noaa_20_Alaska =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-20-viirs-c2/Alaska" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
+                cmd_str_noaa_21_Alaska =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-21-viirs-c2/Alaska" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
+
+
                 #self.download_url(csv_url,self.firms_path)
                 os.system(cmd_str_suomi)
                 os.system(cmd_str_noaa_20)
                 os.system(cmd_str_noaa_21)
+                os.system(cmd_str_landsat)
+                os.system(cmd_str_suomi_Alaska)
+                os.system(cmd_str_noaa_20_Alaska)
+                os.system(cmd_str_noaa_21_Alaska)
             # else:
             #     print('\tPolar data for',sat, 'already in place')
             if not os.path.exists(csv_local):
