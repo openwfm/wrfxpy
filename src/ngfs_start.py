@@ -300,6 +300,11 @@ class ngfs_incident():
       #change the base configuration file to match the individual incidents parameters
       
       cfg = copy.deepcopy(base_cfg)
+      #look for Alaska incidents and change to GFSF
+      if any(self.data.state == 'AK'):
+         cfg['grib_source'] = 'GFSF'
+         print('\tAlaska incident detected, using GFSF and Alaska Landfire data')
+         cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_alaska'
       try:
          print('\tGrib source: ',cfg['grib_source'])
       except:
@@ -738,6 +743,12 @@ def read_NGFS_csv_data(csv_file):
       try:
          # Try reading v2 csv file
          data_read = pd.read_csv(file_path, parse_dates=time_cols2)
+         #filter full-disk data to get only USA detections
+         if 'Full' in file_path:
+            print('\tReading full-disk data: ',file_path)
+            print('\tNumber of all Full-Disk detections: ',len(data_read))
+            data_read = data_read[data_read.country == 'USA']
+            print('\tNumber of USA Full-Disk detections: ',len(data_read))
          data_read['initial_observation_time'] = data_read[time_cols2[1]]
          data_read['incident_start_time'] = data_read[time_cols2[1]]
          data_read.rename(columns=nd.v2_to_v1, inplace=True)
