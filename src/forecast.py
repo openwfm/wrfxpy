@@ -589,6 +589,8 @@ def vars_add_to_geogrid(js):
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
     geo_vars_path = 'etc/vtables/geo_vars.json'
+    if 'geo_vars_path' in js.keys():
+        geo_vars_path = js['geo_vars_path']
     geo_vars = None
     try:
         if osp.exists(geo_vars_path):
