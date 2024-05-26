@@ -22,9 +22,12 @@
 from __future__ import absolute_import
 from __future__ import print_function
 from ingest.HRRR import HRRR
+from ingest.HRRR_AK import HRRR_AK
 from ingest.NARR import NARR
 from ingest.NAM218 import NAM218
 from ingest.NAM227 import NAM227
+from ingest.NAM198 import NAM198
+from ingest.NAM196 import NAM196
 from ingest.CFSR import CFSR_P, CFSR_S
 from ingest.GFSA import GFSA
 from ingest.GFSF import GFSF_P, GFSF_S
@@ -55,10 +58,16 @@ if __name__ == '__main__':
     grib_src = None
     if grib_src_name == 'HRRR':
         grib_src = HRRR(js)
+    if grib_src_name == 'HRRR_AK':
+        grib_src = HRRR_AK(js)
     elif grib_src_name == 'NAM':
         grib_src = NAM218(js)
     elif grib_src_name == 'NAM227':
         grib_src = NAM227(js)
+    elif grib_src_name == 'NAM198':
+        grib_src = NAM198(js)
+    elif grib_src_name == 'NAM196':
+        grib_src = NAM196(js)
     elif grib_src_name == 'CFSR_P':
         grib_src = CFSR_P(js)
     elif grib_src_name == 'CFSR_S':

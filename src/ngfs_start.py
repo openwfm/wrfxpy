@@ -183,13 +183,13 @@ class ngfs_day():
       ongoing_lat= ongoing_latlons[:,0]
       x_ongoing, y_ongoing = m(ongoing_lon,ongoing_lat)
       
-      #new incidents
+      #new incidents,not started
       new_latlons = latlons[self.new,:]
       new_lon = new_latlons[:,1]
       new_lat= new_latlons[:,0]
       x_new, y_new = m(new_lon,new_lat)
 
-      #started incidents
+      #new, started incidents
       started_latlons = latlons[self.started*self.new,:]
       started_lon = started_latlons[:,1]
       started_lat= started_latlons[:,0]
@@ -208,7 +208,7 @@ class ngfs_day():
 
       #title and save the figure
       time_str = str(time.gmtime().tm_hour).zfill(2) + ':' + str(time.gmtime().tm_min).zfill(2) + '  UTC'
-      t_str = 'NIFC Fire Incidents \n' + csv_date_str + '\n ' + self.sat_name
+      t_str = 'NIFC Fire Incidents \n' + self.date_str + '\n ' + self.sat_name
       plt.title(t_str)
 
       print('Saving ',self.map_save_str)
@@ -302,9 +302,13 @@ class ngfs_incident():
       cfg = copy.deepcopy(base_cfg)
       #look for Alaska incidents and change to GFSF
       if any(self.data.state == 'AK'):
-         cfg['grib_source'] = 'GFSF'
-         print('\tAlaska incident detected, using GFSF and Alaska Landfire data')
+         cfg['grib_source'] = 'NAM198'
+         print('\tAlaska incident detected, using NAM198 and Alaska Landfire data')
          cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_alaska'
+      if any(self.data.state == 'HI'):
+         cfg['grib_source'] = 'NAM196'
+         print('\tHawaii incident detected, using NAM196 and Hawaii Landfire data')
+         cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_hawaii'
       try:
          print('\tGrib source: ',cfg['grib_source'])
       except:
@@ -403,7 +407,7 @@ class ngfs_incident():
       #HRR needs special data handling because 48 hour forecasts are only issued 
       #   at t00z, t06z, t12z, and t18z
       cycle_start = self.start_utc
-      if cfg['grib_source'] == 'HRRR':
+      if cfg['grib_source'] == 'HRRR' or cfg['grib_source'] == 'HRRR_AK':
          print('\tComputing start of grib cycle')
          cycle_hour = np.int8(np.trunc(self.start_utc.hour/6))*6
          cycle_start = cycle_start.replace(hour = cycle_hour)
@@ -745,7 +749,7 @@ def read_NGFS_csv_data(csv_file):
          data_read = pd.read_csv(file_path, parse_dates=time_cols2)
          #filter full-disk data to get only USA detections
          if 'Full' in file_path:
-            print('\tReading full-disk data: ',file_path)
+            print('\Reading full-disk data: ',file_path)
             print('\tNumber of all Full-Disk detections: ',len(data_read))
             data_read = data_read[data_read.country == 'USA']
             print('\tNumber of USA Full-Disk detections: ',len(data_read))
@@ -798,11 +802,12 @@ def prioritize_incidents(incidents,new_idx,num_starts):
    #nums_start is number of the new simulations to start set tpo be -1 
    priority_by_population = False
    
-   n = len(new_idx)
-   if n > num_starts+20:
+   if sum(new_idx) > num_starts:
       frp_cutoff = 5e3 # will filter out low-frp incidents
    else:
       frp_cutoff = 0
+
+   n = len(new_idx)
    started = np.zeros(n,dtype=int)
    pop = np.zeros(n)
    frp = np.zeros(n)
@@ -837,7 +842,7 @@ def prioritize_incidents(incidents,new_idx,num_starts):
                os.system(incidents[i].cmd_str)
                #print(incidents[i].cmd_str)
                os.system('jobs')
-               #pause between jobs to help avoid crash in metgrid. Working ? <------------------
+               #pause between jobs to help avoid crash in metgrid. <------------------
                time.sleep(120)
                incidents[i].set_started()
                started[i] = 1
@@ -1027,7 +1032,7 @@ if __name__ == '__main__':
          polar.add_firms_dates(sat=satellite, csv_timestamp=csv_timestamp, days_to_get=days_to_get)
       except:
          print(f'Error getting {satellite} date data')
-
+   
    if csv.today:
       print('\tGetting the polar data for the previous 48 hours')
       satellites = ['noaa_20', 'noaa_21','suomi', 'landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
@@ -1038,7 +1043,7 @@ if __name__ == '__main__':
       satellites = ['noaa_20', 'noaa_21', 'suomi','landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
       for satellite in satellites:
          add_firms_data(satellite, csv.timestamp, 3)
-      
+   
    #polar.add_modis() #<<----------- different columns than the VIIIRS dat sets 
    
 

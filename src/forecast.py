@@ -43,7 +43,10 @@ except:
 
 from ingest.NAM218 import NAM218
 from ingest.HRRR import HRRR
+from ingest.HRRR_AK import HRRR_AK
 from ingest.NAM227 import NAM227
+from ingest.NAM198 import NAM198
+from ingest.NAM196 import NAM196
 from ingest.CFSR import CFSR_P, CFSR_S
 from ingest.NARR import NARR
 from ingest.GFSA import GFSA
@@ -136,10 +139,16 @@ class JobState(Dict):
         """
         if gs_name == 'HRRR':
             return [HRRR(js)]
+        if gs_name == 'HRRR_AK':
+            return [HRRR_AK(js)]
         elif gs_name == 'NAM' or gs_name == 'NAM218' :
             return [NAM218(js)]
         elif gs_name == 'NAM227':
             return [NAM227(js)]
+        elif gs_name == 'NAM198':
+            return [NAM198(js)]
+        elif gs_name == 'NAM196':
+            return [NAM196(js)]
         elif gs_name == 'NARR':
             return [NARR(js)]
         elif gs_name == 'CFSR':
@@ -1446,8 +1455,8 @@ def verify_inputs(args,sys_cfg):
 
     # check for valid grib source
     if 'grib_source' in args:
-        if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR','GFSA','GFSF']:
-            raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
+        if args['grib_source'] not in ['HRRR', 'HRRR_AK', 'NAM','NAM218', 'NAM227','NAM196', 'NAM198', 'NARR','CFSR','GFSA','GFSF']:
+            raise ValueError('Invalid grib source %s, must be one of HRRR, HRRR_AK, NAM, NAM227, NAM196, NAM198, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
 
     # check for valid satellite source
     if 'satellite_source' in args:
