@@ -305,6 +305,7 @@ class ngfs_incident():
          cfg['grib_source'] = 'NAM198'
          print('\tAlaska incident detected, using NAM198 and Alaska Landfire data')
          cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_alaska'
+         cfg['wps_namelist_path'] ='etc/nlists/default.wps_alaska'
       if any(self.data.state == 'HI'):
          cfg['grib_source'] = 'NAM196'
          print('\tHawaii incident detected, using NAM196 and Hawaii Landfire data')
@@ -1000,24 +1001,20 @@ if __name__ == '__main__':
    #id strings seem to be less mutable thaqst   n the names
    initialize_by_names  = False
 
+   #make an array of ngfs_incident objects
    if initialize_by_names:
       print('\tInitializing incident object by incident names')
       num_incidents = num_names
+      incidents = [ngfs_incident(incident_names[i]) for i in range(num_names)]
    else:
       print('\tInitializing incident object by incident id string')
       num_incidents = num_id_strings
+      incidents = [ngfs_incident(incident_id_strings[i]) for i in range(num_id_strings)]
 
-
-   
    #should belong to the ngfs_day class object
    #array for recording which incidents are new
    new_idx = np.zeros((num_incidents,), dtype=int)
 
-   #make an array of ngfs_incident objects
-   if initialize_by_names:
-      incidents = [ngfs_incident(incident_names[i]) for i in range(num_names)]
-   else:
-      incidents = [ngfs_incident(incident_id_strings[i]) for i in range(num_id_strings)]
 
    print('Acquiring Polar data')
    polar = nh.polar_data(csv.timestamp)
@@ -1043,6 +1040,7 @@ if __name__ == '__main__':
       satellites = ['noaa_20', 'noaa_21', 'suomi','landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
       for satellite in satellites:
          add_firms_data(satellite, csv.timestamp, 3)
+      
    
    #polar.add_modis() #<<----------- different columns than the VIIIRS dat sets 
    
