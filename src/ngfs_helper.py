@@ -133,10 +133,6 @@ class polar_data():
         #sat is string with sateliite name, modis is not included 
         #csv_datestamp is a pandas.timestamp object
         #gets firms nrt for specific dates, maybe requires tokens
-        #wget -e robots=off -m -np -R .html,.tmp -nH --cut-dirs=3 "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/README.pdf" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJBUFMgT0F1dGgyIEF1dGhlbnRpY2F0b3IiLCJpYXQiOjE2ODY5MjIwMjQsIm5iZiI6MTY4NjkyMjAyNCwiZXhwIjoxNzAyNDc0MDI0LCJ1aWQiOiJqaGFsZXkiLCJlbWFpbF9hZGRyZXNzIjoiamFtZXMuaGFsZXlAdWNkZW52ZXIuZWR1IiwidG9rZW5DcmVhdG9yIjoiamhhbGV5In0.dsvczMWdYHnowYZ-k_wG5KKXIvJJQfzdaxd0lL6hj6M" -P .
-        # sat_dict = {
-        #     'suomi ' : 
-        # }
         tokens = json.load(open('etc/tokens.json'))
         #probably should go back at least 24 hours
         #days_to_get = 2
@@ -151,7 +147,7 @@ class polar_data():
         
         #same for all satellites
         url_base = 'https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/'
-        #url_base = 'https://nrt3.modaps.eosdis.nasa.gov/archive/FIRMS/'
+        #example file path
         #https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/landsat/USA_contiguous_and_Hawaii/LANDSAT_USA_contiguous_and_Hawaii__2022312.txt
         satellite_info = {
             'noaa_20': {
@@ -166,11 +162,11 @@ class polar_data():
                 'csv_file_pattern': 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_VNP14IMGTDL_NRT_{0}{1:03d}.txt',
                 'csv_dir': 'suomi-npp-viirs-c2/USA_contiguous_and_Hawaii/'
             },
-                'noaa_20_Alaska': {
+            'noaa_20_Alaska': {
                 'csv_file_pattern': 'J1_VIIRS_C2_Alaska_VJ114IMGTDL_NRT_{0}{1:03d}.txt',
                 'csv_dir': 'noaa-20-viirs-c2/Alaska/'
             },
-                'noaa_21_Alaska': {
+            'noaa_21_Alaska': {
                 'csv_file_pattern': 'J2_VIIRS_C2_Alaska_VJ214IMGTDL_NRT_{0}{1:03d}.txt',
                 'csv_dir': 'noaa-21-viirs-c2/Alaska/'
             },
@@ -208,40 +204,14 @@ class polar_data():
             #downloading not working, files are all in place
             if not os.path.exists(csv_local):
                 print('updating VIIRS data cache',csv_local)
-                cmd_str = 'wget -e robots=off -m -np -R .html,.tmp -nd "{}{}" --header "Authorization: Bearer {}" -P ingest/FIRMS'
+                cmd_str = 'wget -e robots=off -m -np -R .html,.tmp -nd "{}" --header "Authorization: Bearer {}" -P ingest/FIRMS'
                 #   print(cmd_str.format(url_base,csv_dir[:-1],tokens['nrt']))
-                os.system(cmd_str.format(url_base,csv_dir[:-1],tokens['nrt']))
+                os.system(cmd_str.format(url_base+csv_dir+csv_file,tokens['nrt']))
                 
-                #cmd_str_suomi = cmd_str.format(sat_dir = 'suomi-npp-viirs-c2',domain ='USA_contiguous_and_Hawaii')
-                #cmd_str_noaa_20 = cmd_str.format(sat_dir = 'noaa-20-viirs-c2',domain ='USA_contiguous_and_Hawaii')
-                #cmd_str_noaa_21 = cmd_str.format(sat_dir = 'noaa-21-viirs-c2',domain ='USA_contiguous_and_Hawaii')
-                #cmd_str_suomi_Alaska = cmd_str.format(sat_dir = 'suomi-npp-viirs-c2',domain ='Alaska')
-                #cmd_str_noaa_20_Alaska = cmd_str.format(sat_dir = 'noaa-20-npp-viirs-c2',domain ='Alaska')
-                #cmd_str_noaa_20_Alaska = cmd_str.format(sat_dir = 'noaa-21-npp-viirs-c2',domain ='Alaska')
-                #cmd_str_landsat = cmd_str.format(sat_dir = 'landsat',domain ='USA_contiguous_and_Hawaii')
-
-                #cmd_str_suomi = 'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/s" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
-                # =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-20-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
-                #cmd_str_noaa_21 =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-21-viirs-c2/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SAa" -P ingest/FIRMS'
-                #cmd_str_landsat =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/landsat/USA_contiguous_and_Hawaii" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
-                #cmd_str_suomi_Alaska = 'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/suomi-npp-viirs-c2/Alaska" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
-                #cmd_str_noaa_20_Alaska =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-20-viirs-c2/Alaska" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
-                #cmd_str_noaa_21_Alaska =  'wget -e robots=off -m -np -R .html,.tmp -nd "https://nrt3.modaps.eosdis.nasa.gov/api/v2/content/archives/FIRMS/noaa-21-viirs-c2/Alaska" --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpoYWxleSIsImV4cCI6MTcyMDQ0MDk2MywiaWF0IjoxNzE1MjU2OTYzLCJpc3MiOiJFYXJ0aGRhdGEgTG9naW4ifQ.tep3EwFLZN2k1E9XHQqlijKqH4G2nVxVcYJTTgkjWENA2b50RzGt9EKUFQ9A5DnsL7vgTWLBiupAhj9HUZHQoIjBlJOvZXF-wq1AuFDOGn42iW0rq169d8GtUvCBFNEdtXqcjuEyDCwbfRZGByhFuj5ndiBaQppZ0vHHhmSR1H6hr0RsQrsRWshO9OKRDN6GUwI8nm2AQ1PqzjDhB074BbpQS0vv5egA9hwEGhTpKdsrAnWG27F6dl8mb206pdvFUoaJgAx2oiWCxjfZ2qkp1lqORdxa_5tKh_1y69XDDj3xPy5eqrRWW33Bz7h7KMN3kcIAsGKiWjfeJ6D2F3Z6SA" -P ingest/FIRMS'
-
-
-                #self.download_url(csv_url,self.firms_path)
-                #os.system(cmd_str_suomi)
-                #os.system(cmd_str_noaa_20)
-                #os.system(cmd_str_noaa_21)
-                #os.system(cmd_str_landsat)
-                #os.system(cmd_str_suomi_Alaska)
-                #os.system(cmd_str_noaa_20_Alaska)
-                #os.system(cmd_str_noaa_21_Alaska)
-            # else:
-            #     print('\tPolar data for',sat, 'already in place')
+            #if downloads fails
             if not os.path.exists(csv_local):
                 print('Missing the file: ',csv_local)
-            #read the csv file
+            #else, read the csv file
             else:
                 print('\tReading',csv_local)
                 data_read = pd.read_csv(csv_local)
@@ -255,12 +225,6 @@ class polar_data():
                 data_read.drop(columns='satellite',inplace=True)
 
                 #turn the weird column of 'acq_time' into houurs, min,ecs and add to the acq_date
-                # acq_int = data_read['acq_time']
-                # #remove the colon
-                # acq_str = [str(i).replace(':','') for i in acq_int]
-                # #now pad zeros to the left of strings like '912'
-                # acq_str = [str(i).rjust(4,'0') for i in acq_str]
-                # data_read['acq_time'] = acq_str
                 data_read = self.fix_times(data_read)
 
                 #filter out low confidence detections
@@ -297,11 +261,7 @@ class polar_data():
     def best_ign_estimate(self,ignition_pixel,inc_bb):
         #use shapely to help find the first viirs pixel within the boundaries of the goes pixel
         #inc_bb is the incident bounding box (minx, miny, maxx, maxy)
-        #GOignition_pixel
-        #to do
-        #   1) convert times to timestamps, maybe pass as a separate array
-        #   2) 
-        #   3) download the named files with tokens
+        #GOignition_pixe
         print('\tFinding best viirs pixel for the incident GOES ignition point')
         print('\tTime of GOES imaging: ',ignition_pixel.loc['observation_time'])
 
