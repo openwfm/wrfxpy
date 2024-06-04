@@ -318,3 +318,78 @@ def fire_front(d,t,var):
       m = np.logical_and(lfn > 60.,lfn <= dt)
       v[~m] = np.nan
       return v
+
+def ffwi(d,t):
+      """
+      Calculate the Fosberg Index
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      :return: Fosberg Index (unitless)
+      """
+      # Get the needed variables
+      r = d.variables['QVAPOR'][t,0,:,:] # Mixing ratio (kg kg-1)
+      p = (d.variables['PSFC'][t,:,:]) / 100. # Surface Pressure (hPa)
+      t2_k = d.variables['T2'][t,:,:] # Temperature (K)
+      t2_c = t2_k - 273.15 # Temperature (C)
+      t2_f = ((t2_k - 273.15) * 1.8) + 32 # Temperature (F)
+      u10 = (d.variables['U10'][t,:,:]) * 2.23694 # U-Component of the Wind at 10m (mph) (conversion from m/s to mph)
+      v10 = (d.variables['V10'][t,:,:]) * 2.23694 # V-Component of the Wind at 10m (mph) (conversion from m/s to mph)
+      ws = np.sqrt(u10**2 + v10**2) # Wind speed (mph)
+      #Find specific humidity
+      q = r / (1 + r) # Specific Humidity (%)
+      # Find vapor pressure
+      e = (q * p) / 0.622 # Vapor pressure (hPa)
+      # Note: 0.622 is the ratio between the gas constant for dry air and the gas constant for water vapor
+      # Find saturated vapor pressure
+      es = 6.112 * np.exp((17.67 * t2_c) / (t2_c + 243.5)) # Saturation Vapor Pressure (hPa)
+      # Note: The constant 6.112 is derived from the molecular weight of water and the universal gas constant
+      # Find relative humidity
+      rh = e / es # Relative Humidity (%)
+      # Initialize equilibrium moisture content
+      emc = np.zeros(rh.shape)
+      # Case 1: RH >= 50
+      rh_mask = rh >= 50
+      emc[rh_mask] = 21.0606 + 0.005565 * rh[rh_mask]**2 - 0.00035 * rh[rh_mask] * t2_f[rh_mask] - 0.483199 * rh[rh_mask] # Equilibrium Moisture Content (%)
+      # Case 2: 10 <= RH < 50
+      rh_mask = np.logical_and(rh >= 10, rh < 50)
+      emc[rh_mask] = 2.22749 + 0.160107 * rh[rh_mask] - 0.014784 * t2_f[rh_mask] # Equilibrium Moisture Content (%)
+      # Case 3: RH < 10
+      rh_mask = rh < 10
+      emc[rh_mask] = 0.03229 + 0.281073 * rh[rh_mask] - 0.000578 * rh[rh_mask] * t2_f[rh_mask] # Equilibrium Moisture Content (%)
+      # Find eta
+      eta = 1 - 2 * (emc/30) + 1.5 * (emc / 30)**2 - 0.5 * (emc / 30)**3
+      # Find Fosberg Index
+      ffwi = (eta * np.sqrt(1 + ws**2)) / 0.3002 # Fosberg Index Value (unitless)
+      return ffwi
+
+def hdw(d,t):
+      """
+      Calculate the Hot Dry and Windy (HDW) Index
+      :param d: open NetCDF4 dataset
+      :param t: number of timestep
+      :return: HDW Index (hPa m s-1, but units should be ignored)
+      """
+      # Get the needed variables
+      r = d.variables['QVAPOR'][t,0,:,:] # Mixing ratio (kg kg-1)
+      p = (d.variables['PSFC'][t,:,:]) / 100. # Surface Pressure (hPa)
+      t2_k = d.variables['T2'][t,:,:] # Temperature (K)
+      t2_c = t2_k - 273.15 # Temperature (C)
+      t2_f = ((t2_k - 273.15) * 1.8) + 32 # Temperature (F)
+      u10 = (d.variables['U10'][t,:,:]) * 2.23694 # U-Component of the Wind at 10m (mph) (conversion from m/s to mph)
+      v10 = (d.variables['V10'][t,:,:]) * 2.23694 # V-Component of the Wind at 10m (mph) (conversion from m/s to mph)
+      ws = np.sqrt(u10**2 + v10**2)
+      #Find specific humidity
+      q = r / (1 + r) # Specific Humidity (%)
+      # Find vapor pressure
+      e = (q * p) / 0.622 # Vapor pressure (hPa)
+      # Note: 0.622 is the ratio between the gas constant for dry air and the gas constant for water vapor
+      # Find saturated vapor pressure
+      es = 6.112 * np.exp((17.67 * t2_c) / (t2_c + 243.5)) # Saturation Vapor Pressure (hPa)
+      # Note: The constant 6.112 is derived from the molecular weight of water and the universal gas constant
+      # Find relative humidity
+      rh = e / es # Relative Humidity (%)
+      # Find vapor pressure deficit
+      vpd = es - ((rh * es) / 100.) # Vapor Pressure Deficit (hPa)
+      # Find Hot, Dry, & Windy Index
+      hdw = ws * vpd # Hot Dry & Windy (hpa m s-1) 
+      return hdw
