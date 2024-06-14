@@ -324,11 +324,11 @@ class ngfs_incident():
       #change if there is a viirs detection to work with
       #the domain stays the same otherwise so comparision between viirs and goes ignitions may be examined
       if not hasattr(self,'new_ign_latlon'):
-         cfg['ignitions'] = { '1' : [ { 'time_utc' : self.time_utc,
+         cfg['ignitions'] = { '1' : [ { 'time_utc' : utils.utc_to_esmf(self.ign_utc),
                                     'duration_s' : ign_dur,
                                     'latlon' : self.ign_latlon } ] }
       else:
-         cfg['ignitions'] = { '1' : [ { 'time_utc' : self.time_utc,
+         cfg['ignitions'] = { '1' : [ { 'time_utc' : utils.utc_to_esmf(self.new_ign_utc),
                                    'duration_s' : ign_dur,
                                    'latlon' : self.new_ign_latlon } ] }  # <<---- new 
          cfg['domains']['1']['center_latlon'] = self.new_ign_latlon
@@ -917,7 +917,7 @@ if __name__ == '__main__':
       ngfs_dir = 'ingest/NGFS'
       
       #download the data
-      days_to_get = 3
+      days_to_get = 2
       csv_str, csv_path = download_csv_data(days_to_get)
       csv_file = csv_path ## <---- This can be a list of paths
       
@@ -1018,6 +1018,8 @@ if __name__ == '__main__':
 
    print('Acquiring Polar data')
    polar = nh.polar_data(csv.timestamp)
+   firms_days_to_get = 3
+   satellites = ['noaa_20', 'noaa_21', 'suomi','landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
 
    def add_firms_data(satellite, csv_timestamp, days_to_get):   #<<------ move into the NGFS_helper module?
       try:
@@ -1032,14 +1034,12 @@ if __name__ == '__main__':
    
    if csv.today:
       print('\tGetting the polar data for the previous 48 hours')
-      satellites = ['noaa_20', 'noaa_21','suomi', 'landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
       for satellite in satellites:
-         add_firms_data(satellite, csv.timestamp, 3)
+         add_firms_data(satellite, csv.timestamp, firms_days_to_get)
    else:
       print(f'Getting the polar data for {csv_date_str}, {csv.timestamp.day_of_year}')
-      satellites = ['noaa_20', 'noaa_21', 'suomi','landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
       for satellite in satellites:
-         add_firms_data(satellite, csv.timestamp, 3)
+         add_firms_data(satellite, csv.timestamp, firms_days_to_get)
       
    
    #polar.add_modis() #<<----------- different columns than the VIIIRS dat sets 
