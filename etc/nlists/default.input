@@ -154,6 +154,8 @@ fire_ignition_start_time5           =   0,      0
 fire_ignition_end_time5             =   0,      0
 fire_viscosity                      =   0
 fire_boundary_guard                 =   3,      3
+fire_wind_log_interp 		    =   1,      1
+fire_use_windrf 		    =   2,      2
 /
 
   &bdy_control
