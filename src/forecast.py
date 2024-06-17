@@ -936,8 +936,7 @@ def execute(args,job_args):
     if js.iofields and osp.exists('etc/iofields.cfg'):
         js.wrf_nml['time_control']['iofields_filename'] = [osp.abspath('etc/iofields.cfg')] * js.num_doms
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
-    if 'ignitions' in js.keys():
-        update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
+    update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
     if 'fmda_geogrid_path' in js.args:
         moisture_classes = js.fire_nml['moisture'].get('moisture_classes', 5)
         fmc_gc_initialization = []
@@ -1017,7 +1016,7 @@ def execute(args,job_args):
             logging.error('use_realtime is selected, but no fire information to start a fire simulation')
             sys.exit(1)
     else:
-        if 'ignitions' in js.keys() and len(js.ignitions) and js.use_tign_ignition:
+        if len(js.ignitions) and js.use_tign_ignition:
             process_ignitions(js)
     
     logging.info('run_wrf = %s' % js.run_wrf)

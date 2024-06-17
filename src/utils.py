@@ -459,7 +459,7 @@ def render_ignitions(js, max_dom):
         nml_fire['fire_perimeter_time'][max_dom-1] = fire_perimeter_time
         nml_fire.update({'fire_boundary_guard': [0] * max_dom})
         nml_fire['fire_boundary_guard'][max_dom-1] = -1
-        ign_specs = {k: [] for k in ign_specs.keys()}
+        ign_specs = {str(max_dom): []}
     elif js.use_tign_ignition:
         ign_times = [
             (
@@ -472,7 +472,7 @@ def render_ignitions(js, max_dom):
             fire_tign_in_time = max([int((ign_time - js.start_utc).total_seconds())+ign_dur for ign_time,ign_dur in ign_times])
             nml_fire.update({'fire_tign_in_time': [0] * max_dom})
             nml_fire['fire_tign_in_time'][max_dom-1] = fire_tign_in_time
-        ign_specs = {k: [] for k in ign_specs.keys()}
+        ign_specs = {str(max_dom): []}
     
     for dom_str, dom_igns in ign_specs.items():
         dom_id = int(dom_str)
