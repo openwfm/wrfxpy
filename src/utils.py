@@ -451,7 +451,8 @@ def render_ignitions(js, max_dom):
                  'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom,
                  'fmoist_run' : [False] * max_dom, 'fmoist_interp' : [False] * max_dom,
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
-                 'fire_viscosity' : [0] * max_dom }
+                 'fire_viscosity' : [0] * max_dom, 'fire_wind_log_interp': [0] * max_dom,
+                 'fire_use_windrf': [0] * max_dom }
     
     if js.use_realtime:
         fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
@@ -478,6 +479,8 @@ def render_ignitions(js, max_dom):
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
         nml_fire['ifire'][dom_id-1] = 1
+        nml_fire['fire_wind_log_interp'] = 1
+        nml_fire['fire_use_windrf'] = 2
         if not (js.use_tign_ignition or js.use_realtime):
             nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
