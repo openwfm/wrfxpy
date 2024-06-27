@@ -55,5 +55,13 @@
     "qstat_arg" : "-j %s",
     "qsub_job_num_index" : 3,
     "qsub_script" : "etc/qsub/ember.sub"
+  },
+  "tryton" : {
+    "qsub_cmd" : "sbatch",
+    "qdel_cmd" : "scancel",
+    "qstat_cmd" : "squeue",
+    "qstat_arg" : "-j %s",
+    "qsub_job_num_index" : 3,
+    "qsub_script" : "etc/qsub/tryton.sub"
   }
 }

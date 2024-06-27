@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH --time=06:00:00 # walltime, abbreviated by -t
+#SBATCH --nodes=2     # number of cluster nodes, abbreviated by -N
+#SBATCH --output            /users/kdm/przyluski/WRFXPY.stdout
+#SBATCH --error             /users/kdm/przyluski/WRFXPY.stderr
+#SBATCH --ntasks=96   # number of MPI tasks, abbreviated by -n
+# additional information for allocated clusters
+#SBATCH --exclude=gt0633,gt0805
+#SBATCH --partition=batch  # partition, abbreviated by -p
+#SBATCH --job-name=WRFXPY
+# set data and working directories
+export WORKDIR=%(cwd)s 
+cd $WORKDIR
+#
+source /users/project1/pt01071/METMF/wrfxpy/SFIRE_IMGW_ENV.sh
+# see below for ways to do this for different MPI distributions
+mpirun -np $SLURM_NTASKS ./wrf.exe
+
+
+
+
+
+

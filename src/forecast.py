@@ -41,17 +41,10 @@ try:
 except:
     _fire_init_plugin = False
 
-from ingest.NAM218 import NAM218
-from ingest.HRRR import HRRR
-from ingest.NAM227 import NAM227
-from ingest.CFSR import CFSR_P, CFSR_S
-from ingest.NARR import NARR
-from ingest.GFSA import GFSA
-from ingest.GFSF import GFSF_P, GFSF_S
+import ingest.ingest_common as common
+for _i in range(len(common.INGEST_MODULES)):
+        exec(f"from ingest.{list(common.INGEST_MODULES.keys())[_i]} import {','.join(common.INGEST_MODULES[list(common.INGEST_MODULES.keys())[_i]])}")
 
-from ingest.MODIS import Terra, Aqua
-from ingest.VIIRS import SNPP
-from ingest.GOES import GOES16, GOES17
 
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
@@ -69,7 +62,7 @@ import glob
 import pickle
 import netCDF4 as nc4
 import numpy as np
-
+import six
 import smtplib
 from email.mime.text import MIMEText
 import hashlib
@@ -134,20 +127,16 @@ class JobState(Dict):
         :param gs_name: the name of the grib source
         :param js: configuration json
         """
-        if gs_name == 'HRRR':
-            return [HRRR(js)]
-        elif gs_name == 'NAM' or gs_name == 'NAM218' :
-            return [NAM218(js)]
-        elif gs_name == 'NAM227':
-            return [NAM227(js)]
-        elif gs_name == 'NARR':
-            return [NARR(js)]
-        elif gs_name == 'CFSR':
-            return [CFSR_P(js),CFSR_S(js)]
-        elif gs_name == 'GFSA':
-            return [GFSA(js)]
-        elif gs_name == 'GFSF':
-            return [GFSF_P(js),GFSF_S(js)]
+
+        #for _i in range(len(common.INGEST_MODULES)):
+        #    exec(f"from ingest.{list(common.INGEST_MODULES.keys())[_i]} import {','.join(common.INGEST_MODULES[list(common.INGEST_MODULES.keys())[_i]])}")
+        if gs_name in list(common.INGEST_MODULES.keys()):
+            returns = common.INGEST_MODULES[gs_name]
+            return_call = ""
+            for r in returns:
+                return_call += f"{r}(js),"
+            return_call = return_call[:-1]
+            return eval(f"[{return_call}]")
         else:
             sat_only = js.get('sat_only',False)
             if not sat_only:
@@ -586,66 +575,59 @@ def vars_add_to_geogrid(js):
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
-    # get number of fuel categories
-    nfuelcats = js.fire_nml['fuel_scalars'].get('nfuelcats', 13)
     # load the variables to process
-    geo_data_path = osp.join(js.wps_dir, 'geo_data')
-    geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
     geo_vars_path = 'etc/vtables/geo_vars.json'
     geo_vars = None
     try:
-        if osp.exists(geo_vars_path):
-            geo_vars = Dict(json.load(open(geo_vars_path)))
-        else:
-            logging.warning('Any {} specified for NFUEL_CAT and ZSF GeoTIFF location'.format(geo_vars_path))
-            logging.info('Trying default NFUEL_CAT and ZSF from {}.'.format(js.args['wps_geog_path']))
-            nfuel_path = osp.join(js.args['wps_geog_path'], 'fuel_cat_fire', 'lf_data.tif')
-            topo_path = osp.join(js.args['wps_geog_path'], 'topo_fire', 'ned_data.tif')
-            if osp.exists(nfuel_path) and osp.exists(topo_path) and nfuelcats == 13:
-                geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
-        for var,tif_file in geo_vars.items():
-            if var == 'NFUEL_CAT':
-                var = 'NFUEL_CAT_13'
-            wisdom = get_wisdom(var)
-            if (
-                wisdom['name'] == 'NFUEL_CAT'
-                and 'category_range' in wisdom
-                and nfuelcats != wisdom['category_range'][1] - 1
-            ):
-                logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
-                continue
-            bbox = js.bounds[str(js.min_sub_dom)]
-            logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
-            try:
-                GeoDriver.from_file(tif_file).to_geogrid(geo_data_path, var, bbox)
-            except Exception as e:
-                if 'NFUEL_CAT' in var or 'ZSF' in var:
-                    logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
-                    logging.error('Exception: %s',e)
-                    raise Exception('Failed to process GeoTIFF file for variable {}'.format(var))
-                else:
-                    logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
-                    logging.warning('Exception: %s',e)
-        geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
+        geo_vars = Dict(json.load(open(geo_vars_path)))
     except:
-        logging.warning('Problems processing GeoTIFF files for NFUEL_CAT and ZSF'.format(geo_vars_path))
-        logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path))
-        varnames = ['NFUEL_CAT_{}_MODIS_20'.format(nfuelcats), 'ZSF_MODIS_20']
-        geogrid_tbl_json = {}
-        for varname in varnames:
-            logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
-            vartable = wisdom_to_table(varname, get_wisdom(varname))
-            geogrid_tbl_json.update({varname: vartable})
+        logging.info('Any {0} specified, defining default GeoTIFF files for NFUEL_CAT and ZSF from {1}.'.format(geo_vars_path,js.args['wps_geog_path']))
+        nfuel_path = osp.join(js.args['wps_geog_path'],'fuel_cat_fire','lf_data.tif')
+        topo_path = osp.join(js.args['wps_geog_path'],'topo_fire','ned_data.tif')
+        if osp.exists(nfuel_path) and osp.exists(topo_path):
+            geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
+        else:
+            logging.warning('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
+            geogrid_tbl_json_path = 'etc/vtables/geogrid_tbl.json'
+            if osp.exists(geogrid_tbl_json_path):
+                logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path, geogrid_tbl_json_path))
+                geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
+                for varname,vartable in six.iteritems(geogrid_tbl_json):
+                    logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
+                    if 'abs_path' in vartable.keys():
+                        vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
+                        logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
+                    elif 'rel_path' in vartable.keys():
+                        vartable['rel_path'] = 'default:'+vartable['rel_path']
+                        logging.info('GEOGRID rel_path=%s' % vartable['rel_path'])
+                    write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
+                return
+            else:
+                raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
+
+    geo_data_path = osp.join(js.wps_dir, 'geo_data')
+    for var,tif_file in six.iteritems(geo_vars):
+        bbox = js.bounds[str(js.min_sub_dom)]
+        logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
+        try:
+            GeoDriver.from_file(tif_file).to_geogrid(geo_data_path,var,bbox)
+        except Exception as e:
+            if var in ['NFUEL_CAT', 'ZSF']:
+                logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
+                logging.error('Exception: %s',e)
+                raise Exception('Failed to process GeoTIFF file for variable {}'.format(var))
+            else:
+                logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
+                logging.warning('Exception: %s',e)
     
     # update geogrid table
+    geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
     logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path,geogrid_tbl_json_path))
-    for varname,vartable in geogrid_tbl_json.items():
+    geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
+    for varname,vartable in six.iteritems(geogrid_tbl_json):
         logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
-        if 'abs_path' in vartable:
-            logging.info('GEOGRID abs_path={}'.format(vartable['abs_path']))
-            vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
-        else:
-            logging.info('GEOGRID rel_path={}'.format(vartable['rel_path']))
+        vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
+        logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
 
 
@@ -1454,8 +1436,8 @@ def verify_inputs(args,sys_cfg):
 
     # check for valid grib source
     if 'grib_source' in args:
-        if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR','GFSA','GFSF']:
-            raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
+        if args['grib_source'] not in list(common.INGEST_MODULES.keys()):
+            raise ValueError('Invalid grib source %s, must be one of %s' % (args['grib_source'], list(common.INGEST_MODULES.keys())))
 
     # check for valid satellite source
     if 'satellite_source' in args:
