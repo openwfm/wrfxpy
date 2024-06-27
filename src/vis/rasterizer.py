@@ -210,10 +210,9 @@ def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,no
     return str_io.getvalue(), float_bounds
 
 
-def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's', linewidths = 0, text = False):
+def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's', linewidths = 0, text = False, border=0.05):
     # number of scatter elements
     N = len(val)	
-    border = .05
     bounds = (bounds[0]-border, bounds[1]+border, bounds[2]-border, bounds[3]+border)
    
     logging.info('basemap_scatter_mercator: bounding box {}'.format(bounds))
