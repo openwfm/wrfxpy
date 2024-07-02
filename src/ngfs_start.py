@@ -38,6 +38,7 @@ import json
 import time
 from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
+from PIL import Image
 from datetime import timedelta, datetime
 #add src directory to path json time
 sys.path.insert(1, 'src/')
@@ -53,6 +54,7 @@ import ngfs_dictionary as nd
 #import shapely
 from shapely.geometry import Point, LineString, Polygon
 from pyproj import Proj, transform, Transformer
+
 #import geopandas as gpd
 ####### Classes  ######
 
@@ -161,15 +163,13 @@ class ngfs_day():
 
    def print_base_map(self):
       print('Starting map making')
-      m = Basemap(llcrnrlon=-119,llcrnrlat=22,urcrnrlon=-64,urcrnrlat=49,
-         projection='lcc',lat_1=33,lat_2=45,lon_0=-95)
+      m = Basemap(llcrnrlon=-119,llcrnrlat=22,urcrnrlon=-64,urcrnrlat=49, projection='lcc',lat_1=33,lat_2=45,lon_0=-95)
       m.latlon = True 
       #m.bluemarble()
       m.shadedrelief()
       m.drawstates()
       m.drawcountries()
-      
- 
+
       #for i in range(self.num_incidents()):
       #   print(i,self.incidents[i].name,self.incidents[i].started)
 
@@ -207,14 +207,79 @@ class ngfs_day():
       plt.legend(loc ="lower left")
 
       #title and save the figure
-      time_str = str(time.gmtime().tm_hour).zfill(2) + ':' + str(time.gmtime().tm_min).zfill(2) + '  UTC'
+      #time_str = str(time.gmtime().tm_hour).zfill(2) + ':' + str(time.gmtime().tm_min).zfill(2) + '  UTC'
       t_str = 'NIFC Fire Incidents \n' + self.date_str + '\n ' + self.sat_name
       plt.title(t_str)
+
+      #set size to b 520x400 at 100 dpi
+      #figure = plt.gcf()
+      #figure.set_size_inches(5.2,4.0)
 
       print('Saving ',self.map_save_str)
       plt.savefig(self.map_save_str,bbox_inches='tight')
       #plt.show
-      
+      plt.cla()
+
+      #optionally plot Alaska fires
+      if max(latlons[:,0])>54.0:
+
+         #for alaska fires
+         n = Basemap(llcrnrlon=-164,llcrnrlat=54,urcrnrlon=-130,urcrnrlat=73, projection='lcc',lat_1=63,lat_2=68,lon_0=-151)
+         n.latlon = True 
+         #m.bluemarble()
+         n.shadedrelief()
+         n.drawstates()
+         n.drawcountries()
+
+
+         #ongoing Alaska
+         xa_ongoing, ya_ongoing = n(ongoing_lon,ongoing_lat)
+         #new Alaska incidents,not started
+         xa_new, ya_new = n(new_lon,new_lat)
+         #new Alaska, started incidents
+         xa_started, ya_started = n(started_lon,started_lat)
+
+         if any(self.ongoing):
+            n.scatter(xa_ongoing,ya_ongoing,s=15,label='Ongoing Incident',edgecolors='black')
+         if any(self.new):
+            n.scatter(xa_new,ya_new,s=30,label='New Incident',edgecolors='black')
+         if any(self.started):
+            n.scatter(xa_started,ya_started,s=30,label='New, Forecast Started',edgecolors='black')
+
+         plt.legend(loc ="lower right")
+
+         #title and save the figure
+         t_str = 'NIFC Alaska Fire Incidents \n' + self.date_str + '\n ' + 'GOES-18'
+         plt.title(t_str)
+         sv_str = self.map_save_str
+         sv_str = sv_str.replace('ngfs/','ngfs/Alaska_')
+         print('Saving ',sv_str)
+         plt.savefig(sv_str,bbox_inches='tight')
+
+         #join figures if there are Alaska 
+         
+         #copy the CONUS figure to a separate png file
+         conus_str = self.map_save_str
+         conus_str = conus_str.replace('ngfs/','ngfs/CONUS_')
+         cpy_cmd = 'cp ' + self.map_save_str + ' ' + conus_str
+         os.system(cpy_cmd)
+
+         time.sleep(20)
+         #joing the two figures
+         img0 = Image.open(self.map_save_str)
+         img1 = Image.open(sv_str)
+
+         #resize Alaska map but keep aspect ratio
+         height = img0.size[1]
+         width = int(np.round(height*img1.size[0]/img1.size[1]))
+         img1 = img1.resize((width,height),Image.Resampling.LANCZOS)
+         img1.save(sv_str)
+
+         image_new = Image.new("RGB",(img0.size[0]+img1.size[0],height),"white")
+         image_new.paste(img1,(0,0))
+         image_new.paste(img0,(width,0))
+         #this overwrites the previous file
+         image_new.save(self.map_save_str)
 
 
 
@@ -300,7 +365,13 @@ class ngfs_incident():
       #change the base configuration file to match the individual incidents parameters
       
       cfg = copy.deepcopy(base_cfg)
-      #look for Alaska incidents and change to GFSF
+      #look for Alaska/Hawaii and updated regions to use latest Landfire and appropriate weather products
+      update_states_sw = ['CA','AZ','NV','UT','NM']
+      for ups in update_states_sw:
+         if any(self.data.state == ups):
+            cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_2023'
+            print('\tUsing updated Landfire maps')
+            break
       if any(self.data.state == 'AK'):
          cfg['grib_source'] = 'NAM198'
          print('\tAlaska incident detected, using NAM198 and Alaska Landfire data')
@@ -408,7 +479,8 @@ class ngfs_incident():
       #HRR needs special data handling because 48 hour forecasts are only issued 
       #   at t00z, t06z, t12z, and t18z
       cycle_start = self.start_utc
-      if cfg['grib_source'] == 'HRRR' or cfg['grib_source'] == 'HRRR_AK':
+      cycle_list = ['HRRR','HRRR_AK','NAM198','NAM196']
+      if cfg['grib_source'] in cycle_list:
          print('\tComputing start of grib cycle')
          cycle_hour = np.int8(np.trunc(self.start_utc.hour/6))*6
          cycle_start = cycle_start.replace(hour = cycle_hour)
