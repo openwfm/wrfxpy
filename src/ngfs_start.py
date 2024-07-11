@@ -366,7 +366,7 @@ class ngfs_incident():
       
       cfg = copy.deepcopy(base_cfg)
       #look for Alaska/Hawaii and updated regions to use latest Landfire and appropriate weather products
-      update_states_sw = ['CA','AZ','NV','UT','NM']
+      update_states_sw = ['CA','AZ','NV','UT','OR','WA','ID','MT','WY']
       for ups in update_states_sw:
          if any(self.data.state == ups):
             cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_2023'
@@ -429,16 +429,6 @@ class ngfs_incident():
          #xb,yb = transform(outProj,inProj,b.exterior.coords.xy[0],b.exterior.coords.xy[1])
          yb,xb = tg.transform(b.exterior.coords.xy[1],b.exterior.coords.xy[0])
          buff = Polygon(zip(xb,yb))
-         '''
-         #depends on geopandas, not in the wrfx environment
-         ctr_pt = gpd.points_from_xy([x],[y])
-         df = pd.DataFrame()
-         gdf = gpd.GeoDataFrame(df,geometry = ctr_pt,crs = 'epsg:4326')
-         #crs = 'epsg:4326' 
-         gdf_a = gdf.to_crs(3857)
-         buff_a = gdf_a.buffer(r)  # make a 15km radius around the center
-         buff = buff_a.to_crs(4326) #convert back to la/lon
-         '''
          return buff
       
       x = self.ign_latlon[1]
@@ -490,7 +480,7 @@ class ngfs_incident():
       
       #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
       # /data/WRFXPY/wksp_fmda/CONUS/202307/
-      if 'fmda_geogrid_path' in cfg:
+      if True: #'fmda_geogrid_path' in cfg:
          print('Will use FMDA for fuel moisture')
          fmda_year = cfg['start_utc'][:4]
          fmda_month = cfg['start_utc'][5:7]
@@ -521,8 +511,8 @@ class ngfs_incident():
          time.sleep(10)
 
       #take the first id string and name from the list
-      self.incident_id_string = incident_data['incident_id_string'][incident_data.index[0]]
-      self.incident_name  = incident_data['incident_name'][incident_data.index[0]]
+      self.incident_id_string = incident_data['incident_id_string'].iloc[0]
+      self.incident_name  = incident_data['incident_name'].iloc[0] 
       print(self.incident_name)
 
       self.det_count = incident_data.shape[0]
@@ -579,11 +569,13 @@ class ngfs_incident():
          swir_ign_latlon = [incident_data.lat_tc_swir[idx], incident_data.lon_tc_swir[idx]]
          #average of all detections within three hours of first detection
          time_msk = incident_data.actual_image_time - incident_data.actual_image_time[idx] < timedelta(hours = 3.0)
+         #missing data fill values are -999 for lon_tc_swir, this filters them
          swir_msk = abs(incident_data.lon_tc_swir) < 180.0
 
          if sum(time_msk & swir_msk) > 1:
             mean_ign_latlon = [np.mean(incident_data.lat_tc_swir[time_msk & swir_msk]), np.mean(incident_data.lon_tc_swir[time_msk & swir_msk])]
             print('\tAveraging SWIR pixels from first three hours')
+         # in case there is no swir observation
          else:
             mean_ign_latlon = [np.mean(incident_data.lat_tc[time_msk]), np.mean(incident_data.lon_tc[time_msk])]
          
@@ -595,7 +587,8 @@ class ngfs_incident():
          lat_diff = abs(tc_ign_latlon[0] - swir_ign_latlon[0])
          lon_diff = abs(tc_ign_latlon[1] - swir_ign_latlon[1])
 
-         if max(lat_diff, lon_diff) < 0.01:
+         #in case the swir observation is very far from the nominal
+         if max(lat_diff, lon_diff) < 0.04:
             self.ign_latlon = swir_ign_latlon
             print('\tUsing SWIR ignition location')
          else:
@@ -916,7 +909,7 @@ def prioritize_incidents(incidents,new_idx,num_starts):
                #print(incidents[i].cmd_str)
                os.system('jobs')
                #pause between jobs to help avoid crash in metgrid. <------------------
-               time.sleep(120)
+               time.sleep(180)
                incidents[i].set_started()
                started[i] = 1
                start_count += 1
@@ -1070,7 +1063,7 @@ if __name__ == '__main__':
    print('Found ',num_id_strings, 'unique id strings')
    time.sleep(5)
 
-   #id strings seem to be less mutable thaqst   n the names
+   #id strings seem to be less mutable than the names
    initialize_by_names  = False
 
    #make an array of ngfs_incident objects
@@ -1174,15 +1167,13 @@ if __name__ == '__main__':
             #print(\n\t\t ./forecast.sh %s' % incidents[i].filename)
             print(cmd_str)
 
-
-   
-      
-   print('Number of incidents in csv file: ',num_incidents)
-   print('Number of new incidents: ',sum(new_idx))
-
    #prioritize and autostart the new incidents
    #this functionallity should be put in the ngfs_day class
    sort_idx, started = prioritize_incidents(incidents,new_idx,num_starts)
+
+   print('Number of incidents in csv file: ',num_incidents)
+   print('Number of new incidents: ',sum(new_idx))
+   print('Number of started incidents: ',sum(started))
 
    #update the ngfs_day object
    #maybe some of these could be called inside each other??
