@@ -48,6 +48,14 @@
     "qsub_job_num_index" : 3,
     "qsub_script" : "etc/qsub/haguespeak.sub"
   },
+  "alderaan" : {
+    "qsub_cmd" : "sbatch",
+    "qdel_cmd" : "scancel",
+    "qstat_cmd" : "squeue",
+    "qstat_arg" : "-j %s",
+    "qsub_job_num_index" : 3,
+    "qsub_script" : "etc/qsub/alderaan.sub"
+  },
   "ember" : {
     "qsub_cmd" : "sbatch",
     "qdel_cmd" : "scancel",
