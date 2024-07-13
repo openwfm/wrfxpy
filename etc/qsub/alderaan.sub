@@ -1,0 +1,44 @@
+#!/bin/bash
+#SBATCH --time=%(wall_time_hrs)02d:00:00 # walltime, abbreviated by -t
+#SBATCH --ntasks=%(np)d   # number of MPI tasks, abbreviated by -n
+
+##SBATCH --nodes=%(nodes)d     # number of cluster nodes, abbreviated by -N  #KH: comment out
+##SBATCH -o  # name of the stdout
+# additional information for allocated clusters
+##SBATCH --account=kochanski-kp     # account - abbreviated by -A  #KH: comment out
+#SBATCH --partition=math-alderaan  # partition, abbreviated by -p  #KH: comment out
+##SBATCH --job-name=WRFX  #KH: comment out
+
+# set data and working directories
+export WORKDIR=%(cwd)s 
+cd $WORKDIR
+
+#
+
+###
+#alderaan:
+
+module load netcdf # sets NETCDF and HDF5
+export DIR=~jmandel/libraries
+export JASPERLIB="$DIR/grib2/lib"
+export JASPERINC="$DIR/grib2/include"
+export LIBTIFF=/usr/lib64
+export LIBGEOTIFF=/usr/lib64   # libgeotiff does not exist though
+export WRFIO_NCD_LARGE_FILE_SUPPORT=1
+
+export LD_LIBRARY_PATH="$DIR/grib2/lib:$LD_LIBRARY_PATH"
+
+###
+
+# for MPICH2 over Ethernet, set communication method to TCP
+# see below for network interface selection options for different MPI distributions
+#export MV2_ENABLE_AFFINITY=0  #KH:comment out for now
+
+env
+
+#setenv MPICH_NEMESIS_NETMOD tcp
+# run the program
+# see below for ways to do this for different MPI distributions
+##mpirun -np $SLURM_NTASKS ./wrf.exe  #KH: removed p option
+
+mpirun -n $SLURM_NTASKS ./wrf.exe
