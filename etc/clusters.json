@@ -57,7 +57,6 @@
     "qsub_script" : "etc/qsub/alderaan.sub"
   },
   "ember" : {
-  "ember" : {
     "qsub_cmd" : "sbatch",
     "qdel_cmd" : "scancel",
     "qstat_cmd" : "squeue",
