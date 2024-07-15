@@ -1,0 +1,69 @@
+{
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "grid_code": "czu_sim",
+    "start_utc": "2020-08-16_14:00:00",
+    "end_utc": "2020-08-22_14:00:00",
+    "grib_source": "HRRR",
+    "wps_geog_path": "/data001/projects/jmandel/WPS_GEOG",
+    "domains": {
+        "1": {
+            "cell_size": [
+                900,
+                900
+            ],
+            "domain_size": [
+                61,
+                61
+            ],
+            "subgrid_ratio": [
+                30,
+                30
+            ],
+            "geog_res": ".3s",
+            "center_latlon": [
+                37.17162,
+                -122.22275
+            ],
+            "truelats": [
+                37.17162,
+                37.17162
+            ],
+            "stand_lon": -122.22275,
+            "history_interval": 15,
+            "time_step": 4
+        }
+    },
+    "ignitions": {
+        "1": [
+            {
+                "time_utc": "2020-08-16_15:00:00",
+                "duration_s": 240,
+                "latlon": [
+                    37.17162,
+                    -122.22275
+                ]
+            }
+        ]
+    },
+    "num_nodes": 9,
+    "ppn": 64,
+    "wall_time_hrs": 96,
+    "qsys": "alderaan",
+    "postproc": {
+        "1": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "FIRE_AREA",
+            "FGRNHFX",
+            "FLINEINT",
+            "SMOKE_INT"
+        ],
+        "shuttle": "incremental",
+        "description": "czu base"
+    }
+}
