@@ -5,7 +5,7 @@
     "emissions_namelist_path": "etc/nlists/default.fire_emissions",
     "grid_code": "czu_sim",
     "start_utc": "2020-08-16_14:00:00",
-    "end_utc": "2020-08-22_14:00:00",
+    "end_utc": "2020-08-18_13:00:00",
     "grib_source": "HRRR",
     "wps_geog_path": "/data001/projects/jmandel/WPS_GEOG",
     "domains": {
