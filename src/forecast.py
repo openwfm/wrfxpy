@@ -721,6 +721,7 @@ def execute(args,job_args):
     :param fire_namelist_path: the path to the namelist.fire file that will be used as template
     :param wps_geog_path: the path to the geogrid data directory providing terrain/fuel data
     :param email_notification: dictionary containing keys address and events indicating when a mail should be fired off
+    :return: None if failed, something otherwise
 
 
     """
@@ -781,10 +782,10 @@ def execute(args,job_args):
             create_sat_manifest(js)
             # create satellite outputs
             process_sat_output(js.job_id)
-            return
+            return 0
         else:
             logging.error('any available sat source specified')
-            return
+            return None
     else:
         # read in all namelists
         js.wps_nml = read_namelist(js.args['wps_namelist_path'])
@@ -859,8 +860,8 @@ def execute(args,job_args):
     if js.ungrib_only:
         for grib_source in js.grib_source:
             if proc_q.get() != 'SUCCESS':
-                return
-        return
+                return None
+        return 0
     else:
         geogrid_proc.join()
         if js.use_realtime:
@@ -872,7 +873,7 @@ def execute(args,job_args):
     if js.satellite_source:
         for satellite_source in js.satellite_source:
             if proc_q.get() != 'SUCCESS':
-                return
+                return None
 
     if js.use_realtime:
         if proc_q.get() != 'SUCCESS':
@@ -880,10 +881,10 @@ def execute(args,job_args):
 
     for grib_source in js.grib_source:
         if proc_q.get() != 'SUCCESS':
-            return
+            return None
 
     if proc_q.get() != 'SUCCESS':
-        return
+        return None
 
     proc_q.close()
 
@@ -1562,7 +1563,8 @@ if __name__ == '__main__':
 
     # execute the job
     logging.info('calling execute')
-    execute(args,job_args)
+    if execute(args,job_args) is None: 
+        logging.error('At least one parallel task failed, check for ERROR in the log above')
 
     logging.info('forecast.py done')
 
