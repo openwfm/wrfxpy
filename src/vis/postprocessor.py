@@ -537,6 +537,9 @@ class Postprocessor(object):
             lat, lon = wisdom['grid'](dg)
             fa = wisdom['retrieve_as'](df)
 
+            dataset_name = df.getncattr('dataset_name')
+            logging.info('_sat2raster: dataset_name=%s' % dataset_name)
+            
             # check variables
             if fa.shape != lat.shape:
                 raise PostprocError("Variable %s size does not correspond to grid size." % sat)
