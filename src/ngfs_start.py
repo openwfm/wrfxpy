@@ -287,6 +287,7 @@ class ngfs_incident():
    def __init__(self,name):
       self.name = name
       self.data = pd.DataFrame()
+      self.viirs_data = pd.DataFrame()
       self.new = False
       self.started = False
       self.affected_population = 0
@@ -314,6 +315,9 @@ class ngfs_incident():
    def add_data(self,df):
       self.data = self.data.append(df)
 
+   def add_viirs_data(self,viirs_df):
+      self.viirs_data = self.viirs_data.append(viirs_df)
+
    def set_incident_start_time(self):
       if self.data.shape[0] > 0:
          #self.incident_start_time = self.data.iloc[0,3]
@@ -334,7 +338,7 @@ class ngfs_incident():
          print('\tOld UTC time:',self.ign_utc)
          self.ign_utc = new_ign_utc
          #the start and finish times of the simulation get adjusted too
-         self.start_utc = utils.round_time_to_hour(self.ign_utc - timedelta(minutes=30))
+         self.start_utc = utils.round_time_to_hour(self.ign_utc - timedelta(minutes=60))
          self.end_utc = self.start_utc + timedelta(hours=24)
 
    
@@ -366,7 +370,7 @@ class ngfs_incident():
       
       cfg = copy.deepcopy(base_cfg)
       #look for Alaska/Hawaii and updated regions to use latest Landfire and appropriate weather products
-      update_states_sw = ['CA','AZ','NV','UT','OR','WA','ID','MT','WY']
+      update_states_sw = ['CA','AZ','NV','UT','OR','WA','ID','MT','WY','CO']
       for ups in update_states_sw:
          if any(self.data.state == ups):
             cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_2023'
@@ -376,16 +380,20 @@ class ngfs_incident():
          cfg['grib_source'] = 'NAM198'
          print('\tAlaska incident detected, using NAM198 and Alaska Landfire data')
          cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_alaska'
-         cfg['wps_namelist_path'] ='etc/nlists/default.wps_alaska'
       if any(self.data.state == 'HI'):
          cfg['grib_source'] = 'NAM196'
          print('\tHawaii incident detected, using NAM196 and Hawaii Landfire data')
          cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_hawaii'
+         #maybe use the old adrjrw here because there is so much ocean in the domain?
+         #cfg['wrf_namelist_path']  = "etc/nlists/default.input_adjrw"
+         #cfg['fire_namelist_path'] = "etc/nlists/default.fire_adjrw"
       try:
          print('\tGrib source: ',cfg['grib_source'])
       except:
          print('\tGrib source is unset')
-      gc_string  = self.incident_name+'_'+utils.utc_to_esmf(self.start_utc)+'_'+self.incident_id_string[1:-1]
+      gc_string = self.incident_name+'_'+utils.utc_to_esmf(self.start_utc)+'_'+self.incident_id_string[1:-1]
+      gc_string = gc_string.replace('(','_')
+      gc_string = gc_string.replace(')','_')
       cfg['grid_code'] = gc_string.replace(' ','_')
       cfg['domains']['1']['center_latlon'] = self.ign_latlon
       cfg['domains']['1']['truelats'] = (self.ign_latlon[0], self.ign_latlon[0])
@@ -399,7 +407,8 @@ class ngfs_incident():
                                     'duration_s' : ign_dur,
                                     'latlon' : self.ign_latlon } ] }
       else:
-         cfg['ignitions'] = { '1' : [ { 'time_utc' : utils.utc_to_esmf(self.new_ign_utc),
+         t_utc = min(self.ign_utc,self.new_ign_utc)
+         cfg['ignitions'] = { '1' : [ { 'time_utc' : utils.utc_to_esmf(t_utc),
                                    'duration_s' : ign_dur,
                                    'latlon' : self.new_ign_latlon } ] }  # <<---- new 
          cfg['domains']['1']['center_latlon'] = self.new_ign_latlon
@@ -464,7 +473,7 @@ class ngfs_incident():
 
 
       cfg['start_utc'] = utils.utc_to_esmf(self.start_utc)
-      cfg['end_utc'] = utils.utc_to_esmf(self.end_utc)
+      cfg['end_utc'] = utils.utc_to_esmf(utils.round_time_to_hour(self.ign_utc + timedelta(hours =  25.5))) #utils.round_time_to_hour(self.ign_utc - timedelta(minutes=30))
 
       #HRR needs special data handling because 48 hour forecasts are only issued 
       #   at t00z, t06z, t12z, and t18z
@@ -475,13 +484,13 @@ class ngfs_incident():
          cycle_hour = np.int8(np.trunc(self.start_utc.hour/6))*6
          cycle_start = cycle_start.replace(hour = cycle_hour)
          cfg['cycle_start_utc'] = utils.utc_to_esmf(cycle_start)
-         #cfg['download_whole_cycle'] = 'true' for 
+         #cfg['download_whole_cycle'] = 'true' 
 
-      
+      non_conus = ['Alaska','Hawaii']
       #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
       # /data/WRFXPY/wksp_fmda/CONUS/202307/
-      if True: #'fmda_geogrid_path' in cfg:
-         print('Will use FMDA for fuel moisture')
+      if self.state not in non_conus: #'fmda_geogrid_path' in cfg:
+         print('\tWill use FMDA for fuel moisture')
          fmda_year = cfg['start_utc'][:4]
          fmda_month = cfg['start_utc'][5:7]
          fmda_day = cfg['start_utc'][8:10]
@@ -489,6 +498,10 @@ class ngfs_incident():
          base_folder = '/data/WRFXPY/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
          date_folder = 'fmda-CONUS-'+fmda_year+fmda_month+fmda_day+'-'+fmda_hour+'.geo'
          cfg['fmda_geogrid_path'] = base_folder + date_folder
+      else:
+         print('\tNon-CONUS fire, will use eqilibrium FMC')
+         #removes the key from dictionary
+         cfg.pop('fmda_geogrid_path',None)
 
 
          #print(cfg)
@@ -631,8 +644,8 @@ class ngfs_incident():
       #minimum of the earliest detection pixel and stated NIFC incident start time
       self.ign_utc = min(incident_data.observation_time[idx],self.incident_start_time,incident_data.initial_observation_time[idx])
       
-      #date to start the simulation, 30 minutes before the ignition
-      self.start_utc = utils.round_time_to_hour(self.ign_utc - timedelta(minutes=30))
+      #date to start the simulation, 60 minutes before the ignition
+      self.start_utc = utils.round_time_to_hour(self.ign_utc - timedelta(minutes=60))
       self.end_utc = self.start_utc + timedelta(hours=24)
       #time_utc goes into the namelist file
       self.time_utc = utils.utc_to_esmf(self.ign_utc)
@@ -867,6 +880,8 @@ def prioritize_incidents(incidents,new_idx,num_starts):
    #new_idx is boolean mask
    #nums_start is number of the new simulations to start set tpo be -1 
    priority_by_population = False
+   job_sleep = 150 # time to pause beteen jobs
+   
    
    if sum(new_idx) > num_starts:
       frp_cutoff = 5e3 # will filter out low-frp incidents
@@ -877,14 +892,26 @@ def prioritize_incidents(incidents,new_idx,num_starts):
    started = np.zeros(n,dtype=int)
    pop = np.zeros(n)
    frp = np.zeros(n)
+   domain_size = 31*np.ones(n)
    for i in range(n):
       pop[i] = incidents[i].affected_population
       frp[i] = np.sum(incidents[i].data.frp)  # <<--------------------------------- Could be double counting if both GOES see it?
+      if hasattr(incidents[i],'cfg'):
+         domain_size[i] = incidents[i].cfg['domains']['1']['domain_size'][0]
+   
+   
    #to get decreasing list, sort its negative
    if priority_by_population:
-      sort_idx = np.argsort(-pop)
+      sort_array = np.array([-pop,domain_size])
+      #sort_idx = np.argsort(-pop)
    else:
-      sort_idx = np.argsort(-frp)
+      sort_array = np.array([frp,domain_size])
+      #sort_idx = np.argsort(-frp)
+   
+   #sort jobs by decreasing priority, but move large domain jobs to the end of the queue
+   sort_array = np.transpose(sort_array)
+   sort_idx = np.lexsort((sort_array[:,0],sort_array[:,1]))
+
 
    if num_starts > 0:
       print('New incidents by priority')
@@ -904,12 +931,13 @@ def prioritize_incidents(incidents,new_idx,num_starts):
             
          #print('\t',incidents[i].json_start_code)
             if start_count < num_starts and (not rx or np.sum(incidents[i].data.frp) > frp_cutoff):
+
                print('\t Automatically starting this simulation')
+               #os.system('jobs')
                os.system(incidents[i].cmd_str)
-               #print(incidents[i].cmd_str)
-               os.system('jobs')
                #pause between jobs to help avoid crash in metgrid. <------------------
-               time.sleep(180)
+               print(incidents[i].cmd_str)
+               time.sleep(job_sleep) # now 
                incidents[i].set_started()
                started[i] = 1
                start_count += 1
@@ -918,6 +946,8 @@ def prioritize_incidents(incidents,new_idx,num_starts):
                if rx:
                   print('\t Skipping low-FRP RX incident')
             # note started incident that is new within time frame but previously started
+            #keep track of what is started
+            
          if incidents[i].started:
                started[i] = 1
  
@@ -1008,7 +1038,7 @@ if __name__ == '__main__':
       #this forces auto_start and avoids questions
       force = True
       auto_start = True
-      num_starts = 25 # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
+      num_starts = 30 # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
    else:
       force = True  # <<<------------------------------- change this to require confirmation of forecast configuration
       auto_start = False
@@ -1127,7 +1157,7 @@ if __name__ == '__main__':
 
       #get polar data ignition estimate, if polar data exists
       if polar:
-         new_ign_latlon, new_ign_utc = polar.best_ign_estimate(incidents[i].ignition_pixel,incidents[i].bbox)
+         new_ign_latlon, new_ign_utc, viirs_ign_data = polar.best_ign_estimate(incidents[i].ignition_pixel,incidents[i].bbox)
          #print(type(new_ign_latlon))
          if not np.any(np.isnan(new_ign_latlon)):
             print('\tChanging ignition location to VIIRS data location')
@@ -1135,7 +1165,7 @@ if __name__ == '__main__':
             # print(type(incidents[i].ign_latlon))
             incidents[i].set_new_ign_latlon(new_ign_latlon)
             incidents[i].set_new_ign_utc(new_ign_utc)
-      
+            incidents[i].add_viirs_data(viirs_ign_data)
       #detect a new incident from today Maybe this should go in the process stage
       inc_started = False
       for old_inc in old_ngfs_incidents:
