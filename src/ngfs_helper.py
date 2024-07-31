@@ -206,7 +206,7 @@ class polar_data():
                 print('updating VIIRS data cache',csv_local)
                 cmd_str = 'wget -e robots=off -m -np -R .html,.tmp -nd "{}" --header "Authorization: Bearer {}" -P ingest/FIRMS'
                 #   print(cmd_str.format(url_base,csv_dir[:-1],tokens['nrt']))
-                os.system(cmd_str.format(url_base+csv_dir+csv_file,tokens['nrt']))
+                os.system(cmd_str.format(csv_url,tokens['nrt']))
                 
             #if downloads fails
             if not os.path.exists(csv_local):
@@ -274,6 +274,8 @@ class polar_data():
         incident_polygon = box(inc_bb[0],inc_bb[2],inc_bb[1],inc_bb[3])
         
         #brute force way to get at it, loop through list of all viirs detections
+        viirs_inc_data = pd.DataFrame()
+        viirs_ign_data = pd.DataFrame()
         new_ign_pts = np.empty([0,2])
         new_inc_pts = np.empty([0,2])
         new_ign_times = np.array([])
@@ -295,17 +297,20 @@ class polar_data():
                 #print('i = ', i,self.data.loc[i]['acq_date'])
                 #time.sleep(1)
                 #print('\tFound additional incident pixel')
+                viirs_inc_data = viirs_inc_data.append(self.data.loc[i])
                 new_inc_pts = np.append(new_inc_pts,[viirs_ign],axis = 0)
                 new_inc_times = np.append(new_inc_times,self.data.loc[i,'acq_date'])
                 if viirs_point.within(ignition_polygon):
                     new_ign_pts = np.append(new_ign_pts,[viirs_ign],axis = 0)
                     new_ign_times = np.append(new_ign_times,self.data.loc[i,'acq_date'])
+                    viirs_ign_data = viirs_ign_data.append(self.data.loc[i])
                     #print('\tFound viirs pixel within earliest GOES pixel:',viirs_ign,self.data.loc[i,'acq_date'])
                 
         if (new_ign_pts.shape[0] == 0 & new_inc_pts.shape[0] != 0):
             print('\tUsing earliest VIIRS pixel, but it is not within the earliest GOES Pixel')
             new_ign_pts = new_inc_pts
             new_ign_times = new_inc_times
+            viirs_ign_data = viirs_inc_data
             print('\t',new_ign_pts.shape[0],' new incident points found')
 
         if new_ign_pts.shape[0]>0:
@@ -315,7 +320,7 @@ class polar_data():
             new_ign_times = new_ign_times[srt_idx]
             min_ign_time = new_ign_times[0]
             #boolean index
-            first_viirs_pixels = new_ign_times == min_ign_time
+            first_viirs_pixels = new_ign_times <= min_ign_time + timedelta(hours=3)
             print('\tCount of earliest viirs pixels: ',sum(first_viirs_pixels))
 
             #replace with better estimate of lat/lon pf ignition
@@ -330,4 +335,4 @@ class polar_data():
             new_ign_latlon = [float('NaN'),float('NaN')]
             new_ign_utc = pd.NaT  # << -------- return something of correct data type
 
-        return new_ign_latlon, new_ign_utc            
+        return new_ign_latlon, new_ign_utc, viirs_ign_data      
