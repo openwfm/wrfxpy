@@ -18,7 +18,7 @@
 #        NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
 '''
 to do list:
-1) dynamic sizing of domain 
+1) 
 2) feature tracking id awareness
 3) 
 4) 
@@ -38,6 +38,8 @@ import json
 import time
 from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
+from sklearn import metrics
+from sklearn.cluster import DBSCAN
 from PIL import Image
 from datetime import timedelta, datetime
 #add src directory to path json time
@@ -54,7 +56,7 @@ import ngfs_dictionary as nd
 #import shapely
 from shapely.geometry import Point, LineString, Polygon
 from pyproj import Proj, transform, Transformer
-
+from ingest.NWS_warnings import set_red_flags, red_flag_incident
 #import geopandas as gpd
 ####### Classes  ######
 
@@ -73,6 +75,8 @@ class ngfs_day():
       self.today = today  # <--- Boolean as to whether script was called with 'now', maybe change name to 'now'
       #self.set_new = list()
       #self.started_incident = list()
+      self.red_flag_warnings = list()
+      self.red_flag_zones = list()
 
    def add_incidents(self,incidents):
       self.incidents = incidents  ## <--- This will hold all the information
@@ -97,7 +101,7 @@ class ngfs_day():
       if self.today:
          self.sat_name = 'GOES 16 & 18'
          self.map_save_str = 'ngfs/NGFS_'+csv_date_str+'.png'
-         time_str = str(time.gmtime().tm_hour).zfill(2) + '_' + str(time.gmtime().tm_min).zfill(2)
+         time_str = str(time.gmtime().tm_year)+str(time.gmtime().tm_mon).zfill(2)+str(time.gmtime().tm_mday).zfill(2)+'_'+str(time.gmtime().tm_hour).zfill(2) + '_' + str(time.gmtime().tm_min).zfill(2)
          self.pickle_save_str = 'ngfs/pkl_ngfs_day_'+csv_date_str+'_'+time_str+'.pkl'
       else:
          try:
@@ -119,6 +123,62 @@ class ngfs_day():
       with open(self.pickle_save_str,'wb') as f:
          pickle.dump(self,f)
       #make script to run through all saved files to plot
+   ''' 
+   def set_red_flags(self):
+   #returns geopandas geodataframe of state zones with active red_flag warnings
+   #     for current the ngfs_day.datestr
+   # all active warnings are downloaded from NWA api : https://api.weather.gov/alerts/active?
+   #rf_shape is geojson file with warning regions derived from shape file from :
+   #  https://www.weather.gov/source/gis/Shapefiles/WSOM/fz05mr24.zip
+   # this shape file needs to be updated , see : https://www.weather.gov/gis/
+      rf_shape = rf_zones = gpd.read_file('ingest/red_flag/west_fire_warning_zones.geojson')
+      #rf_xml = 'ingest/red_flag/current_red_flag_'+self.date_str+'.xml'
+      #os.system('wget -O ' + rf_xml +' https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.7761e4c3d072b6e56fc4dca8513cf8b02487b2ae.001.1.cap ')
+      active_json = 'ingest/red_flag/active_'+self.date_str+'.geojson'
+      os.system('wget -O ' + active_json + ' https://api.weather.gov/alerts/active?')
+      redflags = list()
+      try:
+         active_frame = gpd.read_file(active_json)
+         for j in range(len(active_frame)):
+            if 'Red Flag' in active_frame.iloc[j].event:
+               for zones in active_frame.iloc[j].geocode['UGC']:
+                  #remove the 'Z' to match codes in shape file
+                  redflags.append(zones.replace('Z',''))  
+         print('Red flag zones found: ',redflags)
+      except:
+         print('Error reading NWS warning file')
+      rf_zones = gpd.GeoDataFrame()
+      for rf in redflags:
+         #in xml file, zones have WAZ703 instead of WA703, like in shape file
+         #sz = rf_shape.STATE_ZONE.iloc[i]
+         #az = sz[0:2]+'Z'+sz[2:]
+         #if os.system('grep ' + az + ' ' + rf_xml) == 0:
+         rf_zones = rf_zones.append(rf_shape[rf_shape.STATE_ZONE == rf])
+      
+      for i in range(len(df.data)):
+         viirs_point = Point(df.data.lon_tc.iloc[i],df.data.lat_tc.iloc[i])
+         for j in range(len(active_red_flags)):
+               if viirs_point.within(active_red_flags.iloc[j].geometry):
+                  print(df.data.incident_name.iloc[i],active_red_flags.STATE_ZONE.iloc[j])
+
+      
+      self.red_flag_zones = rf_zones
+      '''
+   '''
+   def red_flag_points(self):
+      #returns true if the point is within a current red flag zone
+      
+      for i in self.incidents:
+         ig_point = Point(i.ign_latlon[1],i.ign_latlon[0])
+         for j in range(len(self.red_flag_zones)):
+                  if ig_point.within(self.red_flag_zones.iloc[j].geometry):
+                     print(i.incident_name,' is in red flag zone ',self.red_flag_zones.STATE_ZONE.iloc[j])
+                     i.red_flag = True
+                     break
+   '''
+
+
+
 
    def save_incident_text(self):
       #saves the ignition point information for all csv events as a csv file. Needs to add 
@@ -220,7 +280,7 @@ class ngfs_day():
       #plt.show
       plt.cla()
 
-      #optionally plot Alaska fires
+      #optionally plot Alaska fires, all have latitude greater than 54
       if max(latlons[:,0])>54.0:
 
          #for alaska fires
@@ -288,11 +348,14 @@ class ngfs_incident():
       self.name = name
       self.data = pd.DataFrame()
       self.viirs_data = pd.DataFrame()
+      self.feature_data = pd.DataFrame()
       self.new = False
       self.started = False
       self.affected_population = 0
       self.force = False
       self.auto_start = False
+      self.feature_tracking_id = list()
+      self.red_flag = False
    # def process_incident(self,data):
    #    #takes in DataFrame and fills in details about incident   <<<----- done below already ??
    #    pass
@@ -391,9 +454,13 @@ class ngfs_incident():
          print('\tGrib source: ',cfg['grib_source'])
       except:
          print('\tGrib source is unset')
+      #remove the { and } characters at the end of the incident id strings
       gc_string = self.incident_name+'_'+utils.utc_to_esmf(self.start_utc)+'_'+self.incident_id_string[1:-1]
-      gc_string = gc_string.replace('(','_')
-      gc_string = gc_string.replace(')','_')
+      
+      replace_chars = ['#','(',')',':']
+      for rc in replace_chars:
+         gc_string = gc_string.replace(rc,'_')
+      #gc_string = gc_string.replace(')','_')
       cfg['grid_code'] = gc_string.replace(' ','_')
       cfg['domains']['1']['center_latlon'] = self.ign_latlon
       cfg['domains']['1']['truelats'] = (self.ign_latlon[0], self.ign_latlon[0])
@@ -513,9 +580,9 @@ class ngfs_incident():
       del cfg
       #viewprint(cfg)
 
-   def process_incident(self,incident_data,data,full_data):
+   def process_incident(self,incident_data,data,full_data,rf_zones):
 
-      #sort data by observation time	
+      #sort data by observation time  ##is this already sorted when it arrives?
       incident_data = incident_data.sort_values(by='actual_image_time')
 
       id_strings = incident_data['incident_id_string'].unique()
@@ -526,7 +593,20 @@ class ngfs_incident():
       #take the first id string and name from the list
       self.incident_id_string = incident_data['incident_id_string'].iloc[0]
       self.incident_name  = incident_data['incident_name'].iloc[0] 
+      #incidents may have multiple feature tracking ids
+      self.feature_tracking_id = list(incident_data.feature_tracking_id.unique())
       print(self.incident_name)
+      print('\tIncident has ',len(self.feature_tracking_id),' feature tracking ids')
+
+      #search also for the feature tracking id in the full 
+      for f in self.feature_tracking_id:
+         feature_subset = full_data[full_data.feature_tracking_id == f]
+         #filter out detections already accounted for
+         feature_subset = feature_subset.drop(feature_subset[feature_subset.incident_id_string==self.incident_id_string].index)
+         if len(feature_subset) > 0:
+            print('\tFound ',len(feature_subset),' hotspots with feature tracking id: ',f)
+            print('\tMean lat / lon :',str(np.mean(feature_subset.lat_tc)),str(np.mean(feature_subset.lon_tc)))
+            self.feature_data = self.feature_data.append(feature_subset)
 
       self.det_count = incident_data.shape[0]
       print('\tNumber of detections: ',self.det_count) 
@@ -634,7 +714,7 @@ class ngfs_incident():
          print('\tFound additional, earlier detections')
          self.ign_utc = full_subset.observation_time[full_subset.index[0]]
          print('\tNew earliest pixel time: ',self.ign_utc)
-
+      
       #search also for the case where t multiple incident names may exist
       id_subset = data[data['incident_id_string'] == self.incident_id_string]
       if id_subset.shape[0] > self.data.shape[0]:
@@ -643,6 +723,9 @@ class ngfs_incident():
 
       #minimum of the earliest detection pixel and stated NIFC incident start time
       self.ign_utc = min(incident_data.observation_time[idx],self.incident_start_time,incident_data.initial_observation_time[idx])
+
+      #determine if location within red flag warning zone
+      self.red_flag = red_flag_incident(self.ign_latlon[1],self.ign_latlon[0],self.ign_utc,rf_zones)
       
       #date to start the simulation, 60 minutes before the ignition
       self.start_utc = utils.round_time_to_hour(self.ign_utc - timedelta(minutes=60))
@@ -723,8 +806,103 @@ def timestamp_from_string(csv_date_str):
    csv_month = int(csv_date_str[5:7])
    csv_day = int(csv_date_str[8:10])
    return pd.Timestamp(year=csv_year,month=csv_month,day=csv_day,tz='UTC')
+
+def subset_wfo_data(full_data,data,wfo_list):
+   #finds possible wildfire detections in a NWS FO region withouth NIFC designation and assigns 
+   #incident_id_string and incident_name derived fron the feature_tracking_id
+   wfo_data = pd.DataFrame()
+   temp_data = full_data[full_data.type_description == 'Possible Wildland Fire']  
+   for w in wfo_list:
+      wfo_subset = temp_data[full_data.wfo_code == w]
+      wfo_subset = wfo_subset[wfo_subset.type_description == 'Possible Wildland Fire']  #needed ???
+      print('Found ',len(wfo_subset),' possible wildfire detections in ',w)
+      wfo_data = wfo_data.append(wfo_subset)
+
+   #filter data that as feature_tracking is associated with known incident
+   f_ids = data.feature_tracking_id.unique()
+   for f in f_ids:
+      wfo_data = wfo_data.drop(wfo_data[wfo_data.feature_tracking_id == f].index)
+
+   for i in range(len(wfo_data)):
+      wfo_code = wfo_data.wfo_code.iloc[i]
+      fid = wfo_data.feature_tracking_id.iloc[i].replace(':','').replace('-','').replace('_','')
+      wfo_data.incident_id_string.iloc[i] = '{'+str(wfo_code)+fid[-4:]+'-'+fid[2:6]+'-'+fid[6:10]+'-'+fid[11:15]+'-'+fid[-12:]+'}'
+      wfo_data.incident_name.iloc[i] = str(wfo_code)+'_'+fid[2:6]+'_'+fid[6:10]+'_'+fid[-12:]
    
-    
+   return wfo_data
+
+def subset_red_flag_data(full_data,data,rf_zones):
+
+   state_data = pd.DataFrame()
+   rf_data = pd.DataFrame()
+   if len(rf_zones) == 0:
+      print('No red flag warnings issued')
+      return rf_data
+   temp_data = full_data[full_data.type_description == 'Possible Wildland Fire'] 
+   #subset dat byt state first
+   #make list of states with active fed flag zones, append data for these states
+   rf_states = list()
+   for i in range(len(rf_zones)):
+      rfz = rf_zones.iloc[i]
+      if rfz['properties']['STATE'] not in rf_states:
+         rf_states.append(rfz['properties']['STATE'])
+         state_data = state_data.append(temp_data[temp_data.state == rfz['properties']['STATE']])
+   #look for hotspots within red flag zones in the state data
+   print('state data length = ',len(state_data))
+   for i in range(len(state_data)):
+      if red_flag_incident(state_data.iloc[i].lon_tc,state_data.iloc[i].lat_tc,state_data.iloc[i]['actual_image_time'],rf_zones):
+         rf_data = rf_data.append(state_data.iloc[i])
+         #break
+   print('red flag detections length  = ',len(rf_data))
+   #filter out data for known feature tracking ids
+   f_ids = data.feature_tracking_id.unique()
+   for f in f_ids:
+      rf_data = rf_data.drop(rf_data[rf_data.feature_tracking_id == f].index)
+   # names and incident id strings to the data
+   for i in range(len(rf_data)):
+      wfo_code = rf_data.wfo_code.iloc[i]
+      fid = rf_data.feature_tracking_id.iloc[i].replace(':','').replace('-','').replace('_','')
+      rf_data.incident_id_string.iloc[i] = '{REDFLAGS-'+str(wfo_code)+'-'+fid[2:6]+'-'+fid[6:10]+'-'+fid[-12:]+'}'
+      rf_data.incident_name.iloc[i] = 'RED_FLAG_'+str(wfo_code)+'_'+fid[2:6]+'_'+fid[6:10]+'_'+fid[-12:]
+   return rf_data
+   
+def cluster_data(df):
+   ##sort the data by image time
+   df = df.sort_values(by = 'actual_image_time')
+
+   #uses DBSCAN to cluster detection datawfo
+   clust = pd.DataFrame()
+
+   #project the coordinates into someting with meters as unit
+   x,y = df.lon_tc,df.lat_tc
+   tf = Transformer.from_crs("EPSG:4326", "EPSG:3857")
+   xp,yp = tf.transform(y,x)
+   lonlat = np.transpose(np.array([xp,yp]))
+
+   #dbscan parameters
+   min_pts = 5 #could be one pixel that was seen for a while, or several pixels in different locations
+   db_eps = 2*np.sqrt(np.mean(df.pixel_area))*1000 #about 2 times average resolution of 
+   print('DBSCAN parameters: ',db_eps,min_pts)
+
+   #clustering
+   db = DBSCAN(eps = db_eps,min_samples = min_pts).fit(lonlat)
+   db_labels = db.labels_
+   print('Found ',len(set(db_labels)),' clusters in the data')
+
+   #rename the incident names and id strings for the clusters and join to dataframe to return
+   for i in set(db_labels):
+      tmp = df[db_labels == i]
+      id = tmp.incident_id_string.unique()[0]
+      name = tmp.incident_name.unique()[0]
+
+      tmp.incident_id_string.iloc[:] = id
+      tmp.incident_name.iloc[:] = name
+
+      clust = clust.append(tmp)
+      del tmp
+
+   return clust
+
 def get_ngfs_csv(days_previous,goes,domain):
    #downloads NGFS csv files from 0 to 4 days previous to now
    #   to download today's csv: get_ngfs_csv(0)
@@ -905,7 +1083,7 @@ def prioritize_incidents(incidents,new_idx,num_starts):
       sort_array = np.array([-pop,domain_size])
       #sort_idx = np.argsort(-pop)
    else:
-      sort_array = np.array([frp,domain_size])
+      sort_array = np.array([-frp,domain_size])
       #sort_idx = np.argsort(-frp)
    
    #sort jobs by decreasing priority, but move large domain jobs to the end of the queue
@@ -928,9 +1106,13 @@ def prioritize_incidents(incidents,new_idx,num_starts):
                rx = True
             else:
                rx = False
-            
+
+            #don't start RX incidents or low FRP incidents under certain circumstances, frp cutoff is zero when there are not many incidents
+            frp_filtered = (not rx or np.sum(incidents[i].data.frp) > frp_cutoff) 
+            #start anything with viirs detections, but on't wait more than 6 hours for them
+            viirs_filtered  = (len(incidents[i].viirs_data ) > 0 ) or (incidents[i].ign_utc + timedelta(hours=4) < pd.Timestamp.now(tz='UTC'))
          #print('\t',incidents[i].json_start_code)
-            if start_count < num_starts and (not rx or np.sum(incidents[i].data.frp) > frp_cutoff):
+            if start_count < num_starts and frp_filtered and viirs_filtered:
 
                print('\t Automatically starting this simulation')
                #os.system('jobs')
@@ -945,6 +1127,8 @@ def prioritize_incidents(incidents,new_idx,num_starts):
                print('\t New incident, but unstarted simulation')
                if rx:
                   print('\t Skipping low-FRP RX incident')
+               if not viirs_filtered:
+                  print('\t Waiting for VIIRS detection data')
             # note started incident that is new within time frame but previously started
             #keep track of what is started
             
@@ -975,7 +1159,7 @@ if __name__ == '__main__':
    print('Reading in county population data')
    pop_data = pd.read_csv('ingest/NGFS/Population_by_US_County_July_2022.txt',sep='\t',encoding = "ISO-8859-1")
 
-   print('Reading previous 3 (?) pickle files')
+   print('Reading previous pickle files')
    full_pick_list = glob.glob('ngfs/*.pkl')
    full_pick_list.sort(key=os.path.getmtime)
    pick_list = list()
@@ -1071,8 +1255,8 @@ if __name__ == '__main__':
 
    #filter out "null incidents"
    #maybe null incidents are what we are interested in?
-   full_data = data
-   #filter out the possible artifacts 'possible_instrument_artifact'
+   full_data = copy.deepcopy(data)
+   #filter out the possible artifacts 'possible_instrument_artifact', no longer part of the CSV
    # idx = data.possible_instrument_artifact == 'Y'
    # print('Found', sum(idx), ' artifact pixels')
    #try:
@@ -1083,6 +1267,26 @@ if __name__ == '__main__':
       #print('\tNo filter for possible artifact applied')
 
    data = data.dropna(subset=['incident_name'])  #  <------ change to use id_string?
+
+   #get red flag warning data
+   rf_warnings, rf_zones = set_red_flags(csv.date_str)
+
+   ### add detections in selected NWS WFOs that have no incident_id_string, but are possible wildlnad fires ####
+   wfo_list = ['KBOU','KSLC','KPDT','KMFR','KBOI'] # ['KSLC','KBOU','KPQR']
+
+   if 'unknown' in str(sys.argv):
+      forecast_unknown = True
+      unknown_data = pd.DataFrame()
+   else:
+      forecast_unknown = False
+   if forecast_unknown:
+      wfo_data = subset_wfo_data(full_data,data,wfo_list)
+      unknown_data = unknown_data.append(wfo_data)
+      #add data for unnamed fires in red flag areas
+      rf_data = subset_red_flag_data(full_data,data,rf_zones)
+      unknown_data = unknown_data.append(rf_data)
+      data = data.append(cluster_data(unknown_data))
+
 
    #print('Incidents in csv file')
    incident_names = data['incident_name'].unique()
@@ -1098,18 +1302,17 @@ if __name__ == '__main__':
 
    #make an array of ngfs_incident objects
    if initialize_by_names:
-      print('\tInitializing incident object by incident names')
+      print('\tInitializing incident objects by incident names')
       num_incidents = num_names
       incidents = [ngfs_incident(incident_names[i]) for i in range(num_names)]
    else:
-      print('\tInitializing incident object by incident id string')
+      print('\tInitializing incident objects by incident id string')
       num_incidents = num_id_strings
       incidents = [ngfs_incident(incident_id_strings[i]) for i in range(num_id_strings)]
 
    #should belong to the ngfs_day class object
    #array for recording which incidents are new
    new_idx = np.zeros((num_incidents,), dtype=int)
-
 
    print('Acquiring Polar data')
    polar = nh.polar_data(csv.timestamp)
@@ -1153,7 +1356,7 @@ if __name__ == '__main__':
 
       #process all the data for an individual incident
       #print('Subsetting data for incident. Number of detections = ',incident_subset.shape[0])
-      incidents[i].process_incident(incident_subset,data,full_data)
+      incidents[i].process_incident(incident_subset,data,full_data,rf_zones)
 
       #get polar data ignition estimate, if polar data exists
       if polar:
@@ -1163,6 +1366,7 @@ if __name__ == '__main__':
             print('\tChanging ignition location to VIIRS data location')
             # print(type(new_ign_latlon))
             # print(type(incidents[i].ign_latlon))
+            # print('\tAdding new VIIRS data, ',len(viirs_ign_data))
             incidents[i].set_new_ign_latlon(new_ign_latlon)
             incidents[i].set_new_ign_utc(new_ign_utc)
             incidents[i].add_viirs_data(viirs_ign_data)
@@ -1210,6 +1414,9 @@ if __name__ == '__main__':
    csv.add_data(data) #only csv rows with an incident name or id
    csv.add_full_data(full_data) #all csv data rows
    csv.add_incidents(incidents)
+   #red_flag information
+   csv.red_flag_warnings = rf_warnings
+   csv.red_flag_zones = rf_zones
    csv.set_save_name()
    csv.set_new(new_idx.astype(bool))
    csv.set_started(started.astype(bool))
