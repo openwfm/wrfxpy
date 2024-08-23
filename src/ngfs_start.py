@@ -57,9 +57,8 @@ import ngfs_dictionary as nd
 from shapely.geometry import Point, LineString, Polygon
 from pyproj import Proj, transform, Transformer
 from ingest.NWS_warnings import set_red_flags, red_flag_incident
-#import geopandas as gpd
+#import geopandas as gpdpaste
 ####### Classes  ######
-
 
 #class that keeps atrributes about the day's data
 class ngfs_day():
@@ -356,6 +355,11 @@ class ngfs_incident():
       self.auto_start = False
       self.feature_tracking_id = list()
       self.red_flag = False
+      #set current time as estimate ignition time
+      self.ign_utc = pd.Timestamp.now(tz='UTC') 
+      self.start_utc = self.ign_utc - timedelta(hours = 2)
+      self.end_utc = self.ign_utc + timedelta(hours = 4)
+      self.ign_latlon = [40.0,-120.0]
    # def process_incident(self,data):
    #    #takes in DataFrame and fills in details about incident   <<<----- done below already ??
    #    pass
@@ -376,10 +380,10 @@ class ngfs_incident():
       
    #these are the columns of the csv file as pandas dataframe
    def add_data(self,df):
-      self.data = self.data.append(df)
+      self.data = self.data.append(df,ignore_index = True)
 
    def add_viirs_data(self,viirs_df):
-      self.viirs_data = self.viirs_data.append(viirs_df)
+      self.viirs_data = self.viirs_data.append(viirs_df,ignore_index = True)
 
    def set_incident_start_time(self):
       if self.data.shape[0] > 0:
@@ -588,7 +592,7 @@ class ngfs_incident():
       id_strings = incident_data['incident_id_string'].unique()
       if id_strings.shape[0] > 1:
          print('\tFound multiple id strings for named incident')
-         time.sleep(10)
+         #time.sleep(10)
 
       #take the first id string and name from the list
       self.incident_id_string = incident_data['incident_id_string'].iloc[0]
@@ -606,7 +610,7 @@ class ngfs_incident():
          if len(feature_subset) > 0:
             print('\tFound ',len(feature_subset),' hotspots with feature tracking id: ',f)
             print('\tMean lat / lon :',str(np.mean(feature_subset.lat_tc)),str(np.mean(feature_subset.lon_tc)))
-            self.feature_data = self.feature_data.append(feature_subset)
+            self.feature_data = self.feature_data.append(feature_subset,ignore_index = True)
 
       self.det_count = incident_data.shape[0]
       print('\tNumber of detections: ',self.det_count) 
@@ -623,12 +627,18 @@ class ngfs_incident():
       
       #demographic data for incident
       #could span more than one county, state --> use unique to generate a list?
-      self.county = incident_data['locale'][incident_data.index[0]]
-      self.state = incident_data['state'][incident_data.index[0]]
+      self.county = incident_data.locale.iloc[0] #['locale'][incident_data.index[0]]
+      self.state = incident_data.state.iloc[0]  #['state'][incident_data.index[0]]
       if len(self.state) == 2:
-         self.state = sn.abbrev_to_us_state[self.state]
-      #matches the first column of population data text file
-      self.loc_str = '.'+self.county+', '+self.state
+         try:
+            self.state = sn.abbrev_to_us_state[self.state]
+            #matches the first column of population data text file
+            self.loc_str = '.'+self.county+', '+self.state
+         except:
+            print('Error translating the state abbreviation(s)')
+            self.state = 'Unkown'
+            self.loc_str = 'Unknown'
+      
       print('\tLocation: ',self.county,', ',self.state)
       
       #location and population data for incident
@@ -687,10 +697,12 @@ class ngfs_incident():
          else:
             self.ign_latlon = tc_ign_latlon
 
+      #remove and fix , starting at try on line 670
       except:
          print('\tNo terrain corected lat/lon available')
          self.ign_latlon = [incident_data.lat[idx], incident_data.lon[idx]]
          mean_ign_latlon = [np.mean(incident_data.lat_tc), np.mean(incident_data.lon_tc)]
+   
       #reduce to only unique lat/lon pairs
       
       #if mean_ign is true, the ignition point will be estimated from average location of initial detections
@@ -816,13 +828,14 @@ def subset_wfo_data(full_data,data,wfo_list):
       wfo_subset = temp_data[full_data.wfo_code == w]
       wfo_subset = wfo_subset[wfo_subset.type_description == 'Possible Wildland Fire']  #needed ???
       print('Found ',len(wfo_subset),' possible wildfire detections in ',w)
-      wfo_data = wfo_data.append(wfo_subset)
+      wfo_data = wfo_data.append(wfo_subset,ignore_index = True)
 
    #filter data that as feature_tracking is associated with known incident
    f_ids = data.feature_tracking_id.unique()
    for f in f_ids:
       wfo_data = wfo_data.drop(wfo_data[wfo_data.feature_tracking_id == f].index)
 
+   #assign incident id_strings and names to the detections
    for i in range(len(wfo_data)):
       wfo_code = wfo_data.wfo_code.iloc[i]
       fid = wfo_data.feature_tracking_id.iloc[i].replace(':','').replace('-','').replace('_','')
@@ -846,12 +859,12 @@ def subset_red_flag_data(full_data,data,rf_zones):
       rfz = rf_zones.iloc[i]
       if rfz['properties']['STATE'] not in rf_states:
          rf_states.append(rfz['properties']['STATE'])
-         state_data = state_data.append(temp_data[temp_data.state == rfz['properties']['STATE']])
+         state_data = state_data.append(temp_data[temp_data.state == rfz['properties']['STATE']],ignore_index=True)
    #look for hotspots within red flag zones in the state data
    print('state data length = ',len(state_data))
    for i in range(len(state_data)):
       if red_flag_incident(state_data.iloc[i].lon_tc,state_data.iloc[i].lat_tc,state_data.iloc[i]['actual_image_time'],rf_zones):
-         rf_data = rf_data.append(state_data.iloc[i])
+         rf_data = rf_data.append(state_data.iloc[i],ignore_index=True)
          #break
    print('red flag detections length  = ',len(rf_data))
    #filter out data for known feature tracking ids
@@ -880,8 +893,8 @@ def cluster_data(df):
    lonlat = np.transpose(np.array([xp,yp]))
 
    #dbscan parameters
-   min_pts = 5 #could be one pixel that was seen for a while, or several pixels in different locations
-   db_eps = 2*np.sqrt(np.mean(df.pixel_area))*1000 #about 2 times average resolution of 
+   min_pts = 10#could be one pixel that was seen for a while, or several pixels in different locations
+   db_eps = 2*np.sqrt(np.mean(df.pixel_area))*1000 #about 1 times average resolution of 
    print('DBSCAN parameters: ',db_eps,min_pts)
 
    #clustering
@@ -889,17 +902,18 @@ def cluster_data(df):
    db_labels = db.labels_
    print('Found ',len(set(db_labels)),' clusters in the data')
 
-   #rename the incident names and id strings for the clusters and join to dataframe to return
+   #rename the incident data for the first entry in the cluster is for the clusters and join to dataframe to return
    for i in set(db_labels):
-      tmp = df[db_labels == i]
-      id = tmp.incident_id_string.unique()[0]
-      name = tmp.incident_name.unique()[0]
-
-      tmp.incident_id_string.iloc[:] = id
-      tmp.incident_name.iloc[:] = name
-
-      clust = clust.append(tmp)
-      del tmp
+      #noise label is -1
+      if i != -1:
+         tmp = df[db_labels == i]
+         id = tmp.incident_id_string.unique()[0]
+         name = tmp.incident_name.unique()[0]
+         #assign the new names
+         tmp.loc[:,'incident_id_string'] = id
+         tmp.loc[:,'incident_name'] = name
+         clust = clust.append(tmp)
+         del tmp
 
    return clust
 
@@ -1163,17 +1177,20 @@ if __name__ == '__main__':
    full_pick_list = glob.glob('ngfs/*.pkl')
    full_pick_list.sort(key=os.path.getmtime)
    pick_list = list()
-   #filters  out pickle files generated by running only a specific csv file
+   #filters  out pickle files generated by running only a specific csv file, keeps only newest
+   current_time = time.time()
    for i in full_pick_list:
       #print(i)
-      if 'GOES' not in i:
+      if 'GOES' not in i and ((current_time - os.path.getmtime(i))/3600 < 48):
          pick_list.append(i)
    #print(pick_list)
    #time.sleep(10)
+   #find old incidents in reverse chronological order
+   pick_list.reverse()
    old_ngfs_incidents = list()
-   for i in range(-1,-15,-1):
+   for i in pick_list:
       #print(pick_list[i])
-      with open(pick_list[i],'rb') as f:
+      with open(i,'rb') as f:
          df = pickle.load(f)
       old_ngfs_incidents.extend(df.incidents)
 
@@ -1272,7 +1289,7 @@ if __name__ == '__main__':
    rf_warnings, rf_zones = set_red_flags(csv.date_str)
 
    ### add detections in selected NWS WFOs that have no incident_id_string, but are possible wildlnad fires ####
-   wfo_list = ['KBOU','KSLC','KPDT','KMFR','KBOI'] # ['KSLC','KBOU','KPQR']
+   wfo_list = ['KBOU','KSLC','KPDT','KMFR','KBOI','KUNR','KBYZ','KGJT','KPUB'] # ['KSLC','KBOU','KPQR']
 
    if 'unknown' in str(sys.argv):
       forecast_unknown = True
@@ -1281,18 +1298,18 @@ if __name__ == '__main__':
       forecast_unknown = False
    if forecast_unknown:
       wfo_data = subset_wfo_data(full_data,data,wfo_list)
-      unknown_data = unknown_data.append(wfo_data)
+      unknown_data = unknown_data.append(wfo_data,ignore_index=True)
       #add data for unnamed fires in red flag areas
       rf_data = subset_red_flag_data(full_data,data,rf_zones)
       unknown_data = unknown_data.append(rf_data)
-      data = data.append(cluster_data(unknown_data))
+      data = data.append(cluster_data(unknown_data),ignore_index=True)
 
 
    #print('Incidents in csv file')
    incident_names = data['incident_name'].unique()
    incident_id_strings = data['incident_id_string'].unique()
-   num_names = incident_names.shape[0]
-   num_id_strings = incident_id_strings.shape[0]
+   num_names = len(incident_names)
+   num_id_strings = len(incident_id_strings)
    print('Found ',num_names, 'unique incident names')
    print('Found ',num_id_strings, 'unique id strings')
    time.sleep(5)
@@ -1356,8 +1373,13 @@ if __name__ == '__main__':
 
       #process all the data for an individual incident
       #print('Subsetting data for incident. Number of detections = ',incident_subset.shape[0])
+      #try:
       incidents[i].process_incident(incident_subset,data,full_data,rf_zones)
-
+      '''
+      except:
+         print('Error processing incident, saving incident data')
+         incident_subset.to_csv(str(incidents[i].incident_id_string)+'_data.csv')
+      '''
       #get polar data ignition estimate, if polar data exists
       if polar:
          new_ign_latlon, new_ign_utc, viirs_ign_data = polar.best_ign_estimate(incidents[i].ignition_pixel,incidents[i].bbox)
@@ -1383,7 +1405,7 @@ if __name__ == '__main__':
                inc_started = True
                incidents[i].set_started()
             #time.sleep(2)
-      #start new incidents to run  change the hours back to 163
+      #start new incidents to run 
       lookback_time = 24
       if (csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = lookback_time): #
          #(incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
