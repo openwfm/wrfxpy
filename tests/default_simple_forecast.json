@@ -31,7 +31,7 @@
             }
         ]
     },
-    "num_nodes": 4,
+    "num_nodes": 3,
     "emissions_namelist_path": "etc/nlists/default.fire_emissions",
     "wrf_namelist_path": "etc/nlists/default.input",
     "domains": {
