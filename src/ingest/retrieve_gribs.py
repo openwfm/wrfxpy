@@ -21,7 +21,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
-from ingest.HRRR import HRRR
+from ingest.HRRR import HRRR, HRRR_S
 from ingest.NARR import NARR
 from ingest.NAM218 import NAM218
 from ingest.NAM227 import NAM227
@@ -38,7 +38,7 @@ import os.path as osp
 if __name__ == '__main__':
     if len(sys.argv) != 5:
         print(('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
-        print('       supported GRIB sources: HRRR, NAM, CFSR_P, CFSR_S, NARR, GFSA, GFSF_P, GFSF_S')
+        print('       supported GRIB sources: HRRR_S, HRRR, NAM, CFSR_P, CFSR_S, NARR, GFSA, GFSF_P, GFSF_S')
         sys.exit(-1)
 
 
@@ -53,7 +53,9 @@ if __name__ == '__main__':
     js.ingest_dir = ingest_dir
 
     grib_src = None
-    if grib_src_name == 'HRRR':
+    if grib_src_name == 'HRRR_S':
+        grib_src = HRRR_S(js)
+    elif grib_src_name == 'HRRR':
         grib_src = HRRR(js)
     elif grib_src_name == 'NAM':
         grib_src = NAM218(js)

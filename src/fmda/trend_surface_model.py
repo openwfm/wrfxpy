@@ -17,13 +17,8 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-
-from __future__ import absolute_import
 import numpy as np
 import logging
-from six.moves import range
-from six.moves import zip
-
 
 def numerical_solve_bisect(e2, eps2, k):
     """

@@ -22,6 +22,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 import numpy as np
 import sys
+import pickle
 import logging
 import os.path as osp
 from utils import inq, ensure_dir
@@ -29,7 +30,6 @@ from ingest.rtma_source import RTMA
 from wrf.wps_format import WPSFormat
 from geo.write_geogrid import write_geogrid_var
 from geo.var_wisdom import get_wisdom
-from six.moves import range
 
 class FuelMoistureModel:
     """
@@ -269,7 +269,7 @@ class FuelMoistureModel:
 
             if K[1, 0] > 1.0 or K[1, 0] < 0.0:
                 print(("ERROR at %s, Kalman gain %g out of bounds! I=%g V=%g" % (
-                    str((i, j)), K[fuel_type, 0], I, V[s[0], s[1], 0, 0])))
+                    str((i, j)), K[fuel_types, 0], I, V[i, j, 0, 0])))
 
             # update state and state covariance
             m_ext[i, j, :] += np.dot(K, O[i, j, :] - m_ext[i, j, fuel_types])
@@ -363,7 +363,7 @@ class FuelMoistureModel:
         
         :param path: the path where to store the model
         """
-        cPickle.dump(self, path)
+        pickle.dump(self, path)
                 
 
     def to_netcdf(self, path, data_vars):
@@ -417,13 +417,13 @@ class FuelMoistureModel:
             index.update({'known_x':float(y),'known_y':float(x),'known_lat':float(lats[x-1,y-1]),'known_lon':float(lons[x-1,y-1])})
             logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid updated="+str(index))
 
-        FMC_GC = np.zeros((xsize, ysize, 5))
-        FMC_GC[:,:,:3] = self.m_ext[:,:,:3]
+        FMC_GC = np.zeros((xsize, ysize, n))
+        FMC_GC[:,:,:-2] = self.m_ext[:,:,:-2]
         if test_latslons:
-            logging.info("fmda.fuel_moisture_model.to_geogrid: storing lons lats to FMC_GC(:,:,4:5) to test in WRF against XLONG and XLAT")
-            FMC_GC[:,:,3] = lons
-            FMC_GC[:,:,4] = lats
-        FMEP = self.m_ext[:,:,3:]
+            logging.info("fmda.fuel_moisture_model.to_geogrid: storing lons lats to FMC_GC(:,:,-2:) to test in WRF against XLONG and XLAT")
+            FMC_GC[:,:,-2] = lons
+            FMC_GC[:,:,-1] = lats
+        FMEP = self.m_ext[:,:,-2:]
         
         write_geogrid_var(path,'FMC_GC',FMC_GC,index,bits=32)
         write_geogrid_var(path,'FMEP',FMEP,index,bits=32)
@@ -437,27 +437,26 @@ class FuelMoistureModel:
         logging.info("fmda.fuel_moisture_model.to_wps_format path=%s lats %s lons %s" % (path, inq(lats), inq(lons)))
         logging.info("fmda.fuel_moisture_model.to_wps_format: index="+str(index))
         ny, nx, n = self.m_ext.shape
-        if n != 5:
-            logging.error('wrong number of extended state fields, expecting 5')
 
-        m = 7
+        m = n + 2
         var = np.zeros((ny, nx, m))
-        var[:,:,:3] = self.m_ext[:,:,:3]
-        var[:,:,3] = lons
-        var[:,:,4] = lats
-        var[:,:,5:] = self.m_ext[:,:,3:]
+        var[:,:,:n-2] = self.m_ext[:,:,:n-2]
+        var[:,:,n-2] = lons
+        var[:,:,n-1] = lats
+        var[:,:,n:] = self.m_ext[:,:,n-2:]
         arrs = [var[:,:,k].swapaxes(0,1) for k in range(m)]
         startloc = "SWCORNER"
         startlat = lats[0,0]
         startlon = lons[0,0]
+        fm_fields = ["{}H".format(10**i) for i in range(n-2)]
+        fm_descrs = ["{}h Fuel Moisture Content".format(10**i) for i in range(n-2)]
         params = {
             'ifv': 5, 'hdate': "{}:00:00".format(time_tag), 'xfcst': 0.,
             'map_source': "WRF-SFIRE Wildland Fire Information and Forecasting System",
-            'field': ["FM1H", "FM10H", "FM100H", "FMXLON", "FMXLAT", "FMEP0", "FMEP1"], 
-            'units': ["1", "1", "1", "degrees", "degrees", "1", "1"],
-            'desc': ["1h Fuel Moisture Content","10h Fuel Moisture Content","100h Fuel Moisture Content",
-                     "Longitude for testing", "Latitude for testing", "Drying/Wetting Equilibrium Adjustment",
-                     "Rain Equilibrium Adjustment"],
+            'field': fm_fields + ["FMXLON", "FMXLAT", "FMEP0", "FMEP1"], 
+            'units': ["1" for _ in range(n-2)] + ["degrees", "degrees", "1", "1"],
+            'desc': fm_descrs + ["Longitude for testing", "Latitude for testing", 
+                    "Drying/Wetting Equilibrium Adjustment", "Rain Equilibrium Adjustment"],
             'xlvl': 200100., 'nx': nx, 'ny': ny, 'iproj': 3, 'startloc': startloc, 
             'startlat': startlat, 'startlon': startlon, 'dx': index['dx'], 'dy': index['dy'], 
             'xlonc': index['stdlon'], 'truelat1': index['truelat1'], 'truelat2': index['truelat2'], 

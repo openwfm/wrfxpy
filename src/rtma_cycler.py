@@ -389,7 +389,7 @@ def find_region_indices(glat,glon,minlat,maxlat,minlon,maxlon):
     return i1,i2,j1,j2
 
 
-def compute_rtma_bounds(bbox):
+def compute_bounds(bbox):
     """
     Compute bounds from RTMA data even when RTMA data is not available from terrain static data
     
@@ -541,7 +541,7 @@ def fmda_advance_region(cycle, cfg, rtma, wksp_path, lookback_length, meso_token
         logging.info('CYCLER initializing from equilibrium for cycle %s.' % (str(cycle)))
         # setup model parameters    
         Nk = 3
-        Tk = np.array([1.0, 10.0, 100.0])
+        Tk = np.array([1.0, 10.0, 100.0]) * 3600
         m0 = np.expand_dims(0.5 * (Ed + Ew), axis=2)
         model = FuelMoistureModel(m0[:,:,[0,0,0]], Tk, P0)
     else:

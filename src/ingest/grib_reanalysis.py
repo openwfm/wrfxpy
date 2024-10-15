@@ -65,7 +65,7 @@ class GribReanalysis(GribSource):
             if isinstance(url_bases,str):
                 url_bases = [url_bases]
             for url_base in url_bases:
-                logging.info('Retrieving CFSR GRIBs from %s' % url_base)
+                logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
                 if url_base[:5] == 's3://':
                     unavailables = [x for x in nonlocals if readhead(osp.join(self.browse_aws, x)).status_code != 200]
                 else:

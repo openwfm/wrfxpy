@@ -3,7 +3,7 @@ from ingest.grib_forecast import GribForecast
 
 class HRRR(GribForecast):
     """
-    The HRRR (High Resolution Rapid Refresh) grib source as provided by NOMADS.
+    The HRRR (High Resolution Rapid Refresh) forecast grib source as provided by AWS or NOMADS.
     """
 
     def __init__(self, arg):
@@ -59,12 +59,12 @@ class HRRR(GribForecast):
 
 class HRRR_S(HRRR):
     """
-    The HRRR (High Resolution Rapid Refresh) grib source as provided by NOMADS.
+    The HRRR (High Resolution Rapid Refresh) grib source as provided by AWS or NOMADS.
     The 2D surface product.
     """
 
     def __init__(self, js):
-        super(HRRR, self).__init__(js)
+        super(HRRR_S, self).__init__(js)
 
     def file_names(self, cycle_start, fc_list):
         """

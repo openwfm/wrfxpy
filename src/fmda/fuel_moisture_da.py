@@ -20,7 +20,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 from wrf.wrf_data import WRFModelData
-from .trend_surface_model import fit_tsm
+from .trend_surface_model import fit_tsm, fit_tsm_lstsq
 from utils import ensure_dir, great_circle_distance, find_closest_grid_point
 from .fuel_moisture_model import FuelMoistureModel
 from .fm10_observation import FM10Observation
@@ -176,7 +176,7 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
     return obs_data
 
 
-def execute_da_step(model, model_time, covariates, covariates_names, fm10):
+def execute_da_step(model, model_time, covariates, covariates_names, fm10, use_lstsq=False):
     """
     Execute a single DA step from the current state/extended parameters and covariance matrix using
     the <covariates> and observations <fm10>.  Assimilation time window is fixed at 60 mins.
@@ -186,6 +186,7 @@ def execute_da_step(model, model_time, covariates, covariates_names, fm10):
     :param covariates: the covariate fields to take into account to model the spatial structure of the FM field
     :param covariates_names: strings with the names of the covariates
     :param fm10: the 10-hr fuel moisture observations
+    :param use_lstsq: optional, use lstsq for solving linear system
     """
     valid_times = [z for z in fm10.keys() if abs((z - model_time).total_seconds()) < 1800]
 
@@ -207,11 +208,14 @@ def execute_da_step(model, model_time, covariates, covariates_names, fm10):
         logging.info('FMDA is using %d covariates: %s' % (Xd3,','.join(['fmc_gc[:,:,1]']+covariates_names)))
         X = np.zeros((dom_shape[0], dom_shape[1], Xd3))
         X[:,:,0] = fmc_gc[:,:,1]
-        for i,c in zip(list(range(Xd3-1)),covariates):
+        for i,c in zip(list(range(Xd3-1)), covariates):
             X[:,:,i+1] = covariates[i]
 
         # run the trend surface model (clamp output to [0.0 - 2.5] to be safe)
-        Kf_fn, Vf_fn = fit_tsm(obs_valid_now, X)
+        if use_lstsq:
+            Kf_fn, Vf_fn = fit_tsm_lstsq(obs_valid_now, X)
+        else:
+            Kf_fn, Vf_fn = fit_tsm(obs_valid_now, X)
         Kf_fn[Kf_fn < 0.0] = 0.0
         Kf_fn[Kf_fn > 2.5] = 2.5
 
