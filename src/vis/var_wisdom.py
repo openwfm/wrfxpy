@@ -1113,6 +1113,7 @@ _units_wisdom = {
     ('m/s', 'mph') : lambda x: 2.236936292 * x,
     ('m/s', 'chains/h') : lambda x: 178.95492 * x,
     ('m',   'ft') : lambda x: 3.2808399 * x,
+    ('m',   'mm') : lambda x: 1000.0 * x,
     ('km',   'miles') : lambda x: 0.621371 * x,
     ('miles', 'km') : lambda x: 1.609344 * x,
     ('ft/s','m/s') : lambda x: x / 3.2808399,
