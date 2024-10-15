@@ -19,6 +19,13 @@ def strip_end(d):
       fn = int(fn-fn//(n+1))
       return fm,fn
 
+def positive(var):
+    """
+    Remove negative values
+    """
+    var[var < 0] = 0
+    return var
+
 def smoke_to_height_terrain_u(var,d,t,h):
       v=convert_value('ug/m^2', smoke_integrated_unit,smoke_to_height_terrain(d,t,h))
       print_stats(var,v,smoke_integrated_unit)
@@ -942,7 +949,7 @@ _var_wisdom = {
       'colormap' : 'jet_r',
       'scale' : 'original',
       'transparent_values' : [-np.inf, 1],
-      'retrieve_as' : lambda d,t: d.variables['RAINNC'][t,:,:],
+      'retrieve_as' : lambda d,t: positive(d.variables['RAINNC'][t,:,:]),
       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
    },
    'SNOWH' : {
@@ -952,7 +959,7 @@ _var_wisdom = {
       'colorbar' : 'mm',
       'colormap' : 'tab20b_r',
       'scale' : 'original',
-      'retrieve_as' : lambda d,t: d.variables['SNOWH'][t,:,:],
+      'retrieve_as' : lambda d,t: positive(d.variables['SNOWH'][t,:,:]),
       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
    },
    'TERRA_AF' : {
