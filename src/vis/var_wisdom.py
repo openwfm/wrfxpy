@@ -19,6 +19,13 @@ def strip_end(d):
       fn = int(fn-fn//(n+1))
       return fm,fn
 
+def positive(var):
+    """
+    Remove negative values
+    """
+    var[var < 0] = 0
+    return var
+
 def smoke_to_height_terrain_u(var,d,t,h):
       v=convert_value('ug/m^2', smoke_integrated_unit,smoke_to_height_terrain(d,t,h))
       print_stats(var,v,smoke_integrated_unit)
@@ -942,7 +949,7 @@ _var_wisdom = {
       'colormap' : 'jet_r',
       'scale' : 'original',
       'transparent_values' : [-np.inf, 1],
-      'retrieve_as' : lambda d,t: d.variables['RAINNC'][t,:,:],
+      'retrieve_as' : lambda d,t: positive(d.variables['RAINNC'][t,:,:]),
       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
    },
    'SNOWH' : {
@@ -952,7 +959,7 @@ _var_wisdom = {
       'colorbar' : 'mm',
       'colormap' : 'tab20b_r',
       'scale' : 'original',
-      'retrieve_as' : lambda d,t: d.variables['SNOWH'][t,:,:],
+      'retrieve_as' : lambda d,t: positive(d.variables['SNOWH'][t,:,:]),
       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
    },
    'TERRA_AF' : {
@@ -1113,6 +1120,7 @@ _units_wisdom = {
     ('m/s', 'mph') : lambda x: 2.236936292 * x,
     ('m/s', 'chains/h') : lambda x: 178.95492 * x,
     ('m',   'ft') : lambda x: 3.2808399 * x,
+    ('m',   'mm') : lambda x: 1000.0 * x,
     ('km',   'miles') : lambda x: 0.621371 * x,
     ('miles', 'km') : lambda x: 1.609344 * x,
     ('ft/s','m/s') : lambda x: x / 3.2808399,
