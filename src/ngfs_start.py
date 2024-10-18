@@ -19,7 +19,7 @@
 '''
 to do list:
 1) 
-2) feature tracking id awareness
+2) 
 3) 
 4) 
 5) 
@@ -63,7 +63,10 @@ from ingest.NWS_warnings import set_red_flags, red_flag_incident
 #class that keeps atrributes about the day's data
 class ngfs_day():
    #maybe add some attributes so that ongoing, new, and started incidents can be tracked
-   def __init__(self,csv_date_str,today):
+   def __init__(self,ngfs_cfg,csv_date_str,today):
+      #where to store output like maps, data, etc.
+      self.ngfs_directory = ngfs_cfg['ngfs_directory']
+
       self.date_str = csv_date_str # <<---------------------------------------- rename ????
       if today:
          self.timestamp = pd.Timestamp.now(tz='UTC')
@@ -100,9 +103,9 @@ class ngfs_day():
    def set_save_name(self):
       if self.today:
          self.sat_name = 'GOES 16 & 18'
-         self.map_save_str = 'ngfs/NGFS_'+csv_date_str+'.png'
+         self.map_save_str = self.ngfs_directory+'/NGFS_'+csv_date_str+'.png'
          time_str = str(time.gmtime().tm_year)+str(time.gmtime().tm_mon).zfill(2)+str(time.gmtime().tm_mday).zfill(2)+'_'+str(time.gmtime().tm_hour).zfill(2) + '_' + str(time.gmtime().tm_min).zfill(2)
-         self.pickle_save_str = 'ngfs/pkl_ngfs_day_'+csv_date_str+'_'+time_str+'.pkl'
+         self.pickle_save_str = self.ngfs_directory+'/pkl_ngfs_day_'+csv_date_str+'_'+time_str+'.pkl'
       else:
          try:
             self.sat_name = self.sats[0].replace('-','_')
@@ -434,28 +437,33 @@ class ngfs_incident():
       self.bbox = min_lon, max_lon, min_lat, max_lat
       print('\tBounding box:', self.bbox)
  
-   def make_incident_configuration(self,base_cfg):
+   def make_incident_configuration(self,base_cfg,ngfs_cfg):
       #change the base configuration file to match the individual incidents parameters
       
       cfg = copy.deepcopy(base_cfg)
       #look for Alaska/Hawaii and updated regions to use latest Landfire and appropriate weather products
-      update_states_sw = ['CA','AZ','NV','UT','OR','WA','ID','MT','WY','CO']
-      for ups in update_states_sw:
-         if any(self.data.state == ups):
-            cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_2023'
-            print('\tUsing updated Landfire maps')
-            break
-      if any(self.data.state == 'AK'):
-         cfg['grib_source'] = 'NAM198'
-         print('\tAlaska incident detected, using NAM198 and Alaska Landfire data')
-         cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_alaska'
-      if any(self.data.state == 'HI'):
-         cfg['grib_source'] = 'NAM196'
-         print('\tHawaii incident detected, using NAM196 and Hawaii Landfire data')
-         cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_hawaii'
-         #maybe use the old adrjrw here because there is so much ocean in the domain?
-         #cfg['wrf_namelist_path']  = "etc/nlists/default.input_adjrw"
-         #cfg['fire_namelist_path'] = "etc/nlists/default.fire_adjrw"
+      if 'region_cfg' in ngfs_cfg.keys():
+         for r in ngfs_cfg['region_cfg']:
+            if self.data.state[0] in ngfs_cfg['region_cfg'][r]['state']:
+               cfg['grib_source'] = ngfs_cfg['region_cfg'][r]['grib_source']
+               cfg['geo_vars_path'] = ngfs_cfg['region_cfg'][r]['geo_vars_path']
+               print(ngfs_cfg['region_cfg'][r]['msg'])
+      else:
+         update_states = ['CA','AZ','NV','UT','OR','WA','ID','MT','WY','CO']
+         if self.data.state[0] in update_states:
+               cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_2023'
+               print('\tUsing updated Landfire maps')
+         if any(self.data.state == 'AK'):
+            cfg['grib_source'] = 'NAM198'
+            print('\tAlaska incident detected, using NAM198 and Alaska Landfire data')
+            cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_alaska'
+         if any(self.data.state == 'HI'):
+            cfg['grib_source'] = 'NAM196'
+            print('\tHawaii incident detected, using NAM196 and Hawaii Landfire data')
+            cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_hawaii'
+            #maybe use the old adrjrw here because there is so much ocean in the domain?
+            #cfg['wrf_namelist_path']  = "etc/nlists/default.input_adjrw"
+            #cfg['fire_namelist_path'] = "etc/nlists/default.fire_adjrw"
       try:
          print('\tGrib source: ',cfg['grib_source'])
       except:
@@ -548,7 +556,7 @@ class ngfs_incident():
       cfg['start_utc'] = utils.utc_to_esmf(self.start_utc)
       cfg['end_utc'] = utils.utc_to_esmf(utils.round_time_to_hour(self.ign_utc + timedelta(hours =  25.5))) #utils.round_time_to_hour(self.ign_utc - timedelta(minutes=30))
 
-      #HRR needs special data handling because 48 hour forecasts are only issued 
+      #HRR and others need special data handling because 48 hour forecasts are only issued 
       #   at t00z, t06z, t12z, and t18z
       cycle_start = self.start_utc
       cycle_list = ['HRRR','HRRR_AK','NAM198','NAM196']
@@ -559,6 +567,7 @@ class ngfs_incident():
          cfg['cycle_start_utc'] = utils.utc_to_esmf(cycle_start)
          #cfg['download_whole_cycle'] = 'true' 
 
+      ##how the FMC will be handled
       non_conus = ['Alaska','Hawaii']
       #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
       # /data/WRFXPY/wksp_fmda/CONUS/202307/
@@ -568,7 +577,7 @@ class ngfs_incident():
          fmda_month = cfg['start_utc'][5:7]
          fmda_day = cfg['start_utc'][8:10]
          fmda_hour = cfg['start_utc'][11:13]
-         base_folder = '/data/WRFXPY/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
+         base_folder = ': /' + fmda_year + fmda_month + '/'
          date_folder = 'fmda-CONUS-'+fmda_year+fmda_month+fmda_day+'-'+fmda_hour+'.geo'
          cfg['fmda_geogrid_path'] = base_folder + date_folder
       else:
@@ -650,7 +659,7 @@ class ngfs_incident():
          try:
             self.state = sn.abbrev_to_us_state[self.state]
             #matches the first column of population data text file
-            self.loc_str = '.'+self.county+', '+self.state
+            self.loc_str = self.county+', '+self.state
          except:
             print('Error translating the state abbreviation(s)')
             self.state = 'Unkown'
@@ -659,17 +668,20 @@ class ngfs_incident():
          self.loc_str = 'Unknown'
 
       
-      print('\tLocation: ',self.county,', ',self.state)
+      print('\tLocation: ',self.loc_str) #self.county,', ',self.state)
       
       #location and population data for incident
       loc_idx = pop_data[pop_data['Location'] == self.loc_str]
-      
+      #print(loc_idx)
       if loc_idx.index.empty:
          self.affected_population = float('NaN')
          print('\tNo matching population data found')
       else:
-         pop = loc_idx.iloc[0]['Population'] #this is a string with commas
-         self.affected_population = float(pop.replace(',',''))  # convert string to float
+         pop = loc_idx.iloc[0]['Population'] #this might be a string with commas
+         if type(pop) is str:
+            self.affected_population = float(pop.replace(',',''))  # convert string to float
+         else:
+            self.affected_population = pop
          print('\tIncident county population is ',self.affected_population)
       
       #add detections to the incidnet
@@ -759,7 +771,7 @@ class ngfs_incident():
       #determine if location within red flag warning zone
       self.red_flag = red_flag_incident(self.ign_latlon[1],self.ign_latlon[0],self.ign_utc,rf_zones)
       if self.red_flag:
-         print('Incident in a red flag warning zone')
+         print('\tIncident in a red flag warning zone')
       
       #date to start the simulation, 60 minutes before the ignition
       self.start_utc = utils.round_time_to_hour(self.ign_utc - timedelta(minutes=60))
@@ -782,6 +794,51 @@ class ngfs_incident():
 
       
 ####### Functions  #######
+def get_old_incidents(ngfs_directory):
+   print('Reading previous pickle file(s)')
+   full_pick_list = glob.glob(ngfs_directory + '/*.pkl')
+   full_pick_list.sort(key=os.path.getmtime)
+   pick_list = list()
+   #filters  out pickle files generated by running only a specific csv file, keeps only newest
+   current_time = time.time()
+   for i in full_pick_list:
+      #print(i)
+      #look back one week
+      if 'GOES' not in i and ((current_time - os.path.getmtime(i))/3600 < 24*7):
+         pick_list.append(i)
+   #print(pick_list)
+   #time.sleep(10)
+   #find old incidents in reverse chronological order, newest is first
+   print('Number of pickle files to possibly look at: ',len(pick_list))
+   pick_list.reverse()
+   old_ngfs_incidents = []
+   started_inc_ids = []
+
+   for i in pick_list:
+      print('\tReading ',i)
+      df = pd.read_pickle(i)
+      old_ngfs_incidents.extend(df.incidents)
+      #will exit loop if the previous pickle file has statrted_inc_ids attribute
+      if hasattr(df,'started_inc_ids'):
+         started_inc_ids.extend(df.started_inc_ids)
+         print('\tTracking ',len(started_inc_ids),' old incident ID strings')
+         break
+      else:
+         print('\tPickle file does not have started_inc_ids')
+      print(len(started_inc_ids))
+      
+      
+   #print the old incidents, if not from the list, check if they are started
+   print('Found the previous incidents:')
+   for incs in old_ngfs_incidents:
+      if incs.incident_id_string in started_inc_ids:
+         incs.set_started
+      elif incs.started:
+         started_inc_ids.append(incs.incident_id_string)
+      print(incs.incident_id_string,incs.incident_name,'Started = ',incs.started)
+   
+   return list(set(started_inc_ids)),old_ngfs_incidents
+
    
 def make_base_configuration(force):
    #check to see if a  base ngfs configuration file exists
@@ -805,7 +862,7 @@ def make_base_configuration(force):
       
       #handling of fmda if the json file  has path to fmda "fmda_geogrid_path"
       # /data/WRFXPY/wksp_fmda/CONUS/202307/
-      if 'fmda_geogrid_path' in temp_cfg:
+      if 'fmda_geogrid_path' in temp_cfg or ngfs_cfg['fmda_cfg']['use_fmda']:
          print('Will use FMDA for fuel moisture')
          fmda_year = temp_cfg['start_utc'][:4]
          fmda_month = temp_cfg['start_utc'][5:7]
@@ -825,13 +882,16 @@ def make_base_configuration(force):
       if use_base_cfg:
          base_cfg = temp_cfg
       else:
-         base_cfg = sf.questionnaire()   
+         base_cfg = sf.questionnaire()
+   #base configuration file not found --> make one, using simple_forecast (sf)
    else:
       # standard configuration to be used by all forecasts
       base_cfg = sf.questionnaire()
       print(base_cfg)
-   # save base confg for next time
-   json.dump(base_cfg, open('jobs/base_ngfs_cfg.json', 'w'), indent=4, separators=(',', ': '))
+      # save base confg for next time
+      json.dump(base_cfg, open('jobs/base_ngfs_cfg.json', 'w'), indent=4, separators=(',', ': '))
+
+   
    return base_cfg
    
 def timestamp_from_string(csv_date_str):
@@ -939,14 +999,10 @@ def cluster_data(df):
 
    return clust
 
-def get_ngfs_csv(days_previous,goes,domain):
-   #downloads NGFS csv files from 0 to 4 days previous to now
-   #   to download today's csv: get_ngfs_csv(0)
+def get_ngfs_csv(days_previous,sat,domain):
+   #downloads NGFS csv file, returns file name and local paths
    #example csv name:
    #   NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
-   
-   ngfs_dir = 'ingest/NGFS'
-   print('\tWill download to: ',utils.make_dir(ngfs_dir))
 
    #name the csv file
    # Get the date components
@@ -962,20 +1018,21 @@ def get_ngfs_csv(days_previous,goes,domain):
    base_str = 'NGFS_FIRE_DETECTIONS_GOES-{}_ABI_{}_{}_{}_{}_{}.csv'
 
    # Determine the satellite
-   satellite = '18' if goes == 18 else '16'
+   satellite = '18' if sat == 18 else '16'
 
    # Format the csv_str using satellite and other variables
    csv_str = base_str.format(satellite,domain,yyyy, str(mm).zfill(2), str(dd).zfill(2), str(day_of_year).zfill(3))
 
    # Define the csv_url using csv_str
-   csv_url = f'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-{"WEST" if goes == 18 else "EAST"}/{domain}/{csv_str}'
+   csv_url = f'https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-{"WEST" if sat == 18 else "EAST"}/{domain}/{csv_str}'
 
   
    print('\tDownloading: ',csv_str)
-   csv_path = ngfs_dir+'/'+csv_str
-   #downloading
+   csv_path = ngfs_ingest+'/'+csv_str
+   # today's and yesterday's
    if days_previous < 2:
       download_url(csv_url,csv_path)
+   #older file should be the same as what is cached
    else:
       if os.path.exists(csv_path):
          print('\tUsing older data in ingest path')
@@ -984,32 +1041,22 @@ def get_ngfs_csv(days_previous,goes,domain):
          
    return csv_str, csv_path
    
-def download_csv_data(days_to_get):
-   #downloads csv data by ftp, returns list of csv files obtained
+def get_csv_lists(days_to_get):
+   #returns list of csv files to be obtained
    #empy lists for storing path names
    csv_str = list()
    csv_path = list()
       
    #number of days of data
-   #days_to_get = 2
-       
+   #days_to_get = 
    for i in range(days_to_get):
-      if i == 0:
-         print('NGFS data from today')
-      else:
-         print('NGFS data from yesterday or before')
-      #GOES-18
-      s1, s2 = get_ngfs_csv(i,18,'CONUS')
-      csv_str.append(s1)
-      csv_path.append(s2)
-      #GOES-18 Full-Disk
-      s1, s2 = get_ngfs_csv(i,18,'Full-Disk')
-      csv_str.append(s1)
-      csv_path.append(s2)
-      #GOES-16
-      s1, s2 = get_ngfs_csv(i,16,'CONUS')
-      csv_str.append(s1)
-      csv_path.append(s2)
+      print('NGFS data from today' if i == 0 else 'NGFS data from yesterday or before')
+    
+      for satellite, region in [(18, 'CONUS'), (18, 'Full-Disk'), (16, 'CONUS')]:
+         c_str, c_path = get_ngfs_csv(i, satellite, region)
+         csv_str.append(c_str)
+         csv_path.append(c_path)
+        
    return csv_str, csv_path
    
 
@@ -1018,8 +1065,8 @@ def read_NGFS_csv_data(csv_file):
    #reads csv file(s) and merges them. Assigns a date to them too
    
    #columns with critical time information from v1 and v2 csv files
-   time_cols =  ['incident_start_time','observation_time','initial_observation_time']
-   time_cols2 = ['acq_date_time','pixel_date_time'] #for v2 csv files
+   time_cols_v1 =  ['incident_start_time','observation_time','initial_observation_time']
+   time_cols_v2 = ['acq_date_time','pixel_date_time'] #for v2 csv files
 
    # Check if csv_file is a list, if not convert it to a list
    if not isinstance(csv_file, list):
@@ -1042,9 +1089,11 @@ def read_NGFS_csv_data(csv_file):
       #feature tracking remains the same for GOES-18 csv
       if 'GOES-16' in file_path:
          os.system("sed -i 's/,ID-20/,I6-20/g' " + str(file_path))
+
+      #read the csv file
       try:
          # Try reading v2 csv file
-         data_read = pd.read_csv(file_path, parse_dates=time_cols2)
+         data_read = pd.read_csv(file_path, parse_dates=time_cols_v2)
          
          #filter full-disk data to get only USA detections
          if 'Full' in file_path:
@@ -1052,13 +1101,15 @@ def read_NGFS_csv_data(csv_file):
             print('\tNumber of all Full-Disk detections: ',len(data_read))
             data_read = data_read[data_read.country == 'USA']
             print('\tNumber of USA Full-Disk detections: ',len(data_read))
-         data_read['initial_observation_time'] = data_read[time_cols2[1]]
-         data_read['incident_start_time'] = data_read[time_cols2[1]]
+         #legacy NGFS fields, maybe delete these from 
+         data_read['initial_observation_time'] = data_read[time_cols_v2[1]]
+         data_read['incident_start_time'] = data_read[time_cols_v2[1]]
+         #use dictionary to translate, set data types for the csv files
          data_read.rename(columns=nd.v2_to_v1, inplace=True)
          data_read = data_read.astype(nd.v2_dict)
       except:
          # Read the csv file assuming it's an early ngfs version
-         data_read = pd.read_csv(file_path, parse_dates=time_cols)
+         data_read = pd.read_csv(file_path, parse_dates=time_cols_v1)
          data_read['actual_image_time'] = data_read['observation_time']
          try:
                data_read = data_read.astype(nd.ngfs_dictionary)
@@ -1083,9 +1134,9 @@ def read_NGFS_csv_data(csv_file):
    # Get the date string from the first file name in the list
    csv_date_str = csv_file[0][-18:-8]
 
-   #make sure the times are UTC, seems to be take care of already, above
+   #make sure the times are UTC, seems to be taken care of already, above
    try:
-      data[time_cols[1]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols[1]])).tz_localize('UTC')
+      data[time_cols_v1[1]] = pd.DatetimeIndex(pd.to_datetime(data[time_cols_v1[1]])).tz_localize('UTC')
    except:
       print('\tData column has correct timezone already')
    
@@ -1101,7 +1152,6 @@ def prioritize_incidents(incidents,new_idx,num_starts):
    #nums_start is number of the new simulations to start set tpo be -1 
    priority_by_population = False
    job_sleep = 150 # time to pause beteen jobs
-   
    
    if sum(new_idx) > num_starts:
       frp_cutoff = 5e3 # will filter out low-frp incidents
@@ -1144,10 +1194,9 @@ def prioritize_incidents(incidents,new_idx,num_starts):
             print('\t Total FRP: ',np.sum(incidents[i].data.frp))
             print('\t Population affected: ',incidents[i].affected_population)
             print('\t',incidents[i].county,', ',incidents[i].state)
-            if 'RX' in incidents[i].incident_name:
-               rx = True
-            else:
-               rx = False
+            
+            #detect prescribed burn
+            rx = 'RX' in incidents[i].incident_name
 
             #don't start RX incidents or low FRP incidents under certain circumstances, frp cutoff is zero when there are not many incidents
             frp_filtered = (not rx or np.sum(incidents[i].data.frp) > frp_cutoff) 
@@ -1195,55 +1244,25 @@ if __name__ == '__main__':
 
    print()
    print('Starting ngfs script')
+
+   print('Reading the ngfs configuration file')
+   with open('etc/ngfs.json','r') as openfile:
+         ngfs_cfg = json.load(openfile)
+
+   ngfs_directory = ngfs_cfg['ngfs_directory']
+
+
+   print('Reading the base wrfxpy configuration file')
+   with open(ngfs_cfg['wrfxpy_cfg'],'r') as openfile:
+         wrfxpy_cfg = json.load(openfile)
    
+   #put this in the configuratoin file
    print('Reading in county population data')
    pop_data = pd.read_csv('ingest/NGFS/Population_by_US_County_July_2022.txt',sep='\t',encoding = "ISO-8859-1")
 
-   print('Reading previous pickle file(s)')
-   full_pick_list = glob.glob('ngfs/*.pkl')
-   full_pick_list.sort(key=os.path.getmtime)
-   pick_list = list()
-   #filters  out pickle files generated by running only a specific csv file, keeps only newest
-   current_time = time.time()
-   for i in full_pick_list:
-      #print(i)
-      #look back one week
-      if 'GOES' not in i and ((current_time - os.path.getmtime(i))/3600 < 24*7):
-         pick_list.append(i)
-   #print(pick_list)
-   #time.sleep(10)
-   #find old incidents in reverse chronological order, newest is first
-   print('Number of pickle files to possibly look at: ',len(pick_list))
-   pick_list.reverse()
-   old_ngfs_incidents = []
-   started_inc_ids = []
 
-   for i in pick_list:
-      print('\tReading ',i)
-      df = pd.read_pickle(i)
-      old_ngfs_incidents.extend(df.incidents)
-      #will exit loop if the previous pickle file has statrted_inc_ids attribute
-      if hasattr(df,'started_inc_ids'):
-         started_inc_ids.extend(df.started_inc_ids)
-         print('Tracking ',len(started_inc_ids),' old incident ID strings')
-         break
-      else:
-         print('Pickle file does not have started_inc_ids')
-      print(len(started_inc_ids))
-      
-      
-   #print the old incidents, if not from the list, check if they are started
-   print('Found the previous incidents:')
-   for incs in old_ngfs_incidents:
-      if incs.incident_id_string in started_inc_ids:
-         incs.set_started
-      elif incs.started:
-         started_inc_ids.append(incs.incident_id_string)
-      print(incs.incident_id_string,incs.incident_name,'Started = ',incs.started)
-   started_inc_ids = list(set(started_inc_ids))
-
-
-   #print(old_ngfs_incidents)
+   started_inc_ids, old_ngfs_incidents  = get_old_incidents(ngfs_directory)
+   #print(old_inc_ids:q\ll )
    #time.sleep(10)
    
    #setup of automatic download of csv file
@@ -1255,19 +1274,26 @@ if __name__ == '__main__':
       print('Downloading latest csv files:')
       #configure download path, create directory if needed
       # this should be set elsewhere
-      ngfs_dir = 'ingest/NGFS'
-      
-      #download the data
-      days_to_get = 2
-      csv_str, csv_path = download_csv_data(days_to_get)
-      csv_file = csv_path ## <---- This can be a list of paths
-      
+      try:
+         ngfs_ingest = ngfs_cfg['goes_cfg']['ingest_directory']
+         days_to_get = ngfs_cfg['goes_cfg']['days_to_get']
+      except:
+         ngfs_ingest = 'ingest/NGFS'
+         days_to_get = 2
+
+      print('\tWill download to: ',utils.make_dir(ngfs_ingest))
+
+      #get list of files to download
+      csv_str, csv_file = get_csv_lists(days_to_get)
+      ## csv_file should be a list of paths to files
+   
+   # csv file passed as system argument
    else:
-      # csv file passed as system argument
+      today = False
       csv_file = [sys.argv[1]]  ## <--- A single file path
       print('Using existing csv file:')
       print('\t',csv_file[0]) 
-      today = False
+      
    
    # this belongs in the ngfs_day class
    #setup automatic start of simulations
@@ -1280,11 +1306,11 @@ if __name__ == '__main__':
          num_starts = sf.read_integer(25)
       else:
          num_starts = -1
-   elif 'force' in str(sys.argv):
+   elif 'force' in str(sys.argv) or ngfs_cfg['run_cfg']['force_process']:
       #this forces auto_start and avoids questions
       force = True
       auto_start = True
-      num_starts = 30 # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
+      num_starts = ngfs_cfg['run_cfg']['num_starts'] # <<<------------------------------- set to -1 for testing, change to 10 or more for operations
    else:
       force = True  # <<<------------------------------- change this to require confirmation of forecast configuration
       auto_start = False
@@ -1312,21 +1338,10 @@ if __name__ == '__main__':
    ##################################################################
    #               initialize an object of the ngfs_day class       #
    ##################################################################
-   csv = ngfs_day(csv_date_str,today)
+   csv = ngfs_day(ngfs_cfg,csv_date_str,today)
    
 
-   #filter out "null incidents"
-   #maybe null incidents are what we are interested in?
    full_data = copy.deepcopy(data)
-   #filter out the possible artifacts 'possible_instrument_artifact', no longer part of the CSV
-   # idx = data.possible_instrument_artifact == 'Y'
-   # print('Found', sum(idx), ' artifact pixels')
-   #try:
-      # data = data[data['possible_instrument_artifact'] == 'N']
-      #new data shape
-      #print('\tNew data shape after filtering possible artifacts: ',data.shape)
-   # except:
-      #print('\tNo filter for possible artifact applied')
 
    #removes entries which are not from a known incident
    data = data.dropna(subset=['incident_name'])  #  <------ change to use id_string?
@@ -1335,21 +1350,21 @@ if __name__ == '__main__':
    rf_warnings, rf_zones = set_red_flags(csv.date_str)
 
    ### add detections in selected NWS WFOs that have no incident_id_string, but are possible wildlnad fires ####
-   wfo_list = ['KBOU','KSLC','KPDT','KMFR','KBOI','KUNR','KBYZ','KGJT','KPUB'] # ['KSLC','KBOU','KPQR']
+   try:
+      wfo_list = ngfs_cfg['unknown']['wfo_list']
+   except:
+      wfo_list = ["KBOU","KSLC","KPDT","KMFR","KBO","KUNR","KBYZ","KGJT","KPUB"]# ['KSLC','KBOU','KPQR']
 
-   #will cause forecasts to be made for unnamed, unknown incidents
-   if 'unknown' in str(sys.argv):
-      forecast_unknown = True
+   #will cause forecasts to be made for unknown, unnamed incidents
+   if 'unknown' in str(sys.argv) or ngfs_cfg['unknown']['run']:
       unknown_data = pd.DataFrame()
-   else:
-      forecast_unknown = False
-   
-   if forecast_unknown:
+      #add data for unknown incidents in WFO regions
       wfo_data = subset_wfo_data(full_data,data,wfo_list)
       unknown_data = unknown_data.append(wfo_data,ignore_index=True)
-      #add data for unnamed fires in red flag areas
+      #add data for unknown fires in red flag areas
       rf_data = subset_red_flag_data(full_data,data,rf_zones)
-      unknown_data = unknown_data.append(rf_data)
+      unknown_data = unknown_data.append(rf_data,ignore_index=True)
+      #add unknown_data to the data for named incidents
       data = data.append(cluster_data(unknown_data),ignore_index=True)
 
 
@@ -1363,7 +1378,10 @@ if __name__ == '__main__':
    time.sleep(5)
 
    #id strings seem to be less mutable than the names
-   initialize_by_names  = False
+   try:
+      initialize_by_names = ngfs_cfg['run_cfg']['initialize_by_names']
+   except:
+      initialize_by_names  = False
 
    #make an array of ngfs_incident objects
    if initialize_by_names:
@@ -1377,19 +1395,22 @@ if __name__ == '__main__':
 
    #should belong to the ngfs_day class object
    #array for recording which incidents are new
-   new_idx = np.zeros((num_incidents,), dtype=int)
+   new_idx = np.zeros(num_incidents, dtype=int)
 
    print('Acquiring Polar data')
    polar = nh.polar_data(csv.timestamp)
-   firms_days_to_get = 3
-   satellites = ['noaa_20', 'noaa_21', 'suomi','landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
+   try:
+      firms_days_to_get = ngfs_cfg['firms_cfg']['days_to_get']
+      firms_satellites = ngfs_cfg['firms_cfg']['sats'] 
+   except:
+      firms_days_to_get = 3
+      firms_satellites = ['noaa_20', 'noaa_21', 'suomi','landsat','noaa_20_Alaska', 'noaa_21_Alaska','suomi_Alaska']
 
    def add_firms_data(satellite, csv_timestamp, days_to_get):   #<<------ move into the NGFS_helper module?
       try:
          polar.add_firms_24(sat=satellite, csv_timestamp=csv_timestamp)
       except:
          print(f'Error getting {satellite} 24-hour data')
-
       try:
          polar.add_firms_urt(sat=satellite, csv_timestamp=csv_timestamp)
       except Exception as e:
@@ -1405,11 +1426,11 @@ if __name__ == '__main__':
 
    if csv.today:
       print('\tGetting the polar data for the previous 48 hours')
-      for satellite in satellites:
+      for satellite in firms_satellites:
          add_firms_data(satellite, csv.timestamp, firms_days_to_get)
    else:
       print(f'Getting the polar data for {csv_date_str}, {csv.timestamp.day_of_year}')
-      for satellite in satellites:
+      for satellite in firms_satellites:
          add_firms_data(satellite, csv.timestamp, firms_days_to_get)
       
    
@@ -1470,7 +1491,10 @@ if __name__ == '__main__':
             
       #time.sleep(2)
       #start new incidents to run 
-      lookback_time = 24
+      try:
+         lookback_time = ngfs_cfg['run_cfg']['lookback_time']
+      except:
+         lookback_time = 24
       #if the incident is not started already, make new configuration
       if not incidents[i].started and ((csv.timestamp - incidents[i].incident_start_time) < timedelta(hours = lookback_time)): #
          #(incidents[i].incident_start_time.day == csv.timestamp.day and incidents[i].incident_start_time.month == csv.timestamp.month):
@@ -1478,7 +1502,7 @@ if __name__ == '__main__':
          new_idx[i] = 1
          #change 'new' object attribute
          incidents[i].set_new()
-         incidents[i].make_incident_configuration(base_cfg)
+         incidents[i].make_incident_configuration(base_cfg,ngfs_cfg)
          json.dump(incidents[i].cfg, open(incidents[i].filename, 'w'), indent=4, separators=(',', ': '))
          print('\tTo start the simulation, execute: ')
          cmd_str = './forecast.sh ' + incidents[i].filename + ' &> logs/' + incidents[i].filename[5:-5] +'.log &'
@@ -1523,5 +1547,7 @@ if __name__ == '__main__':
    #save data and pictures
    if csv.today:
       csv.save_incident_text()
-   csv.save_pickle()
+   #don't save pickle file if no new incidents are in the data
+   if sum(csv.new):
+      csv.save_pickle()
    csv.print_base_map()
