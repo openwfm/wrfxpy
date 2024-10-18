@@ -70,8 +70,8 @@ class NAM218(GribForecast):
     info_text = "NAM 218 AWIPS Grid - CONUS (12-km Resolution; full complement of pressure level fields and some surface-based fields)"
     info = "North American Mesoscale (NAM) Forecast System Grid 218"
     remote_url = [
-        "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/", 
-        "s3://noaa-nam-pds/", 
+        "s3://noaa-nam-pds/",
+        "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/",  
         "https://www.ncei.noaa.gov/data/north-american-mesoscale-model/access/forecast/",
         "https://www.ncei.noaa.gov/thredds/fileServer/model-nam218-old/"
     ]
