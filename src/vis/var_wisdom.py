@@ -1,9 +1,8 @@
 import numpy as np
-import logging
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
-      u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
-      smoke_concentration, transform_goes, fire_front
+    u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, print_stats, \
+    smoke_concentration, transform_goes, fire_front
 
 smoke_threshold_int = 10
 smoke_threshold = 1
@@ -13,102 +12,108 @@ smoke_concentration_scale = 300
 smoke_concentration_transparent = 1e-2
 
 def strip_end(d):
-      m,n = d.variables['XLONG'][0,:,:].shape
-      fm,fn = d.variables['FXLONG'][0,:,:].shape
-      fm = int(fm-fm//(m+1))
-      fn = int(fn-fn//(n+1))
-      return fm,fn
+    m,n = d.variables['XLONG'][0,:,:].shape
+    fm,fn = d.variables['FXLONG'][0,:,:].shape
+    fm = int(fm-fm//(m+1))
+    fn = int(fn-fn//(n+1))
+    return fm,fn
 
 def smoke_to_height_terrain_u(var,d,t,h):
-      v=convert_value('ug/m^2', smoke_integrated_unit,smoke_to_height_terrain(d,t,h))
-      print_stats(var,v,smoke_integrated_unit)
-      return v
+    v=convert_value('ug/m^2', smoke_integrated_unit,smoke_to_height_terrain(d,t,h))
+    print_stats(var,v,smoke_integrated_unit)
+    return v
 
 def plume_center(d,t):
-      """
-      Compute plume center of mass
-      :param d: open NetCDF4 dataset
-      :param t: number of timestep
-      """
-      tr = d.variables['tr17_1'][t,:,:,:]
-      smoke_int = np.sum(tr, axis = 0)
-      z = height8p(d,t)
-      h = np.sum(z * tr, axis = 0)
-      h[smoke_int <= smoke_threshold_int] = 0
-      smoke_int[smoke_int <= smoke_threshold_int] = 1
-      return h/smoke_int
+    """
+    Compute plume center of mass
+    :param d: open NetCDF4 dataset
+    :param t: number of timestep
+    """
+    tr = d.variables['tr17_1'][t,:,:,:]
+    smoke_int = np.sum(tr, axis = 0)
+    z = height8p(d,t)
+    h = np.sum(z * tr, axis = 0)
+    h[smoke_int <= smoke_threshold_int] = 0
+    smoke_int[smoke_int <= smoke_threshold_int] = 1
+    return h/smoke_int
 
 def plume_height(d,t):
-      """
-      Compute plume height
-      :param d: open NetCDF4 dataset
-      :param t: number of timestep
-      """
-      z =  height8p(d,t)
-      tr = d.variables['tr17_1'][t,:,:,:]
-      h = np.zeros(tr.shape[1:])
-      for i in range(0, tr.shape[2]):
-          for j in range(0, tr.shape[1]):
-              for k in range(tr.shape[0]-1, -1, -1):
-                   if tr[k,j,i] > smoke_threshold:
-                        h[j,i] = z[k,j,i]
-                        break
-      return h
+    """
+    Compute plume height
+    :param d: open NetCDF4 dataset
+    :param t: number of timestep
+    """
+    z =  height8p(d,t)
+    tr = d.variables['tr17_1'][t,:,:,:]
+    h = np.zeros(tr.shape[1:])
+    for i in range(0, tr.shape[2]):
+        for j in range(0, tr.shape[1]):
+            for k in range(tr.shape[0]-1, -1, -1):
+                if tr[k,j,i] > smoke_threshold:
+                    h[j,i] = z[k,j,i]
+                    break
+    return h
 
 def smoke_at_height_terrain_ft(varname,d,t,level_ft):
-      return smoke_at_height_terrain(varname,d,t,convert_value('ft','m',level_ft))
+    return smoke_at_height_terrain(varname,d,t,convert_value('ft','m',level_ft))
 
 def smoke_at_height_ft(varname,d,t,level_ft):
-      return smoke_at_height(varname,d,t,convert_value('ft','m',level_ft))
+    return smoke_at_height(varname,d,t,convert_value('ft','m',level_ft))
 
 def interpolate2height_terrain(d,t,var,level):
-      return interpolate2height(var,height8p_terrain(d,t),level)
+    return interpolate2height(var,height8p_terrain(d,t),level)
 
 def smoke_at_height_terrain(varname,d,t,level):
-      s = interpolate2height_terrain(d,t,smoke_concentration(d,t),level)
-      print_stats(varname,s,'ug/m^3')
-      return s
+    s = interpolate2height_terrain(d,t,smoke_concentration(d,t),level)
+    print_stats(varname,s,'ug/m^3')
+    return s
 
 def smoke_at_height(varname,d,t,level):
-      s = interpolate2height(smoke_concentration(d,t),height8p(d,t),level)
-      print_stats(varname,s,'ug/m^3')
-      return s
+    s = interpolate2height(smoke_concentration(d,t),height8p(d,t),level)
+    print_stats(varname,s,'ug/m^3')
+    return s
 
 def u8p_m(d,t,level):
-       return interpolate2height(u8p(d,t),height8p_terrain(d,t),level)
+    return interpolate2height(u8p(d,t),height8p_terrain(d,t),level)
 
 def v8p_m(d,t,level):
-       return interpolate2height(v8p(d,t),height8p_terrain(d,t),level)
+    return interpolate2height(v8p(d,t),height8p_terrain(d,t),level)
 
 def u8p_ft(d,t,level_ft):
-       return u8p_m(d,t,convert_value('ft','m',level_ft))
+    return u8p_m(d,t,convert_value('ft','m',level_ft))
 
 def v8p_ft(d,t,level_ft):
-       return v8p_m(d,t,convert_value('ft','m',level_ft))
+    return v8p_m(d,t,convert_value('ft','m',level_ft))
 
 def is_windvec(name):
-       return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC','WINDVEC_mph_D']
+    return name in ['WINDVEC1000FT','WINDVEC4000FT','WINDVEC6000FT','WINDVEC','WINDVEC_mph_D']
 
 def is_fire_var(name):
-       return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FLINEINT_btupftps','FIRE_HFX','F_ROS','F_ROS_chsph','ROS_chsph','F_INT','NFUEL_CAT','ZSF','FMC_G']
+    return name in ['FGRNHFX','FIRE_AREA','FLINEINT','FLINEINT_btupftps','FIRE_HFX','F_ROS','F_ROS_chsph','ROS_chsph','F_INT','NFUEL_CAT','ZSF','FMC_G']
 
 _discrete_wisdom = {
-    'all' : {'values': (3,5,7,8,9),
-            'alphas': (.5,.5,.6,.7,.8),
-            'labels': ('Water','Ground','Fire low','Fire nominal','Fire high'),
-            'colors': ((0,0,.5),(0,.5,0),(1,1,0),(1,.65,0),(.5,0,0))},
-    'fire' : {'values': (7,8,9),
-             'alphas': (.6,.7,.8),
-             'labels': ('Fire low','Fire nominal','Fire high'),
-             'colors': ((1,1,0),(1,.65,0),(.5,0,0))},
-    'nofire' : {'values': (3,5),
-               'alphas': (.5,.5),
-               'labels': ('Water','Ground'),
-               'colors': ((0,0,.5),(0,.5,0))}
+    'all' : {
+        'values': (3, 5, 7, 8, 9),
+        'alphas': (.5, .5, .6, .7, .8),
+        'labels': ('Water', 'Ground', 'Fire low', 'Fire nominal', 'Fire high'),
+        'colors': ((0, 0, .5), (0, .5, 0), (1, 1, 0), (1, .65, 0), (.5, 0, 0))
+    },
+    'fire' : {
+        'values': (7, 8, 9),
+        'alphas': (.6, .7, .8),
+        'labels': ('Fire low', 'Fire nominal', 'Fire high'),
+        'colors': ((1, 1, 0), (1, .65, 0), (.5, 0, 0))
+    },
+    'nofire' : {
+        'values': (3, 5),
+        'alphas': (.5, .5),
+        'labels': ('Water', 'Ground'),
+        'colors': ((0, 0, .5),(0, .5, 0))
+    }
 }
 
 _var_wisdom = {
-     'PBLH': {
+    'PBLH': {
         'name' : 'PBL height',
         'native_unit': 'm',
         'colorbar' : 'm',
@@ -116,8 +121,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: d['PBLH'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-     },
-     'CLOUDTO700HPA' : {
+    },
+    'CLOUDTO700HPA' : {
         'name' : 'Cloud up to 700hPa',
         'native_unit' : 'kg/m^2',
         'colorbar' : 'kg/m^2',
@@ -127,8 +132,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,700),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'CLOUD700TO400HPA' : {
+    },
+    'CLOUD700TO400HPA' : {
         'name' : 'Cloud 700hPa to 400hPa',
         'native_unit' : 'kg/m^2',
         'colorbar' : 'kg/m^2',
@@ -138,8 +143,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,400) - cloud_to_level_hPa(d,t,700),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'CLOUDABOVE400HPA' : {
+    },
+    'CLOUDABOVE400HPA' : {
         'name' : 'Cloud above 400hPa',
         'native_unit' : 'kg/m^2',
         'colorbar' : 'kg/m^2',
@@ -149,8 +154,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: cloud_to_level_hPa(d,t,0) - cloud_to_level_hPa(d,t,400),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE10M_AGL' : {
+    },
+    'SMOKE10M_AGL' : {
         'name' : 'Smoke 10m AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -160,8 +165,8 @@ _var_wisdom = {
         'scale' : [0, 200],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain('SMOKE10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE10M_AGL_D' : {
+    },
+    'SMOKE10M_AGL_D' : {
         'name' : 'Smoke 10m AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -178,8 +183,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain('SMOKE10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'VR10M_AGL' : {
+    },
+    'VR10M_AGL' : {
         'name' : 'Visibility Range 10m AGL',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
@@ -191,8 +196,8 @@ _var_wisdom = {
         'scale': 'original',
         'retrieve_as' : lambda d,t: 870/smoke_at_height_terrain('SMOKE10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE1000FT_AGL' : {
+    },
+    'SMOKE1000FT_AGL' : {
         'name' : 'Smoke 1000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -202,8 +207,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE1000FT',d,t,1000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE1000FT_AGL_D' : {
+    },
+    'SMOKE1000FT_AGL_D' : {
         'name' : 'Smoke 1000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -220,8 +225,8 @@ _var_wisdom = {
         'scale' : [0, 800],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE1000FT',d,t,1000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'VR1000FT_AGL' : {
+    },
+    'VR1000FT_AGL' : {
         'name' : 'Visibility Range 1000ft AGL',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
@@ -234,8 +239,8 @@ _var_wisdom = {
         'scale': 'original',
         'retrieve_as' : lambda d,t: 870/smoke_at_height_terrain_ft('SMOKE1000FT',d,t,1000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE4000FT_AGL' : {
+    },
+    'SMOKE4000FT_AGL' : {
         'name' : 'Smoke 4000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -245,8 +250,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE4000FT',d,t,4000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE4000FT_AGL_D' : {
+    },
+    'SMOKE4000FT_AGL_D' : {
         'name' : 'Smoke 4000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -263,8 +268,8 @@ _var_wisdom = {
         'scale' : [0, 800],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE4000FT',d,t,4000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'VR4000FT_AGL' : {
+    },
+    'VR4000FT_AGL' : {
         'name' : 'Visibility Range 4000ft AGL',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
@@ -277,8 +282,8 @@ _var_wisdom = {
         'scale': 'original',
         'retrieve_as' : lambda d,t: 870/smoke_at_height_terrain_ft('SMOKE4000FT',d,t,4000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE6000FT_AGL' : {
+    },
+    'SMOKE6000FT_AGL' : {
         'name' : 'Smoke 6000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -288,8 +293,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE6000FT',d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE6000FT_AGL_D' : {
+    },
+    'SMOKE6000FT_AGL_D' : {
         'name' : 'Smoke 6000ft AGL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -306,8 +311,8 @@ _var_wisdom = {
         'scale' : [0, 800],
         'retrieve_as' : lambda d,t: smoke_at_height_terrain_ft('SMOKE6000FT',d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'VR6000FT_AGL' : {
+    },
+    'VR6000FT_AGL' : {
         'name' : 'Visibility Range 6000ft AGL',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
@@ -320,8 +325,8 @@ _var_wisdom = {
         'scale': 'original',
         'retrieve_as' : lambda d,t: 870/smoke_at_height_terrain_ft('SMOKE6000FT',d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE1000FT_ASL' : {
+    },
+    'SMOKE1000FT_ASL' : {
         'name' : 'Smoke 1000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -331,8 +336,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE1000FT',d,t,1000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE1000FT_ASL_D' : {
+    },
+    'SMOKE1000FT_ASL_D' : {
         'name' : 'Smoke 1000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -349,8 +354,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE1000FT',d,t,1000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE4000FT_ASL' : {
+    },
+    'SMOKE4000FT_ASL' : {
         'name' : 'Smoke 4000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -360,8 +365,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE4000FT',d,t,4000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE4000FT_ASL_D' : {
+    },
+    'SMOKE4000FT_ASL_D' : {
         'name' : 'Smoke 4000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -378,8 +383,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE4000FT',d,t,4000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE6000FT_ASL' : {
+    },
+    'SMOKE6000FT_ASL' : {
         'name' : 'Smoke 6000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -389,8 +394,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE6000FT',d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKE6000FT_ASL_D' : {
+    },
+    'SMOKE6000FT_ASL_D' : {
         'name' : 'Smoke 6000ft ASL',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -407,8 +412,8 @@ _var_wisdom = {
         'scale' : [0, 500],
         'retrieve_as' : lambda d,t: smoke_at_height_ft('SMOKE6000FT',d,t,6000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'WINDSPD1000FT' : {
+    },
+    'WINDSPD1000FT' : {
         'name' : 'wind speed at 1000ft',
         'native_unit' : 'm/s',
         'colorbar' : 'm/s',
@@ -416,8 +421,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
-     'WINDSPD1000FT_mph' : {
+    },
+    'WINDSPD1000FT_mph' : {
         'name' : 'wind speed at 1000ft',
         'native_unit' : 'm/s',
         'colorbar' : 'mph',
@@ -425,7 +430,7 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
+    },
     'WINDVEC1000FT' : {
         'name' : 'wind speed at 1000ft',
         'components' : [ 'U1000FT', 'V1000FT' ],
@@ -441,7 +446,7 @@ _var_wisdom = {
         'name' : 'latitudinal wind component 1000ft',
         'retrieve_as' : lambda d, t: v8p_ft(d,t,1000),
     },
-     'WINDSPD4000FT' : {
+    'WINDSPD4000FT' : {
         'name' : 'wind speed at 4000ft',
         'native_unit' : 'm/s',
         'colorbar' : 'm/s',
@@ -449,8 +454,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
-     'WINDSPD4000FT_mph' : {
+    },
+    'WINDSPD4000FT_mph' : {
         'name' : 'wind speed at 4000ft',
         'native_unit' : 'm/s',
         'colorbar' : 'mph',
@@ -458,7 +463,7 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
+    },
     'WINDVEC4000FT' : {
         'name' : 'wind speed at 4000ft',
         'components' : [ 'U4000FT', 'V4000FT' ],
@@ -474,7 +479,7 @@ _var_wisdom = {
         'name' : 'latitudinal wind component 4000ft',
         'retrieve_as' : lambda d, t: v8p_ft(d,t,4000),
     },
-     'WINDSPD6000FT' : {
+    'WINDSPD6000FT' : {
         'name' : 'wind speed at 6000ft',
         'native_unit' : 'm/s',
         'colorbar' : 'm/s',
@@ -482,8 +487,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
-     'WINDSPD6000FT_mph' : {
+    },
+    'WINDSPD6000FT_mph' : {
         'name' : 'wind speed at 6000ft',
         'native_unit' : 'm/s',
         'colorbar' : 'mph',
@@ -491,7 +496,7 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
+    },
     'WINDVEC6000FT' : {
         'name' : 'wind speed at 6000ft',
         'components' : [ 'U6000FT', 'V6000FT' ],
@@ -507,7 +512,7 @@ _var_wisdom = {
         'name' : 'latitudinal wind component 6000ft',
         'retrieve_as' : lambda d, t: v8p_ft(d,t,6000),
     },
-     'PLUME_HEIGHT' : {
+    'PLUME_HEIGHT' : {
         'name' : 'plume height',
         'native_unit' : 'm',
         'colorbar' : 'm',
@@ -516,8 +521,8 @@ _var_wisdom = {
         'scale' : [0, 10000],
         'retrieve_as' : lambda d,t: plume_height(d,t),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'PLUME_HEIGHT_ft' : {
+    },
+    'PLUME_HEIGHT_ft' : {
         'name' : 'plume height',
         'native_unit' : 'm',
         'colorbar' : 'ft',
@@ -526,8 +531,8 @@ _var_wisdom = {
         'scale' : [0, 10000],
         'retrieve_as' : lambda d,t: plume_height(d,t),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'PLUME_CENTER' : {
+    },
+    'PLUME_CENTER' : {
         'name' : 'plume height',
         'native_unit' : 'm',
         'colorbar' : 'm',
@@ -536,8 +541,8 @@ _var_wisdom = {
         'scale' : [0, 8000],
         'retrieve_as' : lambda d,t: plume_center(d,t),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'FGRNHFX' : {
+    },
+    'FGRNHFX' : {
         'name' : 'Ground level heat flux [log]',
         'native_unit' : 'W/m^2',
         'colorbar' : 'W/m^2',
@@ -546,8 +551,8 @@ _var_wisdom = {
         'scale' : [0, 6],
         'retrieve_as' : lambda d,t: np.ma.filled(np.ma.log10(np.ma.masked_less_equal(d.variables['FGRNHFX'][t,:,:], 0)), 0),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:]),
-      },
-     'SMOKE_INT' : {
+    },
+    'SMOKE_INT' : {
         'name' : 'vertically integrated smoke',
         'native_unit' : smoke_integrated_unit,
         'colorbar' : None,
@@ -556,8 +561,8 @@ _var_wisdom = {
         'scale' : [0, 2],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKE_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'SMOKETO10M' : {
+    },
+    'SMOKETO10M' : {
         'name' : 'vertically integrated smoke to 10m',
         'native_unit' : smoke_integrated_unit,
         'colorbar' : None,
@@ -567,8 +572,8 @@ _var_wisdom = {
         'scale' : [0, 0.1],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKETO10M',d,t,10),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-     },
-     'PM25_INT' : {
+    },
+    'PM25_INT' : {
         'name' : 'vert integrated PM2.5',
         'native_unit' : smoke_integrated_unit,
         'colorbar' : smoke_integrated_unit,
@@ -577,8 +582,8 @@ _var_wisdom = {
         'scale' : [0, 1],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('PM25_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'PM25_SFC' : {
+    },
+    'PM25_SFC' : {
         'name' : 'surface PM2.5 tracer',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -588,8 +593,8 @@ _var_wisdom = {
         'scale' : [0, smoke_concentration_scale],
         'retrieve_as' : lambda d,t: d.variables['tr17_1'][t,0,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'PM25_SFC_D' : {
+    },
+    'PM25_SFC_D' : {
         'name' : 'surface PM2.5 tracer',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -606,8 +611,8 @@ _var_wisdom = {
         'scale' : [0, 800],
         'retrieve_as' : lambda d,t: d.variables['tr17_1'][t,0,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'PM25_SFC_D2' : {
+    },
+    'PM25_SFC_D2' : {
         'name' : 'surface PM2.5 tracer',
         'native_unit' : 'ug/m^3',
         'colorbar' : 'ug/m^3',
@@ -620,8 +625,8 @@ _var_wisdom = {
         'scale' : [0,800],
         'retrieve_as' : lambda d,t: d.variables['tr17_1'][t,0,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'PM25_SFC_CHEM' : {
+    },
+    'PM25_SFC_CHEM' : {
         'name' : 'surface PM2.5 WRF-CHEM',
         'native_unit' : 'g/m^3',
         'colorbar' : 'ug/m^3',
@@ -630,8 +635,8 @@ _var_wisdom = {
         'scale' : [20, 90],
         'retrieve_as' : lambda d,t: d.variables['PM2_5_DRY'][t,0,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
-     'VR_SFC' : {
+    },
+    'VR_SFC' : {
         'name' : 'surface Visibility Range',
         'native_unit' : 'miles',
         'colorbar' : 'miles',
@@ -644,7 +649,7 @@ _var_wisdom = {
         'scale': 'original',
         'retrieve_as' : lambda d,t: 870/d.variables['tr17_1'][t,0,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
+    },
     'Q2' : {
         'name' : 'vapor mixing ratio at 2m',
         'native_unit' : 'kg/kg',
@@ -653,7 +658,7 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: d.variables['Q2'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
+    },
     'T2' : {
         'name' : 'temperature at 2m',
         'native_unit' : 'K',
@@ -662,7 +667,7 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: d.variables['T2'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
+    },
     'T2_F' : {
         'name' : 'temperature at 2m',
         'native_unit' : 'K',
@@ -671,7 +676,7 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: d.variables['T2'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
-      },
+    },
     'FIRE_AREA' : {
         'name' : 'fire area',
         'native_unit' : '-',
@@ -681,7 +686,7 @@ _var_wisdom = {
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['FIRE_AREA'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
-      },
+    },
     'FLINEINT' : {
         'name' : 'fireline intensity',
         'native_unit' : '-',
@@ -691,7 +696,7 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: np.ma.filled(np.ma.log10(np.ma.masked_less_equal(d.variables['FLINEINT'][t,:,:], 0)), 0),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
-      },
+    },
     'FLINEINT_btupftps' : {
         'name' : 'fireline intensity',
         'native_unit' : 'W/m',
@@ -708,8 +713,8 @@ _var_wisdom = {
         'scale' : [0., 350000000.],
         'retrieve_as' : lambda d,t: fire_front(d,t,'FLINEINT'),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
-      },
-     'RH_FIRE' : {
+    },
+    'RH_FIRE' : {
         'name' : 'relative humidity',
         'native_unit' : '-',
         'colorbar' : '%',
@@ -725,8 +730,8 @@ _var_wisdom = {
         'scale' : [0.0, 1.0],
         'retrieve_as' : lambda d,t: d.variables['RH_FIRE'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
-     'FIRE_HFX' : {
+    },
+    'FIRE_HFX' : {
         'name' : 'fire heat flux',
         'native_unit' : 'W/m^2',
         'colorbar' : 'W/m^2',
@@ -735,7 +740,7 @@ _var_wisdom = {
         'transparent_values' : [-np.inf, 0],
         'retrieve_as' : lambda d,t: d.variables['FIRE_HFX'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
-      },
+    },
     'F_ROS' : {
         'name' : 'fire spread rate',
         'native_unit' : 'm/s',
@@ -744,7 +749,7 @@ _var_wisdom = {
         'scale' : [0.0, 2.0],
         'retrieve_as' : lambda d,t: d.variables['F_ROS'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
-      },
+    },
     'F_ROS_chsph' : {
         'name' : 'fire spread rate',
         'native_unit' : 'm/s',
@@ -753,8 +758,8 @@ _var_wisdom = {
         'scale' : [0.0, 1000.0],
         'retrieve_as' : lambda d,t: d.variables['F_ROS'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
-      },
-     'ROS_chsph' : {
+    },
+    'ROS_chsph' : {
         'name' : 'fire spread rate at front',
         'native_unit' : 'm/s',
         'colorbar' : 'chains/h',
@@ -770,7 +775,7 @@ _var_wisdom = {
         'scale' : [0., 3.],
         'retrieve_as' : lambda d,t: fire_front(d,t,'ROS'),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
-      },
+    },
     'PSFC' : {
         'name' : 'surface pressure',
         'native_unit' : 'Pa',
@@ -779,8 +784,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d, t: d.variables['PSFC'][t,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
-     'WINDSPD' : {
+    },
+    'WINDSPD' : {
         'name' : 'wind speed at 10m',
         'native_unit' : 'm/s',
         'colorbar' : 'm/s',
@@ -788,8 +793,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
-     'WINDSPD_mph' : {
+    },
+    'WINDSPD_mph' : {
         'name' : 'wind speed at 10m',
         'native_unit' : 'm/s',
         'colorbar' : 'mph',
@@ -797,8 +802,8 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
-     'WINDSPD_mph_D' : {
+    },
+    'WINDSPD_mph_D' : {
         'name' : 'wind speed at 10m',
         'native_unit' : 'm/s',
         'colorbar' : 'mph',
@@ -813,7 +818,7 @@ _var_wisdom = {
         'scale' : [0.,32.],
         'retrieve_as' : lambda d, t: np.sqrt(d.variables['U10'][t,:,:]**2.0 + d.variables['V10'][t,:,:]**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
-      },
+    },
     'WINDVEC' : {
         'name' : 'wind speed at 10m',
         'components' : [ 'U10', 'V10' ],
@@ -854,7 +859,7 @@ _var_wisdom = {
         'scale' : 'original',
         'retrieve_as' : lambda d,t: d.variables['F_INT'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
-      },
+    },
     'NFUEL_CAT' : {
        'name' : 'fuel categories',
        'native_unit' : 'fuel_type',
@@ -1107,5 +1112,4 @@ def convert_value(unit_from, unit_to, value):
         return value
     else:
         return func(value)
-
-
+   

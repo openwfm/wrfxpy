@@ -1,7 +1,6 @@
 from ingest.grib_source import GribError, GribSource
 from utils import timedelta_hours, readhead, Dict
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime, timedelta, timezone
 import os.path as osp
 import logging
 
@@ -38,7 +37,7 @@ class GribForecast(GribSource):
         to_utc = to_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)
 
         if ref_utc is None:
-            ref_utc = datetime.now(pytz.UTC)
+            ref_utc = datetime.now(timezone.utc)
  
         logging.info('retrieve_gribs %s from_utc=%s to_utc=%s ref_utc=%s cycle_start=%s download_whole_cycle=%s' %
             (self.id, from_utc, to_utc, ref_utc, cycle_start, download_whole_cycle ))
@@ -49,7 +48,7 @@ class GribForecast(GribSource):
         while cycle_shift < 3:
     
             if cycle_start is not None:
-                cycle_start = cycle_start.replace(minute=0,second=0,microsecond=0)
+                cycle_start = cycle_start.replace(minute=0, second=0, microsecond=0)
                 logging.info('forecast cycle start given as %s' % cycle_start)
             else:
                 # select cycle (at least hours_behind_real_time behind)
@@ -119,7 +118,7 @@ class GribForecast(GribSource):
     hours_behind_real_time = 3     # choose forecast cycle at least this much behind
     
 
-    def forecast_times(self,cycle_start, from_utc, to_utc):  
+    def forecast_times(self, cycle_start, from_utc, to_utc):  
         """
         Compute the span of hours to be used in a forecast cycle
         This should be common to all forecast data sources

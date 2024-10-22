@@ -62,7 +62,6 @@ class FuelMoistureModel:
         # note: the moisture advance will proceed by fuel moisture types
         # thus we only need space for one class at a time
         self.m_i = np.zeros((s0, s1))
-        #self.mn_i = np.zeros((s0,s1))
         self.rlag = np.zeros((s0, s1))
         self.equi = np.zeros((s0, s1))
         self.model_ids = np.zeros((s0, s1))
@@ -103,7 +102,6 @@ class FuelMoistureModel:
         rlag = self.rlag
         model_ids = self.model_ids
         m_i = self.m_i
-        #mn_i = self.mn_i
         J = self.J
         Jii = self.Jii
         P2 = self.P2
@@ -159,10 +157,6 @@ class FuelMoistureModel:
 
             dead_zone = (model_ids == 4)
 
-            # optional inspection of changes at given position
-            #dg_pos = (86,205)
-            #mi_old = m_i[dg_pos]
-
             # select appropriate integration method according to change for each fuel
             # and location
             rlag *= dt
@@ -172,9 +166,6 @@ class FuelMoistureModel:
             small_change = np.logical_not(big_change)
             m_i[small_change] += (equi[small_change] - m_i[small_change]) * change[small_change] * (
                 1.0 - 0.5 * change[small_change])
-
-            #print('Diag at 86,205 fuel %d: model_id %d equi %g rlag %g change %g value %g -> %g' % 
-            #        (i, model_ids[dg_pos], equi[dg_pos], rlag[dg_pos], change[dg_pos], mi_old, m_i[dg_pos]))
 
             # store in state matrix
             m_ext[:, :, i] = m_i
@@ -408,8 +399,6 @@ class FuelMoistureModel:
         logging.info("fmda.fuel_moisture_model.to_geogrid: geogrid_index="+str(index))
         ensure_dir(path)
         xsize, ysize, n = self.m_ext.shape
-        if n != 5:
-            logging.error('wrong number of extended state fields, expecting 5')
 
         if not not_coord:
             x=int(xsize*0.5)

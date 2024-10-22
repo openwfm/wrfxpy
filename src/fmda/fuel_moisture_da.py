@@ -17,33 +17,20 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from __future__ import absolute_import
-from __future__ import print_function
 from wrf.wrf_data import WRFModelData
 from .trend_surface_model import fit_tsm, fit_tsm_lstsq
-from utils import ensure_dir, great_circle_distance, find_closest_grid_point
+from utils import great_circle_distance, find_closest_grid_point, inq
 from .fuel_moisture_model import FuelMoistureModel
 from .fm10_observation import FM10Observation
 
-try:
-    from ingest.MesoDB.mesoDB import mesoDB
-except:
-    pass
-
 import sys
 import os
-import os.path as osp
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-import pytz
 import netCDF4
 import logging
 import json
-from MesoPy import Meso,MesoPyError
-from utils import inq
-from six.moves import range
-from six.moves import zip
 
 def check_overlap(wrf_path,ts_now):
   """
@@ -58,7 +45,7 @@ def check_overlap(wrf_path,ts_now):
     return False
 
 
-def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghgt):
+def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghgt, update=False, max_retries=5):
     """
     Retrieve observation data from Mesowest and repackage them as a time-indexed
     dictionary of lists of observations.  
@@ -71,11 +58,11 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
     """
     def decode_meso_time(t):
         # example: '2016-03-30T00:30:00Z'
-        return datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
+        return datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ')
 
     def meso_time(dt):
         # example: 201603311600
-        return '%04d%02d%02d%02d%02d' % (dt.year, dt.month, dt.day, dt.hour, dt.minute)
+        return dt.strftime('%Y%m%d%H%M')
         
     # the bbox for mesowest is: (min(lon), min(lat), max(lon), max(lat)).
     min_lat, max_lat = np.amin(glat), np.amax(glat)
@@ -84,23 +71,34 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
     meso_obss = None
     # retrieve data from Mesonet API (http://api.mesowest.net/)
     try:
-        logging.info('retrieve_mesowest_observations: retrieving data using MesoDB')
-        db = mesoDB('ingest/MesoDB', meso_token)
-        db.update['startTime'] = tm_start - timedelta(minutes=30)
-        db.update['endTime'] = tm_end + timedelta(minutes=30)
-        db.params['startTime'] = tm_start - timedelta(minutes=30)
-        db.params['endTime'] = tm_end + timedelta(minutes=30)
-        db.params['longitude1'] = min_lon
-        db.params['longitude2'] = max_lon
-        db.params['latitude1'] = min_lat
-        db.params['latitude2'] = max_lat
-        df = db.get_DB()
-        st = db.sites()
-        if not len(df):
-            logging.info('retrieve_mesowest_observations: no data for the query specified')
+        logging.info('retrieve_mesowest_observations - retrieving data using SynopticDB')
+        from ingest.SynopticDB.SynopticDB import SynopticDB
+        db = SynopticDB('ingest/SynopticDB')
+        meta = dict(db.check_table('Metadata'))
+        db.params['startDatetime'] = tm_start
+        db.params['endDatetime'] = tm_end
+        db.params['minLongitude'] = min_lon
+        db.params['maxLongitude'] = max_lon
+        db.params['minLatitude'] = min_lat
+        db.params['maxLatitude'] = max_lat
+        db.params['vars'] = ['fuel_moisture']
+        db.params['makeFile'] = False
+        last_get_data_utc = meta.get('last_get_data_utc')
+        if last_get_data_utc != None:
+            last_get_data_utc = datetime.strptime(last_get_data_utc, '%Y-%m-%d_%H:%M:%S')
+            required = last_get_data_utc < db.params['endDatetime']
+        else:
+            required = True
+        if update or required:
+            db.get_synData(max_retries)
+            
+        df,st = db.query_db()
+        if not isinstance(df, pd.DataFrame) or not len(df):
+            logging.info('retrieve_mesowest_observations - no data for the query specified')
             return {}
-        logging.info('retrieve_mesowest_observations: re-packaging the observations')
-        df = df.dropna(subset=['fm10'])
+        logging.info('retrieve_mesowest_observations - re-packaging the observations')
+        st = st.set_index('STID')
+        df = df.dropna(subset=['FUEL_MOISTURE_VALUE'])
         obs_data = {}
         for stid,data in df.groupby('STID'):
             if len(data):
@@ -109,21 +107,21 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
                 ngp = find_closest_grid_point(st_lon, st_lat, glon, glat)
                 st_elev = st_data['ELEVATION']
                 if st_elev is None:
-                    elev = ghgt[ngp] 
+                    elev = ghgt[ngp]
                 else:
                     elev = float(st_data['ELEVATION']) / 3.2808
-                dts = data.datetime.dt.to_pydatetime() 
-                fms = np.array(data.fm10) 
+                dts = pd.to_datetime(data['DATETIME']).dt.to_pydatetime()
+                fms = np.array(data['FUEL_MOISTURE_VALUE']) 
                 for ts,fm_obs in zip(dts,fms):
                     if fm_obs is not None:
                         o = FM10Observation(ts,st_lat,st_lon,elev,float(fm_obs)/100.,ngp,stid)
                         obs_t = obs_data.get(ts, [])
                         obs_t.append(o)
                         obs_data[ts] = obs_t
-        return obs_data
-    except:
-        logging.warning('retrieve_mesowest_observations: failed with exception {}')
-        logging.info('retrieve_mesowest_observations: retrieving data using Meso instead')
+    except Exception as e:
+        logging.warning('retrieve_mesowest_observations - failed with exception {}'.format(e))
+        logging.info('retrieve_mesowest_observations - retrieving data using Meso instead')
+        from MesoPy import Meso, MesoPyError
         if isinstance(meso_token,str):
             meso_tokens = [meso_token]
             n_tokens = 1
@@ -136,22 +134,22 @@ def retrieve_mesowest_observations(meso_token, tm_start, tm_end, glat, glon, ghg
                                                                     meso_time(tm_end + timedelta(minutes=30))))
             logging.info("bbox=' %g,%g,%g,%g'" % (min_lon, min_lat, max_lon, max_lat))
             try:
-                meso_obss = m.timeseries(meso_time(tm_start - timedelta(minutes=30)),
-                                         meso_time(tm_end + timedelta(minutes=30)),
-                                         showemptystations = '0', bbox='%g,%g,%g,%g' % (min_lon, min_lat, max_lon, max_lat),
+                meso_obss = m.timeseries(meso_time(tm_start), meso_time(tm_end), showemptystations = '0', 
+                                         bbox='%g,%g,%g,%g' % (min_lon, min_lat, max_lon, max_lat),
                                          vars='fuel_moisture')
                 break
             except Exception as e:
+                logging.warning('retrieve_mesowest_observations - failed with exception {}'.format(e))
                 if tn == n_tokens-1: 
-                    raise MesoPyError('Could not connect to the API. Probably the token(s) usage for this month is full.') 
+                    raise MesoPyError('Could not connect to the API.') 
                 else:
-                    logging.warning('Could not connect to the API. Probably the token usage for this month is full. Trying next token...')
+                    logging.warning('Could not connect to the API. Trying next token...')
 
         if meso_obss is None:
-            logging.info('retrieve_mesowest_observations: Meso.timeseries returned None')
+            logging.info('retrieve_mesowest_observations - Meso.timeseries returned None')
             return {}
     
-        logging.info('retrieve_mesowest_observations: re-packaging the observations')
+        logging.info('retrieve_mesowest_observations - re-packaging the observations')
         # repackage all the observations into a time-indexed structure which groups
         # observations at the same time together
         obs_data = {}
@@ -222,11 +220,13 @@ def execute_da_step(model, model_time, covariates, covariates_names, fm10, use_l
         Kg = np.zeros((dom_shape[0], dom_shape[1], fmc_gc.shape[2]))
 
         # run the data assimilation step now
-        logging.info("FMDA mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g" %
-          (np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,0]), np.mean(fmc_gc[:,:,1]), np.mean(fmc_gc[:,:,2])))
+        logging.info("FMDA mean Kf: {} Vf: {} states: {} ".format(
+            np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,:-2], axis=(0, 1))
+        ))
         model.kalman_update_single2(Kf_fn[:,:,np.newaxis], Vf_fn[:,:,np.newaxis,np.newaxis], 1, Kg)
-        logging.info("FMDA mean Kf: %g Vf: %g state[0]: %g state[1]: %g state[2]: %g" %
-          (np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,0]), np.mean(fmc_gc[:,:,1]), np.mean(fmc_gc[:,:,2])))
+        logging.info("FMDA mean Kf: {} Vf: {} states: {} ".format(
+            np.mean(Kf_fn), np.mean(Vf_fn), np.mean(fmc_gc[:,:,:-2], axis=(0, 1))
+        ))
     else:
         logging.warning('FMDA no valid observations found, skipping data assimilation.')
       
