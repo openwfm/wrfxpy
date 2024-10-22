@@ -38,7 +38,7 @@ import pytz
 
 # setup environment
 sys_cfg = Dict(json.load(open('etc/conf.json')))
-cfg = Dict(json.load(open('etc/rtma_cycler.json')))
+cfg = Dict(json.load(open('etc/fmda_cycler.json')))
 meso_token = json.load(open('etc/tokens.json'))['mesowest']
 
 
@@ -636,7 +636,7 @@ if __name__ == '__main__':
         except Exception as e:
             logging.warning(e)
     else:
-        print('Usage: to use domains configured in etc/rtma_cycler.json:')
+        print('Usage: to use domains configured in etc/fmda_cycler.json:')
         print('./rtma_cycler.sh anything')
         print('To use a custom domain named FIRE by giving a bounding box:')
         print('./rtma_cycler.sh lat1 lon1 lat2 lon2')

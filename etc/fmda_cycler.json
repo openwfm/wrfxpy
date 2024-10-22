@@ -1,7 +1,15 @@
 {
     "workspace_path" : "wksp_fmda",
-    "lookback_length" : 20,
+    "lookback_length" : 12,
     "regions" : {
+       "CONUS": {
+         "code" : "CONUS",
+         "bbox" : [24.94, -125, 49.6, -66.93]
+       },
+       "California GACC" : {
+         "code" : "CALI",
+         "bbox" : [32, -123, 42.5, -112]
+       },
        "Northwest GACC" : {
          "code" : "NWCC",
          "bbox" : [42, -124.6, 49, -116.4]
