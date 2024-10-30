@@ -25,6 +25,7 @@ from ingest.HRRRA import HRRRA
 from ingest.HRRR import HRRR
 from utils import Dict, ensure_dir, utc_to_esmf, delete, force_copy
 from vis.postprocessor import scalar_field_to_raster, vector_field_to_raster, scatter_to_raster
+from vis.vis_utils import ffwi, hdw
 from ssh_shuttle import send_product_to_server
 
 import netCDF4

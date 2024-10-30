@@ -131,6 +131,27 @@ _var_wisdom = {
         "spacing" : "uniform",
         "transparent_values" : [-np.inf, 5e-10],
         "scale" : [0, 5e-7]
+    },
+    'FOSBERG' : {
+        'name' : 'Fosberg Index',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'autumn_r',
+        'scale' : [0, 45]
+    },
+    'HDW' : {
+        'name' : 'Hot, Dry, & Windy Index',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'rainbow',
+        'norm_opt' : 'boundary',
+        'bounds' : [0,25,50,75,90,95,100],
+        'colors' : np.array([
+            (255,255,255), (254,239,180), (254, 200, 108),
+            (243,147, 70), (198,104, 54), (135,  81,  56)
+        ])/255.,
+        'spacing' : 'uniform',
+        'scale' : [0, 100]
     }
 }
 
