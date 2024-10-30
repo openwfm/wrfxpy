@@ -164,7 +164,7 @@ def vector_field_to_raster(u, v, lats, lons, wisdom):
         v[v > fa_max] = fa_max
 
     # create the raster & get coordinate bounds, HACK to get better quiver resolution
-    s = wisdom.get('ref', 3)
+    s = wisdom.get('ref', 2)
     raster_png_data,corner_coords = basemap_barbs_mercator(u[::s,::s], v[::s,::s], lats[::s,::s], lons[::s,::s])
 
     return raster_png_data, corner_coords

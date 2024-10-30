@@ -1,4 +1,5 @@
 from utils import Dict
+from operator import add
 import os.path as osp
 import json
 
@@ -238,11 +239,21 @@ class VarWisdom(dict):
         self.update(_var_wisdom)
         custom_path = 'etc/vtables/geo_vars_custom.json'
         if osp.exists(custom_path):
-            self.update(json.load(open(custom_path)))
+            js = json.load(open(custom_path))
+            for k in js.keys():
+                if 'fill' in js[k].keys():
+                    js[k]['fill'] = Dict({
+                        int(k) 
+                            if '-' not in k 
+                            else range(*list(map(add, map(int, k.split('-')[:2]), [0,1])))
+                        : v
+                        for k,v in js[k]['fill'].items()
+                    }) 
+            self.update(js)
 
 def get_wisdom(var_name):
     """Return rendering wisdom for the variable <var_name>."""
-    return VarWisdom()[var_name]
+    return VarWisdom().get(var_name, {})
 
 def get_wisdom_variables():
     """Return the variables for which wisdom is available."""

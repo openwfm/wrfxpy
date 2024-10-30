@@ -146,19 +146,21 @@ def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=2
     return str_io.getvalue()
 
 
-def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None):
+def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None, bounds=None):
     if norm:
         norm = norm(cmin,cmax)
     
-    # longitude/latitude extent
-    lons = (np.amin(lon), np.amax(lon))
-    lats = (np.amin(lat), np.amax(lat))
+    if bounds is None:
+        # longitude/latitude extent
+        lons = (np.amin(lon), np.amax(lon))
+        lats = (np.amin(lat), np.amax(lat))
+        bounds = (lons[0], lons[1], lats[0], lats[1])
 
     logging.info('basemap_raster_mercator: bounding box %s %s %s %s' % (lons + lats))
 
     # construct spherical mercator projection for region of interest
-    m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],
-                llcrnrlon=lons[0],urcrnrlon=lons[1])
+    m = Basemap(projection='merc',llcrnrlat=bounds[2], urcrnrlat=bounds[3],
+                llcrnrlon=bounds[0],urcrnrlon=bounds[1])
 
     masked_grid = np.ma.array(grid,mask=np.isnan(grid))
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72)
@@ -170,22 +172,24 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None):
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
     plt.close()
 
-    numpy_bounds = [ (lons[0],lats[0]),(lons[1],lats[0]),(lons[1],lats[1]),(lons[0],lats[1]) ]
+    numpy_bounds = [ (bounds[0],bounds[2]),(bounds[1],bounds[2]),(bounds[1],bounds[3]),(bounds[0],bounds[3]) ]
     float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
     return str_io.getvalue(), float_bounds
 
 
-def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,norm=None):
+def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,norm=None,bounds=None):
 
-    # lon/lat extents
-    lons = (np.amin(lon), np.amax(lon))
-    lats = (np.amin(lat), np.amax(lat))
+    if bounds is None:
+        # longitude/latitude extent
+        lons = (np.amin(lon), np.amax(lon))
+        lats = (np.amin(lat), np.amax(lat))
+        bounds = (lons[0], lons[1], lats[0], lats[1])
 
     logging.info('basemap_barbs_mercator: bounding box %s %s %s %s' % (lons + lats))
     
     # construct spherical mercator projection for region of interest
-    m = Basemap(projection='merc',llcrnrlat=lats[0], urcrnrlat=lats[1],
-                llcrnrlon=lons[0],urcrnrlon=lons[1])
+    m = Basemap(projection='merc',llcrnrlat=bounds[2], urcrnrlat=bounds[3],
+                llcrnrlon=bounds[0],urcrnrlon=bounds[1])
 
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
@@ -206,19 +210,18 @@ def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,no
     str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
     plt.close()
-
-    numpy_bounds = [ (lons[0],lats[0]),(lons[1],lats[0]),(lons[1],lats[1]),(lons[0],lats[1]) ]
+    
+    numpy_bounds = [ (bounds[0],bounds[2]),(bounds[1],bounds[2]),(bounds[1],bounds[3]),(bounds[0],bounds[3]) ]
     float_bounds = [ (float(x), float(y)) for x,y in numpy_bounds ]
     return str_io.getvalue(), float_bounds
 
 
-def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's', linewidths = 0, text = False, norm=None):
+def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's', linewidths = 0, text = False, border=0.05, norm=None):
     if norm:
         norm = norm(cmin,cmax)
     
     # number of scatter elements
     N = len(val)	
-    border = .05
     bounds = (bounds[0]-border, bounds[1]+border, bounds[2]-border, bounds[3]+border)
    
     logging.info('basemap_scatter_mercator: bounding box {}'.format(bounds))

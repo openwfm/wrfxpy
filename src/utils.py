@@ -34,10 +34,10 @@ import psutil
 import requests
 import socket
 import collections
-from clamp2mesh import clamp2mesh
+from clamp2mesh import nearest_idx, get_subgrid_coordinates, clamp2mesh
 
 try:
-    from fire_init.geometry import process_ignitions_to_tign, process_burn_plot_boundary
+    import fire_init
     _fire_init_plugin = True
 except:
     _fire_init_plugin = False
@@ -428,12 +428,17 @@ def render_ignitions(js, max_dom):
     :param js: the job state
     :param max_dom: the maximum number of domains
     """
+    duration_default = 60.
+    radius_default = 60.
+    ros_default = 1.
+    
     def set_ignition_val(dom_id, v):
         dvals = [0] * max_dom
         dvals[dom_id-1] = v
         return dvals
 
     # extract the original ignition specs and the original start time
+    dom_specs = js.domains
     ign_specs = js.ignitions
     orig_start_time = js.orig_start_utc
 
@@ -446,20 +451,36 @@ def render_ignitions(js, max_dom):
                  'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom,
                  'fmoist_run' : [False] * max_dom, 'fmoist_interp' : [False] * max_dom,
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
-                 'fire_viscosity' : [0] * max_dom }
+                 'fire_viscosity' : [0] * max_dom, 'fire_wind_log_interp': [0] * max_dom,
+                 'fire_use_windrf': [0] * max_dom }
     
     if js.use_realtime:
         fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
-        nml_fire.update({'fire_perimeter_time': fire_perimeter_time})
-    elif js.use_tign_ignition and len(ign_specs):
-        ign_times = [(timespec_to_utc(ign['time_utc'], orig_start_time),ign['duration_s']) for dom_igns in ign_specs.values() for ign in dom_igns]
-        fire_tign_in_time = max([int((ign_time - js.start_utc).total_seconds())+ign_dur for ign_time,ign_dur in ign_times])
-        nml_fire.update({'fire_tign_in_time': fire_tign_in_time})
-
+        nml_fire.update({'fire_perimeter_time': [0] * max_dom})
+        nml_fire['fire_perimeter_time'][max_dom-1] = fire_perimeter_time
+        nml_fire.update({'fire_boundary_guard': [0] * max_dom})
+        nml_fire['fire_boundary_guard'][max_dom-1] = -1
+        ign_specs = {str(max_dom): []}
+    elif js.use_tign_ignition:
+        ign_times = [
+            (
+                timespec_to_utc(ign['time_utc'], orig_start_time),
+                ign.get('duration_s',duration_default)
+            ) 
+            for dom_igns in ign_specs.values() for ign in dom_igns
+        ]
+        if len(ign_times):
+            fire_tign_in_time = max([int((ign_time - js.start_utc).total_seconds())+ign_dur for ign_time,ign_dur in ign_times])
+            nml_fire.update({'fire_tign_in_time': [0] * max_dom})
+            nml_fire['fire_tign_in_time'][max_dom-1] = fire_tign_in_time
+        ign_specs = {str(max_dom): []}
+    
     for dom_str, dom_igns in ign_specs.items():
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
         nml_fire['ifire'][dom_id-1] = 1
+        nml_fire['fire_wind_log_interp'][dom_id-1] = 1
+        nml_fire['fire_use_windrf'][dom_id-1] = 2
         if not (js.use_tign_ignition or js.use_realtime):
             nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
@@ -472,21 +493,30 @@ def render_ignitions(js, max_dom):
         for ndx,ign in enumerate(dom_igns):
             start_time = timespec_to_utc(ign['time_utc'], orig_start_time)
             start = int((start_time - js.start_utc).total_seconds())
-            dur = ign.get('duration_s',240)
-            radius = ign.get('radius',200)
-            ros = ign.get('ros',1)
+            dur = ign.get('duration_s', duration_default)
+            radius = ign.get('radius', radius_default)
+            ros = ign.get('ros', ros_default)
             if 'latlon' in ign.keys():
                 lat,lon = ign['latlon']
-                nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+                nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
                 vals = [ nlat, nlat, nlon, nlon, start, start+dur, radius, ros]
             elif 'start_latlon' in ign.keys() and 'end_latlon' in ign.keys():
                 lat,lon = ign['start_latlon']
-                slon,slat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+                slon,slat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
                 lat,lon = ign['end_latlon']
-                elon,elat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
+                elon,elat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
                 vals = [ slat, elat, slon, elon, start, start+dur, radius, ros]
             kv = dict(list(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals])))
             nml_fire.update(kv)
+
+    # activate fire at domains with subgrid ratio specified
+    for dom_str, dom_spec in dom_specs.items():
+        dom_id = int(dom_str)
+        if any([sr > 0 for sr in dom_spec['subgrid_ratio']]):
+            nml_fire['ifire'][dom_id-1] = 1 # switch on fire model
+            nml_fire['fmoist_run'][dom_id-1] = True # use the fuel moisture model
+            nml_fire['fmoist_interp'][dom_id-1] = True # interpolate fm onto fire mesh
+            nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
 
     return { 'fire' : nml_fire }
 
@@ -496,9 +526,16 @@ def process_ignitions(js):
 
     :param js: the job state
     """
+    if not _fire_init_plugin: 
+        logging.error('fire_init plugin not installed')
+        raise Exception('fire_init plugin is required for selected ignitions')
+    duration_default = 60.
+    radius_default = 60.
+    ros_default = 1.
     orig_start_time = js.orig_start_utc
     for dom,igns in js.ignitions.items():
         wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % int(dom))
+        fxlon,fxlat = get_subgrid_coordinates(wrf_path, strip=False)
         fire_data = {'points': [], 'lines': []}
         points = []
         lines = []
@@ -512,38 +549,52 @@ def process_ignitions(js):
             for line_id in np.unique(line_ids):
                 line_points = [ign for ign in lines if ign['line_id'] == line_id]
                 line_data = {
-                    'times': [], 'lons': [], 'lats': [], 
-                    'duration': [], 'radius': [], 'ros': []
+                    'time': [], 'ix': [], 'iy': [],
+                    'lon': [], 'lat': [],  'duration': [], 
+                    'radius': [], 'ros': []
                 }
                 for line_point in line_points:
                     time_utc = timespec_to_utc(line_point['time_utc'], orig_start_time)
                     time = int((time_utc - js.start_utc).total_seconds())
                     lat,lon = line_point['latlon']
-                    duration = line_point.get('duration_s',240)
-                    radius = line_point.get('radius',200)
-                    ros = ign.get('ros',1)
-                    line_data['times'].append(time) 
-                    line_data['lons'].append(lon)
-                    line_data['lats'].append(lat)
+                    iy,ix = nearest_idx(fxlon, fxlat, float(lon), float(lat))
+                    lon = fxlon[iy, ix]
+                    lat = fxlat[iy, ix]
+                    duration = line_point.get('duration_s', duration_default)
+                    radius = line_point.get('radius', radius_default)
+                    ros = line_point.get('ros', ros_default)
+                    line_data['time'].append(time)
+                    line_data['ix'].append(ix)
+                    line_data['iy'].append(iy)
+                    line_data['lon'].append(lon)
+                    line_data['lat'].append(lat)
                     line_data['duration'].append(duration)
                     line_data['radius'].append(radius)
                     line_data['ros'].append(ros)
                 fire_data['lines'].append(line_data)
         if len(points):
             for point in points:
-                time_utc = timespec_to_utc(ign['time_utc'], orig_start_time)
-                start_time = int((time_utc - js.start_utc).total_seconds())
+                time_utc = timespec_to_utc(point['time_utc'], orig_start_time)
+                time = int((time_utc - js.start_utc).total_seconds())
                 lat,lon = point['latlon']
-                lon,lat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'met_em.d{:02d}*'.format(js.max_dom)))[0], float(lon), float(lat))
-                duration = point.get('duration_s',240)
-                radius = point.get('radius',200)
-                point_data = [start_time, lon, lat, duration, radius]
+                ix,iy = nearest_idx(fxlon, fxlat, float(lon), float(lat))
+                duration = point.get('duration_s', duration_default)
+                radius = point.get('radius', radius_default)
+                ros = point.get('ros', ros_default)
+                point_data = {
+                    'time': time, 'ix': ix, 'iy': iy, 
+                    'lon': lon, 'lat': lat, 'duration': duration, 
+                    'radius': radius, 'ros': ros
+                }
                 fire_data['points'].append(point_data)
-        process_ignitions_to_tign(wrf_path, fire_data)   
+        TIGN_G = fire_init.process_ignitions_to_tign(wrf_path, fire_data)   
     if js.burn_plot_boundary is not None:
         coords = [c[::-1] for c in js.burn_plot_boundary]
+        if coords[0] != coords[-1]:
+            coords.append(coords[0])
         wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % js.max_dom)
-        process_burn_plot_boundary(wrf_path, coords)  
+        FUEL_MASK = fire_init.process_burn_plot_boundary(wrf_path, [[coords]])  
+    fire_init.integrate_init(wrf_path, TIGN_G, FUEL_MASK, no_fuel_cat=js.fire_nml['fuel_scalars']['no_fuel_cat'])
 
 def timespec_to_utc(ts_str, from_time = None):
     """

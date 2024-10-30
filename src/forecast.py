@@ -115,7 +115,7 @@ class JobState(Dict):
             logging.info('restart not in arguments, default restart option %s' % self.restart)
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
-        self.ignitions = args.get('ignitions', None)
+        self.ignitions = args.get('ignitions', {})
         self.fmda = args.get('fuel_moisture_da', None)
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
@@ -345,6 +345,7 @@ def run_fire_init(js, q):
             perim1 = perims['perim1'].coords
             perim2 = perims['perim2'].coords
             fxlon, fxlat = get_subgrid_coordinates(params['wrf_path'], strip=False)
+            params['bbox'] = [fxlon.min(),fxlon.max(),fxlat.min(),fxlat.max()]
             fire_init.perims_interp(perim1, perim2, fxlon, fxlat, **params)
         js.fire_perimeter_time = params.get('spinup_time', 7200.)
         q.put('SUCCESS')
@@ -565,11 +566,13 @@ def read_namelist(path):
 def ensure_abs_path(path,js,max_char=20):
     if len(path) > max_char:
         hexhash = hashlib.sha224(js.job_id.encode()).hexdigest()[:6]
-        geo_path = osp.join(js.wrfxpy_dir,'cache/geo_data.{}'.format(hexhash))
+        geo_path = osp.join(js.wrfxpy_dir, 'cache/geo_data.{}'.format(hexhash))
         js.geo_cache = geo_path
         make_dir(geo_path)
-        new_path = osp.join(geo_path,osp.basename(path))
-        symlink_unless_exists(path,new_path)
+        new_path = osp.join(geo_path, osp.basename(path))
+        if osp.exists(new_path):
+            os.remove(new_path)
+        symlink_unless_exists(path, new_path)
         return new_path
     else:
         return path
@@ -596,19 +599,25 @@ def vars_add_to_geogrid(js):
         else:
             logging.warning('Any {} specified for NFUEL_CAT and ZSF GeoTIFF location'.format(geo_vars_path))
             logging.info('Trying default NFUEL_CAT and ZSF from {}.'.format(js.args['wps_geog_path']))
-            nfuel_path = osp.join(js.args['wps_geog_path'],'fuel_cat_fire','lf_data.tif')
-            topo_path = osp.join(js.args['wps_geog_path'],'topo_fire','ned_data.tif')
+            nfuel_path = osp.join(js.args['wps_geog_path'], 'fuel_cat_fire', 'lf_data.tif')
+            topo_path = osp.join(js.args['wps_geog_path'], 'topo_fire', 'ned_data.tif')
             if osp.exists(nfuel_path) and osp.exists(topo_path) and nfuelcats == 13:
                 geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
         for var,tif_file in geo_vars.items():
             if var == 'NFUEL_CAT':
                 var = 'NFUEL_CAT_13'
-            if 'NFUEL_CAT' in var and var != 'NFUEL_CAT_{}'.format(nfuelcats): 
+            wisdom = get_wisdom(var)
+            if (
+                wisdom['name'] == 'NFUEL_CAT'
+                and 'category_range' in wisdom
+                and nfuelcats != wisdom['category_range'][1] - 1
+            ):
+                logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
                 continue
             bbox = js.bounds[str(js.min_sub_dom)]
             logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
             try:
-                GeoDriver.from_file(tif_file).to_geogrid(geo_data_path,var,bbox)
+                GeoDriver.from_file(tif_file).to_geogrid(geo_data_path, var, bbox)
             except Exception as e:
                 if 'NFUEL_CAT' in var or 'ZSF' in var:
                     logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
@@ -621,12 +630,7 @@ def vars_add_to_geogrid(js):
     except:
         logging.warning('Problems processing GeoTIFF files for NFUEL_CAT and ZSF'.format(geo_vars_path))
         logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path))
-        if nfuelcats == 13:
-            varnames = ['NFUEL_CAT_13_MODIS_20', 'ZSF_13_MODIS_20']
-        elif nfuelcats == 40:
-            varnames = ['NFUEL_CAT_40_MODIS_20', 'ZSF_40_MODIS_20']
-        else:
-            raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
+        varnames = ['NFUEL_CAT_{}_MODIS_20'.format(nfuelcats), 'ZSF_MODIS_20']
         geogrid_tbl_json = {}
         for varname in varnames:
             logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
@@ -738,7 +742,11 @@ def execute(args,job_args):
             logging.info('using real-time data requested, ignoring specified ignitions')
             js.fire_init_dir = osp.abspath(osp.join(js.jobdir, 'fire_init'))
 
-    js.num_doms = len(js.domains)
+    # Parse and setup the domain configuration
+    js.domain_conf = WPSDomainConf(js.domains)
+    js.num_doms = len(js.domain_conf)
+    logging.info("number of domains defined is %d." % js.num_doms)
+
     json.dump(job_args, open(osp.join(js.jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
     jsub = make_job_file(js)
     json.dump(jsub, open(jsub.jobfile,'w'), indent=4, separators=(',', ': '))
@@ -746,11 +754,6 @@ def execute(args,job_args):
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     sys.stdout.flush()
     send_email(js, 'start', 'Job %s started.' % js.job_id)
-
-    # Parse and setup the domain configuration
-    js.domain_conf = WPSDomainConf(js.domains)
-    js.num_doms = len(js.domain_conf)
-    logging.info("number of domains defined is %d." % js.num_doms)
 
     js.bounds = Dict({})
     for k,domain in enumerate(js.domain_conf.domains):
@@ -933,8 +936,7 @@ def execute(args,job_args):
     if js.iofields and osp.exists('etc/iofields.cfg'):
         js.wrf_nml['time_control']['iofields_filename'] = [osp.abspath('etc/iofields.cfg')] * js.num_doms
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
-    if 'ignitions' in js.args:
-        update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
+    update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
     if 'fmda_geogrid_path' in js.args:
         moisture_classes = js.fire_nml['moisture'].get('moisture_classes', 5)
         fmc_gc_initialization = []
@@ -966,7 +968,11 @@ def execute(args,job_args):
         logging.error('Real step failed with exception %s, retrying ...' % str(e))
         Real(js.wrf_dir).execute().check_output()
     # write subgrid coordinates in input files
-    subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()]
+    subgrid_wrfinput_files = [
+        'wrfinput_d{:02d}'.format(int(d)) 
+            for d,_ in args.domains.items() 
+                if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()
+    ]
     for in_path in subgrid_wrfinput_files:
         fill_subgrid(osp.join(js.wrf_dir, in_path))
 
@@ -988,7 +994,10 @@ def execute(args,job_args):
             force_copy(wrf_path, wrf_path + '_orig')
             outside_time = fire_data.get('outside_time', 360000.)
             no_fuel_cat = js.fire_nml['fuel_scalars']['no_fuel_cat']
-            fire_init.integrate_init(wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], outside_time, no_fuel_cat)
+            fire_init.integrate_init(
+                wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], 
+                outside_time=outside_time, no_fuel_cat=no_fuel_cat
+            )
             if 'prev_forecast' in js.keys():
                 # implementation of adding smoke from previous forecast
                 wrfinput_paths = sorted(glob.glob(osp.join(js.wrf_path, 'wrfinput*')))
@@ -1007,7 +1016,7 @@ def execute(args,job_args):
             logging.error('use_realtime is selected, but no fire information to start a fire simulation')
             sys.exit(1)
     else:
-        if 'ignitions' in js.args and len(js.ignitions):
+        if len(js.ignitions) and js.use_tign_ignition:
             process_ignitions(js)
     
     logging.info('run_wrf = %s' % js.run_wrf)
@@ -1053,9 +1062,9 @@ def wrf_execute(job_id):
 
 def process_output(job_id):
     args = load_sys_cfg()
-    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
-    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-    satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id, 'input.json'))
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id, 'job.json'))
+    satfile = osp.abspath(osp.join(args.workspace_path, job_id, 'sat.json'))
     logging.info('process_output: loading input description from %s' % inpfile)
     try:
         jsin = Dict(json.load(open(inpfile,'r')))
@@ -1080,6 +1089,7 @@ def process_output(job_id):
         available_sats = []
         not_empty_sats = []
         pass
+    jsin = process_arguments(jsin, args) 
     logging.info('process_output: available satellite data %s' % available_sats)
     logging.info('process_output: not empty satellite data %s' % not_empty_sats)
     js.old_pid = js.pid
@@ -1088,7 +1098,7 @@ def process_output(job_id):
     js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
-    js.wrf_dir = js.get('wrf_dir',osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf')))
+    js.wrf_dir = js.get('wrf_dir',osp.abspath(osp.join(jsin.workspace_path, js.job_id, 'wrf')))
 
     pp = None
     if js.postproc is None:
@@ -1099,7 +1109,7 @@ def process_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
+    js.pp_dir = js.get('pp_dir', osp.join(jsin.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
@@ -1148,7 +1158,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
@@ -1160,7 +1170,7 @@ def process_output(job_id):
             if js.postproc.get('shuttle', None) == 'on_completion':
                 desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                 tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+                send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         else:
             logging.error('All postprocessing steps failed')
@@ -1192,7 +1202,7 @@ def process_output(job_id):
         line = wrf_out.readline().strip()
         if not line:
             if wait_lines > 10 and not parallel_job_running(js):
-                logging.warning('WRF did not run to completion.')
+                logging.error('WRF did not run to completion.')
                 break
             if not wait_lines:
                 logging.info('Waiting for more output lines')
@@ -1239,7 +1249,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
                         logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
@@ -1255,14 +1265,14 @@ def process_output(job_id):
         if js.postproc.get('shuttle', None) == 'on_completion':
             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+            send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         if js.postproc.get('shuttle', None) is not None:
             steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
-            args = ' '.join([js.job_id,steps,'inc'])
-            make_kmz(args)
-            args = ' '.join([js.job_id,steps,'ref'])
-            make_kmz(args)
+            arg_inp = ' '.join([js.job_id,steps,'inc'])
+            make_kmz(arg_inp)
+            arg_inp = ' '.join([js.job_id,steps,'ref'])
+            make_kmz(arg_inp)
 
         js.state = 'Completed'
 
@@ -1295,10 +1305,10 @@ def create_process_output_script(job_id):
 
 def process_sat_output(job_id):
     args = load_sys_cfg()
-    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
-    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-    satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
-    logging.info('process_output: loading input description from %s' % inpfile)
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id, 'input.json'))
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id, 'job.json'))
+    satfile = osp.abspath(osp.join(args.workspace_path, job_id, 'sat.json'))
+    logging.info('process_sat_output: loading input description from %s' % inpfile)
     try:
         jsin = Dict(json.load(open(inpfile,'r')))
     except Exception as e:
@@ -1322,6 +1332,7 @@ def process_sat_output(job_id):
         available_sats = []
         not_empty_sats = []
         return
+    jsin = process_arguments(jsin, args)
     logging.info('process_sat_output: available satellite data %s' % available_sats)
     logging.info('process_sat_output: not empty satellite data %s' % not_empty_sats)
     if not not_empty_sats:
@@ -1337,7 +1348,7 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
+    js.pp_dir = js.get('pp_dir', osp.join(jsin.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
@@ -1369,7 +1380,7 @@ def process_sat_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
@@ -1378,14 +1389,14 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) == 'on_completion':
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
         tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+        send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
     if js.postproc.get('shuttle', None) is not None:
         steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
-        args = ' '.join([js.job_id,steps,'inc'])
-        make_kmz(args)
-        args = ' '.join([js.job_id,steps,'ref'])
-        make_kmz(args)
+        arg_inp = ' '.join([js.job_id,steps,'inc'])
+        make_kmz(arg_inp)
+        arg_inp = ' '.join([js.job_id,steps,'ref'])
+        make_kmz(arg_inp)
 
     js.old_pid = js.pid
     js.pid = None

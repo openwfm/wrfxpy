@@ -80,12 +80,10 @@ def interpolate_coords(lons,lats,srx,sry,extrap=True):
         clons[-1,-1] = EX(lons[-1,-1],lons[-2,-2])
         clats[-1,-1] = EX(lats[-1,-1],lats[-2,-2])
         return clons,clats
-
     # apply extrapolation if requiered
     if extrap:
         # continue at boundary for atmospheric mesh (extrapolation)
         lons,lats = continue_at_boundary(lons,lats)
-
     # coarse sizes 
     nyc,nxc = lons.shape 
     # refined sizes
@@ -125,7 +123,6 @@ def interpolate_coords(lons,lats,srx,sry,extrap=True):
         for x in range(t0.shape[1]):
             lonsr[j0f+y:j1f+y:sry,i0f+x:i1f+x:srx] = t0[y,x]*lon0+t1[y,x]*lon1+t2[y,x]*lon2+t3[y,x]*lon3
             latsr[j0f+y:j1f+y:sry,i0f+x:i1f+x:srx] = t0[y,x]*lat0+t1[y,x]*lat1+t2[y,x]*lat2+t3[y,x]*lat3
-
     if extrap:
         return lonsr[sry:-sry,srx:-srx],latsr[sry:-sry,srx:-srx]
     else:
@@ -139,7 +136,6 @@ def get_subgrid_coordinates(nc_path, strip=True):
     :param nc_path: path to NetCDF file with WRF coordinate arrays
     :param strip: return or not the strip
     """
-
     with nc4.Dataset(nc_path) as d:
         varis = d.variables
         attrs = d.ncattrs()

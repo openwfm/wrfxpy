@@ -1,0 +1,121 @@
+{
+    "job_id": "testing-NAM218-iofields",
+    "wall_time_hrs": 12,
+    "grib_source": "NAM218",
+    "start_utc": "T-30",
+    "end_utc": "T+120",
+    "download_whole_cycle": true,
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "postproc": {
+        "1": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "SMOKE_INT"
+        ],
+        "shuttle": "incremental",
+        "3": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "FIRE_AREA",
+            "FGRNHFX",
+            "SMOKE_INT"
+        ],
+        "2": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "SMOKE_INT"
+        ],
+        "description": "Testing NAM218 IOFields"
+    },
+    "ppn": 28,
+    "grid_code": "testing-NAM218",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "domains": {
+        "1": {
+            "cell_size": [
+                5000,
+                5000
+            ],
+            "truelats": [
+                40.0699,
+                40.0699
+            ],
+            "stand_lon": -108.2909,
+            "center_latlon": [
+                40.0699,
+                -108.2909
+            ],
+            "history_interval": 120,
+            "geog_res": "30s",
+            "domain_size": [
+                101,
+                101
+            ],
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "time_step": 25
+        },
+        "3": {
+            "parent_time_step_ratio": 3,
+            "parent_start": [
+                41,
+                41
+            ],
+            "history_interval": 15,
+            "geog_res": ".3s",
+            "parent_id": 2,
+            "subgrid_ratio": [
+                20,
+                20
+            ],
+            "parent_end": [
+                81,
+                81
+            ],
+            "parent_cell_size_ratio": 3
+        },
+        "2": {
+            "parent_time_step_ratio": 3,
+            "parent_start": [
+                31,
+                31
+            ],
+            "history_interval": 60,
+            "geog_res": ".3s",
+            "parent_id": 1,
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "parent_end": [
+                71,
+                71
+            ],
+            "parent_cell_size_ratio": 3
+        }
+    },
+    "ignitions": {
+        "3": [
+            {
+                "time_utc": "T+30",
+                "latlon": [
+                    40.0699,
+                    -108.2909
+                ],
+                "duration_s": 240
+            }
+        ]
+    },
+    "num_nodes": 4,
+    "iofields": true
+}

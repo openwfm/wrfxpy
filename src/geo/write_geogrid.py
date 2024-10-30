@@ -98,15 +98,32 @@ def write_geogrid_var(path_dir,var,array,index,bits=32,coord=None):
             fill = {}
             if osp.exists(fill_path):
                 try:
-                    df = pd.read_csv(fill_path, names=['from','to'],index_col=False)
-                    cfrom = np.array(df.loc[1:,'from'])
-                    cto = np.array(df.loc[1:,'to'])
-                    rest_val = df.loc[0,'from']
-                    unique = np.unique(array)
-                    rest_ind = np.array([u for u in unique if u not in cfrom])
-                    fill = Dict({tuple(rest_ind): rest_val})
-                    for k,key in enumerate(cfrom):
-                        fill.update({key: cto[k]})
+                    fill = Dict({})
+                    df = pd.read_csv(
+                        fill_path, names=['from','to'], index_col=False
+                    )
+                    cfrom = np.array(df.loc[:,'from'])
+                    cto = np.array(df.loc[:,'to'])
+                    # add filling of non-specified categories
+                    if np.isnan(cto).sum():
+                        near_inds = tuple(
+                            cfrom[np.where(np.isnan(cto))].astype(int)
+                        )
+                        fill.update({near_inds: 'nearest'})
+                    # add nearest neighbor interpolation
+                    if np.isnan(cfrom).sum():
+                        rest_val = int(cto[np.where(np.isnan(cfrom))[0][0]])
+                        unique = np.unique(array)
+                        rest_ind = np.array([
+                            u for u in unique if u not in cfrom
+                        ])
+                        fill.update({tuple(rest_ind): rest_val})
+                    # add all the rest
+                    df = df.dropna().reset_index()
+                    for k in range(len(df)):
+                        fill.update({
+                            int(df.loc[k,'from']): int(df.loc[k,'to'])
+                        })
                 except Exception as e:
                     logging.warning('write_geogrid_var fail reading fill CSV file {}'.format(fill_path))
                     logging.warning('with exception {}'.format(e))

@@ -1,8 +1,8 @@
 import numpy as np
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
-    u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, print_stats, \
-    smoke_concentration, transform_goes, fire_front
+    u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
+    smoke_concentration, transform_goes, fire_front, ffwi, hdw
 
 smoke_threshold_int = 10
 smoke_threshold = 1
@@ -17,6 +17,13 @@ def strip_end(d):
     fm = int(fm-fm//(m+1))
     fn = int(fn-fn//(n+1))
     return fm,fn
+
+def positive(var):
+    """
+    Remove negative values
+    """
+    var[var < 0] = 0
+    return var
 
 def smoke_to_height_terrain_u(var,d,t,h):
     v=convert_value('ug/m^2', smoke_integrated_unit,smoke_to_height_terrain(d,t,h))
@@ -173,11 +180,13 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,1,2,4,6,8,12,16,20,25,30,40,60,100,200],
-        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
-                             (107,170,213),(72,149,176),(74,167,113),
-                             (114,190,75),(203,217,88),(249,201,80),
-                             (245,137,56),(234,84,43),(217,45,43),
-                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'colors' : np.array([
+            (255,255,255),(197,234,252),(148,210,240),
+            (107,170,213),(72,149,176),(74,167,113),
+            (114,190,75),(203,217,88),(249,201,80),
+            (245,137,56),(234,84,43),(217,45,43),
+            (188,28,32),(156,22,27),(147,32,205)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
@@ -215,11 +224,13 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,1,4,7,11,15,20,25,30,40,50,75,150,250,500],
-        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
-                             (107,170,213),(72,149,176),(74,167,113),
-                             (114,190,75),(203,217,88),(249,201,80),
-                             (245,137,56),(234,84,43),(217,45,43),
-                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'colors' : np.array([
+            (255,255,255),(197,234,252),(148,210,240),
+            (107,170,213),(72,149,176),(74,167,113),
+            (114,190,75),(203,217,88),(249,201,80),
+            (245,137,56),(234,84,43),(217,45,43),
+            (188,28,32),(156,22,27),(147,32,205)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf,smoke_integrated_transparent],
         'scale' : [0, 800],
@@ -258,11 +269,13 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,1,4,7,11,15,20,25,30,40,50,75,150,250,500],
-        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
-                             (107,170,213),(72,149,176),(74,167,113),
-                             (114,190,75),(203,217,88),(249,201,80),
-                             (245,137,56),(234,84,43),(217,45,43),
-                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'colors' : np.array([
+            (255,255,255),(197,234,252),(148,210,240),
+            (107,170,213),(72,149,176),(74,167,113),
+            (114,190,75),(203,217,88),(249,201,80),
+            (245,137,56),(234,84,43),(217,45,43),
+            (188,28,32),(156,22,27),(147,32,205)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf,smoke_integrated_transparent],
         'scale' : [0, 800],
@@ -301,11 +314,13 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,1,4,7,11,15,20,25,30,40,50,75,150,250,500],
-        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
-                             (107,170,213),(72,149,176),(74,167,113),
-                             (114,190,75),(203,217,88),(249,201,80),
-                             (245,137,56),(234,84,43),(217,45,43),
-                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'colors' : np.array([
+            (255,255,255),(197,234,252),(148,210,240),
+            (107,170,213),(72,149,176),(74,167,113),
+            (114,190,75),(203,217,88),(249,201,80),
+            (245,137,56),(234,84,43),(217,45,43),
+            (188,28,32),(156,22,27),(147,32,205)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf,smoke_integrated_transparent],
         'scale' : [0, 800],
@@ -344,11 +359,13 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,1,2,4,6,8,12,16,20,25,30,40,60,100,200],
-        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
-                             (107,170,213),(72,149,176),(74,167,113),
-                             (114,190,75),(203,217,88),(249,201,80),
-                             (245,137,56),(234,84,43),(217,45,43),
-                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'colors' : np.array([
+            (255,255,255),(197,234,252),(148,210,240),
+            (107,170,213),(72,149,176),(74,167,113),
+            (114,190,75),(203,217,88),(249,201,80),
+            (245,137,56),(234,84,43),(217,45,43),
+            (188,28,32),(156,22,27),(147,32,205)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
@@ -373,11 +390,13 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,1,2,4,6,8,12,16,20,25,30,40,60,100,200],
-        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
-                             (107,170,213),(72,149,176),(74,167,113),
-                             (114,190,75),(203,217,88),(249,201,80),
-                             (245,137,56),(234,84,43),(217,45,43),
-                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'colors' : np.array([
+            (255,255,255),(197,234,252),(148,210,240),
+            (107,170,213),(72,149,176),(74,167,113),
+            (114,190,75),(203,217,88),(249,201,80),
+            (245,137,56),(234,84,43),(217,45,43),
+            (188,28,32),(156,22,27),(147,32,205)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf,10],
         'scale' : [0, 500],
@@ -402,11 +421,13 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,1,2,4,6,8,12,16,20,25,30,40,60,100,200],
-        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
-                             (107,170,213),(72,149,176),(74,167,113),
-                             (114,190,75),(203,217,88),(249,201,80),
-                             (245,137,56),(234,84,43),(217,45,43),
-                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'colors' : np.array([
+            (255,255,255),(197,234,252),(148,210,240),
+            (107,170,213),(72,149,176),(74,167,113),
+            (114,190,75),(203,217,88),(249,201,80),
+            (245,137,56),(234,84,43),(217,45,43),
+            (188,28,32),(156,22,27),(147,32,205)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf,1],
         'scale' : [0, 500],
@@ -558,7 +579,7 @@ _var_wisdom = {
         'colorbar' : None,
         'colormap' : 'gray_r',
         'transparent_values' : [-np.inf, smoke_integrated_transparent],
-        'scale' : [0, 2],
+        'scale' : [smoke_integrated_transparent, 2],
         'retrieve_as' : lambda d,t: smoke_to_height_terrain_u('SMOKE_INT',d,t,100000),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
     },
@@ -601,11 +622,13 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,1,4,7,11,15,20,25,30,40,50,75,150,250,500],
-        'colors' : np.array([(255,255,255),(197,234,252),(148,210,240),
-                             (107,170,213),(72,149,176),(74,167,113),
-                             (114,190,75),(203,217,88),(249,201,80),
-                             (245,137,56),(234,84,43),(217,45,43),
-                             (188,28,32),(156,22,27),(147,32,205)])/255.,
+        'colors' : np.array([
+            (255,255,255), (197,234,252), (148,210,240),
+            (107,170,213), ( 72,149,176), ( 74,167,113),
+            (114,190, 75), (203,217, 88), (249,201, 80),
+            (245,137, 56), (234 ,84, 43), (217, 45, 43),
+            (188, 28, 32), (156, 22, 27), (147, 32,205)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf, smoke_concentration_transparent],
         'scale' : [0, 800],
@@ -619,7 +642,10 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,12,35,55,150,210],
-        'colors' : np.array([(114,190,75),(249,201,80),(245,137,56),(217,45,43),(156,22,27),(147,32,205)])/255.,
+        'colors' : np.array([
+            (114,190, 75), (249,201, 80), (245,137, 56),
+            (217, 45, 43), (156, 22, 27), (147, 32,205)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf, smoke_concentration_transparent],
         'scale' : [0,800],
@@ -643,7 +669,9 @@ _var_wisdom = {
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
         'bounds' : [0,1,3,5],
-        'colors' : np.array([(147,32,205),(188,28,32),(249,201,80),(107,170,213)])/255.,
+        'colors' : np.array([
+            (147,32,205), (188,28,32), (249,201,80), (107,170,213)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [-np.inf, 0],
         'scale': 'original',
@@ -705,9 +733,11 @@ _var_wisdom = {
         'norm_opt' : 'boundary',
         'bounds' : [0.,346413.9231,1732069.615,3464139.231,17320696.15,
                     34641392.31,173206961.5,346413920.],
-        'colors' : np.array([(77,155,255),(145,184,77),(214,230,76),
-                             (255,228,77),(255,169,77),(255,103,77),
-                             (250,38,2),(165,2,250)])/255.,
+        'colors' : np.array([
+            ( 77,155,255), (145,184, 77), (214,230, 76),
+            (255,228, 77), (255,169, 77), (255,103, 77),
+            (250, 38,  2), (165,  2,250)
+        ])/255.,
         'spacing' : 'uniform',
         'labels': ['100','500','1k','5k','10k','50k','100k'],
         'scale' : [0., 350000000.],
@@ -721,10 +751,12 @@ _var_wisdom = {
         'colormap' : 'viridis_r',
         'norm_opt' : 'boundary',
         'bounds' : [0,.02,.05,.1,.2,.3,.4,.5,.6,.7,.8],
-        'colors' : np.array([(156,22,27),(188,28,32),(217,45,43),
-       			     (234,84,43),(245,137,56),(249,201,80),
-			     (210,244,254),(197,234,252),(148,210,240),
-			     (107,170,213),(72,149,176)])/255.,
+        'colors' : np.array([
+            (156, 22, 27), (188, 28, 32), (217, 45, 43),
+            (234, 84, 43), (245,137, 56), (249,201, 80),
+            (210,244,254), (197,234,252), (148,210,240),
+            (107,170,213), ( 72,149,176)
+        ])/255.,
         'spacing' : 'uniform',
         'transparent_values' : [70, np.inf],
         'scale' : [0.0, 1.0],
@@ -767,9 +799,11 @@ _var_wisdom = {
         'norm_opt' : 'boundary',
         'bounds' : [0.,0.011175999,0.027939997,0.11175999,0.279399974,
                     0.558799948,0.838199922,2.79399974],
-        'colors' : np.array([(77,155,255),(145,184,77),(214,230,76),
-                             (255,228,77),(255,169,77),(255,103,77),
-                             (250,38,2),(165,2,250)])/255.,
+        'colors' : np.array([
+            ( 77,155,255), (145,184, 77), (214,230, 76),
+            (255,228, 77), (255,169, 77), (255,103, 77),
+            (250, 38,  2), (165,  2,250)
+        ])/255.,
         'spacing' : 'uniform',
         'labels' : ['2','5','20','50','100','150','500'],
         'scale' : [0., 3.],
@@ -810,9 +844,11 @@ _var_wisdom = {
         'colormap' : 'jet',
         'norm_opt' : 'boundary',
         'bounds' : [0,2.2352,4.4704,13.4112,17.8816,22.352,26.8224,31.2928],
-        'colors' : np.array([(26,152,80),(102,189,99),(166,217,106),
-                             (217,239,139),(254,224,139),(253,174,97),
-                             (244,109,67),(215,48,39)])/255.,
+        'colors' : np.array([
+            ( 26,152, 80), (102,189, 99), (166,217,106),
+            (217,239,139), (254,224,139), (253,174, 97),
+            (244,109, 67), (215, 48, 39)
+        ])/255.,
         'spacing' : 'uniform',
         'labels' : ['5','10','30','40','50','60','70'],
         'scale' : [0.,32.],
@@ -834,9 +870,11 @@ _var_wisdom = {
         'colormap' : 'jet',
         'norm_opt' : 'boundary',
         'bounds' : [0,2.2352,4.4704,13.4112,17.8816,22.352,26.8224,31.2928],
-        'colors' : np.array([(26,152,80),(102,189,99),(166,217,106),
-                             (217,239,139),(254,224,139),(253,174,97),
-                             (244,109,67),(215,48,39)])/255.,
+        'colors' : np.array([
+            ( 26,152, 80), (102,189, 99), (166,217,106),
+            (217,239,139), (254,224,139), (253,174, 97),
+            (244,109, 67), (215, 48, 39)
+        ])/255.,
         'spacing' : 'uniform',
         'labels' : ['5','10','30','40','50','60','70'],
         'speed_scale' : [0.,32.],
@@ -845,11 +883,21 @@ _var_wisdom = {
     },
     'U10' : {
         'name' : 'longitudinal wind component',
+        'native_unit' : 'm/s',
+        'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
         'retrieve_as' : lambda d, t: d.variables['U10'][t,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'V10' : {
         'name' : 'latitudinal wind component',
+        'native_unit' : 'm/s',
+        'colorbar' : 'm/s',
+        'colormap' : 'jet',
+        'scale' : 'original',
         'retrieve_as' : lambda d, t: d.variables['V10'][t,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'F_INT' : {
         'name' : 'fireline intensity',
@@ -861,109 +909,111 @@ _var_wisdom = {
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
     },
     'NFUEL_CAT' : {
-       'name' : 'fuel categories',
-       'native_unit' : 'fuel_type',
-       'colorbar' : 'fuel_type',
-       'colormap' : 'Dark2',
-       'scale' : 'original',
-       'retrieve_as' : lambda d,t: d.variables['NFUEL_CAT'][t,:,:],
-       'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+        'name' : 'fuel categories',
+        'native_unit' : 'fuel_type',
+        'colorbar' : 'fuel_type',
+        'colormap' : 'Dark2',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d.variables['NFUEL_CAT'][t,:,:],
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
     },
     'ZSF' : {
-       'name' : 'terrain height',
-       'native_unit' : 'm',
-       'colorbar' : 'ft',
-       'colormap' : 'terrain',
-       'scale' : 'original',
-       'retrieve_as' : lambda d,t: d.variables['ZSF'][t,:,:],
-       'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+        'name' : 'terrain height',
+        'native_unit' : 'm',
+        'colorbar' : 'ft',
+        'colormap' : 'terrain',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d.variables['ZSF'][t,:,:],
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
     },
     'FMC_G' : {
-       'name' : 'fuel moisture',
-       'native_unit' : '-',
-       'colorbar' : '-',
-       'colormap' : 'gist_earth_r',
-       'scale' : [0.0, 0.5],
-       'retrieve_as' : lambda d,t: d.variables['FMC_G'][t,:,:],
-       'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+        'name' : 'fuel moisture',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'gist_earth_r',
+        'scale' : [0.0, 0.5],
+        'retrieve_as' : lambda d,t: d.variables['FMC_G'][t,:,:],
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
     },
     '1HR_FM' : {
-       'name' : '1-HR fuel moisture',
-       'native_unit' : '-',
-       'colorbar' : '-',
-       'colormap' : 'jet_r',
-       'scale' : [0.0, 0.5],
-       'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,0,:,:],
-       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+        'name' : '1-HR fuel moisture',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'jet_r',
+        'scale' : [0.0, 0.5],
+        'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,0,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     '10HR_FM' : {
-       'name' : '10-HR fuel moisture',
-       'native_unit' : '-',
-       'colorbar' : '%',
-       'colormap' : 'jet_r',
-       'norm_opt' : 'boundary',
-       'bounds' : [0,.02,.04,.06,.08,.1,.12,.15,.2,.25,.3],
-       'colors' : np.array([(156,22,27),(188,28,32),(217,45,43),
-                            (234,84,43),(245,137,56),(249,201,80),
-           		    (215,225,95),(203,217,88),(114,190,75),
-			    (74,167,113),(60,150,120)])/255.,
-       'spacing' : 'uniform',
-       'scale' : [0.0, 0.3],
-       'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,1,:,:],
-       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+        'name' : '10-HR fuel moisture',
+        'native_unit' : '-',
+        'colorbar' : '%',
+        'colormap' : 'jet_r',
+        'norm_opt' : 'boundary',
+        'bounds' : [0,.02,.04,.06,.08,.1,.12,.15,.2,.25,.3],
+        'colors' : np.array([
+            (156, 22, 27), (188, 28, 32), (217, 45, 43),
+            (234, 84, 43), (245,137, 56), (249,201, 80),
+            (215,225, 95), (203,217, 88), (114,190, 75),
+            ( 74,167,113), ( 60,150,120)
+        ])/255.,
+        'spacing' : 'uniform',
+        'scale' : [0.0, 0.3],
+        'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,1,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     '100HR_FM' : {
-       'name' : '100-HR fuel moisture',
-       'native_unit' : '-',
-       'colorbar' : '-',
-       'colormap' : 'jet_r',
-       'scale' : [0.0, 0.5],
-       'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,2,:,:],
-       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+        'name' : '100-HR fuel moisture',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'jet_r',
+        'scale' : [0.0, 0.5],
+        'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,2,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'FMC_EQUI' : {
-       'name' : 'fuel moisture equilibrium',
-       'native_unit' : '-',
-       'colorbar' : '-',
-       'colormap' : 'jet_r',
-       'scale' : [0.0, 1.0],
-       'retrieve_as' : lambda d,t: d.variables['FMC_EQUI'][t,0,:,:],
-       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+        'name' : 'fuel moisture equilibrium',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'jet_r',
+        'scale' : [0.0, 1.0],
+        'retrieve_as' : lambda d,t: d.variables['FMC_EQUI'][t,0,:,:],
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'RAIN' : {
-       'name' : 'accumulated precipitation',
-       'native_unit' : 'mm',
-       'colorbar' : 'mm',
-       'colormap' : 'jet_r',
-       'scale' : 'original',
-       'transparent_values' : [-np.inf, 1],
-       'retrieve_as' : lambda d,t: d.variables['RAINNC'][t,:,:],
-       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+        'name' : 'accumulated precipitation',
+        'native_unit' : 'mm',
+        'colorbar' : 'mm',
+        'colormap' : 'jet_r',
+        'scale' : 'original',
+        'transparent_values' : [-np.inf, 1],
+        'retrieve_as' : lambda d,t: positive(d.variables['RAINNC'][t,:,:]),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'SNOWH' : {
-       'name' : 'snow depth',
-       'native_unit' : 'm',
-       'transparent_values' : [-np.inf, 0.01],
-       'colorbar' : 'mm',
-       'colormap' : 'tab20b_r',
-       'scale' : 'original',
-       'retrieve_as' : lambda d,t: d.variables['SNOWH'][t,:,:],
-       'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+        'name' : 'snow depth',
+        'native_unit' : 'm',
+        'transparent_values' : [-np.inf, 0.01],
+        'colorbar' : 'mm',
+        'colormap' : 'tab20b_r',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: positive(d.variables['SNOWH'][t,:,:]),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'TERRA_AF' : {
-       'name' : 'MODIS Terra Active Fires satellite data',
-       'source' : 'Terra',
-       'native_unit' : '-',
-       'colorbar' : '-',
-       'colormap' : 'discrete',
-       'scale' : 'discrete',
-       'options' : _discrete_wisdom['fire'],
-       'retrieve_as' : lambda d : d.select('fire mask').get(),
-       'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
+        'name' : 'MODIS Terra Active Fires satellite data',
+        'source' : 'Terra',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : d.select('fire mask').get(),
+        'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
     },
     'AQUA_AF' : {
         'name' : 'MODIS Aqua Active Fires satellite data',
-       	'source' : 'Aqua',
+        'source' : 'Aqua',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'discrete',
@@ -974,7 +1024,7 @@ _var_wisdom = {
     },
     'SNPP_AF' : {
         'name' : 'VIIRS S-NPP Active Fires satellite data',
-       	'source' : 'SNPP',
+        'source' : 'SNPP',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'discrete',
@@ -1006,19 +1056,19 @@ _var_wisdom = {
         'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
     },
     'TERRA_NF' : {
-       'name' : 'MODIS Terra No Fire Detections satellite data',
-       'source' : 'Terra',
-       'native_unit' : '-',
-       'colorbar' : '-',
-       'colormap' : 'discrete',
-       'scale' : 'discrete',
-       'options' : _discrete_wisdom['nofire'],
-       'retrieve_as' : lambda d : d.select('fire mask').get(),
-       'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
+        'name' : 'MODIS Terra No Fire Detections satellite data',
+        'source' : 'Terra',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : d.select('fire mask').get(),
+        'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
     },
     'AQUA_NF' : {
         'name' : 'MODIS Aqua No Fire Detections satellite data',
-       	'source' : 'Aqua',
+        'source' : 'Aqua',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'discrete',
@@ -1029,7 +1079,7 @@ _var_wisdom = {
     },
     'SNPP_NF' : {
         'name' : 'VIIRS S-NPP No Fire Detections satellite data',
-       	'source' : 'SNPP',
+        'source' : 'SNPP',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'discrete',
@@ -1061,14 +1111,39 @@ _var_wisdom = {
         'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
     },
     'TERRA_AF_T' : {
-       'name' : 'MODIS Terra Temporal Active Fires satellite data',
-       'source' : 'Terra',
-       'native_unit' : '-',
-       'colorbar' : '-',
-       'colormap' : 'jet',
-       'scale' : 'original',
-       'retrieve_as' : lambda d : d.select('fire mask').get(),
-       'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
+        'name' : 'MODIS Terra Temporal Active Fires satellite data',
+        'source' : 'Terra',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'jet',
+        'scale' : 'original',
+        'retrieve_as' : lambda d : d.select('fire mask').get(),
+        'grid' : lambda d: (d.select('Latitude').get(), d.select('Longitude').get())
+    },
+    'FOSBERG' : {
+        'name' : 'Fosberg Index',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'autumn_r',
+        'scale' : [0,45],
+        'retrieve_as' : lambda d, t: ffwi(d,t),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
+    'HDW' : {
+        'name' : 'Hot, Dry, & Windy Index',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'rainbow',
+        'norm_opt' : 'boundary',
+        'bounds' : [0,25,50,75,90,95,100],
+        'colors' : np.array([
+            (255,255,255), (254,239,180), (254, 200, 108),
+            (243,147, 70), (198,104, 54), (135,  81,  56)
+        ])/255.,
+        'spacing' : 'uniform',
+        'scale' : [0, 100],
+        'retrieve_as' : lambda d,t: hdw(d,t),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
     }
 }
 
