@@ -1085,13 +1085,16 @@ _units_wisdom = {
     ('m/s', 'mph') : lambda x: 2.236936292 * x,
     ('m/s', 'chains/h') : lambda x: 178.95492 * x,
     ('m',   'ft') : lambda x: 3.2808399 * x,
+    ('m',   'mm') : lambda x: 1000.0 * x,
     ('km',   'miles') : lambda x: 0.621371 * x,
     ('miles', 'km') : lambda x: 1.609344 * x,
     ('ft/s','m/s') : lambda x: x / 3.2808399,
     ('ft',  'm') : lambda x: x / 3.2808399,
+    ('kg/m^3', 'ug/m^3') : lambda x: 1e9 * x,
     ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x,
     ('ug/m^3', 'g/m^3') : lambda x: 1e-6 * x,
-    ('W/m', 'BTU/ft/s') : lambda x: 0.0002888946124 * x
+    ('W/m', 'BTU/ft/s') : lambda x: 0.0002888946124 * x,
+    ('gm', '%') : lambda x: 100.0 * x
 }
 
 def get_wisdom(var_name):

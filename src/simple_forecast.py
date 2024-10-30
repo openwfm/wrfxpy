@@ -23,8 +23,7 @@ from __future__ import print_function
 import json
 import sys
 import utils
-from datetime import timedelta, datetime
-import pytz
+from datetime import datetime, timedelta, timezone
 import socket
 from six.moves import map
 
@@ -59,7 +58,7 @@ def read_size(default):
 
 
 def select_grib_source(start_time):
-    now = datetime.utcnow().replace(tzinfo=pytz.UTC)
+    now = datetime.utcnow().replace(tzinfo=timezone.utc)
     if now - start_time < timedelta(days=30):
         return 'NAM'
     else:

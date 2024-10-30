@@ -19,11 +19,12 @@
 
 from fmda.fuel_moisture_da import execute_da_step, retrieve_mesowest_observations
 from fmda.fuel_moisture_model import FuelMoistureModel
+from fmda.var_wisdom import get_wisdom
 from ingest.grib_file import GribFile
 from ingest.HRRRA import HRRRA
 from ingest.HRRR import HRRR
 from utils import Dict, ensure_dir, utc_to_esmf, delete, force_copy
-from vis.postprocessor import scalar_field_to_raster, scatter_to_raster
+from vis.postprocessor import scalar_field_to_raster, vector_field_to_raster, scatter_to_raster
 from ssh_shuttle import send_product_to_server
 
 import netCDF4
@@ -47,13 +48,13 @@ hrrr_vars = {
     "soil_moist_0": 561, "soil_moist_1": 563, "soil_moist_2": 565, 
     "soil_moist_3": 567, "soil_moist_4": 569, "soil_moist_5": 571, 
     "soil_moist_6": 573, "soil_moist_7": 575, "soil_moist_8": 577,
-    "snowh": 615, "spfh": 618, "u10": 622, "v10": 623, "ws": 624,
-    "ust": 643, "znt": 642, "swdown": 664 
+    "snowh": 615, "spfh": 618, "massden": 621, "u10": 622, "v10": 623, 
+    "ws": 624, "ust": 643, "znt": 642, "swdown": 664
 }
 
 def write_postprocess(
         mf, postproc_path, cycle_dir, esmf_cycle, name, 
-        raster_png, coords, cb_png, levels=None, alpha=None
+        raster_png, coords, cb_png=None, levels=None, alpha=None
     ):
     """
     Write postprocessing files.
@@ -68,9 +69,11 @@ def write_postprocess(
     cb_name = f"{cycle_dir}-{name}-raster-cb.png"
     with open(osp.join(postproc_path, raster_name), "wb") as f:
         f.write(raster_png)
-    with open(osp.join(postproc_path, cb_name), "wb") as f:
-        f.write(cb_png) 
-    mf["1"][esmf_cycle][name] = { "raster" : raster_name, "coords" : coords, "colorbar": cb_name }
+    mf["1"][esmf_cycle][name] = { "raster" : raster_name, "coords" : coords }
+    if cb_png is not None:
+        with open(osp.join(postproc_path, cb_name), "wb") as f:
+            f.write(cb_png) 
+        mf["1"][esmf_cycle][name].update({ "colorbar": cb_name })
     if levels is not None:
         mf["1"][esmf_cycle][name].update({ "levels" : levels })
     if alpha is not None:
@@ -117,65 +120,8 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
         )
         return None
 
-    var_wisdom = {
-        "dfm" : {
-            "native_unit" : "-",
-            "colorbar" : "-",
-            "colormap" : "jet_r",
-            "scale" : [0.0, 0.4]
-        },
-        "lfm" : {
-            "native_unit" : "-",
-            "colorbar" : "-",
-            "colormap" : "jet_r",
-            "scale" : [0.0, 3.0],
-            "marker" : "^"
-        },
-        "EQUILd FM" : {
-            "name" : "Drying equilibrium FM",
-            "native_unit" : "-",
-            "colorbar" : "i-",
-            "colormap" : "jet_r",
-            "scale" : [0.0, 0.4]
-        },
-        "EQUILw FM" : {
-            "name" : "Wetting equilibrium FM",
-            "native_unit" : "-",
-            "colorbar" : "i-",
-            "colormap" : "jet_r",
-            "scale" : [0.0, 0.4]
-        },
-        "RH" : {
-            "name" : "Relative humidity",
-            "native_unit" : "%",
-            "colorbar" : "%",
-            "colormap" : "jet_r",
-            "scale" : [0.0, 100.0]
-        },
-        "T2" : {
-            "name" : "Temperature at 2m",
-            "native_unit" : "K",
-            "colorbar" : "F",
-            "colormap" : "jet",
-            "scale" : [270.0, 320.0]
-        },
-        "PRECIP" : {
-            "name" : "Precipitation",
-            "native_unit" : "mm/h",
-            "colorbar" : "mm/h",
-            "colormap" : "jet_r",
-            "scale" : [0.0, 2.0]
-        },
-        "HGT" : {
-            "name" : "Terrain height",
-            "native_unit" : "m",
-            "colorbar" : "m",
-            "colormap" : "jet_r",
-            "scale" : [-86.0, 4500.0]
-        },
-    }
-
-    show = ["HGT", "T2", "RH", "PRECIP", "EQUILd FM", "EQUILw FM"]
+    scalar_vars = [ "HGT", "T2", "RH", "PRECIP", "SNOWH", "EQUILd FM", "EQUILw FM", "WINDSPD", "SMOKE" ]
+    vector_vars = [ "WINDVEC" ]
 
     esmf_cycle = utc_to_esmf(cycle + timedelta(hours=fcst_hour))
     mf = { "1" : {esmf_cycle : {}}}
@@ -231,24 +177,44 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
         d.close()
         # read and process model variables
         with netCDF4.Dataset(model_path) as d:
-            for name in show:
+            for name in scalar_vars:
+                wisdom = get_wisdom(name).copy()
                 raster_png, coords, cb_png, levels = scalar_field_to_raster(
-                    d.variables[name][:,:], lats, lons, var_wisdom[name]
+                    d.variables[name][:,:], lats, lons, wisdom
                 )
                 write_postprocess(
                     mf, postproc_path, cycle_id, esmf_cycle, name, 
-                    raster_png, coords, cb_png, levels, .5
+                    raster_png, coords, cb_png, levels, 0.5
                 )
+            for name in vector_vars:
+                wisdom = get_wisdom(name).copy()
+                if region_cfg.code == 'CONUS':
+                    wisdom.update({"ref": 20})
+                else:
+                    wisdom.update({"ref": 10})
+                c1_name, c2_name = wisdom["components"]
+                c1 = d.variables[c1_name][:,:]
+                c2 = d.variables[c2_name][:,:]
+                raster_png, coords = vector_field_to_raster(
+                    c1, c2, lats, lons, wisdom
+                )
+                write_postprocess(
+                    mf, postproc_path, cycle_id, esmf_cycle, name, 
+                    raster_png, coords, alpha = 0.5
+                ) 
+            # Add other variables (Fire Weather Indices)
+            
             fuel_classes = [(0, "1-hr DFM"), (1, "10-hr DFM"), (2, "100-hr DFM"), (3, "1000-hr DFM")]
             for i,name in fuel_classes:
-                fm_wisdom = var_wisdom["dfm"]
+                wisdom = get_wisdom("dfm").copy()
+                fm_wisdom = wisdom
                 fm_wisdom["name"] = f"Estimated {name}"
                 raster_png, coords, cb_png, levels = scalar_field_to_raster(
                     d.variables["FMC_GC"][:,:,i], lats, lons, fm_wisdom
                 )
                 write_postprocess(
                     mf, postproc_path, cycle_id, esmf_cycle, name, 
-                    raster_png, coords, cb_png, levels, .5
+                    raster_png, coords, cb_png, levels, 0.5
                 )
         if osp.exists("src/ingest/SynopticDB"):
             from ingest.SynopticDB.SynopticDB import SynopticDB
@@ -263,7 +229,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
             db.params["vars"] = ["fuel_moisture"]
             db.params["makeFile"] = False
             df,st = db.query_db()
-            meso_wisdom = var_wisdom["dfm"]
+            meso_wisdom = get_wisdom("dfm").copy()
             meso_wisdom["name"] = "MesoWest 10-hr DFM"
             meso_wisdom["bbox"] = bounds
             meso_wisdom["text"] = False
@@ -274,7 +240,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
                 )
             else:
                 st = st.set_index("STID")
-                data = df.groupby("STID").mean().join(st[["LONGITUDE","LATITUDE"]])
+                data = df.groupby("STID").mean(numeric_only=True).join(st[["LONGITUDE","LATITUDE"]])
                 raster_png, coords, cb_png, levels = scatter_to_raster(
                     np.array(data["FUEL_MOISTURE_VALUE"])/100., 
                     np.array(data["LATITUDE"]).astype(float), 
@@ -283,7 +249,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
             name = "MESO 10-hr DFM"
             write_postprocess(
                 mf, postproc_path, cycle_id, esmf_cycle, name, 
-                raster_png, coords, cb_png, levels, 1.
+                raster_png, coords, cb_png, levels, 1.0
             )
 
     prev_complete_manifest_path = osp.join(prev_postproc_path, complete_manifest_name)
@@ -603,8 +569,8 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
         logging.info("CYCLER forecasting mode, skipping data assimilation")
     else:
         # perform assimilation with mesowest observations
-        tm_start = cycle - timedelta(minutes=60)
-        tm_end = cycle
+        tm_start = cycle - timedelta(minutes=30)
+        tm_end = cycle + timedelta(minutes=30)
         if cfg.code == "CONUS":
             fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt, True)
         else:
@@ -674,7 +640,9 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     model.to_netcdf(
         ensure_dir(model_path), {
             "EQUILd FM": Ed, "EQUILw FM": Ew, "T2": data["t2"], 
-            "RH": data["rh"], "PRECIP": rain, "HGT": hgt
+            "RH": data["rh"], "PRECIP": rain, "SNOWH": data["snowh"], 
+            "HGT": hgt, "WINDSPD": data["ws"], "SMOKE": data["massden"],
+            "U10": data["u10"], "V10": data["v10"]
         }
     )
 
@@ -767,7 +735,7 @@ if __name__ == "__main__":
     logging.info(f"regions: {json.dumps(cfg.regions)}")
 
     ### REAL-TIME SECTION
-    # Get HRRR analysis data
+    # Get HRRR real-time data
     try:
         from_utc = cycle - timedelta(hours=lookback_length)
         to_utc = cycle
@@ -783,7 +751,7 @@ if __name__ == "__main__":
             wrapped_cfg.update({"forecast_length": forecast_length}) 
             try:
                 bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
-                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)
+                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds=bounds)
                 if pp_path != None:
                     if "shuttle_remote_host" in sys_cfg:
                         sim_code = "fmda-" + wrapped_cfg.code
@@ -797,13 +765,13 @@ if __name__ == "__main__":
         sys.exit(1)
     logging.info(f"have necessary HRRR data for cycle {cycle}.")
     
-    # check for each region, if we are up to date w.r.t. HRRR data available
+    # Start processing every region
     for region_id,region_cfg in cfg.regions.items():
         logging.info(f"CYCLER processing region {region_id} for {cycle}")
         wrapped_cfg = Dict(region_cfg)
         wrapped_cfg.update({"region_id": region_id})
         wrapped_cfg.update({"forecast_length": forecast_length}) 
-        # real-time part
+        # Process real-time
         if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
             logging.info(f"CYCLER real-time processing for region {region_id} at cycle {cycle}")
             try:
@@ -819,7 +787,7 @@ if __name__ == "__main__":
                 logging.warning("CYCLER copying previous post-processing or re-trying.")
                 try:
                     bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
-                    pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)   
+                    pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds=bounds)   
                     if pp_path != None:
                         if "shuttle_remote_host" in sys_cfg:
                             sim_code = "fmda-" + wrapped_cfg.code
@@ -837,31 +805,77 @@ if __name__ == "__main__":
                 f"at cycle {cycle}, skipping ..."
             )
         
-        ### FORECASTING SECTION
-        if mode == "f":
-            logging.info(f"CYCLER forecasting region {region_id} at cycle {cycle}") 
-            hrrr = HRRR(sys_cfg)
-            shift_hours = cycle.hour % period_hours
-            cycle_start = (cycle - timedelta(hours=shift_hours)).replace(tzinfo=timezone.utc)
-            from_utc = (cycle + timedelta(hours=1)).replace(tzinfo=timezone.utc)
-            to_utc = (cycle_start + timedelta(hours=forecast_length)).replace(tzinfo=timezone.utc)
-            fcst_hour = 1
-            tmp_utc = from_utc + timedelta(hours=fcst_hour)
-            while tmp_utc < to_utc:
-                # Get HRRR forecast data
-                try:
-                    fct_gribs = hrrr.retrieve_gribs(tmp_utc, tmp_utc, cycle_start=cycle_start)
-                    grib_files_fct = fct_gribs["grib_files"]
-                except:
-                    logging.warning("CYCLER could not find useable cycle.")
-                    logging.warning("CYCLER copying previous post-processing.")
-                    for region_id,region_cfg in cfg.regions.items():
-                        wrapped_cfg = Dict(region_cfg)
-                        wrapped_cfg.update({"region_id": region_id})
-                        wrapped_cfg.update({"forecast_length": forecast_length}) 
+    ### FORECASTING SECTION
+    if mode == "f":
+        logging.info(f"CYCLER forecasting region {region_id} at cycle {cycle}") 
+        hrrr = HRRR(sys_cfg)
+        shift_hours = cycle.hour % period_hours
+        cycle_start = (cycle - timedelta(hours=shift_hours)).replace(tzinfo=timezone.utc)
+        from_utc = (cycle + timedelta(hours=1)).replace(tzinfo=timezone.utc)
+        to_utc = (cycle_start + timedelta(hours=forecast_length)).replace(tzinfo=timezone.utc)
+        fcst_hour = 1
+        tmp_utc = from_utc + timedelta(hours=fcst_hour)
+        while tmp_utc < to_utc:
+            # Get HRRR forecast data
+            try:
+                fct_gribs = hrrr.retrieve_gribs(tmp_utc, tmp_utc, cycle_start=cycle_start)
+                grib_files_fct = fct_gribs["grib_files"]
+            except:
+                logging.warning("CYCLER could not find useable cycle.")
+                logging.warning("CYCLER copying previous post-processing.")
+                for region_id,region_cfg in cfg.regions.items():
+                    logging.info(f"CYCLER processing region {region_id} for {cycle}")
+                    wrapped_cfg = Dict(region_cfg)
+                    wrapped_cfg.update({"region_id": region_id})
+                    wrapped_cfg.update({"forecast_length": forecast_length}) 
+                    try:
+                        bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
+                        pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, fcst_hour, bounds)
+                        if pp_path != None:
+                            if "shuttle_remote_host" in sys_cfg:
+                                sim_code = "fmda-" + wrapped_cfg.code
+                                send_product_to_server(
+                                    sys_cfg, pp_path, sim_code, sim_code, 
+                                    sim_code + ".json", region_id + " FM"
+                                )
+                    except Exception as e:
+                        logging.warning(f"CYCLER exception {e}")
+                        logging.error(
+                            f"CYCLER skipping region {region_id} for cycle {cycle} "
+                            f"and forecast hour {fcst_hour}"
+                        )
+                continue
+            logging.info(
+                f"have necessary HRRR data for forecasting cycle {cycle} "
+                f"at forecast hour {fcst_hour}."
+            )
+            # Start processing every region
+            for region_id,region_cfg in cfg.regions.items():
+                logging.info(f"CYCLER processing region {region_id} for {cycle}")
+                wrapped_cfg = Dict(region_cfg)
+                wrapped_cfg.update({"region_id": region_id})
+                wrapped_cfg.update({"forecast_length": forecast_length}) 
+                # Processing forecast
+                if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path, fcst_hour=fcst_hour):
+                    logging.info(
+                        f"CYCLER forecasting region {region_id} at cycle {cycle} and "
+                        f"forecast hour {fcst_hour}"
+                    ) 
+                    try:
+                        fmda_advance_region(
+                            cycle, wrapped_cfg, grib_files_fct,
+                            cfg.workspace_path, 0, fcst_hour, meso_token
+                        )
+                    except Exception as e:
+                        logging.warning(
+                            f"CYCLER failed forecasting for region {region_id} at cycle {cycle} and "
+                            f"forecast hour {fcst_hour}"
+                        )
+                        logging.warning(f"CYCLER exception {e}")
+                        logging.warning("CYCLER copying previous post-processing or re-trying.")
                         try:
                             bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
-                            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)
+                            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, fcst_hour, bounds)
                             if pp_path != None:
                                 if "shuttle_remote_host" in sys_cfg:
                                     sim_code = "fmda-" + wrapped_cfg.code
@@ -870,66 +884,18 @@ if __name__ == "__main__":
                                         sim_code + ".json", region_id + " FM"
                                     )
                         except Exception as e:
-                            logging.warning(f"CYCLER exception {e}")
                             logging.error(
-                                f"CYCLER skipping region {region_id} for cycle {cycle} "
-                                f"and forecast hour {fcst_hour}"
-                            )
-                    sys.exit(1)
-                logging.info(
-                    f"have necessary HRRR data for forecasting cycle {cycle} "
-                    f"at forecast hour {fcst_hour}."
-                )
-
-                # Check for each region, if we are up to date w.r.t. HRRR data available
-                for region_id,region_cfg in cfg.regions.items():
-                    logging.info(
-                        f"CYCLER processing region {region_id} for {cycle} and "
-                        f"forecast hour {fcst_hour}"
-                    )
-                    wrapped_cfg = Dict(region_cfg)
-                    wrapped_cfg.update({"region_id": region_id})
-                    wrapped_cfg.update({"forecast_length": forecast_length}) 
-                    if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path, fcst_hour=fcst_hour):
-                        logging.info(
-                            f"CYCLER forecasting region {region_id} at cycle {cycle} and "
-                            f"forecast hour {fcst_hour}"
-                        ) 
-                        try:
-                            fmda_advance_region(
-                                cycle, wrapped_cfg, grib_files_fct,
-                                cfg.workspace_path, 0, fcst_hour, meso_token
-                            )
-                        except Exception as e:
-                            logging.warning(
-                                f"CYCLER failed forecasting for region {region_id} at cycle {cycle} and "
+                                f"CYCLER skipping region {region_id} for cycle {cycle} and "
                                 f"forecast hour {fcst_hour}"
                             )
-                            logging.warning(f"CYCLER exception {e}")
-                            logging.warning("CYCLER copying previous post-processing or re-trying.")
-                            try:
-                                bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
-                                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds)
-                                if pp_path != None:
-                                    if "shuttle_remote_host" in sys_cfg:
-                                        sim_code = "fmda-" + wrapped_cfg.code
-                                        send_product_to_server(
-                                            sys_cfg, pp_path, sim_code, sim_code, 
-                                            sim_code + ".json", region_id + " FM"
-                                        )
-                            except Exception as e:
-                                logging.error(
-                                    f"CYCLER skipping region {region_id} for cycle {cycle} and "
-                                    f"forecast hour {fcst_hour}"
-                                )
-                    else:
-                        logging.info(
-                            f"CYCLER already completed forecasting processing for region {region_id} "
-                            f"at cycle {cycle} and forecast hour {fcst_hour}, skipping ..."
-                        )
+                else:
+                    logging.info(
+                        f"CYCLER already completed forecasting processing for region {region_id} "
+                        f"at cycle {cycle} and forecast hour {fcst_hour}, skipping ..."
+                    )
 
-                fcst_hour += 1
-                tmp_utc = from_utc + timedelta(hours=fcst_hour)
+            fcst_hour += 1
+            tmp_utc = from_utc + timedelta(hours=fcst_hour)
 
     # done
     logging.info(f"CYCLER cycle {cycle} complete with mode {mode_name}.")

@@ -33,8 +33,7 @@ import logging
 import os
 import os.path as osp
 
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime, timedelta, timezone
 
 # setup environment
 sys_cfg = Dict(json.load(open('etc/conf.json')))
@@ -251,7 +250,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, bounds=None):
                             np.logical_and(lats >= bounds[2],
                                 np.logical_and(lons <= bounds[1],
                                                lons >= bounds[0])))]
-            dates = data['date'].dt.tz_localize(pytz.UTC)
+            dates = data['date'].dt.tz_localize(timezone.utc)
             # calculate top 5 LFM to always plot the same
             top = 5
             hist_data = data[dates.dt.year <= 2020]
@@ -648,7 +647,7 @@ if __name__ == '__main__':
 
 
     # current time
-    now = datetime.now(pytz.UTC)
+    now = datetime.now(timezone.utc)
     cycle = (now - timedelta(minutes=50)).replace(minute=0,second=0,microsecond=0)
     logging.info('CYCLER activated at %s, will attempt cycle at %s' % (str(now), str(cycle)))
     

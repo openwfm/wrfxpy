@@ -11,6 +11,7 @@ import simplekml as kml
 import numpy as np
 import netCDF4 as nc4
 from pyhdf.SD import SD, SDC
+import re
 import h5py
 import sys
 import os
@@ -55,7 +56,7 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
     if 'transparent_values' in wisdom:
         rng = wisdom['transparent_values']
         fa = np.ma.masked_array(fa, np.logical_and(fa >= rng[0], fa <= rng[1]))
-        logging.info('scalar_field_to_raster: transparent from %s to %, elements %s n))ot masked %s' % (rng[0], rng[1], fa.size , fa.count()))
+        logging.info('scalar_field_to_raster: transparent from %s to %s, elements %s not masked %s' % (rng[0], rng[1], fa.size , fa.count()))
         logging.info('scalar_field_to_raster: masked variable %s min %s max %s' % (wisdom['name'], np.nanmin(fa),np.nanmax(fa)))
     else:
         fa = np.ma.masked_array(fa)
@@ -75,6 +76,35 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         fa[fa > fa_max] = fa_max
         fa.mask = m
 
+    # define distribution of colormap if necessary 
+    norm = None
+    ticks = None
+    ticklabels = None
+    if 'norm_opt' in wisdom: 
+        norm_opt = wisdom['norm_opt']
+        if norm_opt == 'lognorm':
+            linthresh = wisdom.get('linthresh',.01)
+            linscale = wisdom.get('linscale',.001)
+            norm = lambda xmin,xmax: mpl.colors.SymLogNorm(linthresh=linthresh,linscale=linscale,vmin=xmin,vmax=xmax,base=10) 
+        elif norm_opt == 'boundary':
+            bounds = wisdom.get('bounds',[0,1,2,4,6,8,12,16,20,25,30,40,60,100,200])
+            if 'labels' in wisdom and wisdom['labels'] is not None:
+                ticklabels = wisdom['labels']
+            elif wisdom['colorbar'] is not None:
+                cb_unit = wisdom['colorbar']
+                ticklabels = [convert_value(native_unit, cb_unit, b) for b in bounds[1:]]
+            ticks = bounds[1:]
+            bounds = bounds + [1e10]
+            colors = wisdom.get('colors',np.array([(255,255,255),(197,234,252),(148,210,240),
+                                                    (107,170,213),(72,149,176),(74,167,113),
+                                                    (114,190,75),(203,217,88),(249,201,80),
+                                                    (245,137,56),(234,84,43),(217,45,43),
+                                                    (188,28,32),(156,22,27),(147,32,205)])/255.)
+            cmap = mpl.colors.LinearSegmentedColormap.from_list('custom',colors,N=len(colors))
+            norm = lambda xmin,xmax: mpl.colors.BoundaryNorm(boundaries=bounds,ncolors=len(bounds))
+        else:
+            norm = lambda xmin,xmax: mpl.colors.Normalize(xmin,xmax) 
+
     # only create the colorbar if requested
     cb_png_data = None
     if wisdom['colorbar'] is not None:
@@ -85,7 +115,11 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
         cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
         #  colorbar + add it to the KMZ as a screen overlay
         logging.info('scalar_field_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
-        cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
+        spacing = wisdom.get('spacing', 'proportional')
+        cb_png_data,levels = make_colorbar(
+            [cbu_min, cbu_max], 'vertical', 2, cmap, wisdom['name'] + ' ' + cb_unit,
+            ticks=ticks, spacing=spacing, norm=norm, ticklabels=ticklabels
+        )
     else:
         levels = None
 
@@ -94,7 +128,7 @@ def scalar_field_to_raster(fa, lats, lons, wisdom):
     fa.fill_value=np.nan
 
     # create the raster & get coordinate bounds
-    raster_png_data,corner_coords = basemap_raster_mercator(lons,lats,fa,fa_min,fa_max,cmap)
+    raster_png_data,corner_coords = basemap_raster_mercator(lons, lats, fa, fa_min, fa_max, cmap, norm=norm)
 
     return raster_png_data, corner_coords, cb_png_data, levels
 
@@ -110,7 +144,6 @@ def vector_field_to_raster(u, v, lats, lons, wisdom):
     :param wisdom: a configuration dictionary controlling the visualization
     :return: the raster png as a StringIO, and the coordinates
     """
-    native_unit = wisdom['native_unit']
 
     if u.shape != lats.shape:
         raise PostprocError("U field does not correspond to grid size: field %s grid %s." % (u.shape, lats.shape))
@@ -131,8 +164,8 @@ def vector_field_to_raster(u, v, lats, lons, wisdom):
         v[v > fa_max] = fa_max
 
     # create the raster & get coordinate bounds, HACK to get better quiver resolution
-    s = 3
-    raster_png_data,corner_coords = basemap_barbs_mercator(u[::s,::s],v[::s,::s],lats[::s,::s],lons[::s,::s])
+    s = wisdom.get('ref', 3)
+    raster_png_data,corner_coords = basemap_barbs_mercator(u[::s,::s], v[::s,::s], lats[::s,::s], lons[::s,::s])
 
     return raster_png_data, corner_coords
 
@@ -188,6 +221,35 @@ def scatter_to_raster(fa, lats, lons, wisdom):
         else:
             fa_min, fa_max = 0.0, 0.0
 
+    # define distribution of colormap if necessary 
+    norm = None
+    ticks = None
+    ticklabels = None
+    if 'norm_opt' in wisdom: 
+        norm_opt = wisdom['norm_opt']
+        if norm_opt == 'lognorm':
+            linthresh = wisdom.get('linthresh',.01)
+            linscale = wisdom.get('linscale',.001)
+            norm = lambda xmin,xmax: mpl.colors.SymLogNorm(linthresh=linthresh,linscale=linscale,vmin=xmin,vmax=xmax,base=10) 
+        elif norm_opt == 'boundary':
+            bounds = wisdom.get('bounds',[0,1,2,4,6,8,12,16,20,25,30,40,60,100,200])
+            if 'labels' in wisdom and wisdom['labels'] is not None:
+                ticklabels = wisdom['labels']
+            elif wisdom['colorbar'] is not None:
+                cb_unit = wisdom['colorbar']
+                ticklabels = [convert_value(native_unit, cb_unit, b) for b in bounds[1:]]
+            ticks = bounds[1:]
+            bounds = bounds + [1e10]
+            colors = wisdom.get('colors',np.array([(255,255,255),(197,234,252),(148,210,240),
+                                                    (107,170,213),(72,149,176),(74,167,113),
+                                                    (114,190,75),(203,217,88),(249,201,80),
+                                                    (245,137,56),(234,84,43),(217,45,43),
+                                                    (188,28,32),(156,22,27),(147,32,205)])/255.)
+            cmap = mpl.colors.LinearSegmentedColormap.from_list('custom',colors,N=len(colors))
+            norm = lambda xmin,xmax: mpl.colors.BoundaryNorm(boundaries=bounds,ncolors=len(bounds))
+        else:
+            norm = lambda xmin,xmax: mpl.colors.Normalize(xmin,xmax) 
+
     # only create the colorbar if requested
     cb_png_data = None
     if wisdom['colorbar'] is not None:
@@ -198,7 +260,11 @@ def scatter_to_raster(fa, lats, lons, wisdom):
         cbu_min,cbu_max = convert_value(native_unit, cb_unit, fa_min), convert_value(native_unit, cb_unit, fa_max)
         #  colorbar + add it to the KMZ as a screen overlay
         logging.info('scatter_to_raster: making colorbar from %s to %s' % (cbu_min, cbu_max))
-        cb_png_data,levels = make_colorbar([cbu_min, cbu_max],'vertical',2,cmap,wisdom['name'] + ' ' + cb_unit)
+        spacing = wisdom.get('spacing', 'proportional') 
+        cb_png_data,levels = make_colorbar(
+            [cbu_min, cbu_max], 'vertical', 2, cmap, wisdom['name'] + ' ' + cb_unit,
+            ticks=ticks, spacing=spacing, norm=norm, ticklabels=ticklabels
+        )
     else:
         levels = None
 
@@ -211,15 +277,18 @@ def scatter_to_raster(fa, lats, lons, wisdom):
         bounds = wisdom.get('bbox',(np.amin(lons), np.amax(lons), np.amin(lats), np.amax(lats)))
     else:
         bounds = wisdom.get('bbox',(0,0,0,0))
-    alpha = wisdom.get('alpha',.7)
-    marker = wisdom.get('marker','o')
-    text = wisdom.get('text',False)
-    size = wisdom.get('size',15)
-    linewidth = wisdom.get('linewidth',.7)
+    alpha = wisdom.get('alpha', 0.7)
+    marker = wisdom.get('marker', 'o')
+    text = wisdom.get('text', False)
+    size = wisdom.get('size', 15)
+    linewidth = wisdom.get('linewidth', 0.7)
     logging.info('scatter_to_raster: options: alpha={}, marker={}, text={}, size={}, linewidth={}'.format(alpha,marker,text,size,linewidth))
 
     # create the raster & get coordinate bounds
-    raster_png_data,corner_coords = basemap_scatter_mercator([fa],[lons],[lats],bounds,[alpha],fa_min,fa_max,cmap,size,marker,linewidth,text)
+    raster_png_data,corner_coords = basemap_scatter_mercator(
+        [fa], [lons], [lats], bounds, [alpha], fa_min, fa_max, cmap, 
+        size=size, marker=marker, linewidths=linewidth, text=text, norm=norm
+    )
 
     return raster_png_data, corner_coords, cb_png_data, levels
 
@@ -403,7 +472,7 @@ class Postprocessor(object):
             lat = lat[:fm,:fn]
 
         if u.shape != lat.shape:
-            raise PostprocError("Variable %s size does not correspond to grid size: var %s grid %s." % (u_name, u.shape, u_lat.shape))
+            raise PostprocError("Variable %s size does not correspond to grid size: var %s grid %s." % (u_name, u.shape, lat.shape))
 
         if v.shape != lat.shape:
             raise PostprocError("Variable %s size does not correspond to grid size." % v_name)
@@ -1280,6 +1349,9 @@ class Postprocessor(object):
         :param skip: only process every skip-th frame
         """
         traceargs()
+
+        # get domain ID
+        dom_id = re.match(r'.*wrfout_d(0[0-9])_[0-9_\-:]{19}', wrfout_path).groups()
 
         # open the netCDF dataset
         d = nc4.Dataset(wrfout_path,'r')

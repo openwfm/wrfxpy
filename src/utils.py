@@ -17,8 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime, timedelta, timezone
 import os
 import os.path as osp
 import glob
@@ -304,7 +303,7 @@ def esmf_to_utc(esmf):
     # ESMF date: YYYY-MM-DD_hh:mm:ss
     year, mon, day = int(esmf[0:4]), int(esmf[5:7]), int(esmf[8:10])
     hour, min, sec = int(esmf[11:13]), int(esmf[14:16]), int(esmf[17:19])
-    return datetime(year, mon, day, hour, min, sec, tzinfo=pytz.utc)
+    return datetime(year, mon, day, hour, min, sec, tzinfo=timezone.utc)
 
 def utc_to_esmf(utc):
     """
@@ -561,7 +560,7 @@ def timespec_to_utc(ts_str, from_time = None):
         return None
     if ts_str[0] == 'T':
         if from_time is None:
-            from_time = datetime.utcnow().replace(tzinfo=pytz.UTC)
+            from_time = datetime.utcnow().replace(tzinfo=timezone.UTC)
         min_shift = int(ts_str[1:])
         return from_time + timedelta(minutes = min_shift)
     else:

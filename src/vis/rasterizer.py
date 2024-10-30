@@ -111,11 +111,13 @@ def make_discrete_colorbar(labels,colors,orientation,size_in,cmap,cb_label,dpi=2
     """
     N = len(labels)
 
-    kwargs = { 'norm': mpl.colors.Normalize(-.5,N-.5),
-	       'orientation': orientation,
-               'spacing': 'proportional',
-	       'ticks': list(range(0,N)),
-               'cmap': cmap}
+    kwargs = { 
+        'norm': mpl.colors.Normalize(-.5, N-.5),
+        'orientation': orientation,
+        'spacing': 'proportional',
+        'ticks': list(range(0,N)),
+        'cmap': cmap
+    }
 
     # build figure according to requested orientation
     hsize, wsize = (size_in,size_in*0.5) if orientation == 'vertical' else (size_in*0.5,size_in)
@@ -193,9 +195,13 @@ def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,no
         if norm:
             norm = norm(cmin,cmax)
         cmap = mpl.cm.get_cmap(cmap_name)
-        m.quiver(lon,lat,u,v,masked_grid,latlon=True,norm=norm,cmap=cmap,clim=(cmin,cmax),edgecolor='k',linewidth=.2)
+        m.quiver(
+            lon, lat, u, v, masked_grid, latlon=True, norm=norm,
+            cmap=cmap, clim=(cmin,cmax), edgecolor='k', linewidth=.2,
+            units='width'
+        )
     else:
-        m.quiver(lon,lat,u,v,latlon=True)
+        m.quiver(lon, lat, u, v, latlon=True, units='width')
 
     str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
@@ -206,7 +212,10 @@ def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,no
     return str_io.getvalue(), float_bounds
 
 
-def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's', linewidths = 0, text = False):
+def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, size = 2, marker = 's', linewidths = 0, text = False, norm=None):
+    if norm:
+        norm = norm(cmin,cmax)
+    
     # number of scatter elements
     N = len(val)	
     border = .05
@@ -221,7 +230,10 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, si
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
     for i in range(N):
-    	m.scatter(lon[i],lat[i],size,c=val[i],latlon=True,marker=marker,cmap=cmap,vmin=cmin,vmax=cmax,alpha=alphas[i],linewidths=linewidths,edgecolors='k')
+        m.scatter(
+            lon[i], lat[i], size, c=val[i], latlon=True, marker=marker, norm=norm,
+            cmap=cmap, vmin=cmin, vmax=cmax, alpha=alphas[i], linewidths=linewidths, edgecolors='k'
+        )
     if text:
         for i in range(N):
             for x1,x2,x3 in zip(lon[i],lat[i],val[i]):

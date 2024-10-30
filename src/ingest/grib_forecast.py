@@ -33,8 +33,8 @@ class GribForecast(GribSource):
             'colmet_missing': list of colmet files that need to be created
         """
         # ensure minutes and seconds are zero, simplifies arithmetic later
-        from_utc = from_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)
-        to_utc = to_utc.replace(minute=0, second=0, microsecond=0, tzinfo=pytz.UTC)
+        from_utc = from_utc.replace(minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+        to_utc = to_utc.replace(minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
 
         if ref_utc is None:
             ref_utc = datetime.now(timezone.utc)
