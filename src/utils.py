@@ -479,7 +479,7 @@ def render_ignitions(js, max_dom):
     for dom_str, dom_igns in ign_specs.items():
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
-        nml_fire['ifire'][dom_id-1] = 1
+        nml_fire['ifire'][dom_id-1] = js.get('ifire',1)
         nml_fire['fire_wind_log_interp'][dom_id-1] = 1
         nml_fire['fire_use_windrf'][dom_id-1] = 2
         if not (js.use_tign_ignition or js.use_realtime):
