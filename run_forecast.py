@@ -17,7 +17,7 @@ def create_forecast_job(start_date, end_date):
     data["end_utc"] = end_str
     
     # Generate filename based on start and end dates
-    unique_name = f"{start_str}_to_{end_str}"
+    unique_name = f"gfsa_{start_str}_to_{end_str}"
     output_json = f'jobs/{unique_name}.json'
     log_file = f'logs/{unique_name}.log'
     
