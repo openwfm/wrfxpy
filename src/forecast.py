@@ -470,7 +470,8 @@ def run_geogrid(js, q):
     try:
         js.geo_cache = None
         logging.info("running GEOGRID")
-        vars_add_to_geogrid(js)
+        if js.get('ifire',1):
+            vars_add_to_geogrid(js)
         Geogrid(js.wps_dir).execute().check_output()
         logging.info('GEOGRID complete')
 
@@ -1516,7 +1517,10 @@ def process_arguments(job_args,sys_cfg):
     args['end_utc'] = round_time_to_hour(timespec_to_utc(args['end_utc'], args['start_utc']), True)
     args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
     args['max_dom'] = max([int(x) for x in [x for x in args['domains'] if len(x) == 1]])
-    args['min_sub_dom'] = min([int(x) for x in [x for x in args['domains'] if len(x) == 1] if (np.array(args['domains'][x].get('subgrid_ratio',[0,0])) > 0).all()])
+    try:
+        args['min_sub_dom'] = min([int(x) for x in [x for x in args['domains'] if len(x) == 1] if (np.array(args['domains'][x].get('subgrid_ratio',[0,0])) > 0).all()])
+    except:
+        args['min_sub_dom'] = None
     args['max_dom_pp'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
     args['satprod_satsource'] = Dict({})
 
