@@ -937,7 +937,11 @@ def execute(args,job_args):
     js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds
     if js.iofields and osp.exists('etc/iofields.cfg'):
         js.wrf_nml['time_control']['iofields_filename'] = [osp.abspath('etc/iofields.cfg')] * js.num_doms
-    update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
+    namelist_keys = js.grib_source[0].namelist_keys()
+    if 'num_metgrid_levels' in js:
+        logging.info('Replacing from input.json num_metgrid_levels=',js.num_metgrid_levels)
+        namelist_keys['domains']['num_metgrid_levels'] = js.num_metgrid_levels
+    update_namelist(js.wrf_nml, namelist_keys)
     update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
     if 'fmda_geogrid_path' in js.args:
         moisture_classes = js.fire_nml['moisture'].get('moisture_classes', 5)
