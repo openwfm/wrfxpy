@@ -938,9 +938,27 @@ def execute(args,job_args):
     if js.iofields and osp.exists('etc/iofields.cfg'):
         js.wrf_nml['time_control']['iofields_filename'] = [osp.abspath('etc/iofields.cfg')] * js.num_doms
     namelist_keys = js.grib_source[0].namelist_keys()
-    if 'num_metgrid_levels' in js:
-        logging.info('Replacing from input.json num_metgrid_levels=',js.num_metgrid_levels)
-        namelist_keys['domains']['num_metgrid_levels'] = js.num_metgrid_levels
+    # Find the first file matching "met_em*"
+    file_path = None
+    for file in glob.glob(os.path.join(js.wps_dir, "met_em*")):
+        file_path = file
+        break  # Get only the first match
+    if file_path:
+        # Open the NetCDF file and read num_metgrid_levels dimension
+        with nc4.Dataset(file_path, 'r') as dataset:
+            num_metgrid_levels_size = dataset.dimensions['num_metgrid_levels'].size
+        # Compare with namelist_keys['domains']['num_metgrid_levels']
+        if namelist_keys['domains']['num_metgrid_levels'] != num_metgrid_levels_size:
+            # Log a warning and update the key
+            logging.warning(
+                "num_metgrid_levels in file %d differs from namelist value %d. Updating the namelist.",
+                num_metgrid_levels_size, namelist_keys['domains']['num_metgrid_levels']
+            )
+            namelist_keys['domains']['num_metgrid_levels'] = num_metgrid_levels_size
+    else:
+        logging.error("No 'met_em*' file found in %d", js.wps_dir)
+
+    # At this point, namelist_keys['domains']['num_metgrid_levels'] is updated if needed
     update_namelist(js.wrf_nml, namelist_keys)
     update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
     if 'fmda_geogrid_path' in js.args:
