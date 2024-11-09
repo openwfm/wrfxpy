@@ -272,15 +272,15 @@ if __name__ == '__main__':
 
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
         print(len(sys.argv), sys.argv)
-        print(('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]'))
-        print('list            : show list of current simulations with their job_id and description')
-        print('cancel <job_id> : kill all processes and the WRF parallel job, do not delete any files')
-        print('output <job id> : cancel, and delete all WRF output and visualization files only')
-        print('vis <job_id> : cancel, and delete all files')
-        print('all <job_id> : cancel, and delete all files')
-        print('workspace       : delete jobs that are not on the visulalization server')
-        print('update <job_id> : check if the job is running and update its job state file')
-        print('send <job_id>   : send local simulation to the server')
+        print(('usage: ./cleanup.sh ' + '|'.join(commands) +' job_id [job_id] ...'))
+        print('list             : show list of current simulations with their job_id and description')
+        print('cancel <job_ids> : kill all processes and the WRF parallel job, do not delete any files')
+        print('output <job ids> : cancel, and delete all WRF output and visualization files only')
+        print('vis <job_ids>    : cancel, and delete all files')
+        print('all <job_ids>    : cancel, and delete all files')
+        print('workspace        : delete jobs that are not on the visulalization server')
+        print('update <job_ids> : check if the job is running and update its job state file')
+        print('send <job_ids>   : send local simulation to the server')
         sys.exit(1)
 
     cmd = sys.argv[1]
