@@ -271,6 +271,7 @@ if __name__ == '__main__':
     commands = [ 'list', 'cancel', 'output', 'vis', 'delete', 'workspace', 'update', 'send']
 
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
+        print(len(sys.argv), sys.argv)
         print(('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]'))
         print('list            : show list of current simulations with their job_id and description')
         print('cancel <job_id> : kill all processes and the WRF parallel job, do not delete any files')
@@ -284,10 +285,10 @@ if __name__ == '__main__':
 
     cmd = sys.argv[1]
     if cmd in ['all' , 'cancel', 'output', 'update', 'vis', 'send']: 
-        if len(sys.argv) == 3 and not sys.argv[2] == "" :
-            job_id = sys.argv[2]
+        if len(sys.argv) >= 3 and not sys.argv[2] == "" :
+            job_id = sys.argv[2:]
         else:
-            print(('%s function requires one job id' % cmd))
+            print(('%s function requires at least one job id' % cmd))
             sys.exit(1)
     else:
         job_id = None
@@ -299,25 +300,31 @@ if __name__ == '__main__':
         list(s)
 
     if cmd == 'cancel':
-        cancel(job_id)
+        for a in job_id:
+            cancel(a)
 
     if cmd == 'output':
-        cancel(job_id)
-        output(s,job_id)
+        for a in job_id:
+            cancel(a)
+            output(s,a)
 
     if cmd == 'all':
-        cancel(job_id)
-        delete(s,job_id)
+        for a in job_id:
+            cancel(a)
+            delete(s,a)
 
     if cmd == 'vis':
-        delete_visualization(job_id)
+        for a in job_id:
+            delete_visualization(a)
 
     if cmd == 'workspace':
         workspace(s)
 
     if cmd == 'update':
-        update(job_id)
+        for a in job_id:
+            update(a)
 
     if cmd == 'send':
-        send_products_to_server(job_id)
+        for a in job_id:
+            send_products_to_server(a)
 		
