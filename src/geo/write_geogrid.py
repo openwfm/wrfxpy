@@ -33,17 +33,43 @@ def write_table(file,lines_dict,mode='w',divider_char='=',divider_count=31,divid
         f.write(divider_char * divider_count + '\n')
     f.close()
 
-def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
+def wisdom_to_table(varname, wisdom):
+    # initialize table
+    table = {
+        'name': wisdom.get('name', varname),
+        'dest_type': wisdom.get('type','continuous'),
+        'interp_option': wisdom.get('interp_option','default:average_gcell(4.0)+four_pt+average_4pt'),
+        'priority': wisdom.get('priority',1)
+    }
+    # resolve path to data
+    if 'abs_path' in wisdom:
+        table.update({'abs_path': wisdom['abs_path']})
+    elif 'rel_path' in wisdom:
+        table.update({'rel_path': wisdom['rel_path']})
+    # some adds to the table
+    if 'fill_missing' in wisdom:
+        table['fill_missing'] = wisdom['fill_missing']
+    if 'smooth_option' in wisdom:
+        table['smooth_option'] = wisdom['smooth_option']
+    if 'subgrid' in wisdom:
+        table['subgrid'] = wisdom['subgrid']
+    if 'add_opts' in wisdom:
+        for key in wisdom['add_opts'].keys():
+            table[key] = wisdom['add_opts'][key]
+    return table
+
+def write_geogrid_var(path_dir,var,array,index,bits=32,coord=None):
     """
     write geogrid dataset and index 
     """
     path_dir=osp.abspath(path_dir)
-    logging.info('write_geogrid_var path_dir=%s varname=%s array=%s index=%s' % (path_dir, varname, inq(array), str(index)))
+    logging.info('write_geogrid_var path_dir=%s varname=%s array=%s index=%s' % (path_dir, var, inq(array), str(index)))
     if not osp.exists(path_dir):
         os.makedirs(path_dir)
 
     # get information from src/geo/var_wisdom.py
-    wisdom = get_wisdom(varname).copy()
+    wisdom = get_wisdom(var).copy()
+    varname = wisdom.get('name', var)
 
     # write geogrid dataset
     geogrid_ds_path = osp.join(path_dir,varname)
@@ -68,30 +94,42 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
     if index['type'] == 'categorical':
         fill = wisdom.get('fill',{})
         if isinstance(fill,str):
-            fill_str = fill
+            fill_path = fill
             fill = {}
-            if fill_str == 'from_file':
-                fill_path = 'etc/vtables/fill.json'
+            if osp.exists(fill_path):
                 try:
-                    fill_vars = json.load(open(fill_path,'r'))
-                except:
-                    logging.warning('write_geogrid_var fail reading fill file {}'.format(fill_path))
-                fill_file = fill_vars.get(varname,'')
-                if osp.exists(fill_file):
-                    try:
-                        df = pd.read_csv(fill_file,names=['from','to'],index_col=False)
-                        cfrom = np.array(df.loc[1:,'from'])
-                        cto = np.array(df.loc[1:,'to'])
-                        rest_val = df.loc[0,'from']
+                    fill = Dict({})
+                    df = pd.read_csv(
+                        fill_path, names=['from','to'], index_col=False
+                    )
+                    cfrom = np.array(df.loc[:,'from'])
+                    cto = np.array(df.loc[:,'to'])
+                    # add filling of non-specified categories
+                    if np.isnan(cto).sum():
+                        near_inds = tuple(
+                            cfrom[np.where(np.isnan(cto))].astype(int)
+                        )
+                        fill.update({near_inds: 'nearest'})
+                    # add nearest neighbor interpolation
+                    if np.isnan(cfrom).sum():
+                        rest_val = int(cto[np.where(np.isnan(cfrom))[0][0]])
                         unique = np.unique(array)
-                        rest_ind = np.array([u for u in unique if u not in cfrom])
-                        fill = Dict({tuple(rest_ind): rest_val})
-                        for k,key in enumerate(cfrom):
-                            fill.update({key: cto[k]})
-                    except Exception as e:
-                        logging.warning('write_geogrid_var fail reading fill CSV file {}'.format(fill_file))
-                        logging.warning('with exception {}'.format(e))
-        array = fill_categories(array,fill,coord)
+                        rest_ind = np.array([
+                            u for u in unique if u not in cfrom
+                        ])
+                        fill.update({tuple(rest_ind): rest_val})
+                    # add all the rest
+                    df = df.dropna().reset_index()
+                    for k in range(len(df)):
+                        fill.update({
+                            int(df.loc[k,'from']): int(df.loc[k,'to'])
+                        })
+                except Exception as e:
+                    logging.warning('write_geogrid_var fail reading fill CSV file {}'.format(fill_path))
+                    logging.warning('with exception {}'.format(e))
+            else:
+                logging.warning('write_geogrid_var fail reading fill CSV file {}'.format(fill_path))
+        array = fill_categories(array, fill, coord)
 
     write_geogrid(geogrid_ds_path,array,index,bits=bits,scale=scale,uscale=uscale)
  
@@ -104,22 +142,9 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
     index_json[varname]=index
     json.dump(index_json,open(index_json_path,'w'), indent=4, separators=(',', ': ')) 
 
-    geogrid_tbl_var = {'name': varname,
-                   'dest_type': wisdom.get('type','continuous'),
-                   'interp_option': wisdom.get('interp_option','default:average_gcell(4.0)+four_pt+average_4pt'),
-                   'abs_path': geogrid_ds_path,
-                   'priority': wisdom.get('priority',1)}
-
-    # some adds to geogrid_tbl_var
-    if 'fill_missing' in wisdom:
-        geogrid_tbl_var['fill_missing'] = wisdom['fill_missing']
-    if 'smooth_option' in wisdom:
-        geogrid_tbl_var['smooth_option'] = wisdom['smooth_option']
-    if 'subgrid' in wisdom:
-        geogrid_tbl_var['subgrid'] = wisdom['subgrid']
-    if 'add_opts' in wisdom:
-        for key in wisdom['add_opts'].keys():
-            geogrid_tbl_var[key] = wisdom['add_opts'][key]
+    # add abs_path to wisdom and create table from wisdom
+    wisdom['abs_path'] = geogrid_ds_path
+    geogrid_tbl_var = wisdom_to_table(varname, wisdom)
 
     # write a segment of GEOGRID.TBL
     geogrid_tbl_path=osp.join(path_dir,'GEOGRID.TBL')
@@ -133,7 +158,6 @@ def write_geogrid_var(path_dir,varname,array,index,bits=32,coord=None):
         geogrid_tbl = {}
     geogrid_tbl[varname]=geogrid_tbl_var 
     json.dump(index,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
-    
     
     json.dump(geogrid_tbl,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
 

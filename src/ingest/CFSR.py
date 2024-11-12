@@ -1,7 +1,7 @@
-from __future__ import absolute_import
 from ingest.grib_reanalysis import GribReanalysis
 from datetime import datetime
 import pytz
+
 
 class CFSR(GribReanalysis):
     """
@@ -46,7 +46,7 @@ class CFSR(GribReanalysis):
     info_aws = "https://registry.opendata.aws/noaa-cfs/"
     info_text = "The CFSRv2 (Climate Forecast System Reanalysis v2)"
     info = "The CFSRv2 (Climate Forecast System Reanalysis v2)"
-    browse_aws = "https://noaa-cfs-pds.s3.amazonaws.com/"
+    browse_aws = "https://noaa-cfs-pds.s3.amazonaws.com/index.html"
     available_from_utc = datetime(2011,4,1,tzinfo=pytz.UTC)
     available_to_utc = datetime.now(pytz.UTC)
     period_hours = 6
@@ -89,8 +89,8 @@ class CFSR_P(CFSR):
 
     # instance variables
     id = "CFSR_P"
-    prefix = 'COLMET_P'
-    remote_url = ["s3://noaa-cfs-pds/", "https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-by-pressure"]
+    prefix = "COLMET_P"
+    remote_url = ["https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-by-pressure", "s3://noaa-cfs-pds/"]
 
 class CFSR_S(CFSR):
     """
@@ -129,7 +129,7 @@ class CFSR_S(CFSR):
 
     # instance variables
     id = "CFSR_S"
-    prefix = 'COLMET_S'
-    remote_url = ["s3://noaa-cfs-pds/", "https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux"]
+    prefix = "COLMET_S"
+    remote_url = ["https://www.ncei.noaa.gov/data/climate-forecast-system/access/operational-analysis/6-hourly-flux", "s3://noaa-cfs-pds/"]
 
 

@@ -50,7 +50,7 @@ if __name__ == '__main__':
     from_utc = esmf_to_utc(sys.argv[2])
     to_utc = esmf_to_utc(sys.argv[3])
     ingest_dir = sys.argv[4]
-    js.ingest_dir = ingest_dir
+    js.ingest_path = ingest_dir
 
     grib_src = None
     if grib_src_name == 'HRRR':

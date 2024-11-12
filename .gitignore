@@ -63,9 +63,14 @@ temp/
 /ingest/
 /wksp/
 /wksp_fmda/
+/jobs/
+/cache/
 
 # config files
 etc/conf.json
 etc/tokens.json
 etc/clusters.json
 
+# Apple
+.DS_Store
+*.swp

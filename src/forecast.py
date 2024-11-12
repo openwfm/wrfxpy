@@ -18,24 +18,28 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
 from wrf.wrf_cloner import WRFCloner
 from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
-from wrf.wps_domains import WPSDomainLCC, WPSDomainConf
+from wrf.wps_domains import WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
                   update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
-                  timespec_to_utc, round_time_to_hour, Dict, dump, save, load, check_obj, \
-                  make_clean_dir, process_create_time, load_sys_cfg, ensure_dir, move, \
-                  json_join, number_minutes, serial_json, link2copy, append2file, delete
-from geo.write_geogrid import write_table
+                  timespec_to_utc, round_time_to_hour, Dict, make_clean_dir, process_create_time, \
+                  load_sys_cfg, ensure_dir, move, json_join, number_minutes, serial_json, link2copy, \
+                  force_copy, process_ignitions
+from geo.write_geogrid import wisdom_to_table, write_table
 from geo.geodriver import GeoDriver
+from geo.var_wisdom import get_wisdom
 from vis.postprocessor import Postprocessor
 from vis.timeseries import Timeseries
-from vis.var_wisdom import get_wisdom_variables,_sat_prods
-from clamp2mesh import fill_subgrid
+from vis.var_wisdom import get_wisdom_variables, _sat_prods
+from clamp2mesh import get_subgrid_coordinates, fill_subgrid
+
+try: 
+    import fire_init
+    _fire_init_plugin = True
+except:
+    _fire_init_plugin = False
 
 from ingest.NAM218 import NAM218
 from ingest.HRRR import HRRR
@@ -54,15 +58,16 @@ from fmda.fuel_moisture_da import assimilate_fm10_observations
 from ssh_shuttle import send_product_to_server, ssh_command
 
 import f90nml
-from datetime import datetime, timedelta
+from datetime import timedelta
 import time, re, json, sys, logging
 import os.path as osp
 import os
 import stat
 from multiprocessing import Process, Queue
+from subprocess import check_call
 import glob
+import pickle
 import netCDF4 as nc4
-import shutil
 import numpy as np
 
 import smtplib
@@ -70,10 +75,7 @@ from email.mime.text import MIMEText
 import hashlib
 
 import traceback
-import pprint
-from cleanup import parallel_job_running, delete_visualization, local_rmdir
-import six
-from six.moves import range
+from cleanup import parallel_job_running, delete_visualization
 
 
 
@@ -89,8 +91,9 @@ class JobState(Dict):
         :param args: the forecast job arguments
         """
         super(JobState, self).__init__(args)
-        self.grib_source = self.resolve_grib_source(self.get('grib_source',None),args)
-        self.satellite_source_list = args.get('satellite_source',[])
+        self.grib_source_name = self.get('grib_source', None)
+        self.grib_source = self.resolve_grib_source(self.grib_source_name, args)
+        self.satellite_source_list = args.get('satellite_source', [])
         self.satellite_source = self.resolve_satellite_source(args)
         logging.info('Simulation requested from %s to %s' % (str(self.start_utc), str(self.end_utc)))
         self.start_utc = round_time_to_hour(self.start_utc, up=False, period_hours=self.grib_source[0].period_hours);
@@ -102,7 +105,7 @@ class JobState(Dict):
             logging.info('job_id %s given in the job description' % args['job_id'])
             self.job_id = args['job_id']
         else:
-            logging.warning('job_id not given, creating.')
+            logging.info('job_id not given, creating.')
             self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(int(self.fc_hrs))
         if 'restart' in args:
             logging.info('restart %s given in the job description' % args['restart'])
@@ -112,12 +115,13 @@ class JobState(Dict):
             logging.info('restart not in arguments, default restart option %s' % self.restart)
         self.emails = self.parse_emails(args)
         self.domains = args['domains']
-        self.ignitions = args.get('ignitions', None)
+        self.ignitions = args.get('ignitions', {})
         self.fmda = args.get('fuel_moisture_da', None)
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
         self.clean_dir = args.get('clean_dir', True)
         self.run_wrf = args.get('run_wrf', True)
+        self.iofields = args.get('iofields', False)
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
 
@@ -232,6 +236,7 @@ def retrieve_satellite(js, sat_source, q):
     :param sat_source: the SatSource object
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
+    logging.info("step 2a: satellite retrieval")
     try:
         logging.info("retrieving satellite files from %s" % sat_source.id)
         # retrieve satellite granules intersecting the last domain
@@ -248,6 +253,7 @@ def retrieve_satellite(js, sat_source, q):
         logging.error('satellite retrieving step failed with exception %s' % repr(e))
         traceback.print_exc()
         q.put('FAILURE')
+
 
 def create_sat_manifest(js):
     sat_manifest = Dict({})
@@ -274,7 +280,80 @@ def create_sat_manifest(js):
         except:
             logging.warning('not able to recover previous satellite file')
     json.dump(sat_manifest, open(osp.join(js.jobdir, 'sat.json'),'w'), indent=4, separators=(',', ': '))
-    return sat_manifest
+
+
+def retrieve_fire_init(js, q):
+    """
+    Retrieve fire real-time data for forecasting
+
+    It returns either 'SUCCESS' or 'FAILURE' on completion.
+
+    :param js: the JobState object containing the forecast configuration
+    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
+    """
+    logging.info("step 2b: fire real-time data retrieval")
+    try:
+        make_dir(js.fire_init_dir)
+        logging.info("running ArcGIS acquisition")
+        args = [osp.join(js.wrfxpy_dir, 'retrieve_arcgis.sh')] + \
+            '{},{},{},{}'.format(*js.bounds[str(js.max_dom)]).split(',') + [js.fire_init_dir]
+        stdout_path = osp.join(js.fire_init_dir, 'acq_arcgis.stdout')
+        stderr_path = osp.join(js.fire_init_dir, 'acq_arcgis.stderr')
+        stdout_file = open(stdout_path, 'w')
+        stderr_file = open(stderr_path, 'w')
+        check_call(args, cwd=js.fire_init_dir, stdout=stdout_file, stderr=stderr_file)
+        send_email(js, 'Fire real-time data acquisition', 'Job %s - Fire real-time data acquisition complete.' % js.job_id)
+        logging.info("Fire real-time data acquisition complete")
+        q.put('SUCCESS')
+    except Exception as e:
+        logging.error('Fire real-time data acquisition step failed with exception %s' % repr(e))
+        traceback.print_exc()
+        q.put('FAILURE')
+
+
+def run_fire_init(js, q):
+    """
+    This function processes fire information to create fire initialization.
+
+    It returns either 'SUCCESS' or 'FAILURE' on completion.
+
+    :param js: the JobState object containing the forecast configuration
+    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
+    """
+    try:
+        logging.info('step 5b: processing fire initialization...')
+        params = json.load(open(osp.join(js.sys_install_path, 'src/fire_init/params.json')))
+        params.update({
+            'perim1_path': osp.join(js.fire_init_dir, 'perim1.pkl'),
+            'perim2_path': osp.join(js.fire_init_dir, 'perim2.pkl'),
+            'wrf_path': osp.join(js.wps_dir, 'geo_em.d{:02d}.nc'.format(js.max_dom)),
+            'result_path': osp.join(js.fire_init_dir, 'results.pkl'),
+            'past_perims_path': osp.join(js.fire_init_dir, 'arcgis_past_perims.pkl'),
+            'scars_mask_path': osp.join(js.fire_init_dir, 'scars_mask.pkl')
+        })
+        if 'prev_forecast' in js.keys():
+            prev_scars_mask_path = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/scars_mask.pkl')
+            if osp.exists(prev_scars_mask_path):
+                force_copy(prev_scars_mask_path, params['scars_mask_path'])
+            prev_fire_init_results = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/results.pkl')
+            if osp.exists(prev_fire_init_results):
+                params.update({'prev_perims': prev_fire_init_results})
+
+        perims, params = fire_init.init_fire_info(**params)
+        if len(perims):
+            params['perims'] = perims
+            perim1 = perims['perim1'].coords
+            perim2 = perims['perim2'].coords
+            fxlon, fxlat = get_subgrid_coordinates(params['wrf_path'], strip=False)
+            params['bbox'] = [fxlon.min(),fxlon.max(),fxlat.min(),fxlat.max()]
+            fire_init.perims_interp(perim1, perim2, fxlon, fxlat, **params)
+        js.fire_perimeter_time = params.get('spinup_time', 7200.)
+        q.put('SUCCESS')
+    except Exception as e:
+        logging.error('fire initialization step failed with exception %s' % repr(e))
+        traceback.print_exc()
+        q.put('FAILURE')
+
 
 def retrieve_gribs_and_run_ungrib(js, grib_source, q):
     """
@@ -309,6 +388,33 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
 
         if not have_all_colmet:
             # this is also if we do not cache
+            use_wgrib2 = js.get('use_wgrib2', True)
+            if use_wgrib2 and js.grib_source_name not in ['CFSR', 'GFSA', 'GFSF']:
+                logging.info('wgrib2 selected - cropping GRIB2 files before running UNGRIB')
+                from subprocess import check_call
+                lon0,lon1,lat0,lat1 = js.bounds['1']
+                grib_files = []
+                for orig_file in manifest.grib_files:
+                    subset_file = ensure_dir(osp.join(
+                        grib_dir, 
+                        grib_source.id.join(orig_file.split(grib_source.id + '/')[1:]).split('.grib2')[0] + '_subset.grib2'
+                    ))
+                    logging.info('wgrib2 running - from {} to {}'.format(orig_file, subset_file))
+                    logging.info('wgrib2 running - using bbox [{},{},{},{}]'.format(lon0,lon1,lat0,lat1))
+                    args = [
+                        'wgrib2', orig_file, '-v0', '-small_grib', 
+                        '{}:{}'.format(lon0, lon1), '{}:{}'.format(lat0, lat1), subset_file
+                    ]
+                    stdout_file = open(osp.join(grib_dir, 'wgrib2_subset.stdout'), 'w')
+                    stderr_file = open(osp.join(grib_dir, 'wgrib2_subset.stderr'), 'w')
+                    logging.debug('executing {}'.format(' '.join(args)))
+                    logging.debug('stdout {}'.format(stdout_file))
+                    logging.debug('stderr {}'.format(stderr_file))
+                    check_call(args, cwd=grib_dir, stdout=stdout_file, stderr=stderr_file)
+                    grib_files.append(subset_file)
+                manifest.update({'orig_grib_files': manifest['grib_files']})
+                manifest.update({'grib_files': grib_files})
+                cache_colmet = False
             grib_source.symlink_gribs(manifest.grib_files, grib_dir)
 
             send_email(js, 'grib2', 'Job %s - %d GRIB2 files downloaded.' % (js.job_id, len(manifest)))
@@ -326,15 +432,9 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
             grib_source.clone_vtables(grib_dir)
             symlink_unless_exists(osp.join(wps_dir,'ungrib.exe'),osp.join(grib_dir,'ungrib.exe'))
 
-            print((grib_dir + ':'))
-            os.system('ls -l %s' % grib_dir)
-
             Ungrib(grib_dir).execute().check_output()
 
-            print((grib_dir + ':'))
-            os.system('ls -l %s' % grib_dir)
-
-            if cache_colmet:
+            if cache_colmet and not use_wgrib2:
                 # move output to cache directory
                 make_dir(colmet_dir)
                 for f in manifest.colmet_files:
@@ -346,9 +446,8 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
                 symlink_unless_exists(osp.join(colmet_dir,f),osp.join(wps_dir,f))
         else:
             # move output
-            for f in glob.glob(osp.join(grib_dir,grib_source.prefix() + '*')):
+            for f in glob.glob(osp.join(grib_dir,grib_source.prefix + '*')):
                 move(f,wps_dir)
-
 
         send_email(js, 'ungrib', 'Job %s - ungrib complete.' % js.job_id)
         logging.info('UNGRIB complete for %s' % grib_source.id)
@@ -367,6 +466,7 @@ def run_geogrid(js, q):
     :param js: the JobState object containing the forecast configuration
     :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
     """
+    logging.info("step 3: execute geogrid")
     try:
         js.geo_cache = None
         logging.info("running GEOGRID")
@@ -379,6 +479,32 @@ def run_geogrid(js, q):
 
     except Exception as e:
         logging.error('GEOGRID step failed with exception %s' % repr(e))
+        q.put('FAILURE')
+
+
+def run_metgrid(js, q):
+    """
+    This function runs metgrid.
+
+    :param js: the JobState object containing the forecast configuration
+    :param q: the multiprocessing Queue into which we will send either 'SUCCESS' or 'FAILURE'
+    """
+    logging.info("step 5: execute metgrid after ensuring all grids will be processed")
+    try:
+        update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
+        js.domain_conf.prepare_for_metgrid(js.wps_nml)
+        logging.info("namelist.wps for METGRID: %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': ')))
+        f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+
+        logging.info("running METGRID")
+        Metgrid(js.wps_dir).execute().check_output()
+        logging.info("METGRID complete")
+
+        send_email(js, 'metgrid', 'Job %s - metgrid complete.' % js.job_id)
+        q.put('SUCCESS')
+
+    except Exception as e:
+        logging.error('METGRID step failed with exception %s' % repr(e))
         q.put('FAILURE')
 
 
@@ -440,11 +566,13 @@ def read_namelist(path):
 def ensure_abs_path(path,js,max_char=20):
     if len(path) > max_char:
         hexhash = hashlib.sha224(js.job_id.encode()).hexdigest()[:6]
-        geo_path = osp.join(js.wrfxpy_dir,'cache/geo_data.{}'.format(hexhash))
+        geo_path = osp.join(js.wrfxpy_dir, 'cache/geo_data.{}'.format(hexhash))
         js.geo_cache = geo_path
         make_dir(geo_path)
-        new_path = osp.join(geo_path,osp.basename(path))
-        symlink_unless_exists(path,new_path)
+        new_path = osp.join(geo_path, osp.basename(path))
+        if osp.exists(new_path):
+            os.remove(new_path)
+        symlink_unless_exists(path, new_path)
         return new_path
     else:
         return path
@@ -455,47 +583,71 @@ def vars_add_to_geogrid(js):
     """
     # add fmda datasets to geogrid if specified
     fmda_add_to_geogrid(js)
-    # load the variables to process
-    geo_vars_path = 'etc/vtables/geo_vars.json'
-    geo_vars = None
-    try:
-        geo_vars = Dict(json.load(open(geo_vars_path)))
-    except:
-        logging.info('Any {0} specified, defining default GeoTIFF files for NFUEL_CAT and ZSF from {1}.'.format(geo_vars_path,js.args['wps_geog_path']))
-        nfuel_path = osp.join(js.args['wps_geog_path'],'fuel_cat_fire','lf_data.tif')
-        topo_path = osp.join(js.args['wps_geog_path'],'topo_fire','ned_data.tif')
-        if osp.exists(nfuel_path) and osp.exists(topo_path):
-            geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
-        else:
-            logging.critical('Any NFUEL_CAT and/or ZSF GeoTIFF path specified')
-            raise Exception('Failed to find GeoTIFF files, generate file {} with paths to your data'.format(geo_vars_path))
-
-    geo_data_path = osp.join(js.wps_dir, 'geo_data')
-    for var,tif_file in six.iteritems(geo_vars):
-        bbox = js.bounds[str(js.min_sub_dom)]
-        logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
-        try:
-            GeoDriver.from_file(tif_file).to_geogrid(geo_data_path,var,bbox)
-        except Exception as e:
-            if var in ['NFUEL_CAT', 'ZSF']:
-                logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
-                logging.error('Exception: %s',e)
-                raise Exception('Failed to process GeoTIFF file for variable {}'.format(var))
-            else:
-                logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
-                logging.warning('Exception: %s',e)
-    
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
+    # get number of fuel categories
+    nfuelcats = js.fire_nml['fuel_scalars'].get('nfuelcats', 13)
+    # load the variables to process
+    geo_data_path = osp.join(js.wps_dir, 'geo_data')
     geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
+    geo_vars_path = 'etc/vtables/geo_vars.json'
+    geo_vars = None
+    try:
+        if osp.exists(geo_vars_path):
+            geo_vars = Dict(json.load(open(geo_vars_path)))
+        else:
+            logging.warning('Any {} specified for NFUEL_CAT and ZSF GeoTIFF location'.format(geo_vars_path))
+            logging.info('Trying default NFUEL_CAT and ZSF from {}.'.format(js.args['wps_geog_path']))
+            nfuel_path = osp.join(js.args['wps_geog_path'], 'fuel_cat_fire', 'lf_data.tif')
+            topo_path = osp.join(js.args['wps_geog_path'], 'topo_fire', 'ned_data.tif')
+            if osp.exists(nfuel_path) and osp.exists(topo_path) and nfuelcats == 13:
+                geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
+        for var,tif_file in geo_vars.items():
+            if var == 'NFUEL_CAT':
+                var = 'NFUEL_CAT_13'
+            wisdom = get_wisdom(var)
+            if (
+                wisdom['name'] == 'NFUEL_CAT'
+                and 'category_range' in wisdom
+                and nfuelcats != wisdom['category_range'][1] - 1
+            ):
+                logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
+                continue
+            bbox = js.bounds[str(js.min_sub_dom)]
+            logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
+            try:
+                GeoDriver.from_file(tif_file).to_geogrid(geo_data_path, var, bbox)
+            except Exception as e:
+                if 'NFUEL_CAT' in var or 'ZSF' in var:
+                    logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
+                    logging.error('Exception: %s',e)
+                    raise Exception('Failed to process GeoTIFF file for variable {}'.format(var))
+                else:
+                    logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
+                    logging.warning('Exception: %s',e)
+        geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
+    except:
+        logging.warning('Problems processing GeoTIFF files for NFUEL_CAT and ZSF'.format(geo_vars_path))
+        logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path))
+        varnames = ['NFUEL_CAT_{}_MODIS_20'.format(nfuelcats), 'ZSF_MODIS_20']
+        geogrid_tbl_json = {}
+        for varname in varnames:
+            logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
+            vartable = wisdom_to_table(varname, get_wisdom(varname))
+            geogrid_tbl_json.update({varname: vartable})
+    
+    # update geogrid table
     logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path,geogrid_tbl_json_path))
-    geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
-    for varname,vartable in six.iteritems(geogrid_tbl_json):
+    for varname,vartable in geogrid_tbl_json.items():
         logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
-        vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
-        logging.info('GEOGRID abs_path=%s' % vartable['abs_path'])
+        if 'abs_path' in vartable:
+            logging.info('GEOGRID abs_path={}'.format(vartable['abs_path']))
+            vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
+        else:
+            logging.info('GEOGRID rel_path={}'.format(vartable['rel_path']))
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
+
 
 def fmda_add_to_geogrid(js):
     """
@@ -542,13 +694,12 @@ def fmda_add_to_geogrid(js):
     logging.info('fmda_add_to_geogrid - updating GEOGRID.TBL at %s from %s' % 
         (geogrid_tbl_path,geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
-    for varname,vartable in six.iteritems(geogrid_tbl_json):
+    for varname,vartable in geogrid_tbl_json.items():
         vartable['abs_path'] = osp.join(js.wps_dir,fmda_geogrid_basename,osp.basename(vartable['abs_path']))
         vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
         logging.info('fmda_add_to_geogrid - GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
 
-    
 def execute(args,job_args):
     """
     Executes a weather/fire simulation.
@@ -582,7 +733,20 @@ def execute(args,job_args):
     if (js.clean_dir and not js.restart) or not osp.exists(osp.join(js.jobdir,'input.json')):
         make_clean_dir(js.jobdir)
 
-    js.num_doms = len(js.domains)
+    if not _fire_init_plugin:
+        if js.use_realtime:
+            logging.warning('requested using real-time data, but fire_init package missing')
+        js.use_realtime = False
+    else:
+        if js.use_realtime:
+            logging.info('using real-time data requested, ignoring specified ignitions')
+            js.fire_init_dir = osp.abspath(osp.join(js.jobdir, 'fire_init'))
+
+    # Parse and setup the domain configuration
+    js.domain_conf = WPSDomainConf(js.domains)
+    js.num_doms = len(js.domain_conf)
+    logging.info("number of domains defined is %d." % js.num_doms)
+
     json.dump(job_args, open(osp.join(js.jobdir,'input.json'),'w'), indent=4, separators=(',', ': '))
     jsub = make_job_file(js)
     json.dump(jsub, open(jsub.jobfile,'w'), indent=4, separators=(',', ': '))
@@ -590,11 +754,6 @@ def execute(args,job_args):
     logging.info("job %s starting [%d hours to forecast]." % (js.job_id, js.fc_hrs))
     sys.stdout.flush()
     send_email(js, 'start', 'Job %s started.' % js.job_id)
-
-    # Parse and setup the domain configuration
-    js.domain_conf = WPSDomainConf(js.domains)
-    js.num_doms = len(js.domain_conf)
-    logging.info("number of domains defined is %d." % js.num_doms)
 
     js.bounds = Dict({})
     for k,domain in enumerate(js.domain_conf.domains):
@@ -619,7 +778,7 @@ def execute(args,job_args):
                 sat_proc[satellite_source.id].join()
             proc_q.close()
             # create satellite manifest
-            sat_manifest = create_sat_manifest(js)
+            create_sat_manifest(js)
             # create satellite outputs
             process_sat_output(js.job_id)
             return
@@ -640,16 +799,12 @@ def execute(args,job_args):
     js.wps_dir = osp.abspath(osp.join(js.jobdir, 'wps'))
     js.wrf_dir = osp.abspath(osp.join(js.jobdir, 'wrf'))
 
-    #check_obj(args,'args')
-    #check_obj(js,'Initial job state')
-
-    logging.info("step 1: clone WPS and WRF directories")
+    logging.info("step 1: clone WPS and WRF directories and process domain information and patch namelist for geogrid")
     logging.info("cloning WPS into %s" % js.wps_dir)
     cln = WRFCloner(js.args)
     cln.clone_wps(js.wps_dir, [])
     js.grib_source[0].clone_vtables(js.wps_dir)
-
-    logging.info("step 2: process domain information and patch namelist for geogrid")
+    logging.info("process domain information")
     js.wps_nml['share']['start_date'] = [utc_to_esmf(js.start_utc)] * js.num_doms
     js.wps_nml['share']['end_date'] = [utc_to_esmf(js.end_utc)] * js.num_doms
     js.wps_nml['geogrid']['geog_data_path'] = js.args['wps_geog_path']
@@ -667,27 +822,36 @@ def execute(args,job_args):
         sat_proc = {}
         for satellite_source in js.satellite_source:
             sat_proc[satellite_source.id] = Process(target=retrieve_satellite, args=(js, satellite_source, proc_q))
+    else:
+        logging.info("step 2a: satellite retrieval [skipping]")
 
+    if js.use_realtime:
+        fire_init_proc = Process(target=retrieve_fire_init, args=(js, proc_q))
+    else:
+        logging.info("step 2b: fire real-time data retrieval [skipping]")
     geogrid_proc = Process(target=run_geogrid, args=(js, proc_q))
 
     grib_proc = {}
     for grib_source in js.grib_source:
         grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
-
-    logging.info('starting GEOGRID and GRIB2/UNGRIB')
+    
+    logging.info('execute: starting parallel GEOGRID, GRIB2/UNGRIB, and Satellite retrieval')
 
     if js.ungrib_only:
-        logging.info('ungrib_only set, skipping GEOGRID and SATELLITE, will exit after UNGRIB')
+        logging.info('ungrib_only set, skipping GEOGRID and Satellite retrieval, will exit after UNGRIB')
     else:
         geogrid_proc.start()
-        for satellite_source in js.satellite_source:
-            sat_proc[satellite_source.id].start()
+        if js.satellite_source:
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id].start()
+        if js.use_realtime:
+            fire_init_proc.start()
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].start()
 
     # wait until all tasks are done
-    logging.info('waiting until all tasks are done')
+    logging.info('execute: waiting until all tasks are done')
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
@@ -699,13 +863,20 @@ def execute(args,job_args):
         return
     else:
         geogrid_proc.join()
-        for satellite_source in js.satellite_source:
-            sat_proc[satellite_source.id].join()
+        if js.use_realtime:
+            fire_init_proc.join()
+        if js.satellite_source:
+            for satellite_source in js.satellite_source:
+                sat_proc[satellite_source.id].join()
 
     if js.satellite_source:
         for satellite_source in js.satellite_source:
             if proc_q.get() != 'SUCCESS':
                 return
+
+    if js.use_realtime:
+        if proc_q.get() != 'SUCCESS':
+            return
 
     for grib_source in js.grib_source:
         if proc_q.get() != 'SUCCESS':
@@ -716,50 +887,79 @@ def execute(args,job_args):
 
     proc_q.close()
 
-    logging.info('execute: finished parallel GEOGRID, GRIB2/UNGRIB, and Satellite')
+    logging.info('execute: finished parallel GEOGRID, GRIB2/UNGRIB, and Satellite retrieval')
 
     if js.satellite_source:
         # create satellite manifiest
-        sat_manifest = create_sat_manifest(js)
+        create_sat_manifest(js)
 
-    logging.info("step 5: execute metgrid after ensuring all grids will be processed")
-    update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
-    js.domain_conf.prepare_for_metgrid(js.wps_nml)
-    logging.info("namelist.wps for METGRID: %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': ')))
-    f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
+    # do steps 5 & 5b in parallel (two execution streams)
+    #  -> METGRID ->
+    #  -> fire init processing ->
+    proc_q = Queue()
 
-    logging.info("running METGRID")
-    Metgrid(js.wps_dir).execute().check_output()
+    metgrid_proc = Process(target=run_metgrid, args=(js, proc_q))
 
-    send_email(js, 'metgrid', 'Job %s - metgrid complete.' % js.job_id)
-    logging.info("METGRID complete")
+    if js.use_realtime:
+        fire_init_proc = Process(target=run_fire_init, args=(js, proc_q))
+    else:
+        logging.info("step 5b: fire init processing [skipping]")
 
-    logging.info("cloning WRF into %s" % js.wrf_dir)
+    logging.info('execute: starting parallel METGRID, and fire init processing')
+    metgrid_proc.start()
+    if js.use_realtime:
+        fire_init_proc.start()
+
+    logging.info('execute: waiting until all tasks are done')
+    metgrid_proc.join()
+    if js.use_realtime:
+        fire_init_proc.join()
+
+    if js.use_realtime:
+        if proc_q.get() != 'SUCCESS':
+            return
+
+    if proc_q.get() != 'SUCCESS':
+        return
+
+    proc_q.close()
+
+    logging.info('execute: finished parallel METGRID, and fire init processing')
 
     logging.info("step 6: clone wrf directory, symlink all met_em* files, make namelists")
+    logging.info("cloning WRF into %s" % js.wrf_dir)
     cln.clone_wrf(js.wrf_dir, [])
     symlink_matching_files(js.wrf_dir, js.wps_dir, "met_em*")
     time_ctrl = update_time_control(js.start_utc, js.end_utc, js.num_doms)
     js.wrf_nml['time_control'].update(time_ctrl)
     js.wrf_nml['time_control']['interval_seconds'] = js.grib_source[0].interval_seconds
+    if js.iofields and osp.exists('etc/iofields.cfg'):
+        js.wrf_nml['time_control']['iofields_filename'] = [osp.abspath('etc/iofields.cfg')] * js.num_doms
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
-    if 'ignitions' in js.args:
-        update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
+    update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
     if 'fmda_geogrid_path' in js.args:
-        js.fire_nml['moisture']['fmc_gc_initialization'] = [0,0,0,2,1]
+        moisture_classes = js.fire_nml['moisture'].get('moisture_classes', 5)
+        fmc_gc_initialization = []
+        for mc in range(moisture_classes):
+            if mc < 3:
+                fmc_gc_initialization.append(0)
+            elif mc == 3:
+                fmc_gc_initialization.append(2)
+            else:
+                fmc_gc_initialization.append(1)
+        js.fire_nml['moisture']['fmc_gc_initialization'] = fmc_gc_initialization
     # if we have an emissions namelist, automatically turn on the tracers
     if js.ems_nml is not None:
         logging.debug('namelist.fire_emissions given, turning on tracers')
         f90nml.write(js.ems_nml, osp.join(js.wrf_dir, 'namelist.fire_emissions'), force=True)
         js.wrf_nml['dynamics']['tracer_opt'] = [2] * js.num_doms
 
+    # make namelist input
     f90nml.write(js.wrf_nml, osp.join(js.wrf_dir, 'namelist.input'), force=True)
-
+    # make namelist fire
     f90nml.write(js.fire_nml, osp.join(js.wrf_dir, 'namelist.fire'), force=True)
 
-    # step 7: execute real.exe
-
-    logging.info("running REAL")
+    logging.info("step 7: running REAL")
     # try to run Real twice as it sometimes fails the first time
     # it's not clear why this error happens
     try:
@@ -768,9 +968,13 @@ def execute(args,job_args):
         logging.error('Real step failed with exception %s, retrying ...' % str(e))
         Real(js.wrf_dir).execute().check_output()
     # write subgrid coordinates in input files
-    subgrid_wrfinput_files = ['wrfinput_d{:02d}'.format(int(d)) for d,_ in args.domains.items() if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()]
+    subgrid_wrfinput_files = [
+        'wrfinput_d{:02d}'.format(int(d)) 
+            for d,_ in args.domains.items() 
+                if (np.array(_.get('subgrid_ratio', [0, 0])) > 1).all()
+    ]
     for in_path in subgrid_wrfinput_files:
-    	fill_subgrid(osp.join(js.wrf_dir, in_path))
+        fill_subgrid(osp.join(js.wrf_dir, in_path))
 
     logging.info('step 7b: if requested, do fuel moisture DA')
     logging.info('fmda = %s' % js.fmda)
@@ -780,12 +984,46 @@ def execute(args,job_args):
             logging.info('assimilate_fm10_observations for domain %s' % dom)
             assimilate_fm10_observations(osp.join(js.wrf_dir, 'wrfinput_d%02d' % int(dom)), None, js.fmda.token)
 
-    logging.info('step 8: execute wrf.exe on parallel backend')
+    logging.info('step 7c: fire initialization')
+    if js.use_realtime:
+        fire_init_path = osp.join(js.fire_init_dir, 'results.pkl')
+        if osp.exists(fire_init_path):
+            logging.info('integrating fire arrival time results')
+            fire_data = pickle.load(open(fire_init_path, 'rb'))
+            wrf_path = osp.join(js.wrf_dir, 'wrfinput_d{:02d}'.format(js.max_dom))
+            force_copy(wrf_path, wrf_path + '_orig')
+            outside_time = fire_data.get('outside_time', 360000.)
+            no_fuel_cat = js.fire_nml['fuel_scalars']['no_fuel_cat']
+            fire_init.integrate_init(
+                wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], 
+                outside_time=outside_time, no_fuel_cat=no_fuel_cat
+            )
+            if 'prev_forecast' in js.keys():
+                # implementation of adding smoke from previous forecast
+                wrfinput_paths = sorted(glob.glob(osp.join(js.wrf_path, 'wrfinput*')))
+                wrfout_paths = []
+                for wrfinput_path in wrfinput_paths:
+                    dom_str, = re.match(r'wrfinput_d(0[0-9])', osp.basename(wrfinput_path)).groups()
+                    wrfout_wildcard = js.start_utc.strftime('wrfout_d{:02d}_%Y-%m-%d_%H:%M:*'.format(dom_str))
+                    wrfout_wildcard_paths = osp.join(js.workspace_path, js.prev_forecast, 'wrf', wrfout_wildcard)
+                    prev_wrfout_paths = sorted(glob.glob(wrfout_wildcard_paths))
+                    if len(prev_wrfout_paths):
+                        wrfout_paths.append(prev_wrfout_paths[0])
+                if len(wrfinput_paths) == len(wrfout_paths):
+                    logging.info('integrating smoke from previous forecast')
+                    fire_init.add_smoke(wrfout_paths, wrfinput_paths)
+        else:
+            logging.error('use_realtime is selected, but no fire information to start a fire simulation')
+            sys.exit(1)
+    else:
+        if len(js.ignitions) and js.use_tign_ignition:
+            process_ignitions(js)
+    
     logging.info('run_wrf = %s' % js.run_wrf)
     if js.run_wrf:
-        # step 8: execute wrf.exe on parallel backend
+        logging.info('step 8: execute wrf.exe on parallel backend')
         jobfile = wrf_execute(js.job_id)    
-        # step 9: post-process results from wrf simulation
+        logging.info('step 9: post-process results from wrf simulation')
         process_output(js.job_id)
     else:
         jobfile = jsub.jobfile
@@ -824,9 +1062,9 @@ def wrf_execute(job_id):
 
 def process_output(job_id):
     args = load_sys_cfg()
-    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
-    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-    satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id, 'input.json'))
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id, 'job.json'))
+    satfile = osp.abspath(osp.join(args.workspace_path, job_id, 'sat.json'))
     logging.info('process_output: loading input description from %s' % inpfile)
     try:
         jsin = Dict(json.load(open(inpfile,'r')))
@@ -851,6 +1089,7 @@ def process_output(job_id):
         available_sats = []
         not_empty_sats = []
         pass
+    jsin = process_arguments(jsin, args) 
     logging.info('process_output: available satellite data %s' % available_sats)
     logging.info('process_output: not empty satellite data %s' % not_empty_sats)
     js.old_pid = js.pid
@@ -859,7 +1098,7 @@ def process_output(job_id):
     js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
-    js.wrf_dir = js.get('wrf_dir',osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf')))
+    js.wrf_dir = js.get('wrf_dir',osp.abspath(osp.join(jsin.workspace_path, js.job_id, 'wrf')))
 
     pp = None
     if js.postproc is None:
@@ -870,7 +1109,7 @@ def process_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
+    js.pp_dir = js.get('pp_dir', osp.join(jsin.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
@@ -879,7 +1118,7 @@ def process_output(job_id):
     js.prod_name = js.get('prod_name', 'wfc-' + js.grid_code)
     pp = Postprocessor(js.pp_dir, js.prod_name)
     if 'tslist' in js.keys() and js.tslist is not None:
-        ts = Timeseries(js.pp_dir, prod_name, js.tslist, js.num_doms)
+        ts = Timeseries(js.pp_dir, js.prod_name, js.tslist, js.num_doms)
     else:
         ts = None
     js.manifest_filename= js.get('manifest_filename', 'wfc-' + js.grid_code + '.json')
@@ -919,7 +1158,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
@@ -931,7 +1170,7 @@ def process_output(job_id):
             if js.postproc.get('shuttle', None) == 'on_completion':
                 desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                 tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+                send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         else:
             logging.error('All postprocessing steps failed')
@@ -963,7 +1202,7 @@ def process_output(job_id):
         line = wrf_out.readline().strip()
         if not line:
             if wait_lines > 10 and not parallel_job_running(js):
-                logging.warning('WRF did not run to completion.')
+                logging.error('WRF did not run to completion.')
                 break
             if not wait_lines:
                 logging.info('Waiting for more output lines')
@@ -1010,7 +1249,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
                         logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
@@ -1026,14 +1265,14 @@ def process_output(job_id):
         if js.postproc.get('shuttle', None) == 'on_completion':
             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+            send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         if js.postproc.get('shuttle', None) is not None:
             steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
-            args = ' '.join([js.job_id,steps,'inc'])
-            make_kmz(args)
-            args = ' '.join([js.job_id,steps,'ref'])
-            make_kmz(args)
+            arg_inp = ' '.join([js.job_id,steps,'inc'])
+            make_kmz(arg_inp)
+            arg_inp = ' '.join([js.job_id,steps,'ref'])
+            make_kmz(arg_inp)
 
         js.state = 'Completed'
 
@@ -1066,10 +1305,10 @@ def create_process_output_script(job_id):
 
 def process_sat_output(job_id):
     args = load_sys_cfg()
-    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
-    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-    satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
-    logging.info('process_output: loading input description from %s' % inpfile)
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id, 'input.json'))
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id, 'job.json'))
+    satfile = osp.abspath(osp.join(args.workspace_path, job_id, 'sat.json'))
+    logging.info('process_sat_output: loading input description from %s' % inpfile)
     try:
         jsin = Dict(json.load(open(inpfile,'r')))
     except Exception as e:
@@ -1093,6 +1332,7 @@ def process_sat_output(job_id):
         available_sats = []
         not_empty_sats = []
         return
+    jsin = process_arguments(jsin, args)
     logging.info('process_sat_output: available satellite data %s' % available_sats)
     logging.info('process_sat_output: not empty satellite data %s' % not_empty_sats)
     if not not_empty_sats:
@@ -1108,7 +1348,7 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
+    js.pp_dir = js.get('pp_dir', osp.join(jsin.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
@@ -1140,7 +1380,7 @@ def process_sat_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
@@ -1149,14 +1389,14 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) == 'on_completion':
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
         tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+        send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
     if js.postproc.get('shuttle', None) is not None:
         steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
-        args = ' '.join([js.job_id,steps,'inc'])
-        make_kmz(args)
-        args = ' '.join([js.job_id,steps,'ref'])
-        make_kmz(args)
+        arg_inp = ' '.join([js.job_id,steps,'inc'])
+        make_kmz(arg_inp)
+        arg_inp = ' '.join([js.job_id,steps,'ref'])
+        make_kmz(arg_inp)
 
     js.old_pid = js.pid
     js.pid = None
@@ -1177,9 +1417,9 @@ def verify_inputs(args,sys_cfg):
     for key in sys_cfg:
         if key in args:
             if  sys_cfg[key] != args[key]:
-               logging_error('system configuration %s=%s attempted change to %s'
+                logging.error('system configuration %s=%s attempted change to %s'
                    % (key, sys_cfg[key], args[key]))
-               raise ValueError('System configuration values may not be overwritten.')
+                raise ValueError('System configuration values may not be overwritten.')
 
     # we don't check if job_id is a valid path
     if 'sat_only' in args and args['sat_only']:
@@ -1226,7 +1466,7 @@ def verify_inputs(args,sys_cfg):
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:
-        for key,path in six.iteritems(args['precomputed']):
+        for key,path in args['precomputed'].items():
             if not osp.exists(path):
                 raise OSError('Precomputed entry %s points to non-existent file %s' % (key,path))
 

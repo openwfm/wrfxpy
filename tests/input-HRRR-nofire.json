@@ -1,0 +1,106 @@
+{
+    "run_wrf": false,
+    "job_id": "testing-HRRR-nofire",
+    "wall_time_hrs": 12,
+    "grib_source": "HRRR",
+    "start_utc": "T-60",
+    "end_utc": "T+120",
+    "cycle_start_utc": "T-60",
+    "download_whole_cycle": false,
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "postproc": {
+        "1": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC"
+        ],
+        "shuttle": "incremental",
+        "3": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC"
+        ],
+        "2": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "FMC_G"
+        ],
+        "description": "Testing HRRR No Fire"
+    },
+    "ppn": 28,
+    "grid_code": "testing-HRRR",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "domains": {
+        "1": {
+            "cell_size": [
+                5000,
+                5000
+            ],
+            "truelats": [
+                40.0699,
+                40.0699
+            ],
+            "stand_lon": -108.2909,
+            "center_latlon": [
+                40.0699,
+                -108.2909
+            ],
+            "history_interval": 120,
+            "geog_res": "30s",
+            "domain_size": [
+                101,
+                101
+            ],
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "time_step": 25
+        },
+        "3": {
+            "parent_time_step_ratio": 3,
+            "parent_start": [
+                41,
+                41
+            ],
+            "history_interval": 15,
+            "geog_res": ".3s",
+            "parent_id": 2,
+            "subgrid_ratio": [
+                20,
+                20
+            ],
+            "parent_end": [
+                81,
+                81
+            ],
+            "parent_cell_size_ratio": 3
+        },
+        "2": {
+            "parent_time_step_ratio": 3,
+            "parent_start": [
+                31,
+                31
+            ],
+            "history_interval": 60,
+            "geog_res": ".3s",
+            "parent_id": 1,
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "parent_end": [
+                71,
+                71
+            ],
+            "parent_cell_size_ratio": 3
+        }
+    },
+    "num_nodes": 4 
+}

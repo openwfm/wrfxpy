@@ -47,7 +47,7 @@ def remote_rmdir(s,dirname):
 
 def local_rmdir(dirname):
     work_dir = osp.abspath(osp.join(cfg['workspace_path'], dirname))
-    if osp.exists(dirname):
+    if osp.exists(work_dir):
         logging.info('Deleting directory %s' % work_dir)
         try:
             shutil.rmtree(work_dir)
@@ -276,14 +276,14 @@ if __name__ == '__main__':
         print('cancel <job_id> : kill all processes and the WRF parallel job, do not delete any files')
         print('output <job id> : cancel, and delete all WRF output and visualization files only')
         print('vis <job_id> : cancel, and delete all files')
-        print('delete <job_id> : cancel, and delete all files')
+        print('all <job_id> : cancel, and delete all files')
         print('workspace       : delete jobs that are not on the visulalization server')
         print('update <job_id> : check if the job is running and update its job state file')
         print('send <job_id>   : send local simulation to the server')
         sys.exit(1)
 
     cmd = sys.argv[1]
-    if cmd in ['delete' , 'cancel', 'output', 'update', 'vis', 'send']: 
+    if cmd in ['all' , 'cancel', 'output', 'update', 'vis', 'send']: 
         if len(sys.argv) == 3 and not sys.argv[2] == "" :
             job_id = sys.argv[2]
         else:
@@ -305,7 +305,7 @@ if __name__ == '__main__':
         cancel(job_id)
         output(s,job_id)
 
-    if cmd == 'delete':
+    if cmd == 'all':
         cancel(job_id)
         delete(s,job_id)
 
