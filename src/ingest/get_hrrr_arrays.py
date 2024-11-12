@@ -19,7 +19,7 @@ from osgeo import osr, ogr, gdal
 
 # Variables used throughout
 sys_cfg = Dict(json.load(open('etc/conf.json')))
-hrrrpath = "/home/hirschij/data/hrrr/geotiff_files" # path for atmospheric data stash
+hrrrpath = "/data001/projects/hirschij/data/hrrr/geotiff_files/" # path for atmospheric data stash
 
 # NOTE: choosing to exclude solar bands 'DLWRF', 'USWRF', 'ULWRF'
 # Downward shortwave is expected theoretically to be the most useful solar field 

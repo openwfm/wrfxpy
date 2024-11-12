@@ -121,8 +121,7 @@ if __name__ == '__main__':
     print(f"HRRR Forecast Hours: {forecast_hours}")
     outpath=str(sys.argv[4])
     print('Output Destination: '+outpath)
-
-
+    
     # String to run with retrieve_gribs as subprocess
     base_str = f"python src/ingest/retrieve_gribs.py {grib_source} "
 
@@ -153,7 +152,9 @@ if __name__ == '__main__':
             exists.extend(exists_tmp)
             needed.extend(needed_tmp)
         print(f"These bands already exist: {[osp.basename(path) for path in exists]}")
+        print() 
         print(f"These files need to get downloaded: {[osp.basename(path) for path in needed]}")
+        
         if len(needed)==0:
             print(f"All files for {time} already in {outpath}, skipping to next time")
             continue
@@ -165,7 +166,7 @@ if __name__ == '__main__':
         # Set up destination file path
         temppath = osp.join(outpath, dates[t].strftime("%Y%m%d"))
         os.makedirs(temppath, exist_ok=True)
-
+        
         # Loop over analysis/forecast hours and slice_gribs to get needed HRRR bands
         for ts in ft:
             grib_path = osp.join(sys_cfg.sys_install_path, "ingest", grib_source, grib_source.lower()+'.'+dates[t].strftime("%Y%m%d"),'conus', f"{grib_source.lower()}.t{dates[t].strftime('%H')}z.wrfprsf{ts}.grib2")
