@@ -1,7 +1,7 @@
 # setup environment
 from __future__ import absolute_import
 from __future__ import print_function
-from utils import Dict, hash2
+from utils import Dict
 import subprocess
 import json
 from datetime import datetime, timedelta

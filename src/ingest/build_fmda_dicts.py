@@ -1,7 +1,7 @@
 # setup environment
 from __future__ import absolute_import
 from __future__ import print_function
-from utils import Dict, hash2
+from utils import Dict
 import subprocess
 import json
 from datetime import datetime, timedelta
@@ -494,7 +494,6 @@ if __name__ == '__main__':
     out_dict = build_hrrr_dict(t0, t1, out_dict, forecast_hours)
     
     print(f"Writing output to {outfile}")
-    # print(f"Output hash: {hash2(out_dict)}") 
     ## NOTE: the interpolation procedure returns very slightly different pixel values given the same lon/lat input
     ## This makes exact hashing not possible, but values are still the same to many decimal places
     ## TODO: check for reproducibility
