@@ -106,7 +106,7 @@ if __name__ == '__main__':
 
     if len(sys.argv) != 5:
         print(('Usage: %s <esmf_from_utc> <esmf_to_utc> <forecast_hours> <target_directory>' % sys.argv[0]))
-        print(('Example: %s 2024-01-01_00:00:00 2024-01-01_01:00:00 1 ./ingest/HRRR' % sys.argv[0]))
+        print(('Example: %s 2024-01-01_00:00:00 2024-01-01_01:00:00 1 ./HRRR' % sys.argv[0]))
         sys.exit(-1)
 
     fmt = "%Y-%m-%d_%H:%M:%S" # Time format that pandas can recognize
@@ -160,7 +160,7 @@ if __name__ == '__main__':
             continue
         
         # Call retrieve_gribs via subprocess
-        command = base_str + str(time) + " " + str(tforecast) + " ~"
+        command = base_str + str(time) + " " + str(tforecast) + " ."
         print(command)
         subprocess.call(command,shell=True)
         # Set up destination file path
@@ -169,7 +169,7 @@ if __name__ == '__main__':
         
         # Loop over analysis/forecast hours and slice_gribs to get needed HRRR bands
         for ts in ft:
-            grib_path = osp.join(sys_cfg.sys_install_path, "ingest", grib_source, grib_source.lower()+'.'+dates[t].strftime("%Y%m%d"),'conus', f"{grib_source.lower()}.t{dates[t].strftime('%H')}z.wrfprsf{ts}.grib2")
+            grib_path = osp.join(sys_cfg.sys_install_path,  grib_source, grib_source.lower()+'.'+dates[t].strftime("%Y%m%d"),'conus', f"{grib_source.lower()}.t{dates[t].strftime('%H')}z.wrfprsf{ts}.grib2")
             print("Grib Path: " + grib_path)
             if os.path.exists(grib_path):
                 slice_gribs(grib_path, temppath)
