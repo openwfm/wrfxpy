@@ -10,12 +10,6 @@
 #         ngfs_start.py now auto
 # 
 # needs to be run under the correct python environment for wrfxpy --> conda activate  wrfx
-
-#to do
-#  1) get csv files automatically from:
-#        https://bin.ssec.wisc.edu/pub/volcat/fire_csv/NGFS_daily/GOES-WEST/CONUS/NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
-#        /pub/volcat/fire_csv/NGFS_daily/GOES-WEST/CONUS
-#        NGFS_FIRE_DETECTIONS_GOES-18_ABI_CONUS_2023_05_25_145.csv
 '''
 to do list:
 1) 
@@ -23,7 +17,7 @@ to do list:
 3) 
 4) 
 5) 
-6) try to get standalone working for a case
+6) 
 
 '''
 from __future__ import absolute_import
@@ -61,8 +55,8 @@ try:
    from pyproj import Proj, transform, Transformer
 except:
    from pyproj import Proj, transform # Transformer
-from ingest.NWS_warnings import set_red_flags, red_flag_incident
-#import geopandas as gpdpaste
+from ingest.NWS_warnings import set_red_flags, red_flag_incident, subset_red_flag_data, subset_wfo_data
+#import geopandas as gpd
 ####### Classes  ######
 
 #class that keeps atrributes about the day's data
@@ -131,13 +125,9 @@ class ngfs_day():
          self.map_save_str = 'ngfs/NGFS_'+csv_date_str+'_'+self.sat_name+'.png'
          self.pickle_save_str = 'ngfs/pkl_ngfs_day_'+csv_date_str+'_'+self.sat_name+'.pkl'
 
-      
    def incident_ign_latlons(self):
-      ign_latlons = np.zeros([self.num_incidents(),2])
-      for i in range(self.num_incidents()):
-         ign_latlons[i,:] = self.incidents[i].ign_latlon
-      return ign_latlons
-   
+      return np.array([incident.ign_latlon for incident in self.incidents])
+
    def save_pickle(self,):
       print('Saving as ',self.pickle_save_str)
       with open(self.pickle_save_str,'wb') as f:
@@ -187,126 +177,81 @@ class ngfs_day():
          ign_pix.to_csv(csv_save_str, index=False)
 
    def print_base_map(self):
+
       print('Starting map making')
-      m = Basemap(llcrnrlon=-119,llcrnrlat=22,urcrnrlon=-64,urcrnrlat=49, projection='lcc',lat_1=33,lat_2=45,lon_0=-95)
+
+      #CONUS map
+      m = Basemap(llcrnrlon=-119, llcrnrlat=22, urcrnrlon=-64, urcrnrlat=49, projection='lcc', lat_1=33, lat_2=45, lon_0=-95)
       m.latlon = True 
-      #m.bluemarble()
       m.shadedrelief()
       m.drawstates()
       m.drawcountries()
 
-      #for i in range(self.num_incidents()):
-      #   print(i,self.incidents[i].name,self.incidents[i].started)
-
-      #all incident ignition locations
       latlons = self.incident_ign_latlons()
 
+      def get_coords(latlons, mask):
+         filtered = latlons[mask]
+         return m(filtered[:, 1], filtered[:, 0])
 
-      #get ongoing incidents
-      ongoing_latlons = latlons[self.ongoing,:]
-      ongoing_lon = ongoing_latlons[:,1]
-      ongoing_lat= ongoing_latlons[:,0]
-      x_ongoing, y_ongoing = m(ongoing_lon,ongoing_lat)
-      
-      #new incidents,not started
-      new_latlons = latlons[self.new,:]
-      new_lon = new_latlons[:,1]
-      new_lat= new_latlons[:,0]
-      x_new, y_new = m(new_lon,new_lat)
+      x_ongoing, y_ongoing = get_coords(latlons, self.ongoing)
+      x_new, y_new = get_coords(latlons, self.new)
+      x_started, y_started = get_coords(latlons, self.started * self.new)
 
-      #new, started incidents
-      started_latlons = latlons[self.started*self.new,:]
-      started_lon = started_latlons[:,1]
-      started_lat= started_latlons[:,0]
-      x_started, y_started = m(started_lon,started_lat)
+      def scatter_if_any(x, y, size, label):
+         if len(x) > 0:
+            m.scatter(x, y, s=size, label=label, edgecolors='black')
 
-      #optionally scatter the ongoing, new, and started incident locations
-      if any(self.ongoing):
-         m.scatter(x_ongoing,y_ongoing,s=15,label='Ongoing Incident',edgecolors='black')
-      if any(self.new):
-         m.scatter(x_new,y_new,s=30,label='New Incident',edgecolors='black')
-      if any(self.started):
-         m.scatter(x_started,y_started,s=30,label='New, Forecast Started',edgecolors='black')
-      
-      
-      plt.legend(loc ="lower left")
+      scatter_if_any(x_ongoing, y_ongoing, 15, 'Ongoing Incident')
+      scatter_if_any(x_new, y_new, 30, 'New Incident')
+      scatter_if_any(x_started, y_started, 30, 'New, Forecast Started')
 
-      #title and save the figure
-      #time_str = str(time.gmtime().tm_hour).zfill(2) + ':' + str(time.gmtime().tm_min).zfill(2) + '  UTC'
-      t_str = 'NIFC Fire Incidents \n' + self.date_str + '\n ' + self.sat_name
-      plt.title(t_str)
+      plt.legend(loc="lower left")
+      plt.title(f'NIFC Fire Incidents \n{self.date_str}\n {self.sat_name}')
 
-      #set size to b 520x400 at 100 dpi
-      #figure = plt.gcf()
-      #figure.set_size_inches(5.2,4.0)
-
-      print('Saving ',self.map_save_str)
-      plt.savefig(self.map_save_str,bbox_inches='tight')
-      #plt.show
+      print('Saving ', self.map_save_str)
+      plt.savefig(self.map_save_str, bbox_inches='tight')
       plt.cla()
 
-      #optionally plot Alaska fires, all have latitude greater than 54
-      if max(latlons[:,0])>54.0:
+      #if there are fires in Alaska, make a map and join it to the existing CONUS map
+      if max(latlons[:, 0]) > 54.0:
 
-         #for alaska fires
-         n = Basemap(llcrnrlon=-164,llcrnrlat=54,urcrnrlon=-130,urcrnrlat=73, projection='lcc',lat_1=63,lat_2=68,lon_0=-151)
+         n = Basemap(llcrnrlon=-164, llcrnrlat=54, urcrnrlon=-130, urcrnrlat=73, projection='lcc', lat_1=63, lat_2=68, lon_0=-151)
          n.latlon = True 
-         #m.bluemarble()
          n.shadedrelief()
          n.drawstates()
          n.drawcountries()
 
+         xa_ongoing, ya_ongoing = n(x_ongoing, y_ongoing)
+         xa_new, ya_new = n(x_new, y_new)
+         xa_started, ya_started = n(x_started, y_started)
 
-         #ongoing Alaska
-         xa_ongoing, ya_ongoing = n(ongoing_lon,ongoing_lat)
-         #new Alaska incidents,not started
-         xa_new, ya_new = n(new_lon,new_lat)
-         #new Alaska, started incidents
-         xa_started, ya_started = n(started_lon,started_lat)
+         scatter_if_any(xa_ongoing, ya_ongoing, 15, 'Ongoing Incident')
+         scatter_if_any(xa_new, ya_new, 30, 'New Incident')
+         scatter_if_any(xa_started, ya_started, 30, 'New, Forecast Started')
 
-         if any(self.ongoing):
-            n.scatter(xa_ongoing,ya_ongoing,s=15,label='Ongoing Incident',edgecolors='black')
-         if any(self.new):
-            n.scatter(xa_new,ya_new,s=30,label='New Incident',edgecolors='black')
-         if any(self.started):
-            n.scatter(xa_started,ya_started,s=30,label='New, Forecast Started',edgecolors='black')
+         plt.legend(loc="lower right")
+         plt.title(f'NIFC Alaska Fire Incidents \n{self.date_str}\n GOES-18')
 
-         plt.legend(loc ="lower right")
+         sv_str = self.map_save_str.replace('ngfs/', 'ngfs/Alaska_')
+         print('Saving ', sv_str)
+         plt.savefig(sv_str, bbox_inches='tight')
 
-         #title and save the figure
-         t_str = 'NIFC Alaska Fire Incidents \n' + self.date_str + '\n ' + 'GOES-18'
-         plt.title(t_str)
-         sv_str = self.map_save_str
-         sv_str = sv_str.replace('ngfs/','ngfs/Alaska_')
-         print('Saving ',sv_str)
-         plt.savefig(sv_str,bbox_inches='tight')
-
-         #join figures if there are Alaska 
-         
-         #copy the CONUS figure to a separate png file
-         conus_str = self.map_save_str
-         conus_str = conus_str.replace('ngfs/','ngfs/CONUS_')
-         cpy_cmd = 'cp ' + self.map_save_str + ' ' + conus_str
-         os.system(cpy_cmd)
+         conus_str = self.map_save_str.replace('ngfs/', 'ngfs/CONUS_')
+         os.system(f'cp {self.map_save_str} {conus_str}')
 
          time.sleep(20)
-         #joing the two figures
          img0 = Image.open(self.map_save_str)
          img1 = Image.open(sv_str)
 
-         #resize Alaska map but keep aspect ratio
          height = img0.size[1]
-         width = int(np.round(height*img1.size[0]/img1.size[1]))
-         img1 = img1.resize((width,height),Image.Resampling.LANCZOS)
+         width = int(np.round(height * img1.size[0] / img1.size[1]))
+         img1 = img1.resize((width, height), Image.Resampling.LANCZOS)
          img1.save(sv_str)
 
-         image_new = Image.new("RGB",(img0.size[0]+img1.size[0],height),"white")
-         image_new.paste(img1,(0,0))
-         image_new.paste(img0,(width,0))
-         #this overwrites the previous file
+         image_new = Image.new("RGB", (img0.size[0] + img1.size[0], height), "white")
+         image_new.paste(img1, (0, 0))
+         image_new.paste(img0, (width, 0))
          image_new.save(self.map_save_str)
-
-
 
 class ngfs_incident():
    '''
@@ -721,6 +666,8 @@ class ngfs_incident():
 
       
 ####### Functions  #######
+      
+'''
 def get_old_incidents(ngfs_directory):
    print('Reading previous pickle file(s)')
    full_pick_list = glob.glob(ngfs_directory + '/*.pkl')
@@ -765,6 +712,56 @@ def get_old_incidents(ngfs_directory):
       print(incs.incident_id_string,incs.incident_name,'Started = ',incs.started)
    
    return list(set(started_inc_ids)),old_ngfs_incidents
+
+'''
+def get_old_incidents(ngfs_directory):
+    """
+    Looks at older, saved ngfs_days objects and finds incidents that have already been processed or forecasted.
+    """
+    print('Reading previous pickle file(s)')
+    
+    # Get and sort pickle files by modification time
+    full_pick_list = sorted(glob.glob(f'{ngfs_directory}/*.pkl'), key=os.path.getmtime)
+    current_time = time.time()
+
+    # Filter out old pickle files not generated by specific CSV files
+    pick_list = [
+        i for i in full_pick_list
+        if 'GOES' not in i and (current_time - os.path.getmtime(i)) / 3600 < 24 * 7
+    ]
+    
+    print(f'Number of pickle files to possibly look at: {len(pick_list)}')
+    
+    # Reverse the list to get the newest files first
+    pick_list.reverse()
+    
+    old_ngfs_incidents = []
+    started_inc_ids = []
+
+    for i in pick_list:
+        print(f'\tReading {i}')
+        df = pd.read_pickle(i)
+        old_ngfs_incidents.extend(df.incidents)
+
+        if hasattr(df, 'started_inc_ids'):
+            started_inc_ids.extend(df.started_inc_ids)
+            print(f'\tTracking {len(started_inc_ids)} old incident ID strings')
+            break
+        else:
+            print('\tPickle file does not have started_inc_ids')
+        print(len(started_inc_ids))
+    
+    # Process and print old incidents
+    print('Found the previous incidents:')
+    for inc in old_ngfs_incidents:
+        if inc.incident_id_string in started_inc_ids or inc.started:
+            inc.started = True
+            if inc.incident_id_string not in started_inc_ids:
+                started_inc_ids.append(inc.incident_id_string)
+        print(f'{inc.incident_id_string} {inc.incident_name} Started = {inc.started}')
+    
+    return list(set(started_inc_ids)), old_ngfs_incidents
+
 
 def setup_csv_download(args):
       today = 'now' in str(args) or ngfs_cfg['run_cfg']['today_forecasts']
@@ -834,74 +831,10 @@ def make_base_configuration(force,ngfs_cfg):
 
    
    return base_cfg
-   
+
 def timestamp_from_string(csv_date_str):
-   #print('Detection data from ',csv_date_str)
-   csv_year = int(csv_date_str[0:4])
-   csv_month = int(csv_date_str[5:7])
-   csv_day = int(csv_date_str[8:10])
-   return pd.Timestamp(year=csv_year,month=csv_month,day=csv_day,tz='UTC')
+    return pd.Timestamp(year=int(csv_date_str[:4]), month=int(csv_date_str[5:7]), day=int(csv_date_str[8:10]), tz='UTC')
 
-def subset_wfo_data(full_data,data,wfo_list):
-   #finds possible wildfire detections in a NWS FO region withouth NIFC designation and assigns 
-   #incident_id_string and incident_name derived fron the feature_tracking_id
-   wfo_data = pd.DataFrame()
-   temp_data = full_data[full_data.type_description == 'Possible Wildland Fire']  
-   for w in wfo_list:
-      wfo_subset = temp_data[full_data.wfo_code == w]
-      wfo_subset = wfo_subset[wfo_subset.type_description == 'Possible Wildland Fire']  #needed ???
-      print('Found ',len(wfo_subset),' possible wildfire detections in ',w)
-      wfo_data = wfo_data.append(wfo_subset,ignore_index = True)
-
-   #filter data that as feature_tracking is associated with known incident
-   f_ids = data.feature_tracking_id.unique()
-   for f in f_ids:
-      wfo_data = wfo_data.drop(wfo_data[wfo_data.feature_tracking_id == f].index)
-
-   #assign incident id_strings and names to the detections
-   for i in range(len(wfo_data)):
-      wfo_code = wfo_data.wfo_code.iloc[i]
-      fid = wfo_data.feature_tracking_id.iloc[i].replace(':','').replace('-','').replace('_','')
-      wfo_data.incident_id_string.iloc[i] = '{'+str(wfo_code)+fid[-4:]+'-'+fid[2:6]+'-'+fid[6:10]+'-'+fid[11:15]+'-'+fid[-12:]+'}'
-      wfo_data.incident_name.iloc[i] = str(wfo_code)+'_'+fid[2:6]+'_'+fid[6:10]+'_'+fid[-12:]
-   
-   return wfo_data
-
-def subset_red_flag_data(full_data,data,rf_zones):
-
-   state_data = pd.DataFrame()
-   rf_data = pd.DataFrame()
-   if len(rf_zones) == 0:
-      print('No red flag warnings issued')
-      return rf_data
-   temp_data = full_data[full_data.type_description == 'Possible Wildland Fire'] 
-   #subset dat byt state first
-   #make list of states with active fed flag zones, append data for these states
-   rf_states = list()
-   for i in range(len(rf_zones)):
-      rfz = rf_zones.iloc[i]
-      if rfz['properties']['STATE'] not in rf_states:
-         rf_states.append(rfz['properties']['STATE'])
-         state_data = state_data.append(temp_data[temp_data.state == rfz['properties']['STATE']],ignore_index=True)
-   #look for hotspots within red flag zones in the state data
-   print('state data length = ',len(state_data))
-   for i in range(len(state_data)):
-      if red_flag_incident(state_data.iloc[i].lon_tc,state_data.iloc[i].lat_tc,state_data.iloc[i]['actual_image_time'],rf_zones):
-         rf_data = rf_data.append(state_data.iloc[i],ignore_index=True)
-         #break
-   print('red flag detections length  = ',len(rf_data))
-   #filter out data for known feature tracking ids
-   f_ids = data.feature_tracking_id.unique()
-   for f in f_ids:
-      if len(rf_data) > 0:
-         rf_data = rf_data.drop(rf_data[rf_data.feature_tracking_id == f].index)
-   #assign names and incident id strings to the data
-   for i in range(len(rf_data)):
-      wfo_code = rf_data.wfo_code.iloc[i]
-      fid = rf_data.feature_tracking_id.iloc[i].replace(':','').replace('-','').replace('_','')
-      rf_data.incident_id_string.iloc[i] = '{REDFLAGS-'+str(wfo_code)+'-'+fid[2:6]+'-'+fid[6:10]+'-'+fid[-12:]+'}'
-      rf_data.incident_name.iloc[i] = 'RED_FLAG_'+str(wfo_code)+'_'+fid[2:6]+'_'+fid[6:10]+'_'+fid[-12:]
-   return rf_data
    
 def cluster_data(df):
    ##sort the data by image time
@@ -1049,7 +982,7 @@ def read_NGFS_csv_data(csv_file):
 
     # Loop through each CSV file
     for file_path in csv_file:
-        # Modify incident ID string for GOES-16 files
+        # Modify feature_tracking_id string for GOES-16 files
         if 'GOES-16' in file_path:
             os.system(f"sed -i 's/,ID-20/,I6-20/g' {file_path}")
 
@@ -1073,8 +1006,9 @@ def read_NGFS_csv_data(csv_file):
             data_read['actual_image_time'] = data_read['observation_time']
             try:
                 data_read = data_read.astype(nd.ngfs_dictionary)
-            except Exception:
+            except Exception as e:
                 print('Trouble parsing data types, probably early ngfs version')
+                print(e)
                 data_read = pd.DataFrame()
 
         # Merge the current data with existing data
