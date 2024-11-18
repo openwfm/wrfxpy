@@ -439,6 +439,7 @@ def render_ignitions(js, max_dom):
         return dvals
 
     # extract the original ignition specs and the original start time
+    dom_specs = js.domains
     ign_specs = js.ignitions
     orig_start_time = js.orig_start_utc
 
@@ -478,9 +479,9 @@ def render_ignitions(js, max_dom):
     for dom_str, dom_igns in ign_specs.items():
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
-        nml_fire['ifire'][dom_id-1] = 1
-        nml_fire['fire_wind_log_interp'] = 1
-        nml_fire['fire_use_windrf'] = 2
+        nml_fire['ifire'][dom_id-1] = js.get('ifire',1)
+        nml_fire['fire_wind_log_interp'][dom_id-1] = 1
+        nml_fire['fire_use_windrf'][dom_id-1] = 2
         if not (js.use_tign_ignition or js.use_realtime):
             nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
@@ -508,6 +509,15 @@ def render_ignitions(js, max_dom):
                 vals = [ slat, elat, slon, elon, start, start+dur, radius, ros]
             kv = dict(list(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals])))
             nml_fire.update(kv)
+
+    # activate fire at domains with subgrid ratio specified
+    for dom_str, dom_spec in dom_specs.items():
+        dom_id = int(dom_str)
+        if any([sr > 0 for sr in dom_spec['subgrid_ratio']]):
+            nml_fire['ifire'][dom_id-1] = 1 # switch on fire model
+            nml_fire['fmoist_run'][dom_id-1] = True # use the fuel moisture model
+            nml_fire['fmoist_interp'][dom_id-1] = True # interpolate fm onto fire mesh
+            nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
 
     return { 'fire' : nml_fire }
 

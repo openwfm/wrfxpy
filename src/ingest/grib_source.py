@@ -184,6 +184,7 @@ class GribSource(object):
                 self.remote_url = url_base
                 return available[0]
         logging.error('grib_source.available_online - online file not existent, urls tried:\n {}'.format([osp.join(url_base,link) for url_base in url_bases for link in links]))
+        return None
         raise GribError('GribSource: failed to find an available online file')
 
 

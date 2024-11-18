@@ -46,9 +46,11 @@ class GribReanalysis(GribSource):
         grib_files = []
         colmet_files_utc=[]
         while at_time <= end_utc:
-            grib_files.append(self.make_relative_url(at_time))
-            # logging.info('Adding to manifest input file %s' % self.make_relative_url(at_time))
-            colmet_files_utc.append(at_time)
+            relative_url = self.make_relative_url(at_time)
+            if relative_url is not None:
+                grib_files.append(relative_url)
+                logging.info('Adding to manifest input file %s' % relative_url)
+                colmet_files_utc.append(at_time)
             at_time += timedelta(hours=self.period_hours)
         colmet_prefix = self.id
         colmet_files = self.colmet_files(colmet_files_utc)
