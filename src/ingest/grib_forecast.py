@@ -92,6 +92,7 @@ class GribForecast(GribSource):
                     logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
                     if url_base[:5] == 's3://':
                         unavailables = [x for x in nonlocals if readhead(osp.join(osp.dirname(self.browse_aws), x), msg_level=0).status_code != 200]
+                        logging.debug(f"from s3: {unavailables}")
                     else:
                         unavailables = [x for x in nonlocals if readhead(osp.join(url_base, x), msg_level=0).status_code != 200]
                     if len(unavailables) == 0:

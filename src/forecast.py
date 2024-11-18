@@ -494,7 +494,7 @@ def run_metgrid(js, q):
     try:
         update_namelist(js.wps_nml, js.grib_source[0].namelist_wps_keys())
         js.domain_conf.prepare_for_metgrid(js.wps_nml)
-        logging.info("namelist.wps for METGRID: %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': ')))
+        # logging.info("namelist.wps for METGRID: %s" % json.dumps(js.wps_nml, indent=4, separators=(',', ': ')))
         f90nml.write(js.wps_nml, osp.join(js.wps_dir, 'namelist.wps'), force=True)
 
         logging.info("running METGRID")

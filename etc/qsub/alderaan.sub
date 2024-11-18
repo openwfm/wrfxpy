@@ -41,4 +41,7 @@ env
 # see below for ways to do this for different MPI distributions
 ##mpirun -np $SLURM_NTASKS ./wrf.exe  #KH: removed p option
 
+ulimit -n 65536
+
+
 mpirun -n $SLURM_NTASKS ./wrf.exe
