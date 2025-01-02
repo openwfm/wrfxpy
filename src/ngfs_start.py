@@ -561,15 +561,19 @@ class ngfs_incident():
         except KeyError:
             print('Error translating the state abbreviation(s)')
             self.state = 'Unknown'
-    if self.state == 'Unknown':
-        self.loc_str = 'Unknown'
+            self.loc_str = 'Unknown'
+    try:
+       print(f'\tLocation: {self.loc_str}')
+       loc_idx = pop_data[pop_data['Location'] == self.loc_str]
+    except:
+       print('\tUnknown location')
+       loc_idx = pd.DataFrame()
 
-    print(f'\tLocation: {self.loc_str}')
-
-    loc_idx = pop_data[pop_data['Location'] == self.loc_str]
+    
     if loc_idx.empty:
         self.affected_population = float('NaN')
         print('\tNo matching population data found')
+        #self.affected_population = 0.0
     else:
         pop = loc_idx.iloc[0]['Population']
         self.affected_population = float(pop.replace(',', '')) if isinstance(pop, str) else pop
@@ -1176,8 +1180,10 @@ def setup_auto_start(sys_args,ngfs_cfg):
    
 if __name__ == '__main__':
 
+
+
    print()
-   print('Starting ngfs script')
+   print('Starting ngfs script ',pd.Timestamp.now())
 
    print('Reading the ngfs configuration file')
    with open('etc/ngfs.json','r') as openfile:
