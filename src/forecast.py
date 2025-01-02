@@ -1062,9 +1062,9 @@ def wrf_execute(job_id):
 
 def process_output(job_id):
     args = load_sys_cfg()
-    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
-    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-    satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id, 'input.json'))
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id, 'job.json'))
+    satfile = osp.abspath(osp.join(args.workspace_path, job_id, 'sat.json'))
     logging.info('process_output: loading input description from %s' % inpfile)
     try:
         jsin = Dict(json.load(open(inpfile,'r')))
@@ -1089,6 +1089,7 @@ def process_output(job_id):
         available_sats = []
         not_empty_sats = []
         pass
+    jsin = process_arguments(jsin, args) 
     logging.info('process_output: available satellite data %s' % available_sats)
     logging.info('process_output: not empty satellite data %s' % not_empty_sats)
     js.old_pid = js.pid
@@ -1097,7 +1098,7 @@ def process_output(job_id):
     js.restart = js.get('restart',False)
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
-    js.wrf_dir = js.get('wrf_dir',osp.abspath(osp.join(args.workspace_path, js.job_id, 'wrf')))
+    js.wrf_dir = js.get('wrf_dir',osp.abspath(osp.join(jsin.workspace_path, js.job_id, 'wrf')))
 
     pp = None
     if js.postproc is None:
@@ -1108,7 +1109,7 @@ def process_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
+    js.pp_dir = js.get('pp_dir', osp.join(jsin.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
@@ -1157,7 +1158,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
                         logging.warning('Failed to postprocess for time %s with error %s.' % (esmf_time, str(e)))
@@ -1169,7 +1170,7 @@ def process_output(job_id):
             if js.postproc.get('shuttle', None) == 'on_completion':
                 desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                 tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+                send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         else:
             logging.error('All postprocessing steps failed')
@@ -1248,7 +1249,7 @@ def process_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not (x.endswith('json') or x.endswith('csv') or x.endswith('html'))]
                     except Exception as e:
                         logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
@@ -1264,14 +1265,14 @@ def process_output(job_id):
         if js.postproc.get('shuttle', None) == 'on_completion':
             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-            send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+            send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         if js.postproc.get('shuttle', None) is not None:
             steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
-            args = ' '.join([js.job_id,steps,'inc'])
-            make_kmz(args)
-            args = ' '.join([js.job_id,steps,'ref'])
-            make_kmz(args)
+            arg_inp = ' '.join([js.job_id,steps,'inc'])
+            make_kmz(arg_inp)
+            arg_inp = ' '.join([js.job_id,steps,'ref'])
+            make_kmz(arg_inp)
 
         js.state = 'Completed'
 
@@ -1304,10 +1305,10 @@ def create_process_output_script(job_id):
 
 def process_sat_output(job_id):
     args = load_sys_cfg()
-    inpfile = osp.abspath(osp.join(args.workspace_path, job_id,'input.json'))
-    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-    satfile = osp.abspath(osp.join(args.workspace_path, job_id,'sat.json'))
-    logging.info('process_output: loading input description from %s' % inpfile)
+    inpfile = osp.abspath(osp.join(args.workspace_path, job_id, 'input.json'))
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id, 'job.json'))
+    satfile = osp.abspath(osp.join(args.workspace_path, job_id, 'sat.json'))
+    logging.info('process_sat_output: loading input description from %s' % inpfile)
     try:
         jsin = Dict(json.load(open(inpfile,'r')))
     except Exception as e:
@@ -1331,6 +1332,7 @@ def process_sat_output(job_id):
         available_sats = []
         not_empty_sats = []
         return
+    jsin = process_arguments(jsin, args)
     logging.info('process_sat_output: available satellite data %s' % available_sats)
     logging.info('process_sat_output: not empty satellite data %s' % not_empty_sats)
     if not not_empty_sats:
@@ -1346,7 +1348,7 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) != None and not js.restart:
         delete_visualization(js.job_id)
 
-    js.pp_dir = js.get('pp_dir', osp.join(args.workspace_path, js.job_id, 'products'))
+    js.pp_dir = js.get('pp_dir', osp.join(jsin.workspace_path, js.job_id, 'products'))
     if not js.restart:
         already_sent_files = []
         make_clean_dir(js.pp_dir)
@@ -1378,7 +1380,7 @@ def process_sat_output(job_id):
                         if js.postproc.get('shuttle', None) == 'incremental':
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-                            sent_files_1 = send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
@@ -1387,14 +1389,14 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) == 'on_completion':
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
         tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
-        send_product_to_server(args, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+        send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
     if js.postproc.get('shuttle', None) is not None:
         steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
-        args = ' '.join([js.job_id,steps,'inc'])
-        make_kmz(args)
-        args = ' '.join([js.job_id,steps,'ref'])
-        make_kmz(args)
+        arg_inp = ' '.join([js.job_id,steps,'inc'])
+        make_kmz(arg_inp)
+        arg_inp = ' '.join([js.job_id,steps,'ref'])
+        make_kmz(arg_inp)
 
     js.old_pid = js.pid
     js.pid = None
