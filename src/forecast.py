@@ -332,12 +332,14 @@ def run_fire_init(js, q):
             'scars_mask_path': osp.join(js.fire_init_dir, 'scars_mask.pkl')
         })
         if 'prev_forecast' in js.keys():
-            prev_scars_mask_path = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/scars_mask.pkl')
-            if osp.exists(prev_scars_mask_path):
-                force_copy(prev_scars_mask_path, params['scars_mask_path'])
-            prev_fire_init_results = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/results.pkl')
-            if osp.exists(prev_fire_init_results):
-                params.update({'prev_perims': prev_fire_init_results})
+            prev_forecast_path = osp.join(js.workspace_path, js.prev_forecast) 
+            if osp.exists(prev_forecast_path):
+                prev_scars_mask_path = osp.join(prev_forecast_path, 'fire_init/scars_mask.pkl')
+                if osp.exists(prev_scars_mask_path):
+                    force_copy(prev_scars_mask_path, params['scars_mask_path'])
+                prev_fire_init_results = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/results.pkl')
+                if osp.exists(prev_fire_init_results):
+                    params.update({'prev_perims': prev_fire_init_results})
 
         perims, params = fire_init.init_fire_info(**params)
         if len(perims):
@@ -999,19 +1001,21 @@ def execute(args,job_args):
                 outside_time=outside_time, no_fuel_cat=no_fuel_cat
             )
             if 'prev_forecast' in js.keys():
-                # implementation of adding smoke from previous forecast
-                wrfinput_paths = sorted(glob.glob(osp.join(js.wrf_path, 'wrfinput*')))
-                wrfout_paths = []
-                for wrfinput_path in wrfinput_paths:
-                    dom_str, = re.match(r'wrfinput_d(0[0-9])', osp.basename(wrfinput_path)).groups()
-                    wrfout_wildcard = js.start_utc.strftime('wrfout_d{:02d}_%Y-%m-%d_%H:%M:*'.format(dom_str))
-                    wrfout_wildcard_paths = osp.join(js.workspace_path, js.prev_forecast, 'wrf', wrfout_wildcard)
-                    prev_wrfout_paths = sorted(glob.glob(wrfout_wildcard_paths))
-                    if len(prev_wrfout_paths):
-                        wrfout_paths.append(prev_wrfout_paths[0])
-                if len(wrfinput_paths) == len(wrfout_paths):
-                    logging.info('integrating smoke from previous forecast')
-                    fire_init.add_smoke(wrfout_paths, wrfinput_paths)
+                prev_forecast_path = osp.join(js.workspace_path, js.prev_forecast)
+                if osp.exists(prev_forecast_path):
+                    # implementation of adding smoke from previous forecast
+                    wrfinput_paths = sorted(glob.glob(osp.join(js.wrf_path, 'wrfinput*')))
+                    wrfout_paths = []
+                    for wrfinput_path in wrfinput_paths:
+                        dom_str, = re.match(r'wrfinput_d(0[0-9])', osp.basename(wrfinput_path)).groups()
+                        wrfout_wildcard = js.start_utc.strftime('wrfout_d{:02d}_%Y-%m-%d_%H:%M:*'.format(dom_str))
+                        wrfout_wildcard_paths = osp.join(prev_forecast_path, 'wrf', wrfout_wildcard)
+                        prev_wrfout_paths = sorted(glob.glob(wrfout_wildcard_paths))
+                        if len(prev_wrfout_paths):
+                            wrfout_paths.append(prev_wrfout_paths[0])
+                    if len(wrfinput_paths) == len(wrfout_paths):
+                        logging.info('integrating smoke from previous forecast')
+                        fire_init.add_smoke(wrfout_paths, wrfinput_paths)
         else:
             logging.error('use_realtime is selected, but no fire information to start a fire simulation')
             sys.exit(1)
