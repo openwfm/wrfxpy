@@ -949,11 +949,14 @@ def get_csv_lists(days_to_get):
    for i in range(days_to_get):
       print('NGFS data from today' if i == 0 else 'NGFS data from yesterday or before')
     
-      for satellite, sector in [(18, 'CONUS'), (18, 'Full-Disk'), (16, 'CONUS')]:
-         c_str, c_path = get_ngfs_csv(i, satellite, sector)
-         csv_str.append(c_str)
-         csv_path.append(c_path)
-        
+      for satellite, sector in [(18, 'CONUS'), (16, 'CONUS'), (18, 'Full-Disk')]: ### removed this (18, 'Full-Disk') on March 13 becuase of download error
+         # fix it so download error doesn't crash, also this list should come from the ngfs.json config file
+         try:
+            c_str, c_path = get_ngfs_csv(i, satellite, sector)
+            csv_str.append(c_str)
+            csv_path.append(c_path)
+         except:
+            print('Error getting the csv for GOES-',satellite,sector)
    return csv_str, csv_path
    
 def read_NGFS_csv_data(csv_file):
