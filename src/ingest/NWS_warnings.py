@@ -82,26 +82,52 @@ def set_red_flags(date_str):
 
     # Find the shapes associated with the active red flag zones
     rf_zones = []
-    for rf in redflags:
-        for feature in rf_shape['features']:
-            if rf == feature['properties']['STATE_ZONE']:
-                feature['geom'] = feature['geometry']
-                if feature['geometry']['type'] == 'Polygon':
-                    feature['geometry'] = Polygon(feature['geometry']['coordinates'][0])
-                elif feature['geometry']['type'] == 'MultiPolygon':
-                    polys = [Polygon(c[0]) for c in feature['geometry']['coordinates']]
-                    feature['geometry'] = MultiPolygon(polys)
-                else:
-                    print('Unknown geometry type')
-                rf_zones.append(feature)
+    to_remove = []
+    for i in range(len(redflags)):
+        for j in range(len(rf_shape['features'])):
+            feature = rf_shape['features'][j]
+            try:
+                if redflags[i] == feature['properties']['STATE_ZONE']:
+                    #print(rf)
+                    feature['geom'] = feature['geometry']
+                    if feature['geometry']['type'] == 'Polygon': # isinstance(feature['geometry'],Polygon):
+                        try:
+                            feature['geometry'] = Polygon(feature['geometry']['coordinates'][0])
+                        #some zones have the geometry wrong
+                        except:
+                            feature['geometry']['type'] = 'MultiPolygon'
+                            polys = [Polygon(c[0]) for c in feature['geometry']['coordinates']]
+                            feature['geometry'] = MultiPolygon(polys)
+                    elif feature['geometry']['type'] == 'MultiPolygon': #isinstance(feature['geometry'],MultiPolygon):
+                        polys = [Polygon(c[0]) for c in feature['geometry']['coordinates']]
+                        feature['geometry'] = MultiPolygon(polys)
+                    else:
+                        print('Unknown geometry type')
+                    rf_zones.append(feature)
+                    #print('Have added ',len(rf_zones), 'red flag zones to datframe')
+            except:
+                 print(type(feature))
+                 print('Error with the red flag feature',redflags[i])
+                 #redflags.drop(i)
+                 to_remove.append(i)
 
-    try:
-        red_flag_zones = pd.DataFrame(rf_zones)
-        red_flag_zones['effective'] = effective
-        red_flag_zones['ends'] = ends
-    except:
-        red_flag_zones = pd.DataFrame()
-        print('Error combining red flags zone, returning empty DataFrame')
+    if len(to_remove):
+        r_effective = []
+        r_ends = []
+        for k in range(len(redflags)):
+            if k not in to_remove:
+                r_effective.append(effective[k])
+                r_ends.append(ends[k])
+        effective = r_effective
+        ends = r_ends
+
+    #try:
+    red_flag_zones = pd.DataFrame(rf_zones)
+    red_flag_zones['effective'] = effective
+    red_flag_zones['ends'] = ends
+    #except:
+    #    red_flag_zones = pd.DataFrame()
+     #   print('Error combining red flags zone, returning empty DataFrame')
 
     return red_flag_warnings, red_flag_zones.dropna()
 
