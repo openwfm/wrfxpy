@@ -5,5 +5,7 @@ if [ $# -eq 0 ]
      exit 1
 fi
 cd $(dirname "$0")
+git log | head -1
+echo "$*"
 export PYTHONPATH=src
 python src/forecast.py $1
