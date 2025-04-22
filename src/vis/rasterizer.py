@@ -222,6 +222,12 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, si
     
     # number of scatter elements
     N = len(val)	
+    if bounds is None and len(lons):
+         # longitude/latitude extent
+        lons = (np.amin(lon), np.amax(lon))
+        lats = (np.amin(lat), np.amax(lat))
+        bounds = (lons[0], lons[1], lats[0], lats[1])
+    # Add border to bounds
     bounds = (bounds[0]-border, bounds[1]+border, bounds[2]-border, bounds[3]+border)
    
     logging.info('basemap_scatter_mercator: bounding box {}'.format(bounds))

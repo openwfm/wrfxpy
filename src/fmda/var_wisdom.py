@@ -3,7 +3,7 @@ import numpy as np
 _var_wisdom = {
     "dfm" : {
         "name" : "Dead Fuel moisture",
-        "native_unit" : "gm",
+        "native_unit" : "g/g",
         "colorbar" : "%",
         "colormap" : "jet_r",
         "norm_opt" : "boundary",
@@ -19,7 +19,7 @@ _var_wisdom = {
     },
     "lfm" : {
         "name" : "Live Fuel moisture",
-        "native_unit" : "gm",
+        "native_unit" : "g/g",
         "colorbar" : "%",
         "colormap" : "jet_r",
         "norm_opt" : "boundary",
@@ -132,20 +132,20 @@ _var_wisdom = {
         "transparent_values" : [-np.inf, 5e-10],
         "scale" : [0, 5e-7]
     },
-    'FOSBERG' : {
-        'name' : 'Fosberg Index',
+    'FFWI' : {
+        'name' : 'Fosberg Fire Weather Index',
         'native_unit' : '-',
         'colorbar' : '-',
-        'colormap' : 'autumn_r',
-        'scale' : [0, 45]
+        'colormap' : 'hot_r',
+        'scale' : [0, 100]
     },
-    'HDW' : {
+    'HDWI' : {
         'name' : 'Hot, Dry, & Windy Index',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'rainbow',
         'norm_opt' : 'boundary',
-        'bounds' : [0,25,50,75,90,95,100],
+        'bounds' : [0, 25, 50, 100, 200, 300, 400],
         'colors' : np.array([
             (255,255,255), (254,239,180), (254, 200, 108),
             (243,147, 70), (198,104, 54), (135,  81,  56)

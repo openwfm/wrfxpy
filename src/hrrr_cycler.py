@@ -25,7 +25,7 @@ from ingest.HRRRA import HRRRA
 from ingest.HRRR import HRRR
 from utils import Dict, ensure_dir, utc_to_esmf, delete, force_copy
 from vis.postprocessor import scalar_field_to_raster, vector_field_to_raster, scatter_to_raster
-from vis.vis_utils import ffwi, hdw
+from vis.vis_utils import calculate_svp, calculate_eta
 from ssh_shuttle import send_product_to_server
 
 import netCDF4
@@ -203,8 +203,6 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
                     mf, postproc_path, cycle_id, esmf_cycle, name, 
                     raster_png, coords, alpha = 0.5
                 ) 
-            # Add other variables (Fire Weather Indices)
-            
             fuel_classes = [(0, "1-hr DFM"), (1, "10-hr DFM"), (2, "100-hr DFM"), (3, "1000-hr DFM")]
             for i,name in fuel_classes:
                 wisdom = get_wisdom("dfm").copy()
@@ -217,6 +215,48 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
                     mf, postproc_path, cycle_id, esmf_cycle, name, 
                     raster_png, coords, cb_png, levels, 0.5
                 )
+                
+            # Add other variables (Fire Weather Indices)
+            # Get Temperature [K]
+            T = d.variables["T2"][:]
+            # Get Relative humidity [1]
+            rh = d.variables["RH"][:] / 100  
+            # Get Wind speed [m/s]
+            ws = d.variables["WINDSPD"][:]
+            # Calculate Saturated vapor presure [Pa]
+            pws = calculate_svp(T) 
+            # Calculate Vapor pressure deficit [hPa]         
+            vpd = (1 - rh) * pws / 100
+            # Calculate Moisture damping coefficient
+            eta = calculate_eta(T, rh*100)
+            # Convert Wind speed to mph
+            ws_mph = ws * 2.23694
+            
+            ### Fosberg Index (unitless) ###
+            # Compute index
+            ffwi = (eta * np.sqrt(1 + ws_mph**2)) / 0.3002
+            # Visualization
+            fosberg_wisdom = get_wisdom("FFWI").copy()
+            raster_png, coords, cb_png, levels = scalar_field_to_raster(
+                ffwi, lats, lons, fosberg_wisdom
+            )
+            write_postprocess(
+                mf, postproc_path, cycle_id, esmf_cycle, "FFWI", 
+                raster_png, coords, cb_png, levels, 0.5
+            )
+            
+            ### HDW Index (kPa m s-1) ###
+            # Compute index
+            hdw = vpd * ws
+            # Visualization
+            hdw_wisdom = get_wisdom("HDWI").copy()
+            raster_png, coords, cb_png, levels = scalar_field_to_raster(
+                hdw, lats, lons, hdw_wisdom
+            )
+            write_postprocess(
+                mf, postproc_path, cycle_id, esmf_cycle, "HDWI", 
+                raster_png, coords, cb_png, levels, 0.5
+            )
         if osp.exists("src/ingest/SynopticDB"):
             from ingest.SynopticDB.SynopticDB import SynopticDB
             import pandas as pd
@@ -242,9 +282,9 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
             else:
                 st = st.set_index("STID")
                 data = df.groupby("STID").mean(numeric_only=True).join(st[["LONGITUDE","LATITUDE"]])
+                fm = np.array(data["FUEL_MOISTURE_VALUE"]).astype(float) / 100.
                 raster_png, coords, cb_png, levels = scatter_to_raster(
-                    np.array(data["FUEL_MOISTURE_VALUE"])/100., 
-                    np.array(data["LATITUDE"]).astype(float), 
+                    fm, np.array(data["LATITUDE"]).astype(float), 
                     np.array(data["LONGITUDE"]).astype(float), meso_wisdom
                 ) 
             name = "MESO 10-hr DFM"
@@ -788,7 +828,7 @@ if __name__ == "__main__":
                 logging.warning("CYCLER copying previous post-processing or re-trying.")
                 try:
                     bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
-                    pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds=bounds)   
+                    pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, 0, bounds=bounds)   
                     if pp_path != None:
                         if "shuttle_remote_host" in sys_cfg:
                             sim_code = "fmda-" + wrapped_cfg.code
@@ -812,11 +852,11 @@ if __name__ == "__main__":
         hrrr = HRRR(sys_cfg)
         shift_hours = cycle.hour % period_hours
         cycle_start = (cycle - timedelta(hours=shift_hours)).replace(tzinfo=timezone.utc)
-        from_utc = (cycle + timedelta(hours=1)).replace(tzinfo=timezone.utc)
+        from_utc = cycle.replace(tzinfo=timezone.utc)
         to_utc = (cycle_start + timedelta(hours=forecast_length)).replace(tzinfo=timezone.utc)
         fcst_hour = 1
         tmp_utc = from_utc + timedelta(hours=fcst_hour)
-        while tmp_utc < to_utc:
+        while tmp_utc <= to_utc:
             # Get HRRR forecast data
             try:
                 fct_gribs = hrrr.retrieve_gribs(tmp_utc, tmp_utc, cycle_start=cycle_start)

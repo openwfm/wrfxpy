@@ -2,7 +2,9 @@ import numpy as np
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
     u8p, v8p, cloud_to_level_hPa, smoke_to_height_terrain, density, print_stats, \
-    smoke_concentration, transform_goes, fire_front, ffwi, hdw
+    smoke_concentration, transform_goes, fire_front
+    
+from fwi.fire_weather_indices import FFWI, HDW
 
 smoke_threshold_int = 10
 smoke_threshold = 1
@@ -1126,7 +1128,7 @@ _var_wisdom = {
         'colorbar' : '-',
         'colormap' : 'autumn_r',
         'scale' : [0,45],
-        'retrieve_as' : lambda d, t: ffwi(d,t),
+        'retrieve_as' : lambda d, t: FFWI(d,t),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'HDW' : {
@@ -1142,7 +1144,7 @@ _var_wisdom = {
         ])/255.,
         'spacing' : 'uniform',
         'scale' : [0, 100],
-        'retrieve_as' : lambda d,t: hdw(d,t),
+        'retrieve_as' : lambda d,t: HDW(d,t),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:]),
     }
 }
@@ -1169,7 +1171,7 @@ _units_wisdom = {
     ('ug/m^2', 'g/m^2') : lambda x: 1e-6 * x,
     ('ug/m^3', 'g/m^3') : lambda x: 1e-6 * x,
     ('W/m', 'BTU/ft/s') : lambda x: 0.0002888946124 * x,
-    ('gm', '%') : lambda x: 100.0 * x
+    ('g/g', '%') : lambda x: 100.0 * x
 }
 
 def get_wisdom(var_name):

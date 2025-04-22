@@ -228,27 +228,30 @@ def scatter_to_raster(fa, lats, lons, wisdom):
     if 'norm_opt' in wisdom: 
         norm_opt = wisdom['norm_opt']
         if norm_opt == 'lognorm':
-            linthresh = wisdom.get('linthresh',.01)
-            linscale = wisdom.get('linscale',.001)
+            linthresh = wisdom.get('linthresh', .01)
+            linscale = wisdom.get('linscale', .001)
             norm = lambda xmin,xmax: mpl.colors.SymLogNorm(linthresh=linthresh,linscale=linscale,vmin=xmin,vmax=xmax,base=10) 
+            logging.info(f'scatter_to_raster: norm_opt={norm_opt} linthresh={linthresh} linscale={linscale}')
         elif norm_opt == 'boundary':
-            bounds = wisdom.get('bounds',[0,1,2,4,6,8,12,16,20,25,30,40,60,100,200])
+            bounds = wisdom.get('bounds', [0,1,2,4,6,8,12,16,20,25,30,40,60,100,200])
+            ticks = bounds[1:]
             if 'labels' in wisdom and wisdom['labels'] is not None:
                 ticklabels = wisdom['labels']
             elif wisdom['colorbar'] is not None:
                 cb_unit = wisdom['colorbar']
-                ticklabels = [convert_value(native_unit, cb_unit, b) for b in bounds[1:]]
-            ticks = bounds[1:]
-            bounds = bounds + [1e10]
+                ticklabels = [convert_value(native_unit, cb_unit, b) for b in ticks]
             colors = wisdom.get('colors',np.array([(255,255,255),(197,234,252),(148,210,240),
                                                     (107,170,213),(72,149,176),(74,167,113),
                                                     (114,190,75),(203,217,88),(249,201,80),
                                                     (245,137,56),(234,84,43),(217,45,43),
                                                     (188,28,32),(156,22,27),(147,32,205)])/255.)
             cmap = mpl.colors.LinearSegmentedColormap.from_list('custom',colors,N=len(colors))
-            norm = lambda xmin,xmax: mpl.colors.BoundaryNorm(boundaries=bounds,ncolors=len(bounds))
+            bounds = bounds + [1e10]
+            norm = lambda xmin,xmax,b=bounds: mpl.colors.BoundaryNorm(boundaries=b, ncolors=len(b))
+            logging.info(f'scatter_to_raster: norm_opt={norm_opt} bounds={bounds} ticks={ticks} labels={ticklabels}')
         else:
             norm = lambda xmin,xmax: mpl.colors.Normalize(xmin,xmax) 
+            logging.info(f'scatter_to_raster: norm_opt={norm_opt}')
 
     # only create the colorbar if requested
     cb_png_data = None
@@ -274,9 +277,9 @@ def scatter_to_raster(fa, lats, lons, wisdom):
     
     # other parameters
     if len(lons):
-        bounds = wisdom.get('bbox',(np.amin(lons), np.amax(lons), np.amin(lats), np.amax(lats)))
+        bounds = wisdom.get('bbox', (np.amin(lons), np.amax(lons), np.amin(lats), np.amax(lats)))
     else:
-        bounds = wisdom.get('bbox',(0,0,0,0))
+        bounds = wisdom.get('bbox', (0, 0, 0, 0))
     alpha = wisdom.get('alpha', 0.7)
     marker = wisdom.get('marker', 'o')
     text = wisdom.get('text', False)
