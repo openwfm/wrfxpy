@@ -113,7 +113,7 @@ class ngfs_day():
       self.started = started
    def set_save_name(self):
       if self.today:
-         self.sat_name = 'GOES 16 & 18'
+         self.sat_name = 'GOES 18 & 19'
          self.map_save_str = self.ngfs_directory+'/NGFS_'+csv_date_str+'.png'
          time_str = str(time.gmtime().tm_year)+str(time.gmtime().tm_mon).zfill(2)+str(time.gmtime().tm_mday).zfill(2)+'_'+str(time.gmtime().tm_hour).zfill(2) + '_' + str(time.gmtime().tm_min).zfill(2)
          self.pickle_save_str = self.ngfs_directory+'/pkl_ngfs_day_'+csv_date_str+'_'+time_str+'.pkl'
@@ -766,26 +766,6 @@ def get_old_incidents(ngfs_directory):
     
     return list(set(started_inc_ids)), old_ngfs_incidents
 
-
-def setup_csv_download(args):
-      today = 'now' in str(args) or ngfs_cfg['run_cfg']['today_forecasts']
-
-      # Determine directory and download parameters
-      ngfs_ingest = ngfs_cfg['goes_cfg'].get('ingest_directory', 'ingest/NGFS')
-      days_to_get = ngfs_cfg['goes_cfg'].get('days_to_get', 2)
-      print(f"{'Downloading latest CSV files:' if today else 'Using existing CSV file:'}")
-
-      # Create directory if necessary and configure CSV file list
-      download_path = utils.make_dir(ngfs_ingest)
-      print(f"\tWill download to: {download_path}")
-
-      csv_file = (
-         get_csv_lists(days_to_get)[1] if today else [args[1]]
-      )
-      print(f"\t{'Files to download' if today else 'File to use'}: {csv_file[0] if not today else csv_file}")
-
-      return csv_file, today
-
    
 def make_base_configuration(force,ngfs_cfg):
    #check to see if a  base ngfs configuration file exists
@@ -915,7 +895,7 @@ def get_ngfs_csv(days_previous,sat,domain):
    base_str = 'NGFS_FIRE_DETECTIONS_GOES-{}_ABI_{}_{}_{}_{}_{}.csv'
 
    # Determine the satellite
-   satellite = '18' if sat == 18 else '16'
+   satellite = str(sat)
 
    # Format the csv_str using satellite and other variables
    csv_str = base_str.format(satellite,domain,yyyy, str(mm).zfill(2), str(dd).zfill(2), str(day_of_year).zfill(3))
@@ -938,7 +918,7 @@ def get_ngfs_csv(days_previous,sat,domain):
          
    return csv_str, csv_path
    
-def get_csv_lists(days_to_get):
+def get_csv_lists(days_to_get,ngfs_cfg):
    #returns list of csv files to be obtained
    #empy lists for storing path names
    csv_str = list()
@@ -948,8 +928,22 @@ def get_csv_lists(days_to_get):
    #days_to_get = 
    for i in range(days_to_get):
       print('NGFS data from today' if i == 0 else 'NGFS data from yesterday or before')
-    
-      for satellite, sector in [(18, 'CONUS'), (16, 'CONUS'), (18, 'Full-Disk')]: ### removed this (18, 'Full-Disk') on March 13 becuase of download error
+      '''
+      for satellite in ngfs_cfg['goes_cfg']['sat_sectors']:
+         print(f'GOES-{satellite}')
+         for sector in ngfs_cfg['goes_cfg']['sat_sectors'][satellite]:
+            print(sector)
+            
+            try:
+               c_str, c_path = get_ngfs_csv(i, satellite, sector)
+               csv_str.append(c_str)
+               csv_path.append(c_path)
+            except:
+               print('Error getting the csv for GOES -',satellite,sector)
+               #print(f'\tLooked for it at {c_path}')
+      '''
+      
+      for satellite, sector in [(18, 'CONUS'), (19,'CONUS'), (18, 'Full-Disk')]: ### removed this (18, 'Full-Disk') on March 13 becuase of download error
          # fix it so download error doesn't crash, also this list should come from the ngfs.json config file
          try:
             c_str, c_path = get_ngfs_csv(i, satellite, sector)
@@ -957,6 +951,7 @@ def get_csv_lists(days_to_get):
             csv_path.append(c_path)
          except:
             print('Error getting the csv for GOES-',satellite,sector)
+      
    return csv_str, csv_path
    
 def read_NGFS_csv_data(csv_file):
@@ -989,8 +984,8 @@ def read_NGFS_csv_data(csv_file):
 
     # Loop through each CSV file
     for file_path in csv_file:
-        # Modify feature_tracking_id string for GOES-16 files
-        if 'GOES-16' in file_path:
+        # Modify feature_tracking_id string for GOES-16 or GOES-19 files
+        if 'GOES-16' in file_path or 'GOES-19' in file_path:
             os.system(f"sed -i 's/,ID-20/,I6-20/g' {file_path}")
 
         try:
@@ -1152,7 +1147,7 @@ def setup_csv_download(sys_args,ngfs_cfg):
         print(f'\tWill download to: {utils.make_dir(ngfs_ingest)}')
         
         # Get list of files to download
-        csv_str, csv_file = get_csv_lists(days_to_get)
+        csv_str, csv_file = get_csv_lists(days_to_get,ngfs_cfg)
     else:
         # CSV file was passed as a system argument
         today = False
@@ -1163,26 +1158,31 @@ def setup_csv_download(sys_args,ngfs_cfg):
     return today, csv_file
 
 def setup_auto_start(sys_args,ngfs_cfg):
-    # Check for auto start conditions
-    if 'auto' in str(sys_args) or ngfs_cfg['run_cfg'].get('auto_start_forecasts', False):
+   # Check for auto start conditions
+   if 'auto' in str(sys_args) or ngfs_cfg['run_cfg'].get('auto_start_forecasts', False):
         sf.print_question('Autostart detected. Is this what you want? yes/no, default = [no]')
         auto_start = sf.read_boolean('no')
         num_starts = sf.read_integer(25) if auto_start else -1
         force = False
-    elif 'force' in str(sys.argv) or ngfs_cfg['run_cfg'].get('force_process', False):
+   elif 'force' in str(sys.argv) or ngfs_cfg['run_cfg'].get('force_process', False):
         # Force auto start and avoid questions
         auto_start = True
         num_starts = ngfs_cfg['run_cfg'].get('num_starts', -1)
         force = True
-    else:
+   else:
         auto_start = False
         num_starts = -1
         force = True
+
+   if auto_start:
+      print('Simulations will be started automatically. Make sure you have the resources.')
+      time.sleep(2)
+   else:
+      print('Simulations will need to be started manually')
     
-    return auto_start, num_starts, force
+   return auto_start, num_starts, force
    
 if __name__ == '__main__':
-
 
 
    print()
@@ -1191,6 +1191,7 @@ if __name__ == '__main__':
    print('Reading the ngfs configuration file')
    with open('etc/ngfs.json','r') as openfile:
          ngfs_cfg = json.load(openfile)
+         #should walk user through this if not found  <<<-----------------------------------------------------
 
    ngfs_directory = ngfs_cfg['ngfs_directory']
 
@@ -1215,14 +1216,11 @@ if __name__ == '__main__':
    started_inc_ids, old_ngfs_incidents  = get_old_incidents(ngfs_directory)
    #print(old_inc_ids)
 
+   #determine if the date is "today" and get list of csv NGFS files to download
    today, csv_file = setup_csv_download(sys.argv,ngfs_cfg)
-   auto_start, num_starts, force = setup_auto_start(sys.argv,ngfs_cfg)
 
-   if auto_start:
-      print('Simulations will be started automatically. Make sure you have the resources.')
-      time.sleep(2)
-   else:
-      print('Simulations will need to be started manually')
+   #determine the number of forecastrs to possibly run and whether these will start automatically
+   auto_start, num_starts, force = setup_auto_start(sys.argv,ngfs_cfg)
    
    ##################################################################
    # configure the job(s), uses questionaire from simple_forecast.p #
@@ -1249,7 +1247,11 @@ if __name__ == '__main__':
    data = data.dropna(subset=['incident_name'])  #  <------ change to use id_string?
 
    #get red flag warning data
-   rf_warnings, rf_zones = set_red_flags(csv.date_str)
+   try:
+      rf_warnings, rf_zones = set_red_flags(csv.date_str)
+   except:
+      rf_warnings, rf_zones = [],[]
+      print('Error in finding the red flag zones')
 
    ### add detections in selected NWS WFOs that have no incident_id_string, but are possible wildlnad fires ####
    try:
@@ -1280,7 +1282,7 @@ if __name__ == '__main__':
    print('Found ',num_id_strings, 'unique id strings')
    time.sleep(5)
 
-   #id strings seem to be less mutable than the names
+   #id strings seem to be less mutable than the names  <<<<---------------------------- probably remove this option, initializing by names doesn't make sense
    try:
       initialize_by_names = ngfs_cfg['run_cfg']['initialize_by_names']
    except:
