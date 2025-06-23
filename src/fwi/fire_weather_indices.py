@@ -48,13 +48,12 @@ def calculate_rh(T, q, P):
     rh = Pw / Pws
     return np.clip(rh, 0, 1)
 
-def calculate_eta(T, rh):
+def calculate_emc(T, rh):
     """
-    Calculate moisture damping coefficient (eta) from temperature [K] and relative humidity [%]
+    Calculate equilibrium moisture content (emc) from temperature [K] and relative humidity [%]
     :param T: temperature [K]
     :param rh: relative humidity [1]
-    :return eta: eta quantity
-    """ 
+    """
     # Temperature K -> F
     T_f = ((T - 273.15) * 1.8) + 32
     # Initialize equilibrium moisture content
@@ -68,8 +67,19 @@ def calculate_eta(T, rh):
     # Case 3: RH < 10
     rh_mask = rh < 10
     emc[rh_mask] = 0.03229 + 0.281073 * rh[rh_mask] - 0.000578 * rh[rh_mask] * T_f[rh_mask] # Equilibrium Moisture Content (%)
-    # Find eta
-    eta = 1 - 2 * (emc / 30) + 1.5 * (emc / 30)**2 - 0.5 * (emc / 30)**3
+    return emc
+
+def calculate_eta(fmc, fmce=30):
+    """
+    Calculate moisture damping coefficient (eta)
+    :param fmc: fuel moisture [%]
+    :param fmce: fuel moisture of extinction [%]
+    :return eta: eta value
+    """ 
+    # Find moisture ratio
+    ratio = fmc/fmce
+    # Find moisture damping coefficient
+    eta = 1 - 2.59 * ratio + 5.11 * ratio**2 - 3.52 * ratio**3
     return np.clip(eta, 0, 1)
 
 def calculate_air_temp(theta, P):
@@ -100,22 +110,13 @@ def calculate_dew_point(q, P):
 
 ########### FWI CALCULATIONS ###########
     
-def calculate_ffwi(T, q, P, u, v):
+def calculate_ffwi(ws, eta):
     """
     Calculate the Fosberg Index
-    :param T: temperature [K]
-    :param q: specific humidity [kg/kg]
-    :param P: pressure [Pa]
-    :param u: u-component of wind [m/s]
-    :param v: v-component of wind [m/s] 
+    :param ws: wind speed [mph]
+    :param eta: moisture damping coefficient 
     :return: Fosberg Index (unitless)
     """
-    # Wind speed mph
-    ws = np.sqrt(u**2 + v**2) * 2.23694
-    # Find relative humidity [%]
-    rh = calculate_rh(T, q, P) * 100
-    # Calculate moisture damping coefficient
-    eta = calculate_eta(T, rh)
     # Fosberg Index Value (unitless)
     ffwi = (eta * np.sqrt(1 + ws**2)) / 0.3002 
     return ffwi
@@ -141,41 +142,34 @@ def calculate_hdw(T, q, P, u, v):
     hdw = ws * vpd
     return hdw
 
-def calculate_lfp(T, q, P, u, v):
+def calculate_lfp(T, Td, ws):
     """
     Calculate the Large Fire Potential (LFP) Index
     :param T: temperature [K]
-    :param q: specific humidity [kg/kg]
-    :param P: pressure [Pa]
-    :param u: u-component of wind [m/s]
-    :param v: v-component of wind [m/s] 
+    :param Td: dew point temperature [K]
+    :param ws: sustained wind speed [m/s] 
     :return: LFM Index (unitless)
     """
-    # Calculate dew point temperature [Celsius]
-    Td = calculate_dew_point(q, P)
     # Temperature conversions
-    Td = Td * 9/5 + 32           # C to F
-    T = (T - 273.15) * 9/5 + 32  # K to F
+    T = (T - 273.15) * 9/5 + 32   # K to F
+    Td = (Td - 273.15) * 9/5 + 32 # K to F
     # Compute dew point depression in F
-    dp = T - Td
-    # Wind speed (m/s)
-    ws = np.sqrt(u**2 + v**2) 
+    dp = (T - Td) 
     # Find Large Fire Potential Index (unitless) 
     lfp = 0.001 * np.power(ws, 2) * dp
     return lfp
 
-def calculate_haines(theta, w, P, gph):
+def calculate_haines(t_950, t_850, t_700, t_500, t_dew850, t_dew700, height):
     """
     Calculate the Haines Index
-    :param theta: potential temperature [K]
-    :param w: water vapor mixing ratio [kg/kg]
-    :param P: pressure [Pa]
-    :param gph: geopotential height [m]
-    :return: Haines Index (unitless)
+    :param t_950: Temprature at 950 atm [K]
+    :param t_850: Temprature at 850 atm [K]
+    :param t_700: Temprature at 700 atm [K]
+    :param t_500: Temprature at 500 atm [K]
+    :param t_dew850: Dew Point Temprature at 850hPa [K]
+    :param t_dew700: Dew Point Temprature at 700hPa [K]
+    :param height: Height above sea level [m]
     """
-    def nearest_index(array, value):
-        '''Convert hPa to Pa and find index'''
-        return (np.abs(array - value * 100)).argmin()
     
     def haines_low(t_950, t_850, t_dew850):
         '''Low Elevation Haines Index'''
@@ -231,29 +225,14 @@ def calculate_haines(theta, w, P, gph):
         ) # moisture score
         return A + B
     
-    # Calculate air temperature in K
-    T = calculate_air_temp(theta, P)
-    # Calculate specific humidity from water vapor mixing ratio
-    q = w/(1+w)
-    # Calculate dew point temperature in K
-    Td = calculate_dew_point(q, P) + 273.15
-    # Extract values at required pressure levels
-    T_950 = T[nearest_index(P, 950)]
-    T_850 = T[nearest_index(P, 850)]
-    T_700 = T[nearest_index(P, 700)]
-    T_500 = T[nearest_index(P, 500)]
-    Td_850 = Td[nearest_index(P, 850)]
-    Td_700 = Td[nearest_index(P, 700)]
-    # Extract surface height (first level of geopotential height)
-    surface_height = gph[0] / 9.81  # Convert geopotential height to meters
     # Determine Haines category based on elevation
     haines_index = np.where(
-        surface_height < 304.8,  # <1000 ft
-        haines_low(T_950, T_850, Td_850),
+        height < 304.8,  # <1000 ft
+        haines_low(t_950, t_850, t_dew850),
         np.where(
-            surface_height < 914.4,  # <3000 ft
-            haines_mid(T_850, T_700, Td_850),
-            haines_high(T_700, T_500, Td_700),
+            height < 914.4,  # <3000 ft
+            haines_mid(t_850, t_700, t_dew850),
+            haines_high(t_700, t_500, t_dew700),
         )
     )
     return haines_index
@@ -290,8 +269,16 @@ def HDW(d, t):
     t2 = d.variables['T2'][t,:,:]        # Temperature (K)
     u10 = d.variables['U10'][t,:,:]      # U-Component of the Wind at 10m (m/s)
     v10 = d.variables['V10'][t,:,:]      # V-Component of the Wind at 10m (m/s)
+    # Wind speed mph
+    ws = np.sqrt(u10**2 + v10**2) * 2.23694
+    # Find relative humidity [%]
+    rh = calculate_rh(t2, q2, psfc) * 100
+    # Calculate equilibrium moisture content (EMC)
+    emc = calculate_emc(t2, rh)
+    # Calculate moisture damping coefficient
+    eta = calculate_eta(emc)
     # Calculate HDW
-    hdw = calculate_hdw(t2, q2, psfc, u10, v10)
+    hdw = calculate_hdw(ws, eta)
     return hdw
 
 def LFP(d, t):
@@ -307,8 +294,14 @@ def LFP(d, t):
     t2 = d.variables['T2'][t,:,:]        # Temperature (K)
     u10 = d.variables['U10'][t,:,:]      # U-Component of the Wind at 10m (m/s)
     v10 = d.variables['V10'][t,:,:]      # V-Component of the Wind at 10m (m/s)
+    # Calculate dew point temperature [Celsius]
+    Td = calculate_dew_point(q, P)
+    # Conversion Celsius to Kelvin
+    Td = Td + 273.15
+    # Wind speed (m/s)
+    ws = np.sqrt(u**2 + v**2) 
     # Calculate LFP
-    lfp = calculate_lfp(t2, q2, psfc, u10, v10)
+    lfp = calculate_lfp(T, Td, ws)
     return lfp
 
 def Haines(d, t):
@@ -318,11 +311,29 @@ def Haines(d, t):
     :param t: number of timestep
     :return: Haines (unitless)
     """
+    def nearest_index(array, value):
+        '''Convert hPa to Pa and find index'''
+        return (np.abs(array - value * 100)).argmin()
     # Get the needed variables
     w = d.variables['QVAPOR'][t,:,:]                            # Water vapor mixing ratio (kg/kg)
     P = d.variables['P'][t,:,:] + d.variables['PB'][t,:,:]      # Full pressure (Pa)
     theta = d.variables['T'][t,:,:] + 300                       # Potential Temperature (K)
     gph = d.variables['PH'][t,:,:] + d.variables['PHB'][t,:,:]  # Geopotential height (m)
+    # Calculate air temperature in K
+    T = calculate_air_temp(theta, P)
+    # Calculate specific humidity from water vapor mixing ratio
+    q = w/(1+w)
+    # Calculate dew point temperature in K
+    Td = calculate_dew_point(q, P) + 273.15
+    # Extract values at required pressure levels
+    T_950 = T[nearest_index(P, 950)]
+    T_850 = T[nearest_index(P, 850)]
+    T_700 = T[nearest_index(P, 700)]
+    T_500 = T[nearest_index(P, 500)]
+    Td_850 = Td[nearest_index(P, 850)]
+    Td_700 = Td[nearest_index(P, 700)]
+    # Extract surface height (first level of geopotential height)
+    surface_height = gph[0] / 9.81  # Convert geopotential height to meters
     # Calculate Haines index
-    Haines = calculate_haines(theta, w, P, gph)
+    Haines = calculate_haines(T_950, T_850, T_700, T_500, Td_850, Td_700, surface_height)
     return Haines
