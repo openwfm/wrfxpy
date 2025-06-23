@@ -1,0 +1,11 @@
+{
+    "workspace_path" : "wksp_fmda",
+    "lookback_length" : 0,
+    "regions" : {
+       "CONUS": {
+         "code" : "CONUS",
+         "bbox" : [24.94, -125, 49.6, -66.93]
+       }
+    }
+}
+
