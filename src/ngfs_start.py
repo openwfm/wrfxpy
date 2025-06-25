@@ -180,30 +180,37 @@ class ngfs_day():
 
       print('Starting map making')
 
+      def get_coords(latlons, mask, map):
+         #map is a Basemap object, this returns projected coordinates
+         filtered = latlons[mask]
+         return map(filtered[:, 1], filtered[:, 0])
+      
+      def scatter_if_any(x, y, size, label, map):
+         #scatters projected coordinates and adds legend text to plot
+         if len(x) > 0:
+            map.scatter(x, y, s=size, label=label, edgecolors='black')
+
       #CONUS map
       m = Basemap(llcrnrlon=-119, llcrnrlat=22, urcrnrlon=-64, urcrnrlat=49, projection='lcc', lat_1=33, lat_2=45, lon_0=-95)
       m.latlon = True 
       m.shadedrelief()
       m.drawstates()
       m.drawcountries()
+      m.drawcoastlines()
 
       latlons = self.incident_ign_latlons()
 
-      def get_coords(latlons, mask):
-         filtered = latlons[mask]
-         return m(filtered[:, 1], filtered[:, 0])
+      #tuple with incident status, icon size, legend text label for plotting on map
+      incident_data = [
+         (self.ongoing, 15, 'Ongoing Incident'),
+         (self.new, 30, 'New Incident'),
+         (self.started * self.new, 30, 'New, Forecast Started')
+      ]
 
-      x_ongoing, y_ongoing = get_coords(latlons, self.ongoing)
-      x_new, y_new = get_coords(latlons, self.new)
-      x_started, y_started = get_coords(latlons, self.started * self.new)
-
-      def scatter_if_any(x, y, size, label):
-         if len(x) > 0:
-            m.scatter(x, y, s=size, label=label, edgecolors='black')
-
-      scatter_if_any(x_ongoing, y_ongoing, 15, 'Ongoing Incident')
-      scatter_if_any(x_new, y_new, 30, 'New Incident')
-      scatter_if_any(x_started, y_started, 30, 'New, Forecast Started')
+      #scatter the CONUS incidents
+      for data, size, label in incident_data:
+         x, y = get_coords(latlons, data, m)
+         scatter_if_any(x, y, size, label, m)
 
       plt.legend(loc="lower left")
       plt.title(f'NIFC Fire Incidents \n{self.date_str}\n {self.sat_name}')
@@ -220,14 +227,12 @@ class ngfs_day():
          n.shadedrelief()
          n.drawstates()
          n.drawcountries()
+         n.drawcoastlines()
 
-         xa_ongoing, ya_ongoing = n(x_ongoing, y_ongoing)
-         xa_new, ya_new = n(x_new, y_new)
-         xa_started, ya_started = n(x_started, y_started)
-
-         scatter_if_any(xa_ongoing, ya_ongoing, 15, 'Ongoing Incident')
-         scatter_if_any(xa_new, ya_new, 30, 'New Incident')
-         scatter_if_any(xa_started, ya_started, 30, 'New, Forecast Started')
+         #scatter the Alaska incidents on Alaskan map
+         for data, size, label in incident_data:
+            x, y = get_coords(latlons, data, n)
+            scatter_if_any(x, y, size, label, n)
 
          plt.legend(loc="lower right")
          plt.title(f'NIFC Alaska Fire Incidents \n{self.date_str}\n GOES-18')
@@ -245,7 +250,7 @@ class ngfs_day():
 
          height = img0.size[1]
          width = int(np.round(height * img1.size[0] / img1.size[1]))
-         img1 = img1.resize((width, height), Image.Resampling.LANCZOS)
+         img1 = img1.resize((width, height), Image.LANCZOS)
          img1.save(sv_str)
 
          image_new = Image.new("RGB", (img0.size[0] + img1.size[0], height), "white")
@@ -357,9 +362,9 @@ class ngfs_incident():
                cfg['geo_vars_path'] = ngfs_cfg['region_cfg'][r]['geo_vars_path']
                print(ngfs_cfg['region_cfg'][r]['msg'])
       else:
-         update_states = ['CA','AZ','NV','UT','OR','WA','ID','MT','WY','CO']
+         update_states = ['CA','AZ','NV','UT', 'NM'] #['OR','WA','ID','MT','WY','CO']
          if self.data.state[0] in update_states:
-               cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_2023'
+               cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_2024'
                print('\tUsing updated Landfire maps')
          #look for Alaska/Hawaii and updated regions to use latest Landfire and appropriate weather products
          if any(self.data.state == 'AK'):
@@ -979,6 +984,51 @@ def read_NGFS_csv_data(csv_file):
         'incident_type': 'string'
     }
 
+    def get_alaska_wfo(data):
+      borough_to_wfo = {
+      'Anchorage Municipality': 'KAFC',   # Anchorage Forecast Office
+      'Fairbanks North Star Borough': 'KAFG',  # Fairbanks Forecast Office
+      'Juneau City and Borough': 'KAJK',  # Juneau Forecast Office
+      'Matanuska-Susitna Borough': 'KAFC',
+      'Kenai Peninsula Borough': 'KAFC',
+      'North Slope Borough': 'KAFG',
+      'Nome Census Area': 'KAFG',
+      'Ketchikan Gateway Borough': 'KAJK',
+      'Yakutat City and Borough': 'KAJK',
+      'Bethel Census Area': 'KAFG',
+      'Dillingham Census Area': 'KAFC',
+      'Kusilvak Census Area': 'KAFG',
+      'Valdez-Cordova Census Area': 'KAFC',
+      'Wrangell City and Borough': 'KAJK',
+      'Haines Borough': 'KAJK',
+      'Petersburg Borough': 'KAJK',
+      'Sitka City and Borough': 'KAJK',
+      'Prince of Wales-Hyder Census Area': 'KAJK',
+      'Kodiak Island Borough': 'KAFC',
+      'Bristol Bay Borough': 'KAFC',
+      'Aleutians East Borough': 'KAFC',
+      'Aleutians West Census Area': 'KAFC',
+      'Denali Borough': 'KAFG',
+      'Southeast Fairbanks Census Area': 'KAFG',
+      'Yukon-Koyukuk Census Area': 'KAFG',
+      'Lake and Peninsula Borough': 'KAFC',
+      'Hoonah-Angoon Census Area': 'KAJK',
+      'Skagway Municipality': 'KAJK',
+      'Copper River Census Area': 'KAFC',
+      'Northwest Arctic Borough': 'KAFG'
+      # Add more as needed
+      }
+      data = data[data.state == 'AK']
+      wfo_list = []
+      for i in range(len(data)):
+         try:
+            wfo_list.append(borough_to_wfo[data['county'].iloc[i]])
+         except:
+            wfo_list.append('Unknown')
+      data['nws_wfo_code'] = wfo_list
+      return data
+          
+
     # Initialize an empty DataFrame
     data = pd.DataFrame()
 
@@ -994,8 +1044,9 @@ def read_NGFS_csv_data(csv_file):
             if 'Full' in file_path:
                 print(f'\nReading full-disk data: {file_path}')
                 print(f'\tNumber of all Full-Disk detections: {len(data_read)}')
-                data_read = data_read[data_read.country == 'USA']
+                data_read = data_read[data_read.country == 'United States']
                 print(f'\tNumber of USA Full-Disk detections: {len(data_read)}')
+                data_read = get_alaska_wfo(data_read)
 
             # Update fields to match legacy NGFS fields
             data_read['initial_observation_time'] = data_read[time_cols_v2[1]]
