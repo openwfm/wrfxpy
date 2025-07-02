@@ -1,0 +1,233 @@
+&fuel_scalars                      ! scalar fuel constants
+fire_wind_height = 6.096           ! height to interpolate wind to (m), 6.096 Behave, 0 to use fwh in each category
+cmbcnst  = 1.8605e+07              ! J/kg combustion heat dry fuel
+hfgl     = 17.e4                   ! W/m^2 heat flux to ignite canopy
+fuelmc_g = 0.40                    ! ground fuel moisture, set = 0 for dry
+fuelmc_c = 1.00                    ! canopy fuel moisture, set = 0 for dry
+nfuelcats = 40                     ! number of fuel categories used
+no_fuel_cat = 41                   ! extra category for no fuel
+no_fuel_cat2 = 100                 ! all categories up to here are no fuel
+ibeh = 4                           ! ROS formula: 0 =  MacArthur, 1 = Rothermel, 2 = Balbi, 3 = WIRC, 4 = Behave
+/
+
+&fuel_categories                 
+ fuel_name=
+'1: GR1 (short, patchy grass)',
+'2: GR2 (moderately coarse continuous grass 1ft depth)',
+'3: GR3 (very coarss grass 2ft depth)',
+'4: GR4 (moderately coarse continuous grass 2ft depth)',
+'5: GR5 (dense coarse grass 1-2ft depth)',
+'6: GR6 (dryland grass 1-2ft tall)',
+'7: GR7 (moderately coarse continuous grass 3ft depth)',
+'8: GR8 (Heavy, coarse, continuous grass 3-5ft tall)',
+'9: GR9 (very heavy, coarse, continuous grass 5-8ft tall)',
+'10: GS1 (shrubs 1ft high, low grass load)',
+'11: GS2 (shrubs 1-3ft high, moderate grass load)',
+'12: GS3 (moderate grass/shrub load, avg. grass/shrub depth <2ft)',
+'13: GS4 (Heavy grass/shrub load, depth >2ft)',
+'14: SH1 (Low shrub, fuelbaed depth ~1ft, some grass present)',
+'15: SH2 (moderate fuel load, depth ~1ft, no grass)' ,
+'16: SH3 (moderate shrub load, possible pine overstory or herbacious, fuel bed depth 2-3ft)',
+'17: SH4 (Low to moderate shrub and litter load, possible pine overstory, fuel bed depth about 3ft)',
+'18: SH5 (Heavy shrub load, depth 4-6ft)',
+'19: SH6 (Dense shrubs, little to no herb fuel, depth ~2ft)',
+'20: SH7 (Very heavy shrub load, depth 4-6ft, spread rate lower than SH5 but similar flame length)',
+'21: SH8 (Dense shrubs, little to no herb fuel, depth ~3ft)',
+'22: SH9 (Dense, finely branched shrubs with significant fine dead fuel, 4-6ft tall, some herbaceous fuels present)',
+'23: TU1 (Fuelbed is low load of grass and/or shrub with litter)',
+'24: TU2 (Fuelbed is moderate litter load with shrub component)' ,
+'25: TU3 (Fuelbed is moderate litter load with grass and shrub components)',
+'26: TU4 (Fuelbed is short conifer trees with grass or moss understory)',
+'27: TU5 (Fuelbed is high load conifer litter with shrub understory)',
+'28: TL1 (Light to moderate load, fuels 1-2in deep)',
+'29: TL2 (Low hardwood load, compact)',
+'30: TL3 (Moderate load conifer litter, no coarse fuels)',
+'31: TL4 (Moderate load, includes smaller diameter downed logs, both fine and coarse fuels)',
+'32: TL5 (High load conifer litter; light slash or mortality fuel, no coarse fuels)',
+'33: TL6 (Moderate load hardwood, less compact)',
+'34: TL7 (Heavy load, includes larger diameter downed logs)',
+'35: TL8 (Moderate load and compactness may include small amount of herbaceous load (long-needle pine litter)',
+'36: TL9 (Very high load broadleaf litter, heavy needle-drape in otherwise sparse shrub layer, no coarse fuels)',
+'37: SB1 (Slash-Blowdown, Fine fuel load is 10-20tons/acre, weighted toward fuels 1-3in diameter, depth <1ft)',
+'38: SB2 (Blowdown is scattered, with many trees standing, Fine fuel load is 7-12tons/acre, evenly distrubuted across 0-0.25, 0.25-1, 1-3in diameter classes, depth is about 1ft)',
+'39: SB3 (Blowdown is moderate, trees compacted to near the ground, fine fuel load is 7-12tons/acre, weighted toward 0-0.25in diameter class, depth >1ft)',
+'40: SB4 (Blowdown is total, fuelbed not compacted, foliage still attached)',
+'41: No Fuel'
+
+ ! Wind height to interpolate vertically to (m).
+ fwh = 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 
+       6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960,  
+       6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960
+
+ ! Roughness length (m). It is calculated by 0.13 * fueldepthm.
+ fz0 = 0.0158, 0.0396, 0.0792, 0.0792, 0.0594, 0.0594, 0.1189, 0.1585, 0.1981, 0.0357, 0.0594, 0.0713, 0.0832, 0.0396, 0.0396,
+       0.0951, 0.1189, 0.2377, 0.0792, 0.2377, 0.1189, 0.1743, 0.0238, 0.0396, 0.0515, 0.0198, 0.0396, 0.0079, 0.0079, 0.0119, 
+       0.0158, 0.0238, 0.0119, 0.0158, 0.0119, 0.0238, 0.0396, 0.0396, 0.0475, 0.1070, 1.e-7
+
+ ! Wind reduction factor (-). It takes the wind from 6.1m (20ft) and brings the wind speed down to the midflame height. 
+ windrf = 0.31, 0.36, 0.42, 0.42, 0.39, 0.39, 0.46, 0.46, 0.52, 0.35, 0.39, 0.41, 0.42, 0.36, 0.36, 
+          0.44, 0.46, 0.55, 0.42, 0.55, 0.46, 0.50, 0.33, 0.36, 0.38, 0.32, 0.36, 0.28, 0.28, 0.29, 
+          0.31, 0.33, 0.29, 0.31, 0.29, 0.33, 0.36, 0.36, 0.38, 0.45, 1.e-7
+ 
+ ! Initial total mass of surface fuel (kg/m^2). A combination of all fuel moisture classes.
+ fgi = 0.090, 0.247, 0.359, 0.482, 0.650, 0.785, 1.435, 1.749, 2.242, 0.303, 0.471, 0.673, 2.780, 0.381, 1.166, 
+       1.491, 0.762, 1.457, 0.964, 1.547, 1.435, 2.925, 0.291, 0.260, 0.640, 1.457, 1.569, 0.224, 0.314, 0.112, 
+       0.112, 0.260, 0.538, 0.067, 1.300, 1.491, 0.336, 1.009, 1.233, 5.604, 1.e-7
+
+ ! Fuel depth (m).
+ fueldepthm = 0.12192, 0.3048, 0.6096, 0.6096, 0.4572, 0.4572, 0.9144, 1.2192, 1.524,  0.27432, 0.4572, 0.5486, 
+              0.64008, 0.3048, 0.3048, 0.7315, 0.9144, 1.8288, 0.6096, 1.8288, 0.9144, 1.34112, 0.1829, 0.3048,
+              0.39624, 0.1524, 0.3048, 0.0610, 0.0610, 0.0914, 0.1219, 0.1830, 0.0914, 0.12192, 0.0914, 0.1829,
+              0.3048,  0.3048, 0.3660, 0.8230, 0.003048
+
+ ! Surface area to volume ratio (1/ft). A combination of all fuel moisture classes.
+ savr = 2054., 1820., 1290., 1826., 1631., 2006., 1834., 1302., 1612., 1832., 1827., 1614., 1674., 1674., 1672.,
+        1371., 1682., 1252., 1144., 1233., 1386., 1378., 1606., 1767., 1611., 2216., 1224., 1716., 1806., 1532., 
+        1568., 1713., 1936., 1229., 1770., 1733., 1653., 1884., 1935., 1907., 3500.
+
+ ! Fuel moisture content of extinction (g/g).
+ fuelmce = 0.15, 0.15, 0.30, 0.15, 0.40, 0.40, 0.15, 0.30, 0.40, 0.15, 0.15, 0.40, 0.40, 0.15, 0.15, 
+           0.40, 0.30, 0.15, 0.30, 0.15, 0.40, 0.40, 0.20, 0.30, 0.30, 0.12, 0.25, 0.30, 0.25, 0.20, 
+           0.25, 0.25, 0.25, 0.25, 0.35, 0.35, 0.25, 0.25, 0.25, 0.25, 0.001
+
+ ! Fuel density (lb/ft^3). If solid 32 and if rotten 19.
+ fueldens = 32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,
+            32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,
+            32.,32.,32.,32.,32.,32.,32.,32.,32.,32.,32.
+ 
+ ! Fuel particle total mineral content (kg minerals/kg wood).
+ st = 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555,
+      0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555,
+      0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.0555, 0.5555
+ 
+ ! Fuel particle effective mineral content ((kg minerals - kg silica)/kg wood).
+ se = 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 
+      0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 
+      0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010, 0.010
+
+ ! Weighting parameter that determines the slope of the mass loss curve. 
+ ! Range from 5 (fast burnup) to 1000 (40% decrease in mass over 10 minutes).
+ ! Values were obtained by using the crosswalk table between 13 Albini and 40 S&B. 
+ weight  = 7.,   7.,   7.,   7.,   7.,   7.,   7.,   7.,   7.,   7.,   7.,   100., 100., 100., 100., 
+           180., 100., 180., 100., 100., 100., 100., 900., 900., 900., 900., 900., 900., 900., 900.,
+           900., 900., 900., 900., 900., 900., 900., 900., 900., 900., 7.                
+
+ ! Chaparral flag. Obtained by using the crosswalk table between 13 Albini and 40 S&B.
+ ichap = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+         0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+          
+ ! Fuel is dynamic or not. For transitions from live to dead fuel moisture.
+ idynamic = 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 
+            0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+ ! Multiplicative adjustment of backing spread rate.
+ adjr0 = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+ ! Multiplicative adjustment of wind contribution to spread rate.
+ adjrw = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+ ! Multiplicative adjustment of slope contribution to spread rate.
+ adjrs = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
+         1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+
+ ! Weighting factors used to combine all fuel moisture classes 1-6 (between 0.0 and 1.0). 
+ ! The sum of all fuel moisture classes for a particular fuel model should be always 1. 
+ ! Fuel moisture class 4 (1000h fuel moisture is not used so all zeros by default).
+ fmc_gw01 = 0.2500, 0.0909, 0.0500, 0.1163, 0.1379, 0.0286, 0.1563, 0.0568, 0.0909, 0.1481, 0.1923, 0.0923, 0.1484, 0.1282, 0.1617, 
+            0.0466, 0.1789, 0.4186, 0.5043, 0.2431, 0.1925, 0.2903, 0.0541, 0.2262, 0.3385, 0.6923, 0.2857, 0.1471, 0.2373, 0.0909, 
+            0.0806, 0.1429, 0.5000, 0.0306, 0.6988, 0.4716, 0.0968, 0.3529, 0.4889, 0.3750, 0.0000
+ fmc_gw02 = 0.0000, 0.0000, 0.2000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1136, 0.0909, 0.0000, 0.1923, 0.0769, 0.0234, 0.1282, 0.2874, 
+            0.3109, 0.2421, 0.2442, 0.2522, 0.3681, 0.3192, 0.1581, 0.2432, 0.4286, 0.0462, 0.0000, 0.2857, 0.3235, 0.3898, 0.4000, 
+            0.2419, 0.3106, 0.2500, 0.1429, 0.1687, 0.2340, 0.1935, 0.3333, 0.2444, 0.2500, 0.0000
+ fmc_gw03 = 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0078, 0.0000, 0.0898,
+            0.0000, 0.0421, 0.0000, 0.0000, 0.1528, 0.0798, 0.0000, 0.4054, 0.2976, 0.0769, 0.0000, 0.2143, 0.5294, 0.3729, 0.5091, 
+            0.6774, 0.5466, 0.2500, 0.8265, 0.1325, 0.2943, 0.7097, 0.3137, 0.2667, 0.3750, 0.0000
+ fmc_gw05 = 0.7500, 0.9091, 0.7500, 0.8837, 0.8621, 0.9714, 0.8438, 0.8295, 0.8182, 0.3704, 0.2308, 0.4462, 0.2656, 0.0769, 0.0000, 
+            0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1000, 0.0541, 0.0000, 0.2000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+            0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000
+ fmc_gw06 = 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.4815, 0.3846, 0.3846, 0.5547, 0.6667, 0.4611, 
+            0.6425, 0.5368, 0.3372, 0.2435, 0.2361, 0.4085, 0.4516, 0.2432, 0.0476, 0.3385, 0.3077, 0.2143, 0.0000, 0.0000, 0.0000, 
+            0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000
+
+ ! Surface area to volume ratio (1/ft) divided by fuel moisture classes 1-6.
+ ! Fuel moisture class 4 (1000h fuel moisture is not used so all zeros by default).
+ savr_gc01 = 2200., 2000., 1500., 2000., 1800., 2200., 2000., 1500., 1800., 2000., 2000., 1800., 1800., 2000., 2000., 
+             1600., 2000., 750.,  750.,  750.,  750.,  750.,  2000., 2000., 1800., 2300., 1500., 2000., 2000., 2000.,
+             2000., 2000., 2000., 2000., 1800., 1800., 2000., 2000., 2000., 2000., 2000.
+ savr_gc02 = 109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,
+             109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,
+             109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.,  109.
+ savr_gc03 = 30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   
+             30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,
+             30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.,   30.
+ savr_gc05 = 2000., 1800., 1300., 1800., 1600., 2000., 1800., 1300., 1600., 1800., 1800., 1600., 1600., 1800., 9999.,
+             9999., 1800., 9999., 9999., 9999., 9999., 1800., 1800., 9999., 1600., 9999., 9999., 9999., 9999., 9999., 
+             9999., 9999., 9999., 9999., 9999., 9999., 9999., 9999., 9999., 9999., 9999.
+ savr_gc06 = 9999., 9999., 9999., 9999., 9999., 9999., 9999., 9999., 9999., 1800., 1800., 1600., 1600., 1600., 1600.,
+             1400., 1600., 1600., 1600., 1600., 1600., 1500., 1600., 1600., 1400., 2000., 750.,  9999., 9999., 9999., 
+             9999., 1600., 9999., 9999., 9999., 1600., 9999., 9999., 9999., 9999., 9999.
+
+ ! Oven-dry fuel load (lb/ft^2) dibided by fuel moisture classes 1-6.
+ ! Fuel moisture class 4 (1000h fuel moisture is not used so all zeros by default).
+ fuelload_gc01 = 0.00459137,  0.00459137,  0.00459137,  0.011478,    0.01836548,  0.00459137,  0.0459137,   0.02295685,  0.0459137, 
+                 0.00918274,  0.02295685,  0.01377411,  0.08723603,  0.011478425, 0.061983495, 0.020661165, 0.039026645, 0.16528932, 
+                 0.13314973,  0.16069795,  0.094123085, 0.20661165,  0.00918274,  0.043618015, 0.05050507,  0.20661165,  0.1836548,
+                 0.0459137,   0.06427918,  0.02295685,  0.02295685,  0.052800755, 0.11019288,  0.01377411,  0.26629946,  0.305326105,
+                 0.06887055,  0.20661165,  0.25252535,  0.241046925, 0.001
+ fuelload_gc02 = 0.00,        0.00,        0.01836548,  0.00,        0.00,        0.00,        0.00,        0.0459137,   0.0459137,
+                 0.00,        0.02295685,  0.011478425, 0.01377411,  0.011478425, 0.11019288,  0.1377411,   0.052800755, 0.09641877,
+                 0.066574865, 0.24334261,  0.15610658,  0.112488565, 0.04132233,  0.08264466,  0.006887055, 0.00,        0.1836548,
+                 0.10101014,  0.10560151,  0.10101014,  0.06887055,  0.11478425,  0.05509644,  0.06427918,  0.06427918,  0.15151521,
+                 0.1377411,   0.195133225, 0.126262675, 0.16069795,  0.00   
+ fuelload_gc03 = 0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,
+                 0.00,        0.00,        0.00,        0.00459137,  0.00,        0.034435275, 0.00,        0.00918274,  0.00,
+                 0.00,        0.10101014,  0.039026645, 0.00,        0.06887055,  0.057392125, 0.011478425, 0.00,        0.1377411,
+                 0.16528932,  0.10101014,  0.12855836,  0.19283754,  0.20202028,  0.05509644,  0.37190097,  0.05050507,  0.190541855,
+                 0.5050507,   0.1836548,   0.1377411,   0.241046925, 0.00
+ fuelload_gc05 = 0.01377411,  0.0459137,   0.06887055,  0.087229,    0.11478425,  0.15610658,  0.24793398,  0.33517001,  0.4132233, 
+                 0.02295685,  0.02754822,  0.066574865, 0.15610658,  0.006887055, 0.00,        0.00,        0.00,        0.00,
+                 0.00,        0.00,        0.00,        0.071166235, 0.00918274,  0.00,        0.029843905, 0.00,        0.00,
+                 0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,
+                 0.00,        0.00,        0.00,        0.00,        0.00
+ fuelload_gc06 = 0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,
+                 0.029843905, 0.0459137,   0.057392125, 0.32598727,  0.05968781,  0.176767745, 0.28466494,  0.117079935, 0.13314973,
+                 0.06427918,  0.15610658,  0.199724595, 0.3213959,   0.04132233,  0.00918274,  0.05050507,  0.0918274,   0.1377411,
+                 0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,        0.00,
+                 0.00,        0.00,        0.00,        0.00,        0.00
+/
+
+&moisture
+ moisture_class_name =
+'1 hour fine fuel',
+'10 hour fine fuel',
+'100 hour fine fuel',
+'1000 hour fine fuel',
+'Live Herbaceous',
+'Live Woody'
+
+ ! Number of fuel moisture classes
+ moisture_classes = 6
+ ! Fuel moisture class is dead or live (1 if is dead and 0 if is live)
+ is_dead = 1, 1, 1, 1, 0, 0
+ ! Number of fuel moisture model (only 1=equilibrium moisture Van Wagner (1972) per Viney (1991) allowed at this moment)
+ drying_model = 1, 1, 1, 1, 1, 1
+ ! Drying timelag for each fuel moisture class
+ drying_lag = 1.0, 10.0, 100.0, 1000.0, 1e9, 1e9
+ ! Number of fuel moisture model (only 1=equilibrium moisture Van Wagner (1972) per Viney (1991) allowed at this moment)
+ wetting_model = 1, 1, 1, 1, 1, 1  ! number of model - only 1= allowed at this moment
+ ! Wetting timelag for each fuel moisture class (14 is callibrated to VanWagner&Pickett 1985, Canadian fire danger rating system)
+ wetting_lag = 1.4, 14.0, 140.0, 1400.0, 1e9, 1e9
+ ! Saturation fuel moisture contents (g/g) in rain
+ saturation_moisture = 2.5, 2.5, 2.5, 2.5, 2.5, 2.5
+ ! Saturation rain (mm/h). Stronger rain matters only in duration.
+ saturation_rain = 8.0, 8.0, 8.0, 8.0, 8.0, 8.0
+ ! Rain threshold (mm/h). Rain intensity smaller than that is same as nothing.
+ rain_threshold = 0.05, 0.05, 0.05, 0.05, 0.05, 0.05
+ ! Initialization of fuel moisture (0=from wrfinput, 1=from fuelmc_g, 2=from equilibrium)
+ fmc_gc_initialization = 2, 2, 2, 2, 1, 1
+/

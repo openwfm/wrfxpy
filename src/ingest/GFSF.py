@@ -1,8 +1,4 @@
-from __future__ import absolute_import
-from ingest.grib_source import GribError
 from ingest.grib_forecast import GribForecast
-from datetime import datetime
-import pytz
 
 
 class GFSF(GribForecast):
@@ -43,15 +39,17 @@ class GFSF(GribForecast):
     # instance variables
     id = "GFSF"
     info_url = "https://www.nco.ncep.noaa.gov/pmb/products/gfs/#GFS"
+    info_aws = "https://registry.opendata.aws/noaa-gfs-bdp-pds/"
     info_text = "NCEP GFS 0.25 Degree Global Forecast Grids Historical Archive"
     info = "Global Forecast System (GFS) Forecast"
-    remote_url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"
+    remote_url = ["s3://noaa-gfs-bdp-pds/", "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"]
+    browse_aws = "https://noaa-gfs-bdp-pds.s3.amazonaws.com/index.html"
     cycle_hours = 6
     period_hours = 3 # for METGRID and WRF
     hours_behind_real_time = 6 # choose forecast cycle at least one hour behind
     #    GFS provides hourly GRIB2 files up to hour 120 and then one GRIB2 file
     #    every 3 hours, starting with 123 and ending with 384.
-    grib_forecast_hours_periods = [{'hours':384,'period':3}]
+    grib_forecast_hours_periods = [{'hours':384, 'period':3}]
     # more information: https://www.nco.ncep.noaa.gov/pmb/products/gfs/nomads/
 
 
@@ -92,7 +90,7 @@ class GFSF_P(GFSF):
 
     # instance variables
     id = "GFSF_P"
-    prefix = 'COLMET_P'
+    prefix = "COLMET_P"
 
 
 class GFSF_S(GFSF):
@@ -131,4 +129,4 @@ class GFSF_S(GFSF):
 
     # instance variables
     id = "GFSF_S"
-    prefix = 'COLMET_S'
+    prefix = "COLMET_S"

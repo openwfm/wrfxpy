@@ -1,34 +1,7 @@
-# Copyright (C) 2013-2016 Martin Vejmelka, CU Denver
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-# of the Software, and to permit persons to whom the Software is furnished to do
-# so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR
-# A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-from __future__ import absolute_import
-from utils import ensure_dir, symlink_unless_exists, timedelta_hours, readhead, Dict
+from utils import ensure_dir, symlink_unless_exists, readhead
 from .downloader import download_url, DownloadError
-from datetime import datetime, timedelta
-import pytz
-import requests
-import os
 import os.path as osp
-import sys
 import logging
-import six
-from six.moves import zip
 
 class GribError(Exception):
     """
@@ -106,7 +79,7 @@ class GribSource(object):
         # vtables: a dictionary with keys from list ['geogrid_vtable', 'ungrib_vtable', 'metgrid_vtable'],
         #               which contain paths of the variable tables relative to 'etc/vtables'
 
-        for vtable_id, vtable_path in six.iteritems(vtables):
+        for vtable_id, vtable_path in vtables.items():
             # build path to link location
             symlink_path = osp.join(tgt, vtable_locs[vtable_id])
 
@@ -137,7 +110,7 @@ class GribSource(object):
         :param rel_path: the relative path of the file (w.r.t GRIB base url and w.r.t self.ingest_dir)
         :param max_retries: how many times we may retry to download the file
         """
-        url = url_base + '/' + rel_path
+        url = osp.join(url_base,rel_path)
         logging.info('downloading %s grib from %s' % (self.id, url))
         grib_path = osp.join(self.ingest_dir, rel_path)
         try:
@@ -203,11 +176,14 @@ class GribSource(object):
         if isinstance(url_bases,str):
             url_bases = [url_bases]
         for url_base in url_bases:
-            available = [x for x in links if readhead(url_base + '/' + x, msg_level=0).status_code == 200]
+            if url_base[:5] == 's3://':
+                available = [x for x in links if readhead(osp.join(osp.dirname(self.browse_aws), x), msg_level=0).status_code == 200]
+            else:
+                available = [x for x in links if readhead(osp.join(url_base, x), msg_level=0).status_code == 200]
             if len(available) > 0:
                 self.remote_url = url_base
                 return available[0]
-        logging.error('grib_source.available_online - online file not existent, urls tried:\n {}'.format([url_base + '/' + link for url_base in url_bases for link in links]))
+        logging.error('grib_source.available_online - online file not existent, urls tried:\n {}'.format([osp.join(url_base,link) for url_base in url_bases for link in links]))
         raise GribError('GribSource: failed to find an available online file')
 
 
@@ -229,6 +205,3 @@ def generate_grib_names():
         for c2 in alphabet:
             for c3 in alphabet:
                 yield "GRIBFILE." + c1 + c2 + c3
-
-
-
