@@ -589,12 +589,14 @@ def process_ignitions(js):
                 }
                 fire_data['points'].append(point_data)
         TIGN_G = fire_init.process_ignitions_to_tign(wrf_path, fire_data)   
-    if js.burn_plot_boundary is not None:
+    if js.burn_plot_boundary is not None and len(js.burn_plot_boundary):
         coords = [c[::-1] for c in js.burn_plot_boundary]
         if coords[0] != coords[-1]:
             coords.append(coords[0])
         wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % js.max_dom)
-        FUEL_MASK = fire_init.process_burn_plot_boundary(wrf_path, [[coords]])  
+        FUEL_MASK = fire_init.process_burn_plot_boundary(wrf_path, [[coords]])
+    else:
+        FUEL_MASK = np.zeros(fxlon.shape).astype(bool)
     fire_init.integrate_init(wrf_path, TIGN_G, FUEL_MASK, no_fuel_cat=js.fire_nml['fuel_scalars']['no_fuel_cat'])
 
 def timespec_to_utc(ts_str, from_time = None):
