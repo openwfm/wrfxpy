@@ -759,10 +759,14 @@ def execute(args,job_args):
 
     js.bounds = Dict({})
     for k,domain in enumerate(js.domain_conf.domains):
+        buffer = 0.1 # buffer in degrees
         bbox = domain.bounding_box()
         lons = [b[1] for b in bbox]
         lats = [b[0] for b in bbox]
-        bounds = (min(lons),max(lons),min(lats),max(lats))
+        bounds = (
+            min(lons) - buffer, max(lons) + buffer,
+            min(lats) - buffer, max(lats) + buffer
+        )
         js.bounds[str(k+1)] = bounds
 
     logging.info('satellite sources %s' % [s.id for s in js.satellite_source])

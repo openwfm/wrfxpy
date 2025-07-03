@@ -275,7 +275,7 @@ if __name__ == '__main__':
         print('list            : show list of current simulations with their job_id and description')
         print('cancel <job_id> : kill all processes and the WRF parallel job, do not delete any files')
         print('output <job id> : cancel, and delete all WRF output and visualization files only')
-        print('vis <job_id> : cancel, and delete all files')
+        print('vis <job_id> : cancel, and delete visualization on server files')
         print('all <job_id> : cancel, and delete all files')
         print('workspace       : delete jobs that are not on the visulalization server')
         print('update <job_id> : check if the job is running and update its job state file')
