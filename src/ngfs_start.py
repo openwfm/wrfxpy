@@ -315,10 +315,12 @@ class ngfs_incident():
          print('\tChanging the time parameters of the job for ealier detection information')
          print('\tNew UTC time:',new_ign_utc)
          print('\tOld UTC time:',self.ign_utc)
+         forecast_length = self.end_utc - self.start_utc
+
          self.ign_utc = new_ign_utc
          #the start and finish times of the simulation get adjusted too
          self.start_utc = utils.round_time_to_hour(self.ign_utc - timedelta(minutes=60))
-         self.end_utc = self.start_utc + timedelta(hours=24)
+         self.end_utc = self.start_utc + forecast_length
 
    
    
@@ -472,10 +474,12 @@ class ngfs_incident():
       #if size_increase > 2:
       #   print('Domain too large to forecast')
       
-
-
+      start_utc = utils.esmf_to_utc(base_cfg['start_utc']) #esmf_to_utc
+      end_utc = utils.esmf_to_utc(base_cfg['end_utc'])
+      forecast_length = end_utc-start_utc
+   
       cfg['start_utc'] = utils.utc_to_esmf(self.start_utc)
-      cfg['end_utc'] = utils.utc_to_esmf(utils.round_time_to_hour(self.ign_utc + timedelta(hours =  25.5))) #utils.round_time_to_hour(self.ign_utc - timedelta(minutes=30))
+      cfg['end_utc'] = utils.utc_to_esmf(utils.round_time_to_hour(self.ign_utc + forecast_length + timedelta(hours =  + 1.5))) #utils.round_time_to_hour(self.ign_utc - timedelta(minutes=30))
 
       #HRR and others need special data handling because 48 hour forecasts are only issued 
       #   at t00z, t06z, t12z, and t18z
@@ -612,7 +616,7 @@ class ngfs_incident():
 
         lat_diff = abs(tc_ign_latlon[0] - swir_ign_latlon[0])
         lon_diff = abs(tc_ign_latlon[1] - swir_ign_latlon[1])
-
+        #make sure the swir and nominal ocations aren't too far apart
         self.ign_latlon = swir_ign_latlon if max(lat_diff, lon_diff) < 0.04 else tc_ign_latlon
 
     except KeyError:
@@ -778,7 +782,7 @@ def make_base_configuration(force,ngfs_cfg):
       print('Configuration found')
       with open('jobs/base_ngfs_cfg.json','r') as openfile:
          temp_cfg = json.load(openfile)
-      json_print = json.dumps(temp_cfg, indent=4)   
+      #json_print = json.dumps(temp_cfg, indent=4)   
       #print(json_print)
       start_utc = utils.esmf_to_utc(temp_cfg['start_utc']) #esmf_to_utc
       end_utc = utils.esmf_to_utc(temp_cfg['end_utc'])
