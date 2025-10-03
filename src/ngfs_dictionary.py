@@ -1,3 +1,4 @@
+#data types for v1 ngfs csv files
 ngfs_dictionary = {
         'incident_name':'object',
         'incident_conf':'object',
@@ -144,6 +145,7 @@ v2_dict = {
     'incident_start_time' : 'datetime64[ns, UTC]'
 }
 
+#translates the v2 csv variables into the v1 variables
 v2_to_v1 = {
         'latitude':'lat_tc',
         'longitude':'lon_tc',

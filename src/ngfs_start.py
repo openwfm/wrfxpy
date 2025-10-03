@@ -176,6 +176,33 @@ class ngfs_day():
          csv_save_str = f'ngfs/forecast_ignition_pixels_{self.date_str}_{time_str}.csv'
          ign_pix.to_csv(csv_save_str, index=False)
 
+   def detection_summary(self,hours = 24):
+      #printssummary information about detections from the various sources over the previous period of length hours.
+      sat_list = list(self.full_data.satellite_name.unique())
+      det_summary = pd.DataFrame()
+      min_time = self.timestamp - timedelta(hours=hours)
+      idx = [0]
+      for sat in sat_list:
+         tmp = dict()
+         print(sat)
+         data = self.full_data[(self.full_data.satellite_name == sat) & (self.full_data.actual_image_time > min_time)]
+         tmp['satellite_name'] = sat
+         tmp['end_timestamp'] = self.timestamp
+         tmp['start_timestamp'] = min_time
+         tmp['total_detections'] = len(data)
+         tmp['known_wildland_fire'] = len(data[data.type_description == 'Known Wildland Fire Incident'])
+         tmp['possible_wildland_fire'] = len(data[data.type_description == 'Possible Wildland Fire'])
+         tmp['total_frp'] = np.sum(data.frp)
+         for k in tmp.keys():
+            print(f'\t{k}\t{tmp[k]}')
+         #
+         det_summary = det_summary.append(pd.DataFrame(tmp,index=[tmp['satellite_name']]))
+      
+      return det_summary
+
+
+
+
    def print_base_map(self):
 
       print('Starting map making')
@@ -269,6 +296,8 @@ class ngfs_incident():
       self.feature_data = pd.DataFrame()
       self.new = False
       self.started = False
+      self.continuing = False
+      self.unnamed = False
       self.affected_population = 0
       self.force = False
       self.auto_start = False
@@ -279,6 +308,7 @@ class ngfs_incident():
       self.start_utc = self.ign_utc - timedelta(hours = 2)
       self.end_utc = self.ign_utc + timedelta(hours = 4)
       self.ign_latlon = [40.0,-120.0]
+
 
    #could be more than one location, use append?
    def add_incident_location(self,county,state):

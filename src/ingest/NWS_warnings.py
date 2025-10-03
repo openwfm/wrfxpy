@@ -103,8 +103,9 @@ def set_red_flags(date_str):
                         feature['geometry'] = MultiPolygon(polys)
                     else:
                         print('Unknown geometry type')
+                        to_remove.append(i)
                     rf_zones.append(feature)
-                    #print('Have added ',len(rf_zones), 'red flag zones to datframe')
+                    #dir()print('Have added ',len(rf_zones), 'red flag zones to datframe')
             except:
                  print(type(feature))
                  print('Error with the red flag feature',redflags[i])
@@ -114,7 +115,7 @@ def set_red_flags(date_str):
     if len(to_remove):
         r_effective = []
         r_ends = []
-        for k in range(len(redflags)):
+        for k in range(len(rf_zones)):
             if k not in to_remove:
                 r_effective.append(effective[k])
                 r_ends.append(ends[k])
@@ -139,11 +140,13 @@ def red_flag_incident(lon, lat, ign_utc, red_flag_zones):
     """
     end_utc = ign_utc + timedelta(hours=24)
     point = Point(lon, lat)
-    
-    for _, rfz in red_flag_zones.iterrows():
-        if not (end_utc < rfz['effective'] or ign_utc > rfz['ends']) and point.within(rfz['geometry']):
-            return True
-    return False
+    if len(red_flag_zones):
+        for _, rfz in red_flag_zones.iterrows():
+            if not (end_utc < rfz['effective'] or ign_utc > rfz['ends']) and point.within(rfz['geometry']):
+                return True
+        return False
+    else:
+        return None
 
 def subset_red_flag_data(full_data, data, rf_zones):
     if len(rf_zones) == 0:

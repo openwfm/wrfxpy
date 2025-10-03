@@ -16,11 +16,8 @@ import os, zipfile
 import shapely as shp
 import xml.etree.ElementTree as ET
 import re
-
-
 #from ingest.downloader import download_url as du
 from shapely.geometry import Polygon, Point, box
-
 from datetime import timedelta, datetime
 
 
@@ -111,6 +108,9 @@ def extract_placemark(data):
     return pd.DataFrame([csv_row])
 
 class polar_data():
+    """
+    Utility for obtaining VIIRS data to help better estimate ignition points within GOES hotspots
+    """
     # get the csv files above 
     # combine into large pandas data frame
     #should pass in ngfs_cfg['firms_cfg'] dictionary for initialization
@@ -315,6 +315,8 @@ class polar_data():
             self.data = pd.merge(self.data,data_read,how = 'outer')
         else:
             self.data = data_read
+        #save the file as if it's the archive, like below in add_firms_dates
+        
 
     def add_firms_dates(self,sat,csv_timestamp,days_to_get):
         #sat is string with sateliite name, modis is not included 
@@ -453,7 +455,6 @@ class polar_data():
         print('\tTime of GOES imaging: ',ignition_pixel.loc['observation_time'])
 
         #setup ignition pixel polygon
-
         vertices = [(ignition_pixel[f'lon_tc_c{i}'], ignition_pixel[f'lat_tc_c{i}']) for i in range(1, 5)]
         ignition_polygon = Polygon(vertices)
         
@@ -488,9 +489,9 @@ class polar_data():
                 new_inc_pts = np.append(new_inc_pts,[viirs_ign],axis = 0)
                 new_inc_times = np.append(new_inc_times,self.data.loc[i,'acq_date'])
                 if viirs_point.within(ignition_polygon):
+                    viirs_ign_data = viirs_ign_data.append(self.data.loc[i])
                     new_ign_pts = np.append(new_ign_pts,[viirs_ign],axis = 0)
                     new_ign_times = np.append(new_ign_times,self.data.loc[i,'acq_date'])
-                    viirs_ign_data = viirs_ign_data.append(self.data.loc[i])
                     #print('\tFound viirs pixel within earliest GOES pixel:',viirs_ign,self.data.loc[i,'acq_date'])
         print('\t', len(new_inc_pts),'viirs incident detections, ',len(new_ign_pts),' viirs ignition polygon detections')
         if (len(new_ign_pts) == 0 and len(new_inc_pts) > 0):
