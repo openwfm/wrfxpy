@@ -676,7 +676,10 @@ def fmda_add_to_geogrid(js):
     except:
         logging.error('fmda_add_to_geogrid - cannot open %s' % index_path)
         raise Exception('fmda_add_to_geogrid - failed opening index file {}'.format(index_path))
+    #TODO: improve how it finds the geolocation file
     geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
+    if not osp.exists(geo_path):
+        geo_path = osp.dirname(osp.dirname(osp.dirname(fmda_geogrid_path)))+'-geo.nc'
     logging.info('fmda_add_to_geogrid - reading longitudes and latitudes from NetCDF file %s' % geo_path )
     with nc4.Dataset(geo_path,'r') as d:
         lats = d.variables['XLAT'][:,:]
@@ -1004,7 +1007,7 @@ def execute(args,job_args):
                 wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], 
                 outside_time=outside_time, no_fuel_cat=no_fuel_cat
             )
-            if 'prev_forecast' in js.keys():
+            if 'prev_forecast' in js.keys() and js.get('transfer_smoke', False):
                 prev_forecast_path = osp.join(js.workspace_path, js.prev_forecast)
                 if osp.exists(prev_forecast_path):
                     # implementation of adding smoke from previous forecast
