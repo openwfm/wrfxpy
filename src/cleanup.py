@@ -60,14 +60,14 @@ def local_rmdir(dirname):
     return 0
 
 def cancel_job(job_num,qsys):
-        if job_num is not None:
-            logging.info('Deleting parallel job %s on %s.' % (job_num, qsys))
-            cluster = load_cluster_file(qsys)
-            try:
-                ret = subprocess.check_output([cluster['qdel_cmd'], job_num]).decode()
-                logging.info(ret)
-            except:
-                logging.error('Deleting parallel job %s failed.' % job_num)
+    if job_num is not None:
+        logging.info('Deleting parallel job %s on %s.' % (job_num, qsys))
+        cluster = load_cluster_file(qsys)
+        try:
+            ret = subprocess.check_output([cluster['qdel_cmd'], job_num]).decode()
+            logging.info(ret)
+        except:
+            logging.error('Deleting parallel job %s failed.' % job_num)
 
 def load_cluster_file(qsys):
     clusters = json.load(open('etc/clusters.json','r'))
@@ -206,7 +206,6 @@ def delete_visualization(name):
     s.simple_command('wrfxweb/join_catalog.sh')
     s.disconnect()
 
-
 def delete(s,name):
     s.connect()
     logging.info('Trying to delete all files of job %s' % name)
@@ -250,40 +249,40 @@ def update(name):
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def send_products_to_server(job_id):
-        args = load_sys_cfg()
-        jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
-        logging.info('sent_products_to_server: loading job description from %s' % jobfile)
-        try:
-                js = Dict(json.load(open(jobfile,'r')))
-        except Exception as e:
-                logging.error('Cannot load the job description file %s' % jobfile)
-                logging.error('%s' % e)
-                sys.exit(1)
-        desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
-        pp_dir = js.get('pp_dir',osp.abspath(osp.join(args.workspace_path, job_id, "products")))
-        manifest_filename = js.get('manifest_filename','wfc-' + js.grid_code + '.json')
-        send_product_to_server(args, pp_dir, job_id, job_id, manifest_filename, desc)
+    args = load_sys_cfg()
+    jobfile = osp.abspath(osp.join(args.workspace_path, job_id,'job.json'))
+    logging.info('sent_products_to_server: loading job description from %s' % jobfile)
+    try:
+            js = Dict(json.load(open(jobfile,'r')))
+    except Exception as e:
+            logging.error('Cannot load the job description file %s' % jobfile)
+            logging.error('%s' % e)
+            sys.exit(1)
+    desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
+    pp_dir = js.get('pp_dir',osp.abspath(osp.join(args.workspace_path, job_id, "products")))
+    manifest_filename = js.get('manifest_filename','wfc-' + js.grid_code + '.json')
+    send_product_to_server(args, pp_dir, job_id, job_id, manifest_filename, desc)
 
 if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    commands = [ 'list', 'cancel', 'output', 'vis', 'delete', 'workspace', 'update', 'send']
+    commands = [ 'list', 'cancel', 'output', 'vis', 'all', 'workspace', 'update', 'send', 'free' ]
 
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
         print(('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]'))
         print('list            : show list of current simulations with their job_id and description')
         print('cancel <job_id> : kill all processes and the WRF parallel job, do not delete any files')
         print('output <job id> : cancel, and delete all WRF output and visualization files only')
-        print('vis <job_id> : cancel, and delete visualization on server files')
-        print('all <job_id> : cancel, and delete all files')
+        print('vis <job_id>    : cancel, and delete visualization on server files')
+        print('all <job_id>    : cancel, and delete all files')
         print('workspace       : delete jobs that are not on the visulalization server')
         print('update <job_id> : check if the job is running and update its job state file')
         print('send <job_id>   : send local simulation to the server')
         sys.exit(1)
 
     cmd = sys.argv[1]
-    if cmd in ['all' , 'cancel', 'output', 'update', 'vis', 'send']: 
+    if cmd in [ 'all' , 'cancel', 'output', 'update', 'vis', 'send' ]: 
         if len(sys.argv) == 3 and not sys.argv[2] == "" :
             job_id = sys.argv[2]
         else:
@@ -292,7 +291,7 @@ if __name__ == '__main__':
     else:
         job_id = None
 
-    logging.info('cleanup: command=%s job_id=%s' % (cmd,job_id))
+    logging.info('cleanup: command=%s job_id=%s' % (cmd, job_id))
     s = SSHShuttle(cfg)
 
     if cmd == 'list':
@@ -303,11 +302,11 @@ if __name__ == '__main__':
 
     if cmd == 'output':
         cancel(job_id)
-        output(s,job_id)
+        output(s, job_id)
 
     if cmd == 'all':
         cancel(job_id)
-        delete(s,job_id)
+        delete(s, job_id)
 
     if cmd == 'vis':
         delete_visualization(job_id)
@@ -319,5 +318,4 @@ if __name__ == '__main__':
         update(job_id)
 
     if cmd == 'send':
-        send_products_to_server(job_id)
-		
+        send_products_to_server(job_id)	
