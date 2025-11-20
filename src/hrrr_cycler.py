@@ -41,17 +41,42 @@ from datetime import datetime, timedelta, timezone
 sys_cfg = Dict(json.load(open("etc/conf.json")))
 cfg = Dict(json.load(open("etc/fmda_cycler.json")))
 meso_token = json.load(open("etc/tokens.json"))["mesowest"]
-hrrr_vars = {
-    "rain": 635, "snow": 636, "t2": 616, "rh": 620, "psfc": 607, 
-    "soil_t_0": 560, "soil_t_1": 562, "soil_t_2": 564, 
-    "soil_t_3": 566, "soil_t_4": 568, "soil_t_5": 570, 
-    "soil_t_6": 572, "soil_t_7": 574, "soil_t_8": 576, 
-    "soil_moist_0": 561, "soil_moist_1": 563, "soil_moist_2": 565, 
-    "soil_moist_3": 567, "soil_moist_4": 569, "soil_moist_5": 571, 
-    "soil_moist_6": 573, "soil_moist_7": 575, "soil_moist_8": 577,
-    "snowh": 615, "spfh": 618, "massden": 621, "u10": 622, "v10": 623, 
-    "ws": 624, "ust": 643, "znt": 642, "swdown": 664
-}
+
+def get_hrrr_var_list(target_date):
+    hrrr_vars = {
+        datetime(2018, 7, 12): { # HRRRv3
+            "rain": 634, "snow": 635, "t2": 616, "rh": 620, "psfc": 607, 
+            "soil_t_0": 560, "soil_t_1": 562, "soil_t_2": 564, 
+            "soil_t_3": 566, "soil_t_4": 568, "soil_t_5": 570, 
+            "soil_t_6": 572, "soil_t_7": 574, "soil_t_8": 576, 
+            "soil_moist_0": 561, "soil_moist_1": 563, "soil_moist_2": 565, 
+            "soil_moist_3": 567, "soil_moist_4": 569, "soil_moist_5": 571, 
+            "soil_moist_6": 573, "soil_moist_7": 575, "soil_moist_8": 577,
+            "snowh": 615, "spfh": 618, "massden": None, "u10": 621, "v10": 622, 
+            "ws": 623, "ust": 642, "znt": 641, "swdown": 661
+        },
+        datetime(2020, 12, 2): { # HRRRv4
+            "rain": 635, "snow": 636, "t2": 616, "rh": 620, "psfc": 607, 
+            "soil_t_0": 560, "soil_t_1": 562, "soil_t_2": 564, 
+            "soil_t_3": 566, "soil_t_4": 568, "soil_t_5": 570, 
+            "soil_t_6": 572, "soil_t_7": 574, "soil_t_8": 576, 
+            "soil_moist_0": 561, "soil_moist_1": 563, "soil_moist_2": 565, 
+            "soil_moist_3": 567, "soil_moist_4": 569, "soil_moist_5": 571, 
+            "soil_moist_6": 573, "soil_moist_7": 575, "soil_moist_8": 577,
+            "snowh": 615, "spfh": 618, "massden": 621, "u10": 622, "v10": 623, 
+            "ws": 624, "ust": 643, "znt": 642, "swdown": 664
+        }
+    }
+    # Sort the datetime keys
+    sorted_dates = sorted(hrrr_vars.keys())
+
+    for i, start_date in enumerate(sorted_dates):
+        # If it's the last entry or the target date is before the next start
+        if i == len(sorted_dates) - 1 or target_date < sorted_dates[i + 1]:
+            if target_date >= start_date:
+                return hrrr_vars[start_date]
+
+    return {}  # If no matching config is found
 
 def write_postprocess(
         mf, postproc_path, cycle_dir, esmf_cycle, name, 
@@ -179,14 +204,15 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
         # read and process model variables
         with netCDF4.Dataset(model_path) as d:
             for name in scalar_vars:
-                wisdom = get_wisdom(name).copy()
-                raster_png, coords, cb_png, levels = scalar_field_to_raster(
-                    d.variables[name][:,:], lats, lons, wisdom
-                )
-                write_postprocess(
-                    mf, postproc_path, cycle_id, esmf_cycle, name, 
-                    raster_png, coords, cb_png, levels, 0.5
-                )
+                if name in d.variables.keys():
+                    wisdom = get_wisdom(name).copy()
+                    raster_png, coords, cb_png, levels = scalar_field_to_raster(
+                        d.variables[name][:,:], lats, lons, wisdom
+                    )
+                    write_postprocess(
+                        mf, postproc_path, cycle_id, esmf_cycle, name, 
+                        raster_png, coords, cb_png, levels, 0.5
+                    )
             for name in vector_vars:
                 wisdom = get_wisdom(name).copy()
                 if region_cfg.code == 'CONUS':
@@ -194,15 +220,16 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
                 else:
                     wisdom.update({"ref": 10})
                 c1_name, c2_name = wisdom["components"]
-                c1 = d.variables[c1_name][:,:]
-                c2 = d.variables[c2_name][:,:]
-                raster_png, coords = vector_field_to_raster(
-                    c1, c2, lats, lons, wisdom
-                )
-                write_postprocess(
-                    mf, postproc_path, cycle_id, esmf_cycle, name, 
-                    raster_png, coords, alpha = 0.5
-                ) 
+                if c1_name in d.variables.keys() and c2_name in d.variables.keys():
+                    c1 = d.variables[c1_name][:,:]
+                    c2 = d.variables[c2_name][:,:]
+                    raster_png, coords = vector_field_to_raster(
+                        c1, c2, lats, lons, wisdom
+                    )
+                    write_postprocess(
+                        mf, postproc_path, cycle_id, esmf_cycle, name, 
+                        raster_png, coords, alpha = 0.5
+                    ) 
             fuel_classes = [(0, "1-hr DFM"), (1, "10-hr DFM"), (2, "100-hr DFM"), (3, "1000-hr DFM")]
             for i,name in fuel_classes:
                 wisdom = get_wisdom("dfm").copy()
@@ -227,8 +254,10 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
             pws = calculate_svp(T) 
             # Calculate Vapor pressure deficit [hPa]         
             vpd = (1 - rh) * pws / 100
+            # Fuel moisture (1-hour FM)
+            fm1 = d.variables["FMC_GC"][:, :, 0] * 100
             # Calculate Moisture damping coefficient
-            eta = calculate_eta(T, rh*100)
+            eta = calculate_eta(fm1)
             # Convert Wind speed to mph
             ws_mph = ws * 2.23694
             
@@ -448,6 +477,11 @@ def load_hrrr_data(grib_file, bbox):
     """
     gf = GribFile(grib_file)
     lats, lons = gf[1].latlons()
+    date_str = str(gf[1].grb.date)
+    date = datetime.strptime(date_str, '%Y%m%d')
+    hrrr_vars = get_hrrr_var_list(date)
+    if len(hrrr_vars) == 0:
+        logging.warning("HRRR version is not provided, empty list of variables")
     # bbox format: minlat, minlon, maxlat, maxlon
     i1, i2, j1, j2 = find_region_indices(lats, lons, bbox[0], bbox[2], bbox[1], bbox[3])
    
@@ -457,9 +491,11 @@ def load_hrrr_data(grib_file, bbox):
     data = {"lats": lats, "lons": lons, "hgt": hgt}
     
     for v,idx in hrrr_vars.items():
-        var = np.ma.array(gf[idx].values())[i1:i2,j1:j2]
-        logging.info("{} min {} max {}".format(v, np.min(var), np.max(var)))
-        data.update({v: var})
+        if idx is not None:
+            logging.info(gf[idx])
+            var = np.ma.array(gf[idx].values())[i1:i2,j1:j2]
+            logging.info("{} min {} max {}".format(v, np.min(var), np.max(var)))
+            data.update({v: var})
 
     return data
 
@@ -479,7 +515,7 @@ def compute_equilibria(T, H):
     return d, w
 
 
-def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst_hour, meso_token):
+def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst_hour, meso_token, acquire=False):
     """
     Advance the fuel moisture estimates in the region specified by the configuration.
     The function assumes that the fuel moisture model has not been advanced to this
@@ -500,6 +536,7 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     :param lookback_length: nubmer of cycles to search before we find a computed cycle
     :param forecast_length: number of cycles to forecast
     :param meso_token: the mesowest API access token or a list of them
+    :param acquire: should the SynopticDB be updated? Normally only if CONUS
     :return: the model advanced and assimilated at the current cycle
     """
     min_num_obs = 10
@@ -612,7 +649,7 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
         # perform assimilation with mesowest observations
         tm_start = cycle - timedelta(minutes=30)
         tm_end = cycle + timedelta(minutes=30)
-        if cfg.code == "CONUS":
+        if cfg.code == "CONUS" or acquire == True:
             fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt, True)
         else:
             fm10 = retrieve_mesowest_observations(meso_token, tm_start, tm_end, lats, lons, hgt, False)
@@ -671,20 +708,23 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     model.to_geogrid(geo_path, index, lats, lons)
 
     # make wps format files for WPS
-    fmda_path = osp.join(wksp_path, cfg.code, "{:04d}{:02d}".format(cycle.year,cycle.month))
     time_tag = cycle.strftime("%Y-%m-%d_%H") + f"f{fcst_hour:02d}"
-    model.to_wps_format(fmda_path, index, lats, lons, time_tag)
+    model.to_wps_format(osp.dirname(geo_path), index, lats, lons, time_tag)
     
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path, fcst_hour)
     logging.info("CYCLER writing model variables to:  %s." % model_path)
+    data = {
+        "EQUILd FM": Ed, "EQUILw FM": Ew, "T2": data["t2"], 
+        "RH": data["rh"], "PRECIP": rain, "SNOWH": data["snowh"], 
+        "HGT": hgt, "WINDSPD": data["ws"], "U10": data["u10"], "V10": data["v10"]
+    }
+    if "massden" in data:
+        data.update({
+            "SMOKE": data["massden"],
+        })
     model.to_netcdf(
-        ensure_dir(model_path), {
-            "EQUILd FM": Ed, "EQUILw FM": Ew, "T2": data["t2"], 
-            "RH": data["rh"], "PRECIP": rain, "SNOWH": data["snowh"], 
-            "HGT": hgt, "WINDSPD": data["ws"], "SMOKE": data["massden"],
-            "U10": data["u10"], "V10": data["v10"]
-        }
+        ensure_dir(model_path), data
     )
 
     # create visualization and send results
@@ -713,7 +753,51 @@ def is_cycle_computed(cycle, cfg, wksp_path, fcst_hour=0):
     """
     path = compute_model_path(cycle, cfg.code, wksp_path, fcst_hour=fcst_hour)
     return osp.isfile(path)
+
+
+def fmda_cycle_interval(start_cycle, end_cycle):
+    """
+    Run historical cycle of fuel moisture estimates using FMDA for all the regions 
+    specified by the configuration.
     
+    :param start_cycle: initial time to create FMDA estimates
+    :param end_cycle: final time to create FMDA estimates
+    """
+    lookback_length = 0
+    forecast_length = 0
+    hrrra = HRRRA(sys_cfg)
+    cycle = start_cycle
+    tstep = 0
+    while cycle <= end_cycle:
+        gribs = hrrra.retrieve_gribs(cycle, cycle)
+        grib_files_anl = gribs["grib_files"]
+        for region_id,region_cfg in cfg.regions.items():
+            logging.info(f"CYCLER processing region {region_id} for {cycle}")
+            wrapped_cfg = Dict(region_cfg)
+            wrapped_cfg.update({"region_id": region_id})
+            wrapped_cfg.update({"forecast_length": forecast_length}) 
+            # Process real-time
+            if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
+                logging.info(f"CYCLER real-time processing for region {region_id} at cycle {cycle}")
+                try:
+                    fmda_advance_region(
+                        cycle, wrapped_cfg, grib_files_anl, 
+                        cfg.workspace_path, lookback_length, 0, 
+                        meso_token, True
+                    )
+                except Exception as e:
+                    logging.warning(
+                        f"CYCLER failed processing for region {region_id} at cycle {cycle}"
+                    )
+                    logging.warning("CYCLER exception {}".format(e))
+            else:
+                logging.info(
+                    f"CYCLER already completed processing for region {region_id} "
+                    f"at cycle {cycle}, skipping ..."
+                )
+        cycle += timedelta(hours=1)
+        tstep += 1
+        
     
 if __name__ == "__main__":
     
