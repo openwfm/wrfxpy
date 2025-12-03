@@ -334,8 +334,16 @@ def FFWI(d, t):
     t2 = d.variables['T2'][t,:,:]        # Temperature (K)
     u10 = d.variables['U10'][t,:,:]      # U-Component of the Wind at 10m (m/s)
     v10 = d.variables['V10'][t,:,:]      # V-Component of the Wind at 10m (m/s)
+    # Wind speed mph
+    ws = np.sqrt(u10**2 + v10**2) * 2.23694
+    # Find relative humidity [%]
+    rh = calculate_rh(t2, q2, psfc) * 100
+    # Calculate equilibrium moisture content (EMC)
+    emc = calculate_emc(t2, rh)
+    # Calculate moisture damping coefficient
+    eta = calculate_eta(emc)
     # Calculate FFWI
-    ffwi = calculate_ffwi(t2, q2, psfc, u10, v10)
+    ffwi = calculate_ffwi(ws, eta)
     return ffwi
 
 def HDW(d, t):
@@ -351,16 +359,8 @@ def HDW(d, t):
     t2 = d.variables['T2'][t,:,:]        # Temperature (K)
     u10 = d.variables['U10'][t,:,:]      # U-Component of the Wind at 10m (m/s)
     v10 = d.variables['V10'][t,:,:]      # V-Component of the Wind at 10m (m/s)
-    # Wind speed mph
-    ws = np.sqrt(u10**2 + v10**2) * 2.23694
-    # Find relative humidity [%]
-    rh = calculate_rh(t2, q2, psfc) * 100
-    # Calculate equilibrium moisture content (EMC)
-    emc = calculate_emc(t2, rh)
-    # Calculate moisture damping coefficient
-    eta = calculate_eta(emc)
     # Calculate HDW
-    hdw = calculate_hdw(ws, eta)
+    hdw = calculate_hdw(t2, q2, psfc, u10, v10)
     return hdw
 
 def LFP(d, t):
@@ -377,13 +377,13 @@ def LFP(d, t):
     u10 = d.variables['U10'][t,:,:]      # U-Component of the Wind at 10m (m/s)
     v10 = d.variables['V10'][t,:,:]      # V-Component of the Wind at 10m (m/s)
     # Calculate dew point temperature [Celsius]
-    Td = calculate_dew_point(q, P)
+    Td = calculate_dew_point(q2, psfc)
     # Conversion Celsius to Kelvin
     Td = Td + 273.15
     # Wind speed (m/s)
-    ws = np.sqrt(u**2 + v**2) 
+    ws = np.sqrt(u10**2 + v10**2) 
     # Calculate LFP
-    lfp = calculate_lfp(T, Td, ws)
+    lfp = calculate_lfp(t2, Td, ws)
     return lfp
 
 def Haines(d, t):
