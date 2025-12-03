@@ -1,4 +1,5 @@
 import numpy as np
+import f90nml
 import logging
 
 ########### FWI TOOLS ###########
@@ -107,6 +108,87 @@ def calculate_dew_point(q, P):
     # Compute dew point temperature in Celsius
     Td = (243.5 * np.log(Pw / 6.112)) / (17.67 - np.log(Pw / 6.112))
     return Td
+
+def get_namelist(namelist_fire_path):
+    """
+    Read namelist
+    :param namelist_fire_path: path to namelist file
+    :return nml: namelist object with parsed information
+    """
+    nml = f90nml.read(namelist_fire_path)
+    return nml
+
+def calc_weighting_factors(nml):
+    """
+    Calculate fuel moisture weighting factors
+    :param nml: namelist object with parsed information
+    :return weights: weights in a dictionary 
+    """
+    ## 1) Reading all the parameters
+    # Fuel density
+    fueldens = np.array(nml["fuel_categories"]["fueldens"])
+    # Surface area to volume ratio
+    savr_1 = np.array(nml["fuel_categories"]["savr_gc01"])
+    savr_10 = np.array(nml["fuel_categories"]["savr_gc02"])
+    savr_100 = np.array(nml["fuel_categories"]["savr_gc03"])
+    savr_herba = np.array(nml["fuel_categories"]["savr_gc05"]) 
+    savr_woody = np.array(nml["fuel_categories"]["savr_gc06"])
+    # Fuel load
+    fuelload_1 = np.array(nml["fuel_categories"]["fuelload_gc01"])
+    fuelload_10 = np.array(nml["fuel_categories"]["fuelload_gc02"])
+    fuelload_100 = np.array(nml["fuel_categories"]["fuelload_gc03"])
+    fuelload_herba = np.array(nml["fuel_categories"]["fuelload_gc05"]) 
+    fuelload_woody = np.array(nml["fuel_categories"]["fuelload_gc06"])
+
+    ## 2) Compute surface area per unit of each size class within each category
+    A_1      = savr_1 * fuelload_1 / fueldens
+    A_10     = savr_10 * fuelload_10 / fueldens
+    A_100    = savr_100 * fuelload_100 / fueldens
+    A_herba  = savr_herba * fuelload_herba / fueldens
+    A_woody  = savr_woody * fuelload_woody / fueldens
+    # mean total surface area per unit fuel cell of the dead and live categories
+    A_dead       = A_1 + A_10 + A_100
+    A_live       = A_herba + A_woody
+    # mean total surface area of the fuel
+    AT = A_dead + A_live 
+    
+    ## 3) Calculate weighting factors of each size class within each category
+    f_1 = np.zeros(A_1.shape)
+    f_10 = np.zeros(A_1.shape)
+    f_100 = np.zeros(A_1.shape)
+    f_herba = np.zeros(A_1.shape)
+    f_woody = np.zeros(A_1.shape)
+    f_1[A_dead != 0] = A_1 / A_dead
+    f_10[A_dead != 0] = A_10 / A_dead 
+    f_100[A_dead != 0] = A_100 / A_dead
+    f_herba[A_live != 0] = A_herba / A_live
+    f_woody[A_live != 0] = A_woody / A_live  
+    # weighting factors of the dead and live categories
+    f_dead  = A_dead / AT
+    f_live  = A_live / AT
+    
+    ## 4) Dictionary with results
+    weights = {
+        "f_1": f_1, "f10": f_10, "f_100": f_100,
+        "f_herba": f_herba, "f_woody": f_woody,
+        "f_dead": f_dead, "f_live": f_live
+    }
+    
+    return weights
+
+def calculate_fmc_components(fmc_1, fmc_10, fmc_100, fmc_herba, fmc_woody, weights, n_fuel_cat):
+    # Get factor for fuel category
+    f_1   = weights["f_1"][n_fuel_cat - 1]
+    f_10  = weights["f_10"][n_fuel_cat - 1]
+    f_100 = weights["f_100"][n_fuel_cat - 1]
+    f_herba = weights["f_herba"][n_fuel_cat - 1]
+    f_woody = weights["f_woody"][n_fuel_cat - 1]
+    # Calculate fuel moisture content of the dead and live categories
+    fmc_dead = f_1 * fmc_1 + f_10 * fmc_10 + f_100 * fmc_100
+    fmc_live = f_herba * fmc_herba + f_woody * fmc_woody
+    # Getting the total fuel moisture
+    fmc_total = weights["f_dead"] * fmc_dead + weights["f_live"] * fmc_live
+    return fmc_dead, fmc_live, fmc_total
 
 ########### FWI CALCULATIONS ###########
     
