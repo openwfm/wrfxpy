@@ -118,7 +118,7 @@ def get_namelist(namelist_fire_path):
     nml = f90nml.read(namelist_fire_path)
     return nml
 
-def calc_weighting_factors(nml):
+def calculate_weighting_factors(nml):
     """
     Calculate fuel moisture weighting factors
     :param nml: namelist object with parsed information
@@ -126,20 +126,19 @@ def calc_weighting_factors(nml):
     """
     ## 1) Reading all the parameters
     # Fuel density
-    fueldens = np.array(nml["fuel_categories"]["fueldens"])
+    fueldens = np.array(nml["fuel_categories"]["fueldens"], dtype=float)
     # Surface area to volume ratio
-    savr_1 = np.array(nml["fuel_categories"]["savr_gc01"])
-    savr_10 = np.array(nml["fuel_categories"]["savr_gc02"])
-    savr_100 = np.array(nml["fuel_categories"]["savr_gc03"])
-    savr_herba = np.array(nml["fuel_categories"]["savr_gc05"]) 
-    savr_woody = np.array(nml["fuel_categories"]["savr_gc06"])
+    savr_1 = np.array(nml["fuel_categories"]["savr_gc01"], dtype=float)
+    savr_10 = np.array(nml["fuel_categories"]["savr_gc02"], dtype=float)
+    savr_100 = np.array(nml["fuel_categories"]["savr_gc03"], dtype=float)
+    savr_herba = np.array(nml["fuel_categories"]["savr_gc05"], dtype=float)
+    savr_woody = np.array(nml["fuel_categories"]["savr_gc06"], dtype=float)
     # Fuel load
-    fuelload_1 = np.array(nml["fuel_categories"]["fuelload_gc01"])
-    fuelload_10 = np.array(nml["fuel_categories"]["fuelload_gc02"])
-    fuelload_100 = np.array(nml["fuel_categories"]["fuelload_gc03"])
-    fuelload_herba = np.array(nml["fuel_categories"]["fuelload_gc05"]) 
-    fuelload_woody = np.array(nml["fuel_categories"]["fuelload_gc06"])
-
+    fuelload_1 = np.array(nml["fuel_categories"]["fuelload_gc01"], dtype=float)
+    fuelload_10 = np.array(nml["fuel_categories"]["fuelload_gc02"], dtype=float)
+    fuelload_100 = np.array(nml["fuel_categories"]["fuelload_gc03"], dtype=float)
+    fuelload_herba = np.array(nml["fuel_categories"]["fuelload_gc05"], dtype=float) 
+    fuelload_woody = np.array(nml["fuel_categories"]["fuelload_gc06"], dtype=float)
     ## 2) Compute surface area per unit of each size class within each category
     A_1      = savr_1 * fuelload_1 / fueldens
     A_10     = savr_10 * fuelload_10 / fueldens
@@ -151,44 +150,192 @@ def calc_weighting_factors(nml):
     A_live       = A_herba + A_woody
     # mean total surface area of the fuel
     AT = A_dead + A_live 
-    
     ## 3) Calculate weighting factors of each size class within each category
-    f_1 = np.zeros(A_1.shape)
-    f_10 = np.zeros(A_1.shape)
-    f_100 = np.zeros(A_1.shape)
-    f_herba = np.zeros(A_1.shape)
-    f_woody = np.zeros(A_1.shape)
-    f_1[A_dead != 0] = A_1 / A_dead
-    f_10[A_dead != 0] = A_10 / A_dead 
-    f_100[A_dead != 0] = A_100 / A_dead
-    f_herba[A_live != 0] = A_herba / A_live
-    f_woody[A_live != 0] = A_woody / A_live  
+    f_1 = np.zeros_like(A_1, dtype=float)
+    f_10 = np.zeros_like(A_1, dtype=float)
+    f_100 = np.zeros_like(A_1, dtype=float)
+    f_herba = np.zeros_like(A_1, dtype=float)
+    f_woody = np.zeros_like(A_1, dtype=float)
+    f_dead = np.zeros_like(A_1, dtype=float)
+    f_live = np.zeros_like(A_1, dtype=float)
+    mask_dead = A_dead != 0
+    mask_live = A_live != 0
+    f_1[mask_dead] = A_1[mask_dead] / A_dead[mask_dead]
+    f_10[mask_dead] = A_10[mask_dead] / A_dead[mask_dead]
+    f_100[mask_dead] = A_100[mask_dead] / A_dead[mask_dead]
+    f_herba[mask_live] = A_herba[mask_live] / A_live[mask_live]
+    f_woody[mask_live] = A_woody[mask_live] / A_live[mask_live]
     # weighting factors of the dead and live categories
-    f_dead  = A_dead / AT
-    f_live  = A_live / AT
-    
+    mask_tot = AT != 0
+    f_dead[mask_tot] = A_dead[mask_tot] / AT[mask_tot]
+    f_live[mask_tot]  = A_live[mask_tot] / AT[mask_tot]
     ## 4) Dictionary with results
     weights = {
-        "f_1": f_1, "f10": f_10, "f_100": f_100,
+        "f_1": f_1, "f_10": f_10, "f_100": f_100,
         "f_herba": f_herba, "f_woody": f_woody,
         "f_dead": f_dead, "f_live": f_live
     }
-    
     return weights
 
-def calculate_fmc_components(fmc_1, fmc_10, fmc_100, fmc_herba, fmc_woody, weights, n_fuel_cat):
-    # Get factor for fuel category
-    f_1   = weights["f_1"][n_fuel_cat - 1]
-    f_10  = weights["f_10"][n_fuel_cat - 1]
-    f_100 = weights["f_100"][n_fuel_cat - 1]
-    f_herba = weights["f_herba"][n_fuel_cat - 1]
-    f_woody = weights["f_woody"][n_fuel_cat - 1]
-    # Calculate fuel moisture content of the dead and live categories
+def calculate_eta_effective(
+    fmc_1, fmc_10, fmc_100, fmc_herba, fmc_woody,
+    n_fuel_cat, weights, ratios
+):
+    """
+    Compute a single effective moisture damping coefficient (eta_eff)
+    for a given fuel category, combining dead and live fuels.
+
+    Returns
+    -------
+    eta_eff : float or array
+        Effective moisture damping coefficient for the fuel bed.
+    eta_dead : float or array
+        Dead-fuel moisture damping coefficient.
+    eta_live : float or array
+        Live-fuel moisture damping coefficient.
+    """
+    n_fuel_cat = np.asarray(n_fuel_cat, dtype=int)
+    idx = n_fuel_cat[None, ...] - 1  # same shape as grid
+    # 1) Dead and live FMC (surface-area weighted within group)
+    f_1     = weights["f_1"][idx]
+    f_10    = weights["f_10"][idx]
+    f_100   = weights["f_100"][idx]
+    f_herba = weights["f_herba"][idx]
+    f_woody = weights["f_woody"][idx]
     fmc_dead = f_1 * fmc_1 + f_10 * fmc_10 + f_100 * fmc_100
     fmc_live = f_herba * fmc_herba + f_woody * fmc_woody
-    # Getting the total fuel moisture
-    fmc_total = weights["f_dead"] * fmc_dead + weights["f_live"] * fmc_live
-    return fmc_dead, fmc_live, fmc_total
+    # 2) Dead & live moisture extinction
+    fmce_dead = ratios["fmce_dead"][idx]
+    fmce_live = calculate_fmce_live(fmc_1, fmc_10, fmc_100, ratios, n_fuel_cat)
+    # 3) Group etas
+    eta_dead = calculate_eta(fmc_dead, fmce_dead)
+    eta_live = calculate_eta(fmc_live, fmce_live)
+    # 4) Group weights (dead vs live) for this fuel category
+    f_dead = weights["f_dead"][idx]
+    f_live = weights["f_live"][idx]      
+    numerator = (
+        eta_dead * f_dead + 
+        eta_live * f_live
+    )
+    denom = f_dead + f_live
+    mask_denom = denom > 0
+    eta_eff = np.where(
+        mask_denom,
+        numerator / denom,
+        0.0
+    )
+    return eta_eff, eta_dead, eta_live, fmce_live
+
+def calculate_effective_loading_ratios(nml):
+    fc = nml["fuel_categories"]
+    # Dead fuel moisture of extinction
+    fmce_dead = np.array(fc["fuelmce"], dtype=float)
+    # Dead loads and SAVR
+    w1   = np.array(fc["fuelload_gc01"], dtype=float)
+    w10  = np.array(fc["fuelload_gc02"], dtype=float)
+    w100 = np.array(fc["fuelload_gc03"], dtype=float)
+    savr1   = np.array(fc["savr_gc01"], dtype=float)
+    savr10  = np.array(fc["savr_gc02"], dtype=float)
+    savr100 = np.array(fc["savr_gc03"], dtype=float)
+    # Live loads and SAVR
+    w_herb  = np.array(fc["fuelload_gc05"], dtype=float)
+    w_woody = np.array(fc["fuelload_gc06"], dtype=float)
+    savr_herb  = np.array(fc["savr_gc05"], dtype=float)
+    savr_woody = np.array(fc["savr_gc06"], dtype=float)
+    # Effective heating numbers
+    hd_1 = np.zeros_like(w1, dtype=float)
+    hd_10 = np.zeros_like(w1, dtype=float)
+    hd_100 = np.zeros_like(w1, dtype=float)
+    hl_herb = np.zeros_like(w1, dtype=float)
+    hl_woody = np.zeros_like(w1, dtype=float)
+    mask_s1   = savr1   != 0
+    mask_s10  = savr10  != 0
+    mask_s100 = savr100 != 0
+    mask_sh   = savr_herb  != 0
+    mask_sw   = savr_woody != 0
+    hd_1[mask_s1]    = np.exp(-138.0 / savr1[mask_s1])
+    hd_10[mask_s10]  = np.exp(-138.0 / savr10[mask_s10])
+    hd_100[mask_s100]= np.exp(-138.0 / savr100[mask_s100])
+    hl_herb[mask_sh] = np.exp(-500.0 / savr_herb[mask_sh])
+    hl_woody[mask_sw]= np.exp(-500.0 / savr_woody[mask_sw])
+    # Dead and live effective loads
+    sum_dead_eff = w1*hd_1 + w10*hd_10 + w100*hd_100
+    sum_live_eff = w_herb*hl_herb + w_woody*hl_woody
+    # Dead-to-live effective loading ratio W
+    W = np.zeros_like(w1, dtype=float)
+    mask_live = sum_live_eff > 0
+    W[mask_live] = sum_dead_eff[mask_live] / sum_live_eff[mask_live]
+    # Dictionary output
+    ratios = {
+        "w1": w1, "w10": w10, "w100": w100,
+        "hd_1": hd_1, "hd_10": hd_10, "hd_100": hd_100,
+        "sum_dead_eff": sum_dead_eff, "sum_live_eff": sum_live_eff,
+        "fmce_dead": fmce_dead, "W": W
+    }
+    return ratios
+    
+def calculate_fmce_live(
+    fmc_1, fmc_10, fmc_100,
+    ratios, n_fuel_cat
+):
+    """
+    Compute live fuel moisture of extinction (fmce_live, in %) using
+    the Albini/NFDRS formulation.
+
+    Parameters
+    ----------
+    nml : dict
+        Namelist with fuel_categories.
+    n_fuel_cat : int
+        1-based index of the fuel category.
+    fmc_1, fmc_10, fmc_100 : float
+        1-h, 10-h, 100-h dead FMC [%].
+    fmce_dead : float
+        Dead fuel moisture of extinction [%] for this fuel model.
+
+    Returns
+    -------
+    fmce_live : float
+        Live fuel moisture of extinction [%].
+    """
+    fmc_1   = np.asarray(fmc_1,   dtype=float)
+    fmc_10  = np.asarray(fmc_10,  dtype=float)
+    fmc_100 = np.asarray(fmc_100, dtype=float)
+    # Index into fuel-model arrays (time, y, x) via broadcasting
+    n_fuel_cat = np.asarray(n_fuel_cat, dtype=int)
+    idx = n_fuel_cat[None, ...] - 1
+    # Get information from ratios
+    w1 = ratios["w1"][idx]
+    w10 = ratios["w10"][idx]
+    w100 = ratios["w100"][idx]
+    hd_1 = ratios["hd_1"][idx]
+    hd_10 = ratios["hd_10"][idx]
+    hd_100 = ratios["hd_100"][idx]
+    sum_dead_eff = ratios["sum_dead_eff"][idx]
+    fmce_dead = ratios["fmce_dead"][idx]
+    W = ratios["W"][idx]
+    # Weighted fine dead FMC (fraction)
+    numerator = (
+        fmc_1   * w1   * hd_1 +
+        fmc_10  * w10  * hd_10 +
+        fmc_100 * w100 * hd_100
+    )
+    mask_dead = sum_dead_eff > 0
+    mf_av = np.where(
+        mask_dead,
+        numerator / sum_dead_eff,
+        0.0
+    )
+    # Albini expression (percent)
+    mxd = fmce_dead
+    fmce_live = 2.9 * W * (1.0 - mf_av / mxd) - 0.226
+    # where there is no effective dead load, just use dead Mx
+    fmce_live = np.where(mask_dead, fmce_live, fmce_dead)
+    # Enforce constraints: cannot be < dead Mx, and clip to [0, 3] say.
+    fmce_live = np.maximum(fmce_live, fmce_dead)
+    fmce_live = np.clip(fmce_live, 0.0, 3.0)
+    return fmce_live
+    
 
 ########### FWI CALCULATIONS ###########
     
@@ -318,6 +465,34 @@ def calculate_haines(t_950, t_850, t_700, t_500, t_dew850, t_dew700, height):
         )
     )
     return haines_index
+
+def calculate_fmc(
+    fmc_1, fmc_10, fmc_100, fmc_herba, fmc_woody,
+    n_fuel_cat, weights, gsi
+):
+    n_fuel_cat = np.asarray(n_fuel_cat, dtype=int)
+    idx = n_fuel_cat[None, ...] - 1  # same shape as grid
+    # 1) Dead and live FMC (surface-area weighted within group)
+    f_1     = weights["f_1"][idx]
+    f_10    = weights["f_10"][idx]
+    f_100   = weights["f_100"][idx]
+    f_herba = weights["f_herba"][idx]
+    f_woody = weights["f_woody"][idx]
+    fmc_dead = f_1 * fmc_1 + f_10 * fmc_10 + f_100 * fmc_100
+    fmc_live = f_herba * fmc_herba + f_woody * fmc_woody
+    fmc_live[fmc_live == 0] = 0.001
+    fmc = (0.1 * ((fmc_dead / fmc_live) - 1))
+    fmc = fmc + gsi
+    fmc = np.power(np.abs(fmc), 1.7)
+    return fmc
+
+def calculate_sawti(LFP, FMC):
+    '''Calculates Santa Anna Wildfire Threat Index
+    VARIBLES
+    --------
+    LFP: LargeFire Potential
+    FMC: Fuel Moisture Component'''
+    return LFP*FMC
  
 ########### FWI INTERFACES ###########
 
