@@ -104,9 +104,9 @@ class GeoDriver(object):
         Get coordinate arrays for the whole GeoTIFF file using initial projection.
         """
         x0,dx,_,y0,_,dy = self.gt
-        xx = np.linspace(x0,x0+dx*self.nx,self.nx)
-        yy = np.linspace(y0,y0+dy*self.ny,self.ny)
-        return np.meshgrid(xx,yy)
+        xx = np.linspace(x0, x0+dx*self.nx, self.nx, dtype=np.float32)
+        yy = np.linspace(y0, y0+dy*self.ny, self.ny, dtype=np.float32)
+        return np.meshgrid(xx, yy)
 
     def resample_bbox(self,bbox):
         """
@@ -117,8 +117,8 @@ class GeoDriver(object):
         logging.info('GeoTIFF.resample_bbox - resampling GeoDriver into bounding box: %s' % list(bbox))  
         # geotransform
         x0,dx,_,y0,_,dy = self.gt
-        xx = np.arange(x0,x0+dx*self.nx,dx)
-        yy = np.arange(y0,y0+dy*self.ny,dy)
+        xx = np.arange(x0, x0+dx*self.nx, dx, dtype=np.float32)
+        yy = np.arange(y0, y0+dy*self.ny, dy, dtype=np.float32)
         # get bounding box in projection of the GeoTIFF
         ref_corners = ((bbox[0],bbox[2]),(bbox[0],bbox[3]),(bbox[1],bbox[3]),(bbox[1],bbox[2]))
         if vparse(pyproj.__version__) < vparse('2.2'):

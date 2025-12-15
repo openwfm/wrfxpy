@@ -268,7 +268,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    commands = [ 'list', 'cancel', 'output', 'vis', 'delete', 'workspace', 'update', 'send']
+    commands = [ 'list', 'cancel', 'output', 'vis', 'all', 'workspace', 'update', 'send']
 
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
         print(('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]'))
