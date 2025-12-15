@@ -28,6 +28,14 @@ ibeh = 4                           ! ROS formula: 0 =  MacArthur, 1 = Rothermel,
 '14: no fuel'
  
  ! Wind height to interpolate vertically to (m).
+ fwh = 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960,
+       6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960, 6.0960
+
+ ! Roughness length (m). It is calculated by 0.13 * fueldepthm.
+ fz0 = 0.0396, 0.0396, 0.1000, 0.2378, 0.0793, 0.0991, 0.0991,
+       0.0079, 0.0079, 0.0396, 0.0396, 0.0911, 0.1188, 0.000396
+
+ ! Wind reduction factor (-). It takes the wind from 6.1m (20ft) and brings the wind speed down to the midflame height.
  windrf = 0.36, 0.36, 0.44, 0.55, 0.42, 0.44, 0.44,
           0.36, 0.36, 0.36, 0.36, 0.43, 0.46, 1e-7
  
@@ -71,6 +79,9 @@ ibeh = 4                           ! ROS formula: 0 =  MacArthur, 1 = Rothermel,
  ffw = 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
        0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9
 
+ ! Fuel is dynamic or not. For transitions from live to dead fuel moisture.
+ idynamic = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
  ! Multiplicative adjustment of backing spread rate.
  adjr0 = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
          1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
@@ -80,6 +91,46 @@ ibeh = 4                           ! ROS formula: 0 =  MacArthur, 1 = Rothermel,
  ! Multiplicative adjustment of slope contribution to spread rate.
  adjrs = 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 
          1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
+
+ ! Weighting factors used to combine all fuel moisture classes 1-6 (between 0.0 and 1.0).
+ ! The sum of all fuel moisture classes for a particular fuel model should be always 1.
+ ! Fuel moisture class 4 (1000h fuel moisture is not used so all zeros by default).
+ fmc_gw01 = 1.00000, 0.13918, 1.00000, 0.31250, 0.28571, 0.25000, 0.23214, 
+            0.30000, 0.83750, 0.25000, 0.13043, 0.11594, 0.12069, 0.00000
+ fmc_gw02 = 0.00000, 0.06959, 0.00000, 0.25000, 0.14286, 0.41667, 0.38393, 
+            0.20000, 0.11875, 0.16667, 0.39130, 0.40580, 0.39655, 0.00000
+ fmc_gw03 = 0.00000, 0.03480, 0.00000, 0.12500, 0.00000, 0.33333, 0.30804, 
+            0.50000, 0.04375, 0.41667, 0.47826, 0.47826, 0.48276, 0.00000
+ fmc_gw05 = 0.00000, 0.75643, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 
+            0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000
+ fmc_gw06 = 0.00000, 0.00000, 0.00000, 0.31250, 0.57143, 0.00000, 0.07589, 
+            0.00000, 0.00000, 0.16667, 0.00000, 0.00000, 0.00000, 0.00000
+
+ ! Surface area to volume ratio (1/ft) divided by fuel moisture classes 1-6.
+ ! Fuel moisture class 4 (1000h fuel moisture is not used so all zeros by default).
+ savr_gc01 = 3500., 3000., 1500., 2000., 2000., 1750., 1750.,
+             2000., 2500., 2000., 1500., 1500., 1500., 9999.
+ savr_gc02 = 109.,  109.,  109.,  109.,  109.,  109.,  109.,
+             109.,  109.,  109.,  109.,  109.,  109.,  9999.
+ savr_gc03 = 30.,   30.,   30.,   30.,   30.,   30.,   30.,
+             30.,   30.,   30.,   30.,   30.,   30.,   9999.
+ savr_gc05 = 9999., 1500., 9999., 9999., 9999., 9999., 9999.,
+             9999., 9999., 9999., 9999., 9999., 9999., 9999. 
+ savr_gc06 = 9999., 9999., 9999., 1500., 1500., 9999., 1500.,
+             9999., 9999., 1500., 9999., 9999., 9999., 9999.
+
+ ! Oven-dry fuel load (lb/ft^2) dibided by fuel moisture classes 1-6.
+ ! Fuel moisture class 4 (1000h fuel moisture is not used so all zeros by default).
+ fuelload_gc01 = 0.034, 0.092, 0.138, 0.23,  0.046, 0.069, 0.052, 
+                 0.069, 0.134, 0.138, 0.069, 0.184, 0.322, 0.
+ fuelload_gc02 = 0.,    0.046, 0.,    0.184, 0.023, 0.115, 0.086,
+                 0.046, 0.019, 0.092, 0.207, 0.644, 1.058, 0.
+ fuelload_gc03 = 0.,    0.023, 0.,    0.092, 0.,    0.092, 0.069, 
+                 0.115, 0.007, 0.23,  0.253, 0.759, 1.288, 0.
+ fuelload_gc05 = 0.,    0.5,   0.,    0.,    0.,    0.,    0.,
+                 0.,    0.,    0.,    0.,    0.,    0.,    0., 
+ fuelload_gc06 = 0.,    0.,    0.,    0.23,  0.092, 0.,    0.017,
+                 0.,    0.,    0.092, 0.,    0.,    0.,    0.
  /
 
 &moisture
