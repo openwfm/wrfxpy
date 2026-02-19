@@ -1009,6 +1009,39 @@ _var_wisdom = {
       'retrieve_as' : lambda d : d.variables['fire mask'][:],
       'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
    },
+   'SNPPHR_AF' : {
+      'name' : 'VIIRS S-NPP Active Fires satellite data HR',
+      'source' : 'SNPPHR',
+      'native_unit' : '-',
+      'colorbar' : '-',
+      'colormap' : 'discrete',
+      'scale' : 'discrete',
+      'options' : _discrete_wisdom['fire'],
+      'retrieve_as' : lambda d : d.variables['fire mask'][:],
+      'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+   },
+   'NOAA20_AF' : {
+      'name' : 'VIIRS JPSS-1 Active Fires satellite data',
+      'source' : 'NOAA20',
+      'native_unit' : '-',
+      'colorbar' : '-',
+      'colormap' : 'discrete',
+      'scale' : 'discrete',
+      'options' : _discrete_wisdom['fire'],
+      'retrieve_as' : lambda d : d.variables['fire mask'][:],
+      'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+   },
+   'NOAA20HR_AF' : {
+      'name' : 'VIIRS JPSS-1 Active Fires satellite data HR',
+      'source' : 'NOAA20HR',
+      'native_unit' : '-',
+      'colorbar' : '-',
+      'colormap' : 'discrete',
+      'scale' : 'discrete',
+      'options' : _discrete_wisdom['fire'],
+      'retrieve_as' : lambda d : d.variables['fire mask'][:],
+      'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+   },
    'G16_AF' : {
       'name' : 'GOES16 ABI Fire Detections satellite data',
       'source' : 'G16',
@@ -1023,6 +1056,17 @@ _var_wisdom = {
    'G17_AF' : {
       'name' : 'GOES17 ABI Fire Detections satellite data',
       'source' : 'G17',
+      'native_unit' : '-',
+      'colorbar' : '-',
+      'colormap' : 'discrete',
+      'scale' : 'discrete',
+      'options' : _discrete_wisdom['fire'],
+      'retrieve_as' : lambda d : transform_goes(d),
+      'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+   },
+   'G18_AF' : {
+      'name' : 'GOES18 ABI Fire Detections satellite data',
+      'source' : 'G18',
       'native_unit' : '-',
       'colorbar' : '-',
       'colormap' : 'discrete',
