@@ -71,7 +71,7 @@ class GribForecast(GribSource):
             logging.info('%s downloading cycle %s forecast hours %d to %d' % (self.id, cycle_start, fc_start, fc_hours))
 
             # computes the relative paths of the desired files (the manifest)
-            fc_list, colmet_files_utc = self.file_times(cycle_start,fc_start, fc_hours)
+            fc_list, colmet_files_utc = self.file_times(cycle_start, fc_start, fc_hours)
             grib_files = self.file_names(cycle_start, fc_list)
             colmet_prefix, colmet_files = self.colmet_names(cycle_start, colmet_files_utc)
 
@@ -102,16 +102,18 @@ class GribForecast(GribSource):
                     cycle_shift += 1
                     continue
     
-                # download all gribs we need
-                list(map(lambda x: self.download_grib(url_base, x), nonlocals))
+                # download all gribs not available remotely
+                if url_base[:5] == 's3://':
+                    self.download_grib_many(url_base, nonlocals, workers=32)
+                else:
+                    list(map(lambda x: self.download_grib(url_base, x), nonlocals))
 
             # return manifest
-
             return Dict({'grib_files': [osp.join(self.ingest_dir, x) for x in grib_files], 
-                'colmet_files_utc': colmet_files_utc, 
                 'colmet_prefix': colmet_prefix, 
-                'colmet_files': colmet_files,
-                'colmet_missing': colmet_missing})
+                'colmet_files_utc': colmet_files_utc,
+                'colmet_files': [osp.join(self.cache_dir, colmet_prefix, f) for f in colmet_files],
+                'colmet_missing': [osp.join(self.cache_dir, colmet_prefix, f) for f in colmet_missing]})
 
         raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
 

@@ -598,7 +598,7 @@ def process_ignitions(js):
         if coords[0] != coords[-1]:
             coords.append(coords[0])
         wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % js.max_dom)
-        FUEL_MASK = fire_init.process_burn_plot_boundary(wrf_path, [[coords]])
+        FUEL_MASK = fire_init.process_burn_plot_boundary(wrf_path, [[coords]], buffer_dist=100.)
     else:
         FUEL_MASK = np.zeros(fxlon.shape).astype(bool)
     fire_init.integrate_init(wrf_path, TIGN_G, FUEL_MASK, no_fuel_cat=js.fire_nml['fuel_scalars']['no_fuel_cat'])
