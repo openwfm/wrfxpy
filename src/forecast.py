@@ -908,11 +908,17 @@ def execute(args,job_args):
     proc_q = Queue()
 
     metgrid_proc = Process(target=run_metgrid, args=(js, proc_q))
-
-    if js.use_realtime:
-        fire_init_proc = Process(target=run_fire_init, args=(js, proc_q))
-    else:
-        logging.info("step 5b: fire init processing [skipping]")
+    # check if data is available to run fire initialization
+    if "fire_init_dir" in js.keys():
+        perim1_path = osp.join(js.fire_init_dir, "perim1.pkl")
+        perim2_path = osp.join(js.fire_init_dir, "perim2.pkl")
+        if not (osp.exists(perim1_path) and osp.exists(perim2_path)):
+            logging.warning("Real-time data missing, so skipping running fire initialization")
+            js.use_realtime = False
+        if js.use_realtime:
+            fire_init_proc = Process(target=run_fire_init, args=(js, proc_q))
+        else:
+            logging.info("step 5b: fire init processing [skipping]")
 
     logging.info('execute: starting parallel METGRID, and fire init processing')
     metgrid_proc.start()

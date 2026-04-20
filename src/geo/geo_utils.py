@@ -20,10 +20,11 @@ def fill_categories(array,fill,coord=None):
     :return: array with categories replaced and interpolated missing categories using nearest neighbour
     """
     # replace categories
+    tmp_array = array.copy()
     for k in fill.keys():
         if fill[k] != 'nearest':
             logging.info('geo_utils.fill_categories() - replacing categories %s -> %s' % (int(k),int(fill[k])))
-            array[array==int(k)]=int(fill[k])
+            array[tmp_array==int(k)]=int(fill[k])
     # interpolate missing values
     missing = [int(k) for k in fill.keys() if fill[k] == 'nearest']
     if len(missing):

@@ -593,7 +593,7 @@ def process_ignitions(js):
                 }
                 fire_data['points'].append(point_data)
         TIGN_G = fire_init.process_ignitions_to_tign(wrf_path, fire_data)   
-    if js.burn_plot_boundary is not None and len(js.burn_plot_boundary):
+    if js.get("burn_plot_boundary", None) is not None and len(js.burn_plot_boundary):
         coords = [c[::-1] for c in js.burn_plot_boundary]
         if coords[0] != coords[-1]:
             coords.append(coords[0])

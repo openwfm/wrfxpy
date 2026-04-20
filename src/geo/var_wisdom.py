@@ -57,18 +57,39 @@ _var_wisdom = {
         'category_range': [0,14],
         'fill_missing': 14,
         'fill' : Dict({
-            0: 14, 1: 2, 2: 8, 3: 2, 4: 8, 5: 10, 7: 5, 8: 7, 9: 3, 10: 1, 
-            11: 14, 12: 5, 13: 14, 14: 1, range(15,18): 14, 18: 11, range(19,22): 14
+            0: 14, 1: 8, 2: 9, 3: 8, 4: 9, 5: 10, 6: 4, 7: 5, 8: 2, 9: 2, 10: 3, 
+            11: 14, 12: 1, 13: 14, 14: 2, range(15,18): 14, 18: 8, 19: 5, range(20,22): 14
         }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
         'bits': 16,
         'interp_option': 'default:nearest_neighbor+average_16pt+search',
-        'rel_path': 'default:modis_landuse_20class_30s_with_lakes/',
+        'abs_path': '/home/afarguell/modis_landuse_20class_15s_with_lakes_fbfm13',
         'subgrid': 'yes',
         'add_opts': {'dominant_only': 'NFUEL_CAT',
                     'z_dim_name': 'fuel_cat',
                     'halt_on_missing': 'no'} 
+    },
+    'NFUEL_CAT_40_MODIS_20': {
+        'name': 'NFUEL_CAT',
+        'units': 'fuel category',
+        'description': '40 Scott & Burgan fire behavior categories from MODIS landuse 20 class',
+        'type': 'categorical', 
+        'category_range': [0,41],
+        'fill_missing': 41,
+        'fill' : Dict({
+            0: 41, 1: 35, 2: 36, 3: 30, 4: 33, 5: 31, 6: 18, 7: 16, 8: 25, 9: 12, 10: 3, 
+            11: 41, 12: 2, 13: 41, 14: 11, range(15,18): 41, 18: 24, 19: 11, range(20,22): 41
+        }),
+        'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:nearest_neighbor+average_16pt+search',
+        'abs_path': '/home/afarguell/modis_landuse_20class_15s_with_lakes_fbfm40',
+        'subgrid': 'yes',
+        'add_opts': {'dominant_only': 'NFUEL_CAT',
+                    'z_dim_name': 'fuel_cat',
+                    'halt_on_missing': 'no'}  
     },
     'NTREE_CAT' : {
         'name': 'NTREE_CAT',
