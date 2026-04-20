@@ -17,11 +17,9 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from __future__ import print_function
-
-from __future__ import absolute_import
-import requests
 import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import requests
 
 import os.path as osp
 import os
@@ -29,7 +27,6 @@ import logging
 import time
 import subprocess
 import random
-import json
 
 from utils import ensure_dir, load_sys_cfg, remove
 
@@ -40,11 +37,13 @@ wget = cfg.get('wget','/usr/bin/wget')
 wget_options=cfg.get('wget_options',["--read-timeout=1"])
 download_sleep_seconds=cfg.get('download_sleep_seconds', 5)
 
+
 class DownloadError(Exception):
     """
     Raised when the downloader is unable to retrieve a URL.
     """
     pass
+
 
 def get_dList(url):
     dList = six.moves.urllib.request.urlopen(url).read().splitlines()
@@ -52,6 +51,7 @@ def get_dList(url):
     for l in dList:
         listing.append(l.split()[-1])
     return listing
+
 
 def request_url(url, token):
     use_urllib2 = url[:6] == 'ftp://'
@@ -86,6 +86,7 @@ def request_url(url, token):
             logging.warning('download_url not header contet-length information')
     return content_size
 
+
 def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sleep_seconds_def, token=None, min_size=1):
     """
     Download a remote URL to the location local_path with retries.
@@ -99,10 +100,10 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     :param max_retries: how many times we may retry to download the file
     :param token: key to use for the download or None if not
     """
-    logging.info('download_url %s as %s' % (url, local_path))
-    logging.debug('if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
+    logging.info('download_url - %s as %s' % (url, local_path))
+    logging.debug('download_url - if download fails, will try %d times and wait %d seconds each time' % (max_retries, sleep_seconds))
     sec = random.random() * download_sleep_seconds
-    logging.info('download_url sleeping %s seconds' % sec)
+    logging.info('download_url -  sleeping %s seconds' % sec)
     time.sleep(sec)
 
     use_aws = url[:5] == 's3://'
@@ -111,9 +112,9 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
         content_size = request_url(url, token)
     except Exception as e:
         if max_retries > 0:
-            logging.info('not found, download_url trying again, retries available %d' % max_retries)
+            logging.info('donwload_url - not found, download_url trying again, retries available %d' % max_retries)
             logging.warning(e)
-            logging.info('download_url sleeping %s seconds' % sleep_seconds)
+            logging.info('download_url - sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
             download_url(url, local_path, max_retries = max_retries-1, token = token, min_size = min_size)
         return
@@ -138,21 +139,21 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
 
     # content size may have changed during download
     content_size = request_url(url, token)
-    logging.info('local file size {} remote content size {} minimum size {}'.format(file_size, content_size, min_size))
+    logging.info('download_url - local file size {} remote content size {} minimum size {}'.format(file_size, content_size, min_size))
 
     # it should be != but for some reason content_size is wrong sometimes
     if content_size is not None and int(file_size) < int(content_size) or int(file_size) < min_size:
-        logging.warning('wrong file size, download_url trying again, retries available %d' % max_retries)
+        logging.warning('download_url - wrong file size, download_url trying again, retries available %d' % max_retries)
         if max_retries > 0:
             # call the entire function recursively, this will attempt to redownload the entire file
             # and overwrite previously downloaded data
-            logging.info('download_url sleeping %s seconds' % sleep_seconds)
+            logging.info('download_url - sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
             download_url(url, local_path, max_retries = max_retries-1, token = token, min_size = min_size)
             return  # success
         else:
             os.remove(local_path)
-            raise DownloadError('failed to download file %s' % url)
+            raise DownloadError('download_url - failed to download file %s' % url)
 
     # dump the correct file size to an info file next to the grib file
     # when re-using the GRIB2 file, we check its file size against this record
@@ -160,3 +161,33 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     info_path = local_path + '.size'
     open(ensure_dir(info_path), 'w').write(str(file_size))
 
+
+def download_many(url_local_pairs, workers=16, aws_only=True, **download_kwargs):
+    """
+    url_local_pairs: iterable of (url, local_path)
+    workers: concurrent downloads
+    aws_only: if True, only parallelize s3:// URLs (others can be skipped or handled separately)
+    download_kwargs: forwarded to download_url()
+    """
+    pairs = list(url_local_pairs)
+
+    if aws_only:
+        aws_pairs = [(u, p) for (u, p) in pairs if u.startswith("s3://")]
+        non_aws_pairs = [(u, p) for (u, p) in pairs if not u.startswith("s3://")]
+        if non_aws_pairs:
+            logging.info("download_many - %d non-s3 URLs ignored (aws_only=True)", len(non_aws_pairs))
+        pairs = aws_pairs
+
+    if not pairs:
+        return
+
+    # Threads are appropriate because the heavy work is network + subprocess I/O.
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(download_url, u, p, **download_kwargs): (u, p) for (u, p) in pairs}
+
+        for fut in as_completed(futures):
+            u, p = futures[fut]
+            try:
+                fut.result()
+            except Exception as e:
+                logging.exception("dowlonad_many - download failed %s -> %s (%s)", u, p, e)
