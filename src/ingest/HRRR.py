@@ -3,7 +3,7 @@ from ingest.grib_forecast import GribForecast
 
 class HRRR(GribForecast):
     """
-    The HRRR (High Resolution Rapid Refresh) grib source as provided by NOMADS.
+    The HRRR (High Resolution Rapid Refresh) forecast grib source as provided by AWS or NOMADS.
     """
 
     def __init__(self, arg):
@@ -34,7 +34,7 @@ class HRRR(GribForecast):
         HRRR provides 16 GRIB2 files, one per hour and performs a cycle every hour.
 
         :param cycle_start: UTC time of cycle start
-        :param fc_hours: final forecast hour 
+        :param fc_list: list of forecast hours
         """
         path_tmpl = 'hrrr.%04d%02d%02d/conus/hrrr.t%02dz.wrfprsf%02d.grib2'
         grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, x) for x in fc_list]
@@ -57,3 +57,25 @@ class HRRR(GribForecast):
     # more general info: https://rapidrefresh.noaa.gov/internal/pdfs/RAPX_HRRRX_NWS-13sep2016-pub.pdf
     # file content: http://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfprsf00.grib2.shtml
 
+class HRRR_S(HRRR):
+    """
+    The HRRR (High Resolution Rapid Refresh) grib source as provided by AWS or NOMADS.
+    The 2D surface product.
+    """
+
+    def __init__(self, js):
+        super(HRRR_S, self).__init__(js)
+
+    def file_names(self, cycle_start, fc_list):
+        """
+        Computes the relative paths of required GRIB2 files.
+
+        HRRR provides 16 GRIB2 files, one per hour and performs a cycle every hour.
+
+        :param cycle_start: UTC time of cycle start
+        :param fc_list: list of forecast hours
+        """
+        path_tmpl = 'hrrr.%04d%02d%02d/conus/hrrr.t%02dz.wrfsfcf%02d.grib2'
+        grib_files = [path_tmpl % (cycle_start.year, cycle_start.month, cycle_start.day, cycle_start.hour, x) for x in fc_list]
+
+        return grib_files

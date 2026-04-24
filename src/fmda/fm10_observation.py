@@ -23,7 +23,7 @@ class FM10Observation:
   An observation of an FM-10 value by a RAWS station.
   """
 
-  def __init__(self,tm,lat,lon,elev,obs,ngp):
+  def __init__(self,tm,lat,lon,elev,obs,ngp,stid=None):
     """
     Constructs an fm-10 observation from given information.
 
@@ -40,6 +40,7 @@ class FM10Observation:
     self.elevation = elev
     self.obs_val = obs
     self.ngp = ngp
+    self.stid = stid
 
 
   def get_value(self):

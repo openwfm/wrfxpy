@@ -1,6 +1,6 @@
 {
     "workspace_path" : "wksp_fmda",
-    "lookback_length" : 20,
+    "lookback_length" : 0,
     "regions" : {
        "CONUS": {
          "code" : "CONUS",
