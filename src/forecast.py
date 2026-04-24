@@ -452,12 +452,12 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
                 # move output to cache directory
                 make_dir(colmet_dir)
                 for f in manifest.colmet_files:
-                    move(osp.join(grib_dir,f),osp.join(colmet_dir,f))
+                    move(osp.join(grib_dir, osp.basename(f)), osp.join(colmet_dir, osp.basename(f)))
                 # now all colmet files should be in the cache
 
         if cache_colmet:
             for f in manifest.colmet_files:
-                symlink_unless_exists(osp.join(colmet_dir,f),osp.join(wps_dir,f))
+                symlink_unless_exists(osp.join(colmet_dir,osp.basename(f)),osp.join(wps_dir,osp.basename(f)))
         else:
             # move output
             for f in glob.glob(osp.join(grib_dir,grib_source.prefix + '*')):
