@@ -29,9 +29,9 @@ def fill_categories(array,fill,coord=None):
     missing = [int(k) for k in fill.keys() if fill[k] == 'nearest']
     if len(missing):
         logging.info('geo_utils.fill_categories() - interpolating missing categories %s' % missing)
-        mask = np.zeros(array.shape)
+        mask = np.zeros(tmp_array.shape)
         for cm in missing:
-            mask = np.logical_or(mask,array==int(cm))
+            mask = np.logical_or(mask,tmp_array==int(cm))
         if mask.any():
             array = np.ma.array(array,mask=mask)
             if coord:

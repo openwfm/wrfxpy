@@ -449,10 +449,10 @@ def render_ignitions(js, max_dom):
 
     nml_fire = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom,
                  'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom,
-                 'fmoist_run' : [False] * max_dom, 'fmoist_interp' : [False] * max_dom,
+                 'fmoist_run' : [0] * max_dom, 'fmoist_interp' : [0] * max_dom,
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
                  'fire_viscosity' : [0] * max_dom, 'fire_wind_log_interp': [0] * max_dom,
-                 'fire_use_windrf': [0] * max_dom }
+                 'fire_use_windrf': [0] * max_dom, 'fire_upwinding': [0] * max_dom }
     
     if js.use_realtime:
         fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
@@ -485,9 +485,10 @@ def render_ignitions(js, max_dom):
             nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
         nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
-        nml_fire['fmoist_run'][dom_id-1] = True # use the fuel moisture model
-        nml_fire['fmoist_interp'][dom_id-1] = True # interpolate fm onto fire mesh
+        nml_fire['fmoist_run'][dom_id-1] = 1 # use the fuel moisture model
+        nml_fire['fmoist_interp'][dom_id-1] = 1 # interpolate fm onto fire mesh
         nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
+        nml_fire['fire_upwinding'][dom_id-1] = 3 # use ENO1
 
         # for each ignition
         for ndx,ign in enumerate(dom_igns):
@@ -518,9 +519,10 @@ def render_ignitions(js, max_dom):
             nml_fire['fire_use_windrf'][dom_id-1] = 2 # set fwh from windrf
             nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
             nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
-            nml_fire['fmoist_run'][dom_id-1] = True # use the fuel moisture model
-            nml_fire['fmoist_interp'][dom_id-1] = True # interpolate fm onto fire mesh
+            nml_fire['fmoist_run'][dom_id-1] = 1 # use the fuel moisture model
+            nml_fire['fmoist_interp'][dom_id-1] = 1 # interpolate fm onto fire mesh
             nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
+            nml_fire['fire_upwinding'][dom_id-1] = 3 # use ENO1
 
     return { 'fire' : nml_fire }
 
@@ -600,7 +602,7 @@ def process_ignitions(js):
         FUEL_MASK = fire_init.process_burn_plot_boundary(wrf_path, [[coords]], buffer_dist=100.)
     else:
         FUEL_MASK = np.zeros(fxlon.shape).astype(bool)
-    fire_init.integrate_init(wrf_path, TIGN_G, FUEL_MASK, no_fuel_cat=js.fire_nml['fuel_scalars']['no_fuel_cat'])
+    fire_init.integrate_init(wrf_path, TIGN_G, FUEL_MASK, no_fuel_cat=0)
 
 def timespec_to_utc(ts_str, from_time = None):
     """

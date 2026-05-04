@@ -624,7 +624,7 @@ def vars_add_to_geogrid(js):
             if (
                 wisdom['name'] == 'NFUEL_CAT'
                 and 'category_range' in wisdom
-                and nfuelcats != wisdom['category_range'][1] - 1
+                and nfuelcats != wisdom['category_range'][1]
             ):
                 logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
                 continue
@@ -1020,7 +1020,7 @@ def execute(args,job_args):
             wrf_path = osp.join(js.wrf_dir, 'wrfinput_d{:02d}'.format(js.max_dom))
             force_copy(wrf_path, wrf_path + '_orig')
             outside_time = fire_data.get('outside_time', 360000.)
-            no_fuel_cat = js.fire_nml['fuel_scalars']['no_fuel_cat']
+            no_fuel_cat = 0
             fire_init.integrate_init(
                 wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], 
                 outside_time=outside_time, no_fuel_cat=no_fuel_cat
