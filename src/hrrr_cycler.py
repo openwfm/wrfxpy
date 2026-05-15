@@ -710,7 +710,7 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     # make wps format files for WPS
     time_tag = cycle.strftime("%Y-%m-%d_%H") + f"f{fcst_hour:02d}"
     model.to_wps_format(osp.dirname(geo_path), index, lats, lons, time_tag)
-    
+    logging.info("CHECKPOINT1") 
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path, fcst_hour)
     logging.info("CYCLER writing model variables to:  %s." % model_path)
@@ -723,6 +723,7 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
         data.update({
             "SMOKE": data["massden"],
         })
+    logging.info("CHECKPOINT2")
     model.to_netcdf(
         ensure_dir(model_path), data
     )
@@ -803,12 +804,11 @@ if __name__ == "__main__":
     
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+    mode = None
     if len(sys.argv) > 1:
         mode = sys.argv[1]
         if mode in ["a", "A", "f", "F"]:
             mode = mode.lower()
-        else:
-            mode = None
     if len(sys.argv) == 3:
         code = sys.argv[2]
         for k,region in cfg.regions.items():
@@ -821,10 +821,10 @@ if __name__ == "__main__":
         mode = sys.argv[1]
         code = "FIRE"
         cfg.regions = {
-             "Fire domain" : {
-                  "code" : code,
-                  "bbox" : sys.argv[2:6]
-             }
+            "Fire domain" : {
+                "code" : code,
+                "bbox" : sys.argv[2:6]
+            }
         }
         try:
             os.remove(osp.join(cfg.workspace_path,code+"-geo.nc"))

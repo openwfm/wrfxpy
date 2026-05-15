@@ -122,6 +122,7 @@ class JobState(Dict):
         self.clean_dir = args.get('clean_dir', True)
         self.run_wrf = args.get('run_wrf', True)
         self.iofields = args.get('iofields', False)
+        self.nproc = args.get('nproc', None)
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
 
@@ -1047,6 +1048,13 @@ def execute(args,job_args):
     else:
         if len(js.ignitions) and js.use_tign_ignition:
             process_ignitions(js)
+            
+    # set the parallel processes from nproc for wrf.exe
+    if js.nproc != None and np.prod(js.nproc) == js.num_nodes * js.ppn:
+        js.wrf_nml['domains']['nproc_x'] = js.nproc[0]
+        js.wrf_nml['domains']['nproc_y'] = js.nproc[1]
+        # update namelist input
+        f90nml.write(js.wrf_nml, osp.join(js.wrf_dir, 'namelist.input'), force=True)
     
     logging.info('run_wrf = %s' % js.run_wrf)
     if js.run_wrf:

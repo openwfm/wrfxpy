@@ -47,10 +47,10 @@ def numerical_solve_bisect(e2, eps2, k):
         return 0.0
 
     while val_right > tgt:
-      s2_eta_left = s2_eta_right
-      val_left = np.sum(e2 / (eps2 + s2_eta_left))
-      s2_eta_right *= 2.0
-      val_right = np.sum(e2 / (eps2 + s2_eta_right))
+        s2_eta_left = s2_eta_right
+        val_left = np.sum(e2 / (eps2 + s2_eta_left))
+        s2_eta_right *= 2.0
+        val_right = np.sum(e2 / (eps2 + s2_eta_right))
 
 #    print('BISECT: s2_eta_left %g val_left %g s2_eta_right %g val_right %g tgt %g' %
 #           (s2_eta_left, val_left, s2_eta_right, val_right, tgt))
@@ -277,7 +277,8 @@ def fit_tsm_lstsq(obs_data, X):
             # compute new estimate of variance of microscale variability
             s2_array = res2 - obs_var
             for i in range(len(s2_array)):
-                s2_array[i] += np.dot(Xobs[i,:], np.linalg.lstsq(XtSX, Xobs[i,:].T, rcond=None)[0])
+                adj = np.dot(Xobs[i,:], np.linalg.lstsq(XtSX, Xobs[i,:].T, rcond=None)[0])
+                s2_array[i] += np.asarray(adj).item()
             s2_eta_hat = numerical_solve_bisect(res2, obs_var, Ncov)
             if s2_eta_hat < 0.0:
                 s2_eta_hat = 0.0
@@ -286,13 +287,19 @@ def fit_tsm_lstsq(obs_data, X):
     # map computed betas to original (possibly extended) betas which include unused variables
     beta_ext = np.asmatrix(np.zeros((Nallcov,1)))
     beta_ext[nz_covs] = beta
+    
+    # convert beta and XtSX to arrays of floats for the lstsq calls below
+    beta = np.asarray(beta, dtype=float).ravel()
+    XtSX = np.asarray(XtSX, dtype=float) 
 
+    # compute kriging estimates and variances
     for i in range(X.shape[0]):
         for j in range(X.shape[1]):
-            x_ij = X[i,j,:]
+            x_ij = np.asarray(X[i,j,:], dtype=float).ravel()
             K[i,j] = np.dot(x_ij, beta)
-            V[i,j] = s2_eta_hat + np.dot(x_ij, np.linalg.lstsq(XtSX, x_ij, rcond=None)[0])
+            adj = np.dot(x_ij, np.linalg.lstsq(XtSX, x_ij, rcond=None)[0])
+            V[i,j] = s2_eta_hat + np.asarray(adj).item()
             if V[i,j] < 0.0:
-              logging.error("FMDA negative kriging variance in trend surface model.")
+                logging.error("FMDA negative kriging variance in trend surface model.")
 
     return K, V
