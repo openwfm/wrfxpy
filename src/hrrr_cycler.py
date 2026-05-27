@@ -36,6 +36,7 @@ import logging
 import os
 import os.path as osp
 from datetime import datetime, timedelta, timezone
+from typing import Sequence
 
 # setup environment
 sys_cfg = Dict(json.load(open("etc/conf.json")))
@@ -484,7 +485,6 @@ def load_hrrr_data(grib_file, bbox):
         logging.warning("HRRR version is not provided, empty list of variables")
     # bbox format: minlat, minlon, maxlat, maxlon
     i1, i2, j1, j2 = find_region_indices(lats, lons, bbox[0], bbox[2], bbox[1], bbox[3])
-   
     lats = lats[i1:i2,j1:j2] 
     lons = lons[i1:i2,j1:j2]
     hgt = np.ma.array(netCDF4.Dataset("static/hrrr.terrainh.nc")["HGT_M"][0])[i1:i2,j1:j2]
@@ -533,8 +533,8 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     :param cfg: the configuration dictionary specifying the region
     :param grib_files: path to HRRR grib files to retrieve variables for this cycle (or previous)
     :param wksp_path: the workspace path for the cycler
-    :param lookback_length: nubmer of cycles to search before we find a computed cycle
-    :param forecast_length: number of cycles to forecast
+    :param lookback_length: number of cycles to search before we find a computed cycle
+    :param fcast_hour: TODO
     :param meso_token: the mesowest API access token or a list of them
     :param acquire: should the SynopticDB be updated? Normally only if CONUS
     :return: the model advanced and assimilated at the current cycle
@@ -583,10 +583,16 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
             if pp_path != None:
                 if "shuttle_remote_host" in sys_cfg:
                     sim_code = "fmda-" + cfg.code
-                    send_product_to_server(
-                        sys_cfg, pp_path, sim_code, sim_code, 
-                        sim_code + ".json", cfg.region_id + " FM"
-                    )
+                    try:
+                        send_product_to_server(
+                            sys_cfg, pp_path, sim_code, sim_code,
+                            sim_code + ".json", cfg.region_id + " FM"
+                        )
+                    except Exception as e:
+                        logging.warning(
+                            f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                        )
+                        logging.warning("CYCLER exception {}".format(e))                    
         except Exception as e:
             logging.warning("CYCLER exception {}".format(e))
             logging.error("CYCLER skipping region {} for cycle {}".format(cfg.region_id,str(cycle)))
@@ -733,10 +739,16 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     if pp_path != None:
         if "shuttle_remote_host" in sys_cfg:
             sim_code = "fmda-" + cfg.code
-            send_product_to_server(
-                sys_cfg, pp_path, sim_code, sim_code, 
-                sim_code + ".json", cfg.region_id + " FM"
-            )
+            try:
+                send_product_to_server(
+                    sys_cfg, pp_path, sim_code, sim_code, 
+                    sim_code + ".json", cfg.region_id + " FM"
+                )
+            except Exception as e:
+                logging.warning(
+                    f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                )
+                logging.warning("CYCLER exception {}".format(e))
     
     return model
     
@@ -797,7 +809,19 @@ def fmda_cycle_interval(start_cycle, end_cycle):
                 )
         cycle += timedelta(hours=1)
         tstep += 1
-        
+
+def parse_bbox(args: Sequence[str]) -> tuple[float, float, float, float]:
+    """
+    Convert input arguments for bbox into numeric list
+    """
+    if len(args) != 4:
+        raise ValueError(f"Expected 4 bbox values, got {len(args)}")
+
+    try:
+        return tuple(float(x) for x in args)
+    except ValueError as e:
+        raise ValueError(f"Invalid bbox values: {args}") from e
+
     
 if __name__ == "__main__":
     
@@ -823,7 +847,7 @@ if __name__ == "__main__":
         cfg.regions = {
              "Fire domain" : {
                   "code" : code,
-                  "bbox" : sys.argv[2:6]
+                  "bbox" : parse_bbox(sys.argv[2:6])
              }
         }
         try:
@@ -880,10 +904,16 @@ if __name__ == "__main__":
                 if pp_path != None:
                     if "shuttle_remote_host" in sys_cfg:
                         sim_code = "fmda-" + wrapped_cfg.code
-                        send_product_to_server(
-                            sys_cfg, pp_path, sim_code, sim_code, 
-                            sim_code + ".json", region_id + " FM"
-                        )
+                        try:
+                            send_product_to_server(
+                                sys_cfg, pp_path, sim_code, sim_code,
+                                sim_code + ".json", cfg.region_id + " FM"
+                            )
+                        except Exception as e:
+                            logging.warning(
+                                f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                            )
+                            logging.warning("CYCLER exception {}".format(e))                        
             except Exception as e:
                 logging.warning("CYCLER exception {}".format(e))
                 logging.error(f"CYCLER skipping region {region_id} for cycle {cycle}")
@@ -916,10 +946,16 @@ if __name__ == "__main__":
                     if pp_path != None:
                         if "shuttle_remote_host" in sys_cfg:
                             sim_code = "fmda-" + wrapped_cfg.code
-                            send_product_to_server(
-                                sys_cfg, pp_path, sim_code, sim_code, 
-                                sim_code + ".json", region_id + " FM"
-                            )
+                            try:
+                                send_product_to_server(
+                                    sys_cfg, pp_path, sim_code, sim_code,
+                                    sim_code + ".json", cfg.region_id + " FM"
+                                )
+                            except Exception as e:
+                                logging.warning(
+                                    f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                                )
+                                logging.warning("CYCLER exception {}".format(e))
                 except Exception as e:
                     logging.error(
                         f"CYCLER skipping region {region_id} for cycle {cycle} and mode {mode_name}"
@@ -959,10 +995,16 @@ if __name__ == "__main__":
                         if pp_path != None:
                             if "shuttle_remote_host" in sys_cfg:
                                 sim_code = "fmda-" + wrapped_cfg.code
-                                send_product_to_server(
-                                    sys_cfg, pp_path, sim_code, sim_code, 
-                                    sim_code + ".json", region_id + " FM"
-                                )
+                                try:
+                                    send_product_to_server(
+                                        sys_cfg, pp_path, sim_code, sim_code,
+                                        sim_code + ".json", cfg.region_id + " FM"
+                                    )
+                                except Exception as e:
+                                    logging.warning(
+                                        f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                                    )
+                                    logging.warning("CYCLER exception {}".format(e))                                
                     except Exception as e:
                         logging.warning(f"CYCLER exception {e}")
                         logging.error(
@@ -1004,10 +1046,16 @@ if __name__ == "__main__":
                             if pp_path != None:
                                 if "shuttle_remote_host" in sys_cfg:
                                     sim_code = "fmda-" + wrapped_cfg.code
-                                    send_product_to_server(
-                                        sys_cfg, pp_path, sim_code, sim_code, 
-                                        sim_code + ".json", region_id + " FM"
-                                    )
+                                    try:
+                                        send_product_to_server(
+                                            sys_cfg, pp_path, sim_code, sim_code,
+                                            sim_code + ".json", cfg.region_id + " FM"
+                                        )
+                                    except Exception as e:
+                                        logging.warning(
+                                            f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                                        )
+                                        logging.warning("CYCLER exception {}".format(e)) 
                         except Exception as e:
                             logging.error(
                                 f"CYCLER skipping region {region_id} for cycle {cycle} and "
