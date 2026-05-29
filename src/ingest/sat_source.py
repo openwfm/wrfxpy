@@ -192,6 +192,7 @@ class SatSource(object):
         """
         return {'LAADS': self.tokens.get('laads',None),
                 'LPDAAC_ECS': None,
+                'LPCLOUD': self.tokens.get('laads',None),
                 'LANCEMODIS': self.tokens.get('nrt',None)
             }.get(data_center,None)
 
