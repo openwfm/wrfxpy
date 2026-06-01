@@ -31,7 +31,7 @@ from ssh_shuttle import send_product_to_server
 import netCDF4
 import numpy as np
 import json
-import sys
+import sys 
 import logging
 import os
 import os.path as osp
@@ -534,7 +534,7 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     :param grib_files: path to HRRR grib files to retrieve variables for this cycle (or previous)
     :param wksp_path: the workspace path for the cycler
     :param lookback_length: number of cycles to search before we find a computed cycle
-    :param fcast_hour: TODO
+    :param fcast_hour: if in forecast mode, the forecasting hour (0 otherwise)
     :param meso_token: the mesowest API access token or a list of them
     :param acquire: should the SynopticDB be updated? Normally only if CONUS
     :return: the model advanced and assimilated at the current cycle
