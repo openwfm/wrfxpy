@@ -28,6 +28,7 @@ from vis.postprocessor import scalar_field_to_raster, vector_field_to_raster, sc
 from fwi.fire_weather_indices import calculate_svp, calculate_eta
 from ssh_shuttle import send_product_to_server
 
+import pandas as pd
 import netCDF4
 import numpy as np
 import json
@@ -537,6 +538,7 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     :param fcast_hour: TODO
     :param meso_token: the mesowest API access token or a list of them
     :param acquire: should the SynopticDB be updated? Normally only if CONUS
+    :param stash_ml_data: should we save the full set of covs and Eqs and FMC, for use training/validating ML models of FMC
     :return: the model advanced and assimilated at the current cycle
     """
     min_num_obs = 10
@@ -767,7 +769,7 @@ def is_cycle_computed(cycle, cfg, wksp_path, fcst_hour=0):
     return osp.isfile(path)
 
 
-def fmda_cycle_interval(start_cycle, end_cycle):
+def fmda_cycle_interval(start_cycle, end_cycle, conf_path=None):
     """
     Run historical cycle of fuel moisture estimates using FMDA for all the regions 
     specified by the configuration.
@@ -775,6 +777,11 @@ def fmda_cycle_interval(start_cycle, end_cycle):
     :param start_cycle: initial time to create FMDA estimates
     :param end_cycle: final time to create FMDA estimates
     """
+    if conf_path is None:
+        conf = cfg
+    else:
+        conf = Dict(json.load(open(conf_path)))
+
     lookback_length = 0
     forecast_length = 0
     hrrra = HRRRA(sys_cfg)
@@ -783,7 +790,7 @@ def fmda_cycle_interval(start_cycle, end_cycle):
     while cycle <= end_cycle:
         gribs = hrrra.retrieve_gribs(cycle, cycle)
         grib_files_anl = gribs["grib_files"]
-        for region_id,region_cfg in cfg.regions.items():
+        for region_id,region_cfg in conf.regions.items():
             logging.info(f"CYCLER processing region {region_id} for {cycle}")
             wrapped_cfg = Dict(region_cfg)
             wrapped_cfg.update({"region_id": region_id})
@@ -794,7 +801,7 @@ def fmda_cycle_interval(start_cycle, end_cycle):
                 try:
                     fmda_advance_region(
                         cycle, wrapped_cfg, grib_files_anl, 
-                        cfg.workspace_path, lookback_length, 0, 
+                        conf.workspace_path, lookback_length, 0, 
                         meso_token, True
                     )
                 except Exception as e:
@@ -875,7 +882,8 @@ if __name__ == "__main__":
     # get more readable mode
     mode_name = "analysis" if mode == "a" else "forecast"
     # current time
-    now = datetime.now(timezone.utc)
+    #now = datetime.now(timezone.utc)
+    now = datetime(2026, 5, 18, 17, 20, 11, 202708, tzinfo=timezone.utc) # DEBUG STEP
     cycle = (now - timedelta(minutes=59)).replace(minute=0, second=0, microsecond=0, tzinfo=None)
     # print statements
     logging.info(
