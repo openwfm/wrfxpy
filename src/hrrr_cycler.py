@@ -32,7 +32,7 @@ import pandas as pd
 import netCDF4
 import numpy as np
 import json
-import sys
+import sys 
 import logging
 import os
 import os.path as osp
@@ -535,7 +535,7 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     :param grib_files: path to HRRR grib files to retrieve variables for this cycle (or previous)
     :param wksp_path: the workspace path for the cycler
     :param lookback_length: number of cycles to search before we find a computed cycle
-    :param fcast_hour: TODO
+    :param fcast_hour: if in forecast mode, the forecasting hour (0 otherwise)
     :param meso_token: the mesowest API access token or a list of them
     :param acquire: should the SynopticDB be updated? Normally only if CONUS
     :param stash_ml_data: should we save the full set of covs and Eqs and FMC, for use training/validating ML models of FMC
