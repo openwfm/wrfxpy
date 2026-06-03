@@ -538,7 +538,6 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     :param fcast_hour: if in forecast mode, the forecasting hour (0 otherwise)
     :param meso_token: the mesowest API access token or a list of them
     :param acquire: should the SynopticDB be updated? Normally only if CONUS
-    :param stash_ml_data: should we save the full set of covs and Eqs and FMC, for use training/validating ML models of FMC
     :return: the model advanced and assimilated at the current cycle
     """
     min_num_obs = 10
@@ -796,7 +795,7 @@ def fmda_cycle_interval(start_cycle, end_cycle, conf_path=None):
             wrapped_cfg.update({"region_id": region_id})
             wrapped_cfg.update({"forecast_length": forecast_length}) 
             # Process real-time
-            if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
+            if not is_cycle_computed(cycle, wrapped_cfg, conf.workspace_path):
                 logging.info(f"CYCLER real-time processing for region {region_id} at cycle {cycle}")
                 try:
                     fmda_advance_region(
