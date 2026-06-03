@@ -721,15 +721,16 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path, fcst_hour)
     logging.info("CYCLER writing model variables to:  %s." % model_path)
-    data = {
-        "EQUILd FM": Ed, "EQUILw FM": Ew, "T2": data["t2"], 
-        "RH": data["rh"], "PRECIP": rain, "SNOWH": data["snowh"], 
-        "HGT": hgt, "WINDSPD": data["ws"], "U10": data["u10"], "V10": data["v10"]
+    data.update({
+        "EQUILd FM": Ed, "EQUILw FM": Ew, "PRECIP": rain, "HGT": hgt
+    })
+    rename_vars = {
+        "t2": "T2", "rh": "RH", "snowh": "SNOWH", "ws": "WINDSPD",
+        "u10": "U10", "v10": "V10", "SMOKE": "massden"
     }
-    if "massden" in data:
-        data.update({
-            "SMOKE": data["massden"],
-        })
+    for orig_var_name,new_var_name in rename_vars.items():
+        if orig_var_name in data:
+            data[new_var_name] = data.pop(orig_var_name)
     model.to_netcdf(
         ensure_dir(model_path), data
     )
@@ -851,10 +852,10 @@ if __name__ == "__main__":
         mode = sys.argv[1]
         code = "FIRE"
         cfg.regions = {
-             "Fire domain" : {
-                  "code" : code,
-                  "bbox" : parse_bbox(sys.argv[2:6])
-             }
+            "Fire domain" : {
+                "code" : code,
+                "bbox" : parse_bbox(sys.argv[2:6])
+            }
         }
         try:
             os.remove(osp.join(cfg.workspace_path,code+"-geo.nc"))
