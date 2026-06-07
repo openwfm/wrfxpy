@@ -3,6 +3,8 @@ wrfxpy
 
 |docs|
 
+*** NOTE This page is LEGACY ONLY and not maintained. ***
+
 *wrfxpy* is a set of software modules that provide functionality
 related to running `WPS and WRF <http://www.openwfm.org/>`_.
 
