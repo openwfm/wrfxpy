@@ -13,7 +13,7 @@ _var_wisdom = {
         'fill_missing': 0,       
         'fill' : Dict({
             range(15,91): 0, 92: 0, range(94,100): 0,
-            -9999: 0, (0,91,93): 'nearest'
+            -9999: 0, (91,93): 'nearest'
         }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
@@ -38,7 +38,7 @@ _var_wisdom = {
             161: 23, 162: 24, 163: 25, 164: 26, 165: 27, 181: 28, 182: 29,
             183: 30, 184: 31, 185: 32, 186: 33, 187: 34, 188: 35, 189: 36,
             201: 37, 202: 38, 203: 39, 204: 40, range(42,91): 0, 92: 0,
-            range(94,100): 0, -9999: 0, (0,91,93): 'nearest'
+            range(94,100): 0, -9999: 0, (91,93): 'nearest'
         }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
@@ -147,6 +147,7 @@ _var_wisdom = {
         'description': 'Forest Canopy Height from LANDFIRE',
         'type': 'continuous',
         'signed': 'yes',
+        'scale': 1.,
         'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
@@ -158,6 +159,7 @@ _var_wisdom = {
         'description': 'Forest Canopy Base Height from LANDFIRE',
         'type': 'continuous',
         'signed': 'yes',
+        'scale': 1.,
         'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
@@ -169,8 +171,9 @@ _var_wisdom = {
         'description': 'Forest Canopy Bulk Density from LANDFIRE',
         'type': 'continuous',
         'signed': 'yes',
+        'scale': 1.,
         'unit_scale': 0.01, # scale the array to be in kg/m3 (original data is multiplied by 100)
-        'bits': 16,
+        'bits': 32,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
     },
@@ -180,9 +183,49 @@ _var_wisdom = {
         'description': 'Forest Canopy Cover from LANDFIRE (%)',
         'type': 'continuous',
         'signed': 'yes',
+        'scale': 1.,
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
+    },
+    'URB_SEPARATION' : {
+        'name': 'URB_SEPARATION',
+        'units': 'm',
+        'description': 'Building Separation (m)',
+        'type': 'continuous',
+        'signed': 'yes',
+        'scale': 1.,
+        'bits': 16,
+        'fill_missing': 0,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+        'fill_missing': 0.0
+    },
+    'URB_SIDE_LENGTH' : {
+        'name': 'URB_SIDE_LENGTH',
+        'units': 'm',
+        'description': 'Building Side Length (m)',
+        'type': 'continuous',
+        'signed': 'yes',
+        'scale': 1.,
+        'bits': 16,
+        'fill_missing': 0,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+        'fill_missing': 0.0
+    },
+    'URB_HEIGHT' : {
+        'name': 'URB_HEIGHT',
+        'units': 'm',
+        'description': 'Building Height (m)',
+        'type': 'continuous',
+        'signed': 'yes',
+        'scale': 1.,
+        'bits': 16,
+        'fill_missing': 0,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+        'fill_missing': 0.0
     },
     'FMC_GC' : {
         'name': 'FMC_GC',

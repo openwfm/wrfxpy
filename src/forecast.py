@@ -1553,7 +1553,8 @@ def process_arguments(job_args,sys_cfg):
     args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
     args['max_dom'] = max([int(x) for x in [x for x in args['domains'] if len(x) == 1]])
     args['min_sub_dom'] = min([int(x) for x in [x for x in args['domains'] if len(x) == 1] if (np.array(args['domains'][x].get('subgrid_ratio',[0,0])) > 0).all()])
-    args['max_dom_pp'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
+    if 'postproc' in args.keys() and len(args['postproc']) > 0:
+        args['max_dom_pp'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
     args['satprod_satsource'] = Dict({})
 
     # add postprocess satellite data
