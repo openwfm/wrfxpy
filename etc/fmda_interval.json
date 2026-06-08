@@ -1,0 +1,5 @@
+{
+  "from_utc": "2026-01-09_00:00:00",
+  "to_utc": "2026-03-31_23:00:00",
+  "fmda_conf_path": "etc/fmda_cycler.json"
+}
