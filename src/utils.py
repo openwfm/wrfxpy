@@ -611,7 +611,9 @@ def timespec_to_utc(ts_str, from_time = None):
         return None
     if ts_str[0] == 'T':
         if from_time is None:
-            from_time = datetime.utcnow().replace(tzinfo=timezone.UTC)
+            #from_time = datetime.utcnow().replace(tzinfo=timezone.UTC)
+            from datetime import datetime, timezone
+            from_time = datetime.now(timezone.utc)
         min_shift = int(ts_str[1:])
         return from_time + timedelta(minutes = min_shift)
     else:

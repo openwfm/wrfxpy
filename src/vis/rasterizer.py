@@ -166,7 +166,10 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None, bo
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72)
     plt.axis('off')
     cmap = mpl.cm.get_cmap(cmap_name)
-    m.pcolormesh(lon,lat,masked_grid,latlon=True,norm=norm,cmap=cmap,vmin=cmin,vmax=cmax)
+    if norm:
+        m.pcolormesh(lon,lat,masked_grid,latlon=True,norm=norm,cmap=cmap)
+    else:
+        m.pcolormesh(lon,lat,masked_grid,latlon=True,cmap=cmap,vmin=cmin,vmax=cmax)
 
     str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
@@ -239,10 +242,15 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, si
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
     for i in range(N):
-        m.scatter(
-            lon[i], lat[i], size, c=val[i], latlon=True, marker=marker, norm=norm,
-            cmap=cmap, vmin=cmin, vmax=cmax, alpha=alphas[i], linewidths=linewidths, edgecolors='k'
-        )
+        if norm:
+            m.scatter(lon[i], lat[i], size, c=val[i], latlon=True, marker=marker, norm=norm,
+                    cmap=cmap, alpha=alphas[i], linewidths=linewidths, edgecolors='k'
+            )
+        else:
+            m.scatter(
+                lon[i], lat[i], size, c=val[i], latlon=True, marker=marker,
+                cmap=cmap, vmin=cmin, vmax=cmax, alpha=alphas[i], linewidths=linewidths, edgecolors='k'
+            )
     if text:
         for i in range(N):
             for x1,x2,x3 in zip(lon[i],lat[i],val[i]):

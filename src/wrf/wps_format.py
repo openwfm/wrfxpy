@@ -5,7 +5,7 @@ import collections
 import six
 
 def iterable(arg):
-    return (isinstance(arg, collections.Iterable) 
+    return (isinstance(arg, collections.abc.Iterable) 
         and not isinstance(arg, six.string_types))
 
 class WPSRecordError(Exception):

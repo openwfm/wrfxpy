@@ -58,7 +58,9 @@ def read_size(default):
 
 
 def select_grib_source(start_time):
-    now = datetime.utcnow().replace(tzinfo=timezone.utc)
+    #now = datetime.utcnow().replace(tzinfo=timezone.utc)
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
     if now - start_time < timedelta(days=30):
         return 'NAM'
     else:
