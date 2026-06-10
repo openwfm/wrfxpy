@@ -34,3 +34,18 @@ class GOES17(SatSourceAWS):
     info='GOES17 ABI Geostationary Satellite'
     prefix='G17'
     platform='goes17'
+    
+class GOES18(SatSourceAWS):
+    """
+    GOES17 satellite source.
+    """
+
+    def __init__(self, arg):
+        super(GOES18, self).__init__(arg)
+
+    # instance variables
+    id='G18'
+    info_url=''
+    info='GOES18 ABI Geostationary Satellite'
+    prefix='G18'
+    platform='goes18'

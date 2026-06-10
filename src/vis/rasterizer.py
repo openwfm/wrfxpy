@@ -166,7 +166,10 @@ def basemap_raster_mercator(lon, lat, grid, cmin, cmax, cmap_name, norm=None, bo
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72)
     plt.axis('off')
     cmap = mpl.cm.get_cmap(cmap_name)
-    m.pcolormesh(lon,lat,masked_grid,latlon=True,norm=norm,cmap=cmap,vmin=cmin,vmax=cmax)
+    if norm is None:
+        m.pcolormesh(lon,lat,masked_grid,latlon=True,cmap=cmap,vmin=cmin,vmax=cmax)
+    else:
+        m.pcolormesh(lon,lat,masked_grid,latlon=True,norm=norm,cmap=cmap)
 
     str_io = StringIO()
     plt.savefig(str_io,bbox_inches='tight',format='png',pad_inches=0,transparent=True)
@@ -199,11 +202,18 @@ def basemap_barbs_mercator(u,v,lat,lon,grid=None,cmin=0,cmax=0,cmap_name=None,no
         if norm:
             norm = norm(cmin,cmax)
         cmap = mpl.cm.get_cmap(cmap_name)
-        m.quiver(
-            lon, lat, u, v, masked_grid, latlon=True, norm=norm,
-            cmap=cmap, clim=(cmin,cmax), edgecolor='k', linewidth=.2,
-            units='width'
-        )
+        if norm is None:
+            m.quiver(
+                lon, lat, u, v, masked_grid, latlon=True, cmap=cmap, 
+                clim=(cmin,cmax), edgecolor='k', linewidth=.2,
+                units='width'
+            )
+        else:
+            m.quiver(
+                lon, lat, u, v, masked_grid, latlon=True, norm=norm,
+                cmap=cmap, edgecolor='k', linewidth=.2,
+                units='width'
+            )
     else:
         m.quiver(lon, lat, u, v, latlon=True, units='width')
 
@@ -239,10 +249,16 @@ def basemap_scatter_mercator(val, lon, lat, bounds, alphas, cmin, cmax, cmap, si
     fig = plt.figure(frameon=False,figsize=(12,8),dpi=72*4)
     plt.axis('off')
     for i in range(N):
-        m.scatter(
-            lon[i], lat[i], size, c=val[i], latlon=True, marker=marker, norm=norm,
-            cmap=cmap, vmin=cmin, vmax=cmax, alpha=alphas[i], linewidths=linewidths, edgecolors='k'
-        )
+        if norm is None:
+            m.scatter(
+                lon[i], lat[i], size, c=val[i], latlon=True, marker=marker,
+                cmap=cmap, vmin=cmin, vmax=cmax, alpha=alphas[i], linewidths=linewidths, edgecolors='k'
+            )
+        else:
+            m.scatter(
+                lon[i], lat[i], size, c=val[i], latlon=True, marker=marker, norm=norm,
+                cmap=cmap, alpha=alphas[i], linewidths=linewidths, edgecolors='k'
+            )
     if text:
         for i in range(N):
             for x1,x2,x3 in zip(lon[i],lat[i],val[i]):

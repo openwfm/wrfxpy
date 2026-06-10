@@ -1,3 +1,4 @@
+import matplotlib as mpl
 import numpy as np
 
 from vis.vis_utils import interpolate2height, height8p, height8p_terrain, \
@@ -919,6 +920,27 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: d.variables['NFUEL_CAT'][t,:,:],
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
     },
+    'NFUEL_CAT_URB' : {
+        'name' : 'fuel categories',
+        'native_unit' : 'fuel_type',
+        'colorbar' : 'fuel_type',
+        'colormap' : 'Dark2',
+        'norm_opt' : 'boundary',
+        'bounds' : [
+            -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
+        ],
+        'colors' : np.concatenate((np.array([
+            (85, 85, 85), (255, 204, 170), (188, 188, 188),
+            (250, 238, 7), (255, 153, 85), (255, 102, 0),
+            (191, 77, 0), (255, 0, 0), (209, 0, 0), 
+            (140, 0, 0), (106, 106, 255)
+        ])/255., np.array(mpl.cm.Greens(np.linspace(0, 1, 13)))[:, :-1])),
+        'spacing' : 'uniform',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: d.variables['NFUEL_CAT'][t,:,:],
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:])
+    },
     'ZSF' : {
         'name' : 'terrain height',
         'native_unit' : 'm',
@@ -940,9 +962,18 @@ _var_wisdom = {
     '1HR_FM' : {
         'name' : '1-HR fuel moisture',
         'native_unit' : '-',
-        'colorbar' : '-',
+        'colorbar' : '%',
         'colormap' : 'jet_r',
-        'scale' : [0.0, 0.5],
+        'norm_opt' : 'boundary',
+        'bounds' : [0,.02,.04,.06,.08,.1,.12,.15,.2,.25,.3],
+        'colors' : np.array([
+            (156, 22, 27), (188, 28, 32), (217, 45, 43),
+            (234, 84, 43), (245,137, 56), (249,201, 80),
+            (215,225, 95), (203,217, 88), (114,190, 75),
+            ( 74,167,113), ( 60,150,120)
+        ])/255.,
+        'spacing' : 'uniform',
+        'scale' : [0.0, 0.3],
         'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,0,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
@@ -967,9 +998,18 @@ _var_wisdom = {
     '100HR_FM' : {
         'name' : '100-HR fuel moisture',
         'native_unit' : '-',
-        'colorbar' : '-',
+        'colorbar' : '%',
         'colormap' : 'jet_r',
-        'scale' : [0.0, 0.5],
+        'norm_opt' : 'boundary',
+        'bounds' : [0,.02,.04,.06,.08,.1,.12,.15,.2,.25,.3],
+        'colors' : np.array([
+            (156, 22, 27), (188, 28, 32), (217, 45, 43),
+            (234, 84, 43), (245,137, 56), (249,201, 80),
+            (215,225, 95), (203,217, 88), (114,190, 75),
+            ( 74,167,113), ( 60,150,120)
+        ])/255.,
+        'spacing' : 'uniform',
+        'scale' : [0.0, 0.3],
         'retrieve_as' : lambda d,t: d.variables['FMC_GC'][t,2,:,:],
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
@@ -1035,6 +1075,61 @@ _var_wisdom = {
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
         'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
     },
+    'SNPPHR_AF' : {
+        'name' : 'VIIRS S-NPP Active Fires satellite data HR',
+        'source' : 'SNPPHR',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'NOAA20_AF' : {
+        'name' : 'VIIRS JPSS-1 Active Fires satellite data',
+        'source' : 'NOAA20',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'NOAA20HR_AF' : {
+        'name' : 'VIIRS JPSS-1 Active Fires satellite data HR',
+        'source' : 'NOAA20HR',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'NOAA21_AF' : {
+        'name' : 'VIIRS JPSS-2 Active Fires satellite data',
+        'source' : 'NOAA21',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'NOAA21HR_AF' : {
+        'name' : 'VIIRS JPSS-2 Active Fires satellite data HR',
+        'source' : 'NOAA21HR',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
     'G16_AF' : {
         'name' : 'GOES16 ABI Fire Detections satellite data',
         'source' : 'G16',
@@ -1048,6 +1143,17 @@ _var_wisdom = {
     },
     'G17_AF' : {
         'name' : 'GOES17 ABI Fire Detections satellite data',
+        'source' : 'G17',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['fire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
+    'G18_AF' : {
+        'name' : 'GOES18 ABI Fire Detections satellite data',
         'source' : 'G17',
         'native_unit' : '-',
         'colorbar' : '-',
@@ -1090,6 +1196,61 @@ _var_wisdom = {
         'retrieve_as' : lambda d : d.variables['fire mask'][:],
         'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
     },
+    'SNPPHR_NF' : {
+        'name' : 'VIIRS S-NPP No Fire Detections satellite data HR',
+        'source' : 'SNPPHR',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'NOAA20_NF' : {
+        'name' : 'VIIRS JPSS-1 No Fire Detections satellite data',
+        'source' : 'NOAA20',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'NOAA20HR_NF' : {
+        'name' : 'VIIRS JPSS-1 No Fire Detections satellite data HR',
+        'source' : 'NOAA20HR',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'NOAA21_NF' : {
+        'name' : 'VIIRS JPSS-2 No Fire Detections satellite data',
+        'source' : 'NOAA21',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
+    'NOAA21HR_NF' : {
+        'name' : 'VIIRS JPSS-2 No Fire Detections satellite data HR',
+        'source' : 'NOAA21HR',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : d.variables['fire mask'][:],
+        'grid' : lambda d : (np.array(d.groups['geolocation_data'].variables['latitude']), np.array(d.groups['geolocation_data'].variables['longitude']))
+    },
     'G16_NF' : {
         'name' : 'GOES16 ABI No Fire Detections satellite data',
         'source' : 'G16',
@@ -1104,6 +1265,17 @@ _var_wisdom = {
     'G17_NF' : {
         'name' : 'GOES17 ABI No Fire Detections satellite data',
         'source' : 'G17',
+        'native_unit' : '-',
+        'colorbar' : '-',
+        'colormap' : 'discrete',
+        'scale' : 'discrete',
+        'options' : _discrete_wisdom['nofire'],
+        'retrieve_as' : lambda d : transform_goes(d),
+        'grid' : lambda d : (np.array(d['lat'][:]), np.array(d['lon'][:]))
+    },
+    'G18_NF' : {
+        'name' : 'GOES18 ABI No Fire Detections satellite data',
+        'source' : 'G18',
         'native_unit' : '-',
         'colorbar' : '-',
         'colormap' : 'discrete',
@@ -1192,4 +1364,3 @@ def convert_value(unit_from, unit_to, value):
         return value
     else:
         return func(value)
-   

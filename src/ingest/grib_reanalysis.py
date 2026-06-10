@@ -76,14 +76,17 @@ class GribReanalysis(GribSource):
                 raise GribError('Unsatisfiable: GRIBs %s not available.' % repr(unavailables))
 
             # download all gribs not available remotely
-            list(map(lambda x: self.download_grib(url_base, x), nonlocals))
+            if url_base[:5] == 's3://':
+                self.download_grib_many(url_base, nonlocals, workers=32)
+            else:
+                list(map(lambda x: self.download_grib(url_base, x), nonlocals))
 
         # return manifest
         return Dict({'grib_files': [osp.join(self.ingest_dir, x) for x in grib_files], 
-            'colmet_files_utc': colmet_files_utc, 
             'colmet_prefix': colmet_prefix, 
-            'colmet_files': colmet_files,
-            'colmet_missing': colmet_missing}) 
+            'colmet_files_utc': colmet_files_utc,
+            'colmet_files': [osp.join(self.cache_dir, colmet_prefix, f) for f in colmet_files],
+            'colmet_missing': [osp.join(self.cache_dir, colmet_prefix, f) for f in colmet_missing]})
 
 # instance variables - need to be defined in the subclasses
     info = None

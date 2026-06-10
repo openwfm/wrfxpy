@@ -1,11 +1,14 @@
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 import numpy as np
 import struct
 import re
-import collections
 import six
 
 def iterable(arg):
-    return (isinstance(arg, collections.Iterable) 
+    return (isinstance(arg, Iterable) 
         and not isinstance(arg, six.string_types))
 
 class WPSRecordError(Exception):

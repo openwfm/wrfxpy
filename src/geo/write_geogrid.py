@@ -161,7 +161,7 @@ def write_geogrid_var(path_dir,var,array,index,bits=32,coord=None):
     
     json.dump(geogrid_tbl,open(geogrid_tbl_json_path,'w'), indent=4, separators=(',', ': ')) 
 
-    
+
 def write_geogrid(path,array,index,bits=32,scale=None,uscale=None):
     """
     Write geogrid dataset 
@@ -203,7 +203,6 @@ def write_geogrid(path,array,index,bits=32,scale=None,uscale=None):
     data_file = "00001-%05i.00001-%05i" % (xsize, ysize)
     data_path = osp.join(path,data_file)
     a.flatten().tofile(data_path)
-    
     # write index
     index.update({'scale_factor': scale,
                  'wordsize': bits // 8,
@@ -213,6 +212,99 @@ def write_geogrid(path,array,index,bits=32,scale=None,uscale=None):
                  'endian': sys.byteorder})
     index_path = osp.join(path,'index')
     write_table(index_path,index)
+    
+def read_table(path):
+    """
+    Read WPS geogrid-style index file into a dict.
+    """
+    out = {}
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip().strip('"')
+    return out
+
+def _auto_cast(v):
+    """
+    Convert index strings to int/float when possible.
+    """
+    if isinstance(v, (int, float)):
+        return v
+    try:
+        if any(c in str(v).lower() for c in [".", "e"]):
+            return float(v)
+        return int(v)
+    except ValueError:
+        return v
+
+def read_geogrid(path, uscale=None, squeeze=True):
+    """
+    Reverse write_geogrid().
+
+    Parameters
+    ----------
+    path : str
+        Directory containing geogrid binary tile and index file.
+    uscale : float or None
+        If write_geogrid used `a = a * uscale` before writing, then this
+        function will divide by uscale to recover the original units.
+    squeeze : bool
+        If True, return 2D array when tile_z == 1.
+
+    Returns
+    -------
+    array : np.ndarray
+        Reconstructed array, typically float64 after rescaling.
+    index : dict
+        Parsed index metadata.
+    """
+    index_path = osp.join(path, "index")
+    index = read_table(index_path)
+    index = {k: _auto_cast(v) for k, v in index.items()}
+    xsize = int(index["tile_x"])
+    ysize = int(index["tile_y"])
+    zsize = int(index.get("tile_z", 1))
+    wordsize = int(index["wordsize"])
+    scale = float(index.get("scale_factor", 1.0))
+    endian = index.get("endian", sys.byteorder)
+    if wordsize == 4:
+        dtype = np.int32
+    elif wordsize == 2:
+        dtype = np.int16
+    elif wordsize == 1:
+        dtype = np.int8
+    else:
+        raise ValueError(f"Unsupported wordsize: {wordsize}")
+    if endian == "big":
+        dtype = np.dtype(dtype).newbyteorder(">")
+    elif endian == "little":
+        dtype = np.dtype(dtype).newbyteorder("<")
+    else:
+        raise ValueError(f"Unsupported endian value: {endian}")
+    data_file = f"00001-{xsize:05d}.00001-{ysize:05d}"
+    data_path = osp.join(path, data_file)
+    a = np.fromfile(data_path, dtype=dtype)
+    expected = xsize * ysize * zsize
+    if a.size != expected:
+        raise ValueError(
+            f"File size mismatch, expected {expected} values, got {a.size}"
+        )
+    # written shape was (zsize, ysize, xsize)
+    a = a.reshape((zsize, ysize, xsize))
+    # invert transpose(2,0,1) from the writer
+    # saved: original (x,y,z) -> (z,x,y)? let's verify carefully below
+    a = a.transpose(1, 2, 0)
+    # undo integer scaling
+    a = a.astype(np.float64) * scale
+    # undo unit scaling, if requested
+    if uscale is not None:
+        a = a / float(uscale)
+    if squeeze and a.shape[2] == 1:
+        a = a[:, :, 0]
+    return a, index
 
 if __name__ == '__main__':
     test_name = 'test_geo'

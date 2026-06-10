@@ -45,8 +45,8 @@ class SSHShuttle(object):
     def __init__(self, cfg):
         """
         Initialize via a configuration with keys:
-          shuttle_sshkey, shuttle_remote_host, shuttle_remote_user and shuttle_remote_root
-          plus anything else that shuttle will need from cfg
+        shuttle_sshkey, shuttle_remote_host, shuttle_remote_user and shuttle_remote_root
+        plus anything else that shuttle will need from cfg
         
         :param cfg: dictionary with configuration keys
         """
@@ -100,7 +100,7 @@ class SSHShuttle(object):
         :return: the filenames that were put via SFTP
         """
         if remote_path[0] != '/':
-           remote_path = osp.join(self.root, remote_path)
+            remote_path = osp.join(self.root, remote_path)
 
         prev_cwd = self.sftp.getcwd()
         self.chdir(remote_path, True)
@@ -109,8 +109,8 @@ class SSHShuttle(object):
         sent_files = []
         for filename in os.listdir(local_dir):
             if filename not in exclude_set:
-	            self.sftp.put(osp.join(local_dir, filename), filename)
-	            sent_files.append(filename)
+                self.sftp.put(osp.join(local_dir, filename), filename)
+                sent_files.append(filename)
 
         # restore previous working directory
         self.chdir(prev_cwd)
@@ -125,7 +125,7 @@ class SSHShuttle(object):
         :param remote_path: relative or absolute path to remote file
         """
         if remote_path[0] != '/':
-           remote_path = osp.join(self.root, remote_path)
+            remote_path = osp.join(self.root, remote_path)
         self.sftp.put(local_path, remote_path)
 
     
@@ -139,7 +139,7 @@ class SSHShuttle(object):
         :param local_path: local path
         """
         if remote_path[0] != '/':
-           remote_path = osp.join(self.root, remote_path)
+            remote_path = osp.join(self.root, remote_path)
         try:
             self.sftp.get(remote_path, local_path)
         except IOError as e:
@@ -160,7 +160,7 @@ class SSHShuttle(object):
         :param ensure_exists: make the final directory level if it does not exist
         """
         if remote_dir[0] != '/':
-           remote_dir = osp.join(self.root, remote_dir)
+            remote_dir = osp.join(self.root, remote_dir)
         if ensure_exists:
             self.sftp.chdir(osp.dirname(remote_dir))
             try:
@@ -259,11 +259,14 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
     
         # retrieve the catalog & update it
         logging.info('SHUTTLE updating local catalog file on remote host')
-        local_cat = { sim_name : { 'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
-                          'description' : description if description is not None else sim_name,
-                          'from_utc' : times[0],
-                          'to_utc' : times[-1] }
-                    }
+        local_cat = { 
+            sim_name : { 
+                'manifest_path' : '%s/%s' % (remote_dir, osp.basename(manifest_file)),
+                'description' : description if description is not None else sim_name,
+                'from_utc' : times[0],
+                'to_utc' : times[-1] 
+            }
+        }
         local_cat_path = osp.join(local_dir,'catalog.json')
         json.dump(local_cat, open(local_cat_path, 'w'), indent=1, separators=(',',':'))
         remote_cat_path = remote_dir + '/catalog.json'
