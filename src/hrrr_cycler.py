@@ -834,6 +834,8 @@ if __name__ == "__main__":
     
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+    if len(sys.argv) == 1:
+            mode = None
     if len(sys.argv) > 1:
         mode = sys.argv[1]
         if mode in ["a", "A", "f", "F"]:
@@ -865,7 +867,7 @@ if __name__ == "__main__":
             delete(osp.join(cfg.workspace_path,code))
         except Exception as e:
             logging.warning(e)
-
+    
     if mode is None or len(cfg.regions) < 1:
         print("Usage: to use domains configured in etc/fmda_cycler.json")
         print(f"{sys.argv[0]} mode code")
