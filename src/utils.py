@@ -450,7 +450,7 @@ def render_ignitions(js, max_dom):
 
     nml_fire = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom,
                  'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom,
-                 'fmoist_run' : [False] * max_dom, 'fmoist_interp' : [False] * max_dom,
+                 'fmoist_run' : [0] * max_dom, 'fmoist_interp' : [False] * max_dom,
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
                  'fire_viscosity' : [0] * max_dom, 'fire_wind_log_interp': [0] * max_dom,
                  'fire_use_windrf': [0] * max_dom }
@@ -486,8 +486,8 @@ def render_ignitions(js, max_dom):
             nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
         nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
-        nml_fire['fmoist_run'][dom_id-1] = True # use the fuel moisture model
-        nml_fire['fmoist_interp'][dom_id-1] = True # interpolate fm onto fire mesh
+        nml_fire['fmoist_run'][dom_id-1] = 1 # use the fuel moisture model
+        nml_fire['fmoist_interp'][dom_id-1] = 1 # interpolate fm onto fire mesh
         nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
 
         # for each ignition
