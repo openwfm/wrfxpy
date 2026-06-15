@@ -383,7 +383,7 @@ def calculate_lfp(T, Td, ws):
     T = (T - 273.15) * 9/5 + 32   # K to F
     Td = (Td - 273.15) * 9/5 + 32 # K to F
     # Compute dew point depression in F
-    dp = (T - Td) 
+    dp = np.maximum(T - Td, 0) 
     # Find Large Fire Potential Index (unitless) 
     lfp = 0.001 * np.power(ws, 2) * dp
     return lfp
@@ -466,24 +466,83 @@ def calculate_haines(t_950, t_850, t_700, t_500, t_dew850, t_dew700, height):
     )
     return haines_index
 
-def calculate_fmc(
-    fmc_1, fmc_10, fmc_100, fmc_herba, fmc_woody,
-    n_fuel_cat, weights, gsi
+def compute_percentile_factor(
+    var, time_axis = 0, p_low = 0.3, p_high = 0.9,
 ):
-    n_fuel_cat = np.asarray(n_fuel_cat, dtype=int)
-    idx = n_fuel_cat[None, ...] - 1  # same shape as grid
-    # 1) Dead and live FMC (surface-area weighted within group)
-    f_1     = weights["f_1"][idx]
-    f_10    = weights["f_10"][idx]
-    f_100   = weights["f_100"][idx]
-    f_herba = weights["f_herba"][idx]
-    f_woody = weights["f_woody"][idx]
-    fmc_dead = f_1 * fmc_1 + f_10 * fmc_10 + f_100 * fmc_100
-    fmc_live = f_herba * fmc_herba + f_woody * fmc_woody
-    fmc_live[fmc_live == 0] = 0.001
-    fmc = (0.1 * ((fmc_dead / fmc_live) - 1))
-    fmc = fmc + gsi
-    fmc = np.power(np.abs(fmc), 1.7)
+    """
+    Compute a 0–1 factor from a spatio-temporal array.
+
+    Parameters
+    ----------
+    var : np.ndarray
+        Spatio-temporal array of values. One axis is time.
+        Example shapes: (T, Y, X) or (T, Nstations).
+    time_axis : int, optional
+        Axis index corresponding to time (default: 0).
+    p_low : float, optional
+        Lower percentile (0–1) at which dryness factor starts increasing
+        from 0. Below this percentile, dryness_factor = 0.
+    p_high : float, optional
+        Upper percentile (0–1) at which dryness factor saturates at 1.
+        Above this percentile, dryness_factor = 1.
+
+    Returns
+    -------
+    factor : np.ndarray
+        Same shape as `var`, with values in [0, 1], representing
+        percentile-based var factor per pixel and time.
+    """
+    if not (0.0 <= p_low < p_high <= 1.0):
+        raise ValueError("p_low and p_high must satisfy 0 <= p_low < p_high <= 1.")
+    # Move time axis to 0 for convenience
+    var_time_first = np.moveaxis(var, time_axis, 0)
+    T = var_time_first.shape[0]
+    # Flatten spatial dimensions → (T, N)
+    spatial_shape = var_time_first.shape[1:]
+    N = int(np.prod(spatial_shape))
+    var_2d = var_time_first.reshape(T, N)
+    # ---- Compute per-pixel ranks (vectorized) ----
+    # argsort along time → indices that would sort each column
+    order = np.argsort(var_2d, axis=0)
+    # ranks[i, j] = rank (0..T-1) of var_2d[i, j] among all times for column j
+    ranks = np.empty_like(order)
+    # For each column j, "order[:, j]" gives row indices in sorted order.
+    # We invert that mapping by assigning 0..T-1 into ranks at those positions.
+    rows = np.arange(T)[:, None]     # shape (T, 1)
+    cols = np.arange(N)[None, :]     # shape (1, N)
+    ranks[order, cols] = rows
+    # Convert ranks to percentiles in (0, 1)
+    # (r + 0.5)/T is a mid-rank convention to avoid 0 and 1 exactly.
+    percentiles = (ranks + 0.5) / T
+    # ---- Map percentiles to factor via linear ramp [p_low, p_high] ----
+    # factor = 0 below p_low, 1 above p_high, linear in between
+    factor_2d = (percentiles - p_low) / (p_high - p_low)
+    factor_2d = np.clip(factor_2d, 0.0, 1.0)
+    # Reshape back to original time-first shape and move time axis back
+    factor_time_first = factor_2d.reshape((T,) + spatial_shape)
+    factor = np.moveaxis(factor_time_first, 0, time_axis)
+    return factor
+
+def calculate_dryness_level(erc, fmc_10, w_erc = 0.7, w_fmc_10 = 0.3, p_low = 0.3, p_high = 0.9):
+    d_erc = compute_percentile_factor(erc, p_low=p_low, p_high=p_high)
+    d_fmc_10 = compute_percentile_factor(fmc_10, p_low=p_low, p_high=p_high)
+    return np.clip(1 + 2 * (w_erc * d_erc + w_fmc_10 * d_fmc_10), 1, 3)
+
+def calculate_greness_ag(fmc_herba, fmc_herba_min=30., fmc_herba_max=250.):
+    curing_frac = (fmc_herba_max - fmc_herba) / (fmc_herba_max - fmc_herba_min)
+    curing_frac = np.clip(curing_frac, 0, 1)
+    g_ag = 5 * curing_frac 
+    return g_ag
+
+def calculate_fmc(
+    erc, fmc_10, fmc_herba, fmc_woody,
+    fmc_herba_min=0.3, fmc_herba_max=2.5 
+):
+    dl = calculate_dryness_level(erc, fmc_10)
+    lfm = fmc_woody
+    g_ag = calculate_greness_ag(fmc_herba, fmc_herba_min, fmc_herba_max)
+    fmc = np.maximum((dl / lfm) - 1. + g_ag, 0)
+    fmc = np.minimum(np.power(0.1 * fmc, 1.7), 1)
     return fmc
 
 def calculate_sawti(LFP, FMC):

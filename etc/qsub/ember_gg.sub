@@ -2,11 +2,12 @@
 #SBATCH --time=%(wall_time_hrs)02d:00:00 # walltime, abbreviated by -t
 #SBATCH --ntasks=%(np)d   # number of MPI tasks, abbreviated by -n
 #SBATCH --nodes=%(nodes)d     # number of cluster nodes, abbreviated by -N
+#SBATCH --nodelist=ember-gg[01-12] # only use GG nodes
 #SBATCH --job-name=WRFX  # job name
 
 # set data and working directories
 export WORKDIR=%(cwd)s 
 cd $WORKDIR
 
-source ~/.wrf_4.4_arm_new
+source ~/.wrf_arm
 mpirun -n $SLURM_NTASKS ./wrf.exe
