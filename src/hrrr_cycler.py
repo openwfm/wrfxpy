@@ -542,6 +542,7 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     """
     min_num_obs = 10
     max_fm10_value = 0.5
+    run_postprocessing = cfg.get("run_postprocessing", True)
     logging.info(f"hrrr_cycler.fmda_advance_region: cycle {cycle} and forecasts hour {fcst_hour}")
     model = None
     if fcst_hour == 0:
@@ -577,26 +578,27 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     if not osp.exists(grib_file):
         logging.warning("CYCLER could not find useable cycle.")
         logging.error(e)
-        logging.warning("CYCLER copying previous post-processing.")
-        try:
-            bounds = compute_hrrr_bounds(cfg.bbox)
-            pp_path = postprocess_cycle(cycle, cfg, wksp_path, fcst_hour, bounds)   
-            if pp_path != None:
-                if "shuttle_remote_host" in sys_cfg:
-                    sim_code = "fmda-" + cfg.code
-                    try:
-                        send_product_to_server(
-                            sys_cfg, pp_path, sim_code, sim_code,
-                            sim_code + ".json", cfg.region_id + " FM"
-                        )
-                    except Exception as e:
-                        logging.warning(
-                            f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
-                        )
-                        logging.warning("CYCLER exception {}".format(e))                    
-        except Exception as e:
-            logging.warning("CYCLER exception {}".format(e))
-            logging.error("CYCLER skipping region {} for cycle {}".format(cfg.region_id,str(cycle)))
+        if run_postprocessing:
+            logging.warning("CYCLER copying previous post-processing.")
+            try:
+                bounds = compute_hrrr_bounds(cfg.bbox)
+                pp_path = postprocess_cycle(cycle, cfg, wksp_path, fcst_hour, bounds)   
+                if pp_path != None:
+                    if "shuttle_remote_host" in sys_cfg:
+                        sim_code = "fmda-" + cfg.code
+                        try:
+                            send_product_to_server(
+                                sys_cfg, pp_path, sim_code, sim_code,
+                                sim_code + ".json", cfg.region_id + " FM"
+                            )
+                        except Exception as e:
+                            logging.warning(
+                                f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                            )
+                            logging.warning("CYCLER exception {}".format(e))                    
+            except Exception as e:
+                logging.warning("CYCLER exception {}".format(e))
+                logging.error("CYCLER skipping region {} for cycle {}".format(cfg.region_id,str(cycle)))
         sys.exit(1) 
     
     logging.info(f"CYCLER loading HRRR data from {grib_file}.")
@@ -735,22 +737,23 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
         ensure_dir(model_path), data
     )
 
-    # create visualization and send results
-    bounds = (lons.min(), lons.max(), lats.min(), lats.max())
-    pp_path = postprocess_cycle(cycle, cfg, wksp_path, fcst_hour, bounds)   
-    if pp_path != None:
-        if "shuttle_remote_host" in sys_cfg:
-            sim_code = "fmda-" + cfg.code
-            try:
-                send_product_to_server(
-                    sys_cfg, pp_path, sim_code, sim_code, 
-                    sim_code + ".json", cfg.region_id + " FM"
-                )
-            except Exception as e:
-                logging.warning(
-                    f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
-                )
-                logging.warning("CYCLER exception {}".format(e))
+    if run_postprocessing:
+        # create visualization and send results
+        bounds = (lons.min(), lons.max(), lats.min(), lats.max())
+        pp_path = postprocess_cycle(cycle, cfg, wksp_path, fcst_hour, bounds)   
+        if pp_path != None:
+            if "shuttle_remote_host" in sys_cfg:
+                sim_code = "fmda-" + cfg.code
+                try:
+                    send_product_to_server(
+                        sys_cfg, pp_path, sim_code, sim_code, 
+                        sim_code + ".json", cfg.region_id + " FM"
+                    )
+                except Exception as e:
+                    logging.warning(
+                        f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                    )
+                    logging.warning("CYCLER exception {}".format(e))
     
     return model
     
@@ -784,6 +787,7 @@ def fmda_cycle_interval(start_cycle, end_cycle, conf_path=None):
 
     lookback_length = 0
     forecast_length = 0
+    run_postprocessing = conf.get("run_postprocessing", True)
     hrrra = HRRRA(sys_cfg)
     cycle = start_cycle
     tstep = 0
@@ -795,6 +799,7 @@ def fmda_cycle_interval(start_cycle, end_cycle, conf_path=None):
             wrapped_cfg = Dict(region_cfg)
             wrapped_cfg.update({"region_id": region_id})
             wrapped_cfg.update({"forecast_length": forecast_length}) 
+            wrapped_cfg.update({"run_postprocessing": run_postprocessing})
             # Process real-time
             if not is_cycle_computed(cycle, wrapped_cfg, conf.workspace_path):
                 logging.info(f"CYCLER real-time processing for region {region_id} at cycle {cycle}")
@@ -828,6 +833,22 @@ def parse_bbox(args: Sequence[str]) -> tuple[float, float, float, float]:
         return tuple(float(x) for x in args)
     except ValueError as e:
         raise ValueError(f"Invalid bbox values: {args}") from e
+
+
+def run_checks():
+    """
+    Series of checks to run before executing cycler. Should stop process before spending a long time just to get nothing
+    """
+    import shutil
+
+    if shutil.which("aws") is None:
+        logging.error(
+            "AWS CLI not found. Please install AWS CLI and ensure 'aws' is on your PATH."
+        )
+        return False    
+    if not osp.exists("static/hrrr.terrainh.nc"):
+        logging.error("Static HRRR terrain data doesn't exist at: static/hrrr.terrainh.nc")
+    return
 
     
 if __name__ == "__main__":
@@ -881,11 +902,12 @@ if __name__ == "__main__":
     lookback_length = cfg.get("lookback_length", 24)
     forecast_length = cfg.get("forecast_length", 48)
     period_hours = cfg.get("period_hours", 6)
+    run_postprocessing = cfg.get("run_postprocessing", True)
     # get more readable mode
     mode_name = "analysis" if mode == "a" else "forecast"
     # current time
-    #now = datetime.now(timezone.utc)
-    now = datetime(2026, 5, 18, 17, 20, 11, 202708, tzinfo=timezone.utc) # DEBUG STEP
+    now = datetime.now(timezone.utc)
+    #now = datetime(2026, 5, 18, 17, 20, 11, 202708, tzinfo=timezone.utc) # DEBUG STEP
     cycle = (now - timedelta(minutes=59)).replace(minute=0, second=0, microsecond=0, tzinfo=None)
     # print statements
     logging.info(
@@ -908,25 +930,27 @@ if __name__ == "__main__":
             wrapped_cfg = Dict(region_cfg)
             wrapped_cfg.update({"region_id": region_id})
             wrapped_cfg.update({"forecast_length": forecast_length}) 
-            try:
-                bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
-                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds=bounds)
-                if pp_path != None:
-                    if "shuttle_remote_host" in sys_cfg:
-                        sim_code = "fmda-" + wrapped_cfg.code
-                        try:
-                            send_product_to_server(
-                                sys_cfg, pp_path, sim_code, sim_code,
-                                sim_code + ".json", cfg.region_id + " FM"
-                            )
-                        except Exception as e:
-                            logging.warning(
-                                f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
-                            )
-                            logging.warning("CYCLER exception {}".format(e))                        
-            except Exception as e:
-                logging.warning("CYCLER exception {}".format(e))
-                logging.error(f"CYCLER skipping region {region_id} for cycle {cycle}")
+            wrapped_cfg.update({"run_postprocessing": run_postprocessing})
+            if run_postprocessing:
+                try:
+                    bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
+                    pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, bounds=bounds)
+                    if pp_path != None:
+                        if "shuttle_remote_host" in sys_cfg:
+                            sim_code = "fmda-" + wrapped_cfg.code
+                            try:
+                                send_product_to_server(
+                                    sys_cfg, pp_path, sim_code, sim_code,
+                                    sim_code + ".json", cfg.region_id + " FM"
+                                )
+                            except Exception as e:
+                                logging.warning(
+                                    f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                                )
+                                logging.warning("CYCLER exception {}".format(e))                        
+                except Exception as e:
+                    logging.warning("CYCLER exception {}".format(e))
+                    logging.error(f"CYCLER skipping region {region_id} for cycle {cycle}")
         sys.exit(1)
     logging.info(f"have necessary HRRR data for cycle {cycle}.")
     
@@ -936,6 +960,7 @@ if __name__ == "__main__":
         wrapped_cfg = Dict(region_cfg)
         wrapped_cfg.update({"region_id": region_id})
         wrapped_cfg.update({"forecast_length": forecast_length}) 
+        wrapped_cfg.update({"run_postprocessing": run_postprocessing})
         # Process real-time
         if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
             logging.info(f"CYCLER real-time processing for region {region_id} at cycle {cycle}")
@@ -950,26 +975,27 @@ if __name__ == "__main__":
                 )
                 logging.warning("CYCLER exception {}".format(e))
                 logging.warning("CYCLER copying previous post-processing or re-trying.")
-                try:
-                    bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
-                    pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, 0, bounds=bounds)   
-                    if pp_path != None:
-                        if "shuttle_remote_host" in sys_cfg:
-                            sim_code = "fmda-" + wrapped_cfg.code
-                            try:
-                                send_product_to_server(
-                                    sys_cfg, pp_path, sim_code, sim_code,
-                                    sim_code + ".json", cfg.region_id + " FM"
-                                )
-                            except Exception as e:
-                                logging.warning(
-                                    f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
-                                )
-                                logging.warning("CYCLER exception {}".format(e))
-                except Exception as e:
-                    logging.error(
-                        f"CYCLER skipping region {region_id} for cycle {cycle} and mode {mode_name}"
-                    )
+                if run_postprocessing:
+                    try:
+                        bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
+                        pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, 0, bounds=bounds)   
+                        if pp_path != None:
+                            if "shuttle_remote_host" in sys_cfg:
+                                sim_code = "fmda-" + wrapped_cfg.code
+                                try:
+                                    send_product_to_server(
+                                        sys_cfg, pp_path, sim_code, sim_code,
+                                        sim_code + ".json", cfg.region_id + " FM"
+                                    )
+                                except Exception as e:
+                                    logging.warning(
+                                        f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                                    )
+                                    logging.warning("CYCLER exception {}".format(e))
+                    except Exception as e:
+                        logging.error(
+                            f"CYCLER skipping region {region_id} for cycle {cycle} and mode {mode_name}"
+                        )
         else:
             logging.info(
                 f"CYCLER already completed real-time processing for region {region_id} "
@@ -999,28 +1025,30 @@ if __name__ == "__main__":
                     wrapped_cfg = Dict(region_cfg)
                     wrapped_cfg.update({"region_id": region_id})
                     wrapped_cfg.update({"forecast_length": forecast_length}) 
-                    try:
-                        bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
-                        pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, fcst_hour, bounds)
-                        if pp_path != None:
-                            if "shuttle_remote_host" in sys_cfg:
-                                sim_code = "fmda-" + wrapped_cfg.code
-                                try:
-                                    send_product_to_server(
-                                        sys_cfg, pp_path, sim_code, sim_code,
-                                        sim_code + ".json", cfg.region_id + " FM"
-                                    )
-                                except Exception as e:
-                                    logging.warning(
-                                        f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
-                                    )
-                                    logging.warning("CYCLER exception {}".format(e))                                
-                    except Exception as e:
-                        logging.warning(f"CYCLER exception {e}")
-                        logging.error(
-                            f"CYCLER skipping region {region_id} for cycle {cycle} "
-                            f"and forecast hour {fcst_hour}"
-                        )
+                    wrapped_cfg.update({"run_postprocessing": run_postprocessing})
+                    if run_postprocessing:
+                        try:
+                            bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
+                            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, fcst_hour, bounds)
+                            if pp_path != None:
+                                if "shuttle_remote_host" in sys_cfg:
+                                    sim_code = "fmda-" + wrapped_cfg.code
+                                    try:
+                                        send_product_to_server(
+                                            sys_cfg, pp_path, sim_code, sim_code,
+                                            sim_code + ".json", cfg.region_id + " FM"
+                                        )
+                                    except Exception as e:
+                                        logging.warning(
+                                            f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                                        )
+                                        logging.warning("CYCLER exception {}".format(e))                                
+                        except Exception as e:
+                            logging.warning(f"CYCLER exception {e}")
+                            logging.error(
+                                f"CYCLER skipping region {region_id} for cycle {cycle} "
+                                f"and forecast hour {fcst_hour}"
+                            )
                 continue
             logging.info(
                 f"have necessary HRRR data for forecasting cycle {cycle} "
@@ -1032,6 +1060,7 @@ if __name__ == "__main__":
                 wrapped_cfg = Dict(region_cfg)
                 wrapped_cfg.update({"region_id": region_id})
                 wrapped_cfg.update({"forecast_length": forecast_length}) 
+                wrapped_cfg.update({"run_postprocessing": run_postprocessing})
                 # Processing forecast
                 if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path, fcst_hour=fcst_hour):
                     logging.info(
@@ -1050,27 +1079,28 @@ if __name__ == "__main__":
                         )
                         logging.warning(f"CYCLER exception {e}")
                         logging.warning("CYCLER copying previous post-processing or re-trying.")
-                        try:
-                            bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
-                            pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, fcst_hour, bounds)
-                            if pp_path != None:
-                                if "shuttle_remote_host" in sys_cfg:
-                                    sim_code = "fmda-" + wrapped_cfg.code
-                                    try:
-                                        send_product_to_server(
-                                            sys_cfg, pp_path, sim_code, sim_code,
-                                            sim_code + ".json", cfg.region_id + " FM"
-                                        )
-                                    except Exception as e:
-                                        logging.warning(
-                                            f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
-                                        )
-                                        logging.warning("CYCLER exception {}".format(e)) 
-                        except Exception as e:
-                            logging.error(
-                                f"CYCLER skipping region {region_id} for cycle {cycle} and "
-                                f"forecast hour {fcst_hour}"
-                            )
+                        if run_postprocessing:
+                            try:
+                                bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
+                                pp_path = postprocess_cycle(cycle, wrapped_cfg, cfg.workspace_path, fcst_hour, bounds)
+                                if pp_path != None:
+                                    if "shuttle_remote_host" in sys_cfg:
+                                        sim_code = "fmda-" + wrapped_cfg.code
+                                        try:
+                                            send_product_to_server(
+                                                sys_cfg, pp_path, sim_code, sim_code,
+                                                sim_code + ".json", cfg.region_id + " FM"
+                                            )
+                                        except Exception as e:
+                                            logging.warning(
+                                                f"CYCLER failed sending to server. {sys_cfg['shuttle_remote_host']=}"
+                                            )
+                                            logging.warning("CYCLER exception {}".format(e)) 
+                            except Exception as e:
+                                logging.error(
+                                    f"CYCLER skipping region {region_id} for cycle {cycle} and "
+                                    f"forecast hour {fcst_hour}"
+                                )
                 else:
                     logging.info(
                         f"CYCLER already completed forecasting processing for region {region_id} "
