@@ -35,6 +35,7 @@ import requests
 import socket
 import collections
 from clamp2mesh import nearest_idx, get_subgrid_coordinates, clamp2mesh
+import yaml
 
 try:
     import fire_init
@@ -798,3 +799,12 @@ def split_path(path):
         path = osp.dirname(path)
     path_list.reverse()
     return path_list
+
+
+# Generic helper function to read yaml files
+def read_yml(yaml_path, subkey=None):
+    with open(yaml_path, 'r') as file:
+        d = yaml.safe_load(file)
+        if subkey is not None:
+            d = d[subkey]
+    return d
