@@ -798,3 +798,32 @@ def split_path(path):
         path = osp.dirname(path)
     path_list.reverse()
     return path_list
+
+
+def str2time(input):
+    """
+    Convert string or list of strings to datetime, supporting multiple formats.
+    """
+    formats = [
+        '%Y-%m-%dT%H:%M:%S%z',      # ISO 8601 with 'T'
+        '%Y-%m-%d %H:%M:%S%z',      # ISO 8601 with space instead of 'T'
+        '%Y-%m-%dT%H:%M:%S',        # No timezone
+        '%Y-%m-%d %H:%M:%S',        # No timezone, space separator
+        '%Y-%m-%d_%H:%M:%S'         # Underscore, used throughout wrfxpy
+    ]
+
+    def parse(s):
+        s = s.replace('Z', '+00:00')
+        for fmt in formats:
+            try:
+                return datetime.strptime(s, fmt)
+            except ValueError:
+                continue
+        raise ValueError(f"Unsupported datetime format: {s}")
+
+    if isinstance(input, str):
+        return parse(input)
+    elif isinstance(input, list):
+        return [parse(s) for s in input]
+    else:
+        raise ValueError("Input must be a string or a list of strings")
