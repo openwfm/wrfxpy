@@ -669,7 +669,6 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
         logging.info(f"CYCLER filtering valid data from {len(fm10)} times")
         # filter fm10 values for statistics
         valid_times = [z for z in fm10.keys() if abs((z - cycle).total_seconds()) < 3600]
-        assert valid_times.diff().unique().shape[0] == 2, f"available times with data not consecutive hours, {valid_times.diff().unique()=}"
         fm10_filter = {}
         obs_valid_now = []
         for z in valid_times:
