@@ -432,6 +432,6 @@ if __name__ == '__main__':
 
     f90nml.write(wps_nml, sys.argv[2], force=True)
     if wrf_nml is not None:
-        f90nml.write(wps_nml, sys.argv[3], force=True)
+        f90nml.write(wrf_nml, sys.argv[3], force=True)
 
 

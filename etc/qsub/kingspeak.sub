@@ -25,4 +25,4 @@ env
 #setenv MPICH_NEMESIS_NETMOD tcp
 # run the program
 # see below for ways to do this for different MPI distributions
-mpirun -np $SLURM_NTASKS ./wrf.exe
+time mpirun -np $SLURM_NTASKS ./wrf.exe

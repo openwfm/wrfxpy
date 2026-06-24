@@ -73,7 +73,7 @@ class NAM218(GribForecast):
         "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/", 
         "s3://noaa-nam-pds/", 
         "https://www.ncei.noaa.gov/data/north-american-mesoscale-model/access/forecast/",
-        "https://www.ncei.noaa.gov/thredds/fileServer/model-nam218-old/"
+        "https://www.ncei.noaa.gov/thredds/catalog/model-nam218/"
     ]
     browse_aws = "https://noaa-nam-pds.s3.amazonaws.com/index.html"
     cycle_hours = 6

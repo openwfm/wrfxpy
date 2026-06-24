@@ -12,4 +12,4 @@ module purge
 module load gcc8
 module load slurm
 
-mpirun -n $SLURM_NTASKS ./wrf.exe
+time mpirun -n $SLURM_NTASKS ./wrf.exe

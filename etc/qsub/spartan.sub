@@ -22,4 +22,4 @@ module load netcdf/intel
 #setenv MPICH_NEMESIS_NETMOD tcp
 # run the program
 # see below for ways to do this for different MPI distributions
-mpiexec -n $SLURM_NTASKS $WORKDIR/wrf.exe
+time mpiexec -n $SLURM_NTASKS $WORKDIR/wrf.exe

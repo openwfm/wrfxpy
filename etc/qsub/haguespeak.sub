@@ -52,4 +52,4 @@ env
 # see below for ways to do this for different MPI distributions
 ##mpirun -np $SLURM_NTASKS ./wrf.exe  #KH: removed p option
 
-mpirun -n $SLURM_NTASKS ./wrf.exe
+time mpirun -n $SLURM_NTASKS ./wrf.exe
