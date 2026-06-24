@@ -12,7 +12,7 @@ _var_wisdom = {
         'category_range': [0,13],
         'fill_missing': 0,       
         'fill' : Dict({
-            range(15,91): 0, 92: 0, range(94,100): 0,
+            14: 0, range(15,91): 0, 92: 0, range(94,100): 0,
             -9999: 0, (91,93): 'nearest'
         }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
