@@ -65,6 +65,7 @@ temp/
 /wksp_fmda/
 /jobs/
 /cache/
+/logs/
 
 # config files
 etc/conf.json
