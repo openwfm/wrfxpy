@@ -10,4 +10,24 @@ export WORKDIR=%(cwd)s
 cd $WORKDIR
 
 source ~/.wrf_arm
+
+# Force OpenMPI/UCX over real InfiniBand, not Ethernet.
+unset OMPI_MCA_btl
+unset OMPI_MCA_btl_openib_allow_ib
+unset OMPI_MCA_btl_openib_warn_no_device_params_found
+
+export OMPI_MCA_pml=ucx
+export OMPI_MCA_osc=ucx
+
+# Your Ethernet/RoCE devices are mlx5_0/mlx5_1.
+# Your real InfiniBand devices are mlx5_2/mlx5_3.
+export UCX_NET_DEVICES=mlx5_2:1,mlx5_3:1
+export UCX_TLS=rc,sm,self
+export UCX_IB_GID_INDEX=0
+
+# Keep MPI TCP control traffic off Ethernet when possible.
+export OMPI_MCA_oob_tcp_if_include=ib0
+export OMPI_MCA_btl_tcp_if_include=ib0
+export OMPI_MCA_btl_tcp_if_exclude=lo,enP6s6f0np0,enP6s6f1np1,enP24s24u1u1c2
+
 time mpirun -n $SLURM_NTASKS ./wrf.exe

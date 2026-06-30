@@ -36,12 +36,6 @@ import socket
 import collections
 from clamp2mesh import nearest_idx, get_subgrid_coordinates, clamp2mesh
 
-try:
-    import fire_init
-    _fire_init_plugin = True
-except:
-    _fire_init_plugin = False
-
 class Dict(dict):
     """
     A dictionary that allows member access to its keys.
@@ -532,9 +526,16 @@ def process_ignitions(js):
 
     :param js: the job state
     """
+    try:
+        import fire_init
+        _fire_init_plugin = True
+    except:
+        _fire_init_plugin = False
+        
     if not _fire_init_plugin: 
         logging.error('fire_init plugin not installed')
         raise Exception('fire_init plugin is required for selected ignitions')
+    
     duration_default = 60.
     radius_default = 60.
     ros_default = 1.

@@ -49,6 +49,7 @@
     "qsub_script" : "etc/qsub/haguespeak.sub"
   },
   "alderaan" : {
+    "ppn": 64,
     "qsub_cmd" : "sbatch",
     "qdel_cmd" : "scancel",
     "qstat_cmd" : "squeue",
@@ -57,6 +58,7 @@
     "qsub_script" : "etc/qsub/alderaan.sub"
   },
   "ember" : {
+    "ppn": 64,
     "qsub_cmd" : "sbatch",
     "qdel_cmd" : "scancel",
     "qstat_cmd" : "squeue",
@@ -65,6 +67,7 @@
     "qsub_script" : "etc/qsub/ember.sub"
   },
   "ember_gh" : {
+    "ppn": 72,
     "qsub_cmd" : "sbatch",
     "qdel_cmd" : "scancel",
     "qstat_cmd" : "squeue",
@@ -73,6 +76,7 @@
     "qsub_script" : "etc/qsub/ember_gh.sub"
   },
   "ember_gg" : {
+    "ppn": 144,
     "qsub_cmd" : "sbatch",
     "qdel_cmd" : "scancel",
     "qstat_cmd" : "squeue",
@@ -81,6 +85,7 @@
     "qsub_script" : "etc/qsub/ember_gg.sub"
   },
   "ember_gg_web" : {
+    "ppn": 144,
     "qsub_cmd" : "sbatch",
     "qdel_cmd" : "scancel",
     "qstat_cmd" : "squeue",
