@@ -5,8 +5,6 @@ hfgl     = 17.e4                   ! W/m^2 heat flux to ignite canopy
 fuelmc_g = 0.40                    ! ground fuel moisture, set = 0 for dry
 fuelmc_c = 1.00                    ! canopy fuel moisture, set = 0 for dry
 nfuelcats = 13                     ! number of fuel categories used
-no_fuel_cat = 14                   ! extra category for no fuel
-no_fuel_cat2 = 100                 ! all categories up to here are no fuel
 veg_ros_model = 4                  ! ROS formula: 0 =  MacArthur, 1 = Rothermel, 2 = Balbi, 3 = WIRC, 4 = Behave
 /
 
