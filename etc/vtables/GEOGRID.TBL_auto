@@ -1,25 +1,3 @@
-# See options.txt for a (somewhat up to date) list of the 
-# options that may be specified here.
-===============================
-name = HGT_M
-        priority = 1
-        dest_type = continuous
-        smooth_option = smth-desmth_special; smooth_passes=1
-        fill_missing=0.
-        interp_option = gmted2010_30s:average_gcell(4.0)+four_pt+average_4pt
-        interp_option =     gtopo_30s:average_gcell(4.0)+four_pt+average_4pt
-        interp_option =      gtopo_2m:four_pt
-        interp_option =      gtopo_5m:four_pt
-        interp_option =     gtopo_10m:four_pt
-        interp_option =        lowres:average_gcell(4.0)+four_pt
-        interp_option =       default:average_gcell(4.0)+four_pt+average_4pt
-        rel_path = gmted2010_30s:topo_gmted2010_30s/
-        rel_path =     gtopo_30s:topo_30s/
-        rel_path =      gtopo_2m:topo_2m/
-        rel_path =      gtopo_5m:topo_5m/
-        rel_path =     gtopo_10m:topo_10m/
-        rel_path =        lowres:topo_gmted2010_5m/
-        rel_path =       default:topo_gmted2010_30s/
 ===============================
 name=LANDUSEF
         priority=1
@@ -43,6 +21,8 @@ name=LANDUSEF
         landmask_water =       usgs_10m:16         # Calculate a landmask from this field
         landmask_water =         lowres:17,21      # Calculate a landmask from this field
         landmask_water =        default:17,21      # Calculate a landmask from this field
+        landmask_water =            30s:17,21      # Calculate a landmask from this field
+        landmask_water =            .3s:17,21      # Calculate a landmask from this field
         interp_option =    nlcd2006_9s:average_gcell(0.0)
         interp_option =   nlcd2006_30s:average_gcell(0.0)
         interp_option =    nlcd2011_9s:average_gcell(0.0)  
@@ -60,6 +40,8 @@ name=LANDUSEF
         interp_option =       usgs_10m:four_pt
         interp_option =         lowres:average_gcell(4.0)+four_pt
         interp_option =        default:nearest_neighbor
+        interp_option =            30s:nearest_neighbor
+        interp_option =            .3s:nearest_neighbor
         rel_path =    nlcd2006_9s:nlcd2006_ll_9s/
         rel_path =   nlcd2006_30s:nlcd2006_ll_30s/
         rel_path =    nlcd2011_9s:nlcd2011_ll_9s/
@@ -77,6 +59,8 @@ name=LANDUSEF
         rel_path =       usgs_10m:landuse_10m/
         rel_path =         lowres:modis_landuse_20class_5m_with_lakes/
         rel_path =        default:modis_landuse_20class_30s_with_lakes/
+        rel_path =            30s:modis_landuse_20class_30s_with_lakes/
+        rel_path =            .3s:modis_landuse_20class_15s_with_lakes/
 ===============================
 name=SOILTEMP
         priority=1

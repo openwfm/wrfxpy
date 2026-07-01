@@ -629,7 +629,11 @@ def vars_add_to_geogrid(js):
             ):
                 logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
                 continue
-            bbox = js.bounds[str(js.min_sub_dom)]
+            if var == 'ZSF':
+                dom_id = "1"
+            else:
+                dom_id = str(js.min_sub_dom)
+            bbox = js.bounds[dom_id]
             logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
             try:
                 GeoDriver.from_file(tif_file).to_geogrid(geo_data_path, var, bbox)
@@ -662,6 +666,20 @@ def vars_add_to_geogrid(js):
         else:
             logging.info('GEOGRID rel_path={}'.format(vartable['rel_path']))
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
+        if varname == 'ZSF':
+            logging.info('vars_add_to_geogrid - writting table for variable HGT_M')
+            vartable_hgt = {
+                'name': 'HGT_M',
+                'priority': 1,
+                'dest_type': 'continuous',
+                'smooth_option': 'smth-desmth_special; smooth_passes=1',
+                'fill_missing': 0.,
+                'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+                'rel_path': '30s:topo_gmted2010_30s/'
+            }
+            logging.info('GEOGRID abs_path={}'.format(vartable['abs_path']))
+            vartable_hgt['abs_path'] = vartable['abs_path']                
+            write_table(geogrid_tbl_path,vartable_hgt,mode='a',divider_after=True)
 
 
 def fmda_add_to_geogrid(js):
