@@ -630,7 +630,7 @@ def vars_add_to_geogrid(js):
                 logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
                 continue
             if var == 'ZSF':
-                dom_id = "1"
+                dom_id = str(min([int(k) for k,v in js.domains.items() if v['geog_res'] == '.3s']))
             else:
                 dom_id = str(js.min_sub_dom)
             bbox = js.bounds[dom_id]
