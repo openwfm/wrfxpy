@@ -649,7 +649,7 @@ def vars_add_to_geogrid(js):
     except:
         logging.warning('Problems processing GeoTIFF files for NFUEL_CAT and ZSF'.format(geo_vars_path))
         logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path))
-        varnames = ['NFUEL_CAT_{}_MODIS_20'.format(nfuelcats), 'ZSF_MODIS_20']
+        varnames = ['NFUEL_CAT_{}_MODIS_20'.format(nfuelcats), 'ZSF_GMTED2010_30S']
         geogrid_tbl_json = {}
         for varname in varnames:
             logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))

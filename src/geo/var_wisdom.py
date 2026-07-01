@@ -124,10 +124,10 @@ _var_wisdom = {
                     'df_dy': 'DZDYF',
                     'halt_on_missing': 'no'}
     },
-    'ZSF_MODIS_20' : {
+    'ZSF_GMTED2010_30S' : {
         'name': 'ZSF',
         'units': 'meters',
-        'description': 'National Elevation Dataset 1/3 arcsecond resolution from MODIS landuse 20 class',
+        'description': 'Elevation Dataset 30 arcsecond resolution from GMTED 2010',
         'type': 'continuous',
         'fill_missing': 0,
         'scale': 1.,
@@ -196,7 +196,6 @@ _var_wisdom = {
         'signed': 'yes',
         'scale': 1.,
         'bits': 16,
-        'fill_missing': 0,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
         'fill_missing': 0.0
@@ -209,7 +208,6 @@ _var_wisdom = {
         'signed': 'yes',
         'scale': 1.,
         'bits': 16,
-        'fill_missing': 0,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
         'fill_missing': 0.0
@@ -222,7 +220,6 @@ _var_wisdom = {
         'signed': 'yes',
         'scale': 1.,
         'bits': 16,
-        'fill_missing': 0,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
         'fill_missing': 0.0
