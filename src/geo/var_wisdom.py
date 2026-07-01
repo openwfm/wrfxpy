@@ -113,6 +113,7 @@ _var_wisdom = {
         'units': 'meters',
         'description': 'National Elevation Dataset 1/3 arcsecond resolution',
         'type': 'continuous',
+        'missing_value': -9999,
         'fill_missing': 0,
         'scale': 1.,
         'signed': 'yes',
