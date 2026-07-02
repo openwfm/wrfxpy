@@ -11,23 +11,28 @@ cd $WORKDIR
 
 source ~/.wrf_arm
 
-# Force OpenMPI/UCX over real InfiniBand, not Ethernet.
-unset OMPI_MCA_btl
+# Clean old OpenMPI MCA settings
 unset OMPI_MCA_btl_openib_allow_ib
 unset OMPI_MCA_btl_openib_warn_no_device_params_found
-
+unset OMPI_MCA_btl_tcp_if_exclude
+unset OMPI_MCA_btl_tcp_if_include
+unset OMPI_MCA_oob_tcp_if_exclude
+unset OMPI_MCA_oob_tcp_if_include
+# Force UCX PML
 export OMPI_MCA_pml=ucx
 export OMPI_MCA_osc=ucx
-
-# Your Ethernet/RoCE devices are mlx5_0/mlx5_1.
-# Your real InfiniBand devices are mlx5_2/mlx5_3.
+# Explicitly disable legacy openib BTL
+export OMPI_MCA_btl="^openib"
+# Keep OpenMPI out-of-band control traffic on InfiniBand interface
+export OMPI_MCA_oob_tcp_if_include=ib0
+# If TCP BTL is ever used, restrict it to ib0.
+export OMPI_MCA_btl_tcp_if_include=ib0
+# UCX: restrict data path to real InfiniBand devices
 export UCX_NET_DEVICES=mlx5_2:1,mlx5_3:1
 export UCX_TLS=rc,sm,self
 export UCX_IB_GID_INDEX=0
-
-# Keep MPI TCP control traffic off Ethernet when possible.
-export OMPI_MCA_oob_tcp_if_include=ib0
-export OMPI_MCA_btl_tcp_if_include=ib0
-export OMPI_MCA_btl_tcp_if_exclude=lo,enP6s6f0np0,enP6s6f1np1,enP24s24u1u1c2
+# Debugging with warnings
+export UCX_LOG_LEVEL=warn
+export OMPI_MCA_orte_base_help_aggregate=1
 
 time mpirun -n $SLURM_NTASKS ./wrf.exe

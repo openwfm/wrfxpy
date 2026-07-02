@@ -608,53 +608,62 @@ def vars_add_to_geogrid(js):
     geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
     geo_vars_path = 'etc/vtables/geo_vars.json'
     geo_vars = None
-    try:
-        if osp.exists(geo_vars_path):
-            geo_vars = Dict(json.load(open(geo_vars_path)))
-        else:
-            logging.warning('Any {} specified for NFUEL_CAT and ZSF GeoTIFF location'.format(geo_vars_path))
-            logging.info('Trying default NFUEL_CAT and ZSF from {}.'.format(js.args['wps_geog_path']))
-            nfuel_path = osp.join(js.args['wps_geog_path'], 'fuel_cat_fire', 'lf_data.tif')
-            topo_path = osp.join(js.args['wps_geog_path'], 'topo_fire', 'ned_data.tif')
-            if osp.exists(nfuel_path) and osp.exists(topo_path) and nfuelcats == 13:
-                geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
-        for var,tif_file in geo_vars.items():
-            if var == 'NFUEL_CAT':
-                var = 'NFUEL_CAT_13'
-            wisdom = get_wisdom(var)
-            if (
-                wisdom['name'] == 'NFUEL_CAT'
-                and 'category_range' in wisdom
-                and nfuelcats != wisdom['category_range'][1]
-            ):
-                logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
-                continue
-            if var == 'ZSF':
-                dom_id = str(min([int(k) for k,v in js.domains.items() if v['geog_res'] == '.3s']))
+    geogrid_tbl_json = {}
+    if osp.exists(geo_vars_path):
+        geo_vars = Dict(json.load(open(geo_vars_path)))
+    else:
+        logging.warning('Any {} specified for NFUEL_CAT and ZSF GeoTIFF location'.format(geo_vars_path))
+        logging.info('Trying default NFUEL_CAT and ZSF from {}.'.format(js.args['wps_geog_path']))
+        nfuel_path = osp.join(js.args['wps_geog_path'], 'fuel_cat_fire', 'lf_data.tif')
+        topo_path = osp.join(js.args['wps_geog_path'], 'topo_fire', 'ned_data.tif')
+        if osp.exists(nfuel_path) and osp.exists(topo_path) and nfuelcats == 13:
+            geo_vars = Dict({'NFUEL_CAT': nfuel_path, 'ZSF': topo_path})
+    for var,tif_file in geo_vars.items():
+        if var == 'NFUEL_CAT':
+            var = 'NFUEL_CAT_13'
+        wisdom = get_wisdom(var)
+        if (
+            wisdom['name'] == 'NFUEL_CAT'
+            and 'category_range' in wisdom
+            and nfuelcats != wisdom['category_range'][1]
+        ):
+            logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
+            continue
+        if var == 'ZSF':
+            high_res_doms = [int(k) for k,v in js.domains.items() if v['geog_res'] == '.3s']
+            if len(high_res_doms):
+                dom_id = str(min(high_res_doms))
             else:
-                dom_id = str(js.min_sub_dom)
-            bbox = js.bounds[dom_id]
-            logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
-            try:
-                GeoDriver.from_file(tif_file).to_geogrid(geo_data_path, var, bbox)
-            except Exception as e:
-                if 'NFUEL_CAT' in var or 'ZSF' in var:
-                    logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
-                    logging.error('Exception: %s',e)
-                    raise Exception('Failed to process GeoTIFF file for variable {}'.format(var))
-                else:
-                    logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
-                    logging.warning('Exception: %s',e)
-        geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
-    except:
-        logging.warning('Problems processing GeoTIFF files for NFUEL_CAT and ZSF'.format(geo_vars_path))
-        logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path))
-        varnames = ['NFUEL_CAT_{}_MODIS_20'.format(nfuelcats), 'ZSF_GMTED2010_30S']
-        geogrid_tbl_json = {}
-        for varname in varnames:
-            logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
-            vartable = wisdom_to_table(varname, get_wisdom(varname))
-            geogrid_tbl_json.update({varname: vartable})
+                dom_id = str(js.min_sub_dom) 
+        else:
+            dom_id = str(js.min_sub_dom)
+        bbox = js.bounds[dom_id]
+        logging.info('vars_add_to_geogrid - processing variable {0} from file {1} and bounding box {2}'.format(var,tif_file,bbox))
+        try:
+            GeoDriver.from_file(tif_file).to_geogrid(geo_data_path, var, bbox)
+        except Exception as e:
+            if 'NFUEL_CAT' in var:
+                logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
+                logging.warning('Exception: %s',e) 
+                logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path)) 
+                varname = 'NFUEL_CAT_{}_MODIS_20'.format(nfuelcats)
+                logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
+                vartable = wisdom_to_table(varname, get_wisdom(varname))
+                geogrid_tbl_json.update({varname: vartable}) 
+                continue
+            elif 'ZSF' in var:
+                logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
+                logging.warning('Exception: %s',e)
+                logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path)) 
+                varname = 'ZSF_GMTED2010_30S'
+                logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
+                vartable = wisdom_to_table(varname, get_wisdom(varname))
+                geogrid_tbl_json.update({varname: vartable})
+                continue
+            else:
+                logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
+                logging.warning('Exception: %s',e)
+    geogrid_tbl_json.update(json.load(open(geogrid_tbl_json_path,'r')))
     
     # update geogrid table
     logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path,geogrid_tbl_json_path))
