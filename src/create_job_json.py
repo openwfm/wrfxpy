@@ -22,30 +22,30 @@ profile_sizes = {
 # Functions #
 # Replaces the template json values with the user defined values
 #
-# @Param tmpDict - The original json dictionary values
-# @Param usrDict - The user"s json dictionary values
+# @Param tmp_dict - The original json dictionary values
+# @Param usr_dict - The user"s json dictionary values
 #
-def replace_values(tmpDict, usrDict):
-    for key, value in tmpDict.items():
+def replace_values(tmp_dict, usr_dict):
+    for key, value in tmp_dict.items():
         if isinstance(value, dict):
-            replace_values(value, usrDict)
-        elif key in usrDict:
-            if isinstance(usrDict[key], (dict, list)):  # Check for nested values
-                tmpDict[key] = usrDict[key]
+            replace_values(value, usr_dict)
+        elif key in usr_dict:
+            if isinstance(usr_dict[key], (dict, list)):  # Check for nested values
+                tmp_dict[key] = usr_dict[key]
             else:
-                tmpDict[key] = usrDict[key]
+                tmp_dict[key] = usr_dict[key]
         elif isinstance(value, list):  # Check for lists
             for item in value:
                 if isinstance(item, dict):
-                    replace_values(item, usrDict)
+                    replace_values(item, usr_dict)
                     
-def make_profile_table(profileSizes, innerRes):
+def make_profile_table(profile_sizes, inner_res):
     headers = []
     grid_sizes = []
     physical_sizes = []
 
-    for label, n in profileSizes.items():
-        size_km = round(n * innerRes / 1000)
+    for label, n in profile_sizes.items():
+        size_km = round(n * inner_res / 1000)
 
         headers.append(label)
         grid_sizes.append(f"{n}x{n}")
@@ -83,12 +83,12 @@ INNER_POSTPROC = [
     "FIRE_AREA", "FGRNHFX", "FLINEINT_btupftps", "ROS_chsph",
 ]
 
-def build_domain_conf(gribRes, n_domains, profileSize, center_latlon, ref_ratio=3, subgrid_res=30):    
-    domain_size = profileSize + 1
-    parent_start = profileSize // ref_ratio + 1
-    parent_end = parent_start + profileSize // ref_ratio - 1
-    cell_size = int(round(gribRes * 1000))
-    subgrid_ratio = int(np.ceil(cell_size / 3**(n_domains - 1) / subgrid_res / 2) * 2)
+def build_domain_conf(grib_res, n_domains, profile_size, center_latlon, ref_ratio=3, subgrid_res=30):    
+    domain_size = profile_size + 1
+    parent_start = profile_size // ref_ratio + 1
+    parent_end = parent_start + profile_size // ref_ratio - 1
+    cell_size = int(round(grib_res * 1000))
+    subgrid_ratio = int(np.ceil(cell_size / 3**n_domains / subgrid_res / 2) * 2)
 
     cell_sub_size = cell_size / ref_ratio
     domains = {
@@ -98,7 +98,7 @@ def build_domain_conf(gribRes, n_domains, profileSize, center_latlon, ref_ratio=
             "center_latlon": center_latlon,
             "truelats": [center_latlon[0], center_latlon[0]],
             "stand_lon": center_latlon[1],
-            "time_step": max(1, int(6 * gribRes)),
+            "time_step": max(1, int(6 * cell_sub_size / 1000)),
             "history_interval": 60,
             "geog_res": "30s",
             "subgrid_ratio": [0, 0],
@@ -110,7 +110,7 @@ def build_domain_conf(gribRes, n_domains, profileSize, center_latlon, ref_ratio=
             "parent_id": dom - 1,
             "parent_cell_size_ratio": ref_ratio,
             "parent_time_step_ratio": ref_ratio,
-            "geog_res": ".3s" if cell_sub_size < 1000. else "30s",
+            "geog_res": "30s", #".3s" if cell_sub_size < 1000. else "30s",
             "subgrid_ratio": [
                 subgrid_ratio, subgrid_ratio
             ] if dom == n_domains else [0, 0],
@@ -121,12 +121,12 @@ def build_domain_conf(gribRes, n_domains, profileSize, center_latlon, ref_ratio=
 
     return domains
 
-def build_job_json(cfg, gribRes, n_domains, profileSize, profileSizeInput, fireNameInput):
+def build_job_json(cfg, grib_res, n_domains, profile_size):
     outer_dom = 1
     inner_dom = n_domains
-    fmdaUTC = datetime.strptime(cfg["start_utc"], "%Y-%m-%d_%H:%M:%S").replace(tzinfo=UTC)
+    fmda_utc = datetime.strptime(cfg["start_utc"], "%Y-%m-%d_%H:%M:%S").replace(tzinfo=UTC)
     patch_size = 8
-    n_cores = (profileSize / patch_size)**2
+    n_cores = (profile_size / patch_size)**2
     ppn = clusters[sys_cfg["qsys"]].get("ppn", 64)
     n_nodes = int(np.floor(n_cores / ppn))
     if n_nodes == 0:
@@ -150,9 +150,9 @@ def build_job_json(cfg, gribRes, n_domains, profileSize, profileSizeInput, fireN
         "start_utc": cfg["start_utc"],
         "end_utc": cfg["end_utc"],
         "domains": build_domain_conf(
-            gribRes,
+            grib_res,
             n_domains,
-            profileSize,
+            profile_size,
             cfg["center_latlon"],
         ),
         "ignitions": {},
@@ -162,7 +162,7 @@ def build_job_json(cfg, gribRes, n_domains, profileSize, profileSizeInput, fireN
             "shuttle": "incremental",
             "description": cfg["description"],
         },
-        "fmda_geogrid_path": fmdaUTC.strftime(
+        "fmda_geogrid_path": fmda_utc.strftime(
             f"wksp_fmda/CONUS/%Y%m/fmda-CONUS-%Y%m%d-%H/fmda-CONUS-%Y%m%d-%H.geo"
         ),
     }
@@ -333,8 +333,6 @@ json_data = build_job_json(
     grib_res,
     n_domains,
     profile_sizes[profile_size_input],
-    profile_size_input,
-    fire_name_input,
 )
 
 # Finalize the changes to the json
