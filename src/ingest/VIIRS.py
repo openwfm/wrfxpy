@@ -1,8 +1,7 @@
 #
-# Angel Farguell, CU Denver
+# Angel Farguell, CU Denver and SJSU
 #
 
-from __future__ import absolute_import
 from ingest.sat_source_cmr import SatSourceCMR
 
 class VIIRS(SatSourceCMR):
@@ -41,8 +40,8 @@ class SNPP(VIIRS):
     platform='S-NPP'
     geo_col='5200'
     fire_col='5200'
-    geo_nrt_col='5001'
-    fire_nrt_col='5000'
+    geo_nrt_col='5200'
+    fire_nrt_col='5200'
 
 class SNPPHR(VIIRS):
     """
@@ -69,8 +68,8 @@ class SNPPHR(VIIRS):
     platform='S-NPP'
     geo_col='5200'
     fire_col='5200'
-    geo_nrt_col='5001'
-    fire_nrt_col='5001'
+    geo_nrt_col='5200'
+    fire_nrt_col='5200'
 
 class NOAA20(VIIRS):
     """
@@ -97,8 +96,8 @@ class NOAA20(VIIRS):
     platform='NOAA-20'
     geo_col='5201'
     fire_col='5200'
-    geo_nrt_col=''
-    fire_nrt_col=''
+    geo_nrt_col='5201'
+    fire_nrt_col='5200'
 
 class NOAA20HR(VIIRS):
     """
@@ -125,5 +124,61 @@ class NOAA20HR(VIIRS):
     platform='NOAA-20'
     geo_col='5201'
     fire_col='5200'
-    geo_nrt_col=''
-    fire_nrt_col=''
+    geo_nrt_col='5201'
+    fire_nrt_col='5200'
+
+class NOAA21(VIIRS):
+    """
+    NOAA-21 VIIRS (Visible Infrared Imaging Radiometer Suite) satellite source.
+    """
+
+    def __init__(self, arg):
+        super(NOAA21, self).__init__(arg)
+
+    # instance variables
+    id='NOAA21'
+    info='NOAA-21 Visible Infrared Imaging Radiometer Suite (VIIRS)'
+    info_url='https://www.earthdata.nasa.gov/data/catalog/lpcloud-vj214-002'
+    info_url_nrt='https://www.earthdata.nasa.gov/data/catalog/lancemodis-vj214-nrt-2'
+    prefix='VJ2'
+    geo_prefix='VJ203MOD'
+    fire_prefix='VJ214'
+    geo_nrt_prefix='VJ203MOD_NRT'
+    fire_nrt_prefix='VJ214_NRT'
+    geo_collection_id='C3478458790-LAADS'
+    fire_collection_id='C2831626262-LPCLOUD'
+    geo_nrt_collection_id='C2837613785-LANCEMODIS'
+    fire_nrt_collection_id='C2888646877-LANCEMODIS'
+    platform='NOAA-21'
+    geo_col='5201'
+    fire_col='5200'
+    geo_nrt_col='5201'
+    fire_nrt_col='5200'
+
+class NOAA21HR(VIIRS):
+    """
+    NOAA-21 VIIRS (Visible Infrared Imaging Radiometer Suite) satellite source.
+    """
+
+    def __init__(self, arg):
+        super(NOAA21HR, self).__init__(arg)
+
+    # instance variables
+    id='NOAA21HR'
+    info='NOAA-21 Visible Infrared Imaging Radiometer Suite (VIIRS)'
+    info_url='https://www.earthdata.nasa.gov/data/catalog/lpcloud-vj214img-002'
+    info_url_nrt='https://www.earthdata.nasa.gov/data/catalog/lancemodis-vj214img-nrt-2'
+    prefix='VJ2HR'
+    geo_prefix='VJ203IMG'
+    fire_prefix='VJ214IMG'
+    geo_nrt_prefix='VJ203IMG_NRT'
+    fire_nrt_prefix='VJ214IMG_NRT'
+    geo_collection_id='C3478476050-LAADS'
+    fire_collection_id='C2831626262-LPCLOUD'
+    geo_nrt_collection_id='C3383706938-LANCEMODIS'
+    fire_nrt_collection_id='C2837613056-LANCEMODIS'
+    platform='NOAA-21'
+    geo_col='5201'
+    fire_col='5200'
+    geo_nrt_col='5201'
+    fire_nrt_col='5200'

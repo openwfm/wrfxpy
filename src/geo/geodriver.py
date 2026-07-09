@@ -108,32 +108,90 @@ class GeoDriver(object):
         yy = np.linspace(y0, y0+dy*self.ny, self.ny, dtype=np.float32)
         return np.meshgrid(xx, yy)
 
-    def resample_bbox(self,bbox):
+    def resample_bbox(self, bbox, require_full_coverage=True):
         """
         Resample using lon-lat bounding box.
 
-        :param bbox: optional, WGS84 bounding box (min_lon,max_lon,min_lat,max_lat)
+        :param bbox: WGS84 bounding box (min_lon, max_lon, min_lat, max_lat)
+        :param require_full_coverage: if True, require bbox to be fully inside GeoTIFF extent
         """
         logging.info('GeoTIFF.resample_bbox - resampling GeoDriver into bounding box: %s' % list(bbox))  
-        # geotransform
-        x0,dx,_,y0,_,dy = self.gt
+        # Validate bbox
+        if len(bbox) != 4:
+            raise GeoDriverError(
+                "Incorrect bbox {}. Expected (min_lon, max_lon, min_lat, max_lat)".format(bbox)
+            )
+        min_lon, max_lon, min_lat, max_lat = map(float, bbox)
+        if min_lon >= max_lon:
+            raise GeoDriverError("Invalid bbox longitude limits: {}".format(bbox))
+        if min_lat >= max_lat:
+            raise GeoDriverError("Invalid bbox latitude limits: {}".format(bbox))
+        if not (-180.0 <= min_lon <= 180.0 and -180.0 <= max_lon <= 180.0):
+            raise GeoDriverError("Invalid bbox longitude values: {}".format(bbox))
+        if not (-90.0 <= min_lat <= 90.0 and -90.0 <= max_lat <= 90.0):
+            raise GeoDriverError("Invalid bbox latitude values: {}".format(bbox))
+        # GeoTransform
+        x0, dx, _, y0, _, dy = self.gt
+        # Pixel-center coordinates
         xx = np.arange(x0, x0+dx*self.nx, dx, dtype=np.float32)
         yy = np.arange(y0, y0+dy*self.ny, dy, dtype=np.float32)
-        # get bounding box in projection of the GeoTIFF
-        ref_corners = ((bbox[0],bbox[2]),(bbox[0],bbox[3]),(bbox[1],bbox[3]),(bbox[1],bbox[2]))
+        # GeoTIFF pixel-edge extent
+        img_x_edges = [x0 - 0.5 * dx, x0 + dx * (self.nx - 0.5)]
+        img_y_edges = [y0 - 0.5 * dy, y0 + dy * (self.ny - 0.5)]
+        img_x_min = min(img_x_edges)
+        img_x_max = max(img_x_edges)
+        img_y_min = min(img_y_edges)
+        img_y_max = max(img_y_edges)
+        # Transform bbox corners into GeoTIFF projection
+        ref_corners = (
+            (bbox[0],bbox[2]), 
+            (bbox[0],bbox[3]), 
+            (bbox[1],bbox[3]),
+            (bbox[1],bbox[2])
+        )
         if vparse(pyproj.__version__) < vparse('2.2'):
-            proj_corners = [pyproj.transform(self.ref_proj,self.pyproj,c[0],c[1]) for c in ref_corners]
+            proj_corners = [
+                pyproj.transform(self.ref_proj,self.pyproj,c[0],c[1]) 
+                for c in ref_corners
+            ]
         else:
-            proj_corners = [pyproj.Transformer.from_crs(self.ref_proj4,self.proj4,always_xy=True).transform(c[0],c[1]) for c in ref_corners]
+            transformer = pyproj.Transformer.from_crs(
+                self.ref_proj4, self.proj4, always_xy=True
+            )
+            proj_corners = [
+                transformer.transform(c[0],c[1]) 
+                for c in ref_corners
+            ]
         x_min = min([c[0] for c in proj_corners])
         x_max = max([c[0] for c in proj_corners])
         y_min = min([c[1] for c in proj_corners])
         y_max = max([c[1] for c in proj_corners])
-        # find resample indexes
+        # Strict full-coverage check        
+        if require_full_coverage:
+            eps_x = abs(dx) * 1.0e-6
+            eps_y = abs(dy) * 1.0e-6
+            fully_covered = (
+                x_min >= img_x_min - eps_x
+                and x_max <= img_x_max + eps_x
+                and y_min >= img_y_min - eps_y
+                and y_max <= img_y_max + eps_y
+            )
+            if not fully_covered:
+                msg = (
+                    "GeoTIFF.resample_bbox - bbox is not fully covered by the image. "
+                    "Projected bbox: xmin={}, xmax={}, ymin={}, ymax={}. "
+                    "Image extent: xmin={}, xmax={}, ymin={}, ymax={}"
+                ).format(
+                    x_min, x_max, y_min, y_max,
+                    img_x_min, img_x_max, img_y_min, img_y_max,
+                )
+                raise GeoDriverError(msg)
+        # Find resample indexes using pixel-center coordinates
         i_mins = np.where(x_min <= xx)[0]
         i_maxs = np.where(xx <= x_max)[0]
         j_mins = np.where(y_min <= yy)[0]
         j_maxs = np.where(yy <= y_max)[0]
+        # Catch no-intersection case
         if len(i_mins)==0 or len(i_maxs)==0 or len(j_mins)==0 or len(j_maxs)==0:
             logging.error('GeoTIFF.resample_bbox - bbox provided does not intersect the image')
             raise GeoDriverError('Incorrect bbox {}'.format(bbox))
@@ -149,28 +207,31 @@ class GeoDriver(object):
         else:
             j_max = j_mins.max()
             j_min = j_maxs.min()
-        # save resample indexes
-        self.resample_indxs = (i_min,i_max,j_min,j_max)
-        # only working on Linux
+        # Convert max indexes to Python slice-exclusive bounds
+        i_max += 1
+        j_max += 1
+        # Save resample indexes
+        self.resample_indxs = (i_min, i_max, j_min, j_max)
+        # Read/resample array
         try:
-            # get virtual array and resample
+            # Get virtual array and resample
             if self.bands == 1:
                 a_r = self.ds.GetVirtualMemArray()[j_min:j_max,i_min:i_max].copy()
             else:
                 a_r = self.ds.GetVirtualMemArray()[:,j_min:j_max,i_min:i_max].copy()
         except:
             logging.warning('GeoTIFF.resample_bbox - reading the whole array and sampling after')
-            # get array and resample
+            # Get whole array and resample
             if self.bands == 1:
                 a_r = self.ds.ReadAsArray()[j_min:j_max,i_min:i_max]
             else:
-                a_r = self.ds.ReadAsArray()[:,j_min:j_max,i_min:i_max]
-        # update other elements
-        self.gt = (xx[i_min],dx,0,yy[j_min],0,dy)
+                a_r = self.ds.ReadAsArray()[:,j_min:j_max,i_min:i_max]    
+        # Update georeferencing
+        self.gt = (xx[i_min], dx, 0, yy[j_min], 0, dy)
         if self.bands == 1:
-            self.ny,self.nx = a_r.shape
+            self.ny, self.nx = a_r.shape
         else:
-            _,self.ny,self.nx = a_r.shape
+            _, self.ny, self.nx = a_r.shape
         self.resampled = True
         self.bbox = bbox
         return a_r

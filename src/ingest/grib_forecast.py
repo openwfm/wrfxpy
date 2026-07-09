@@ -75,7 +75,7 @@ class GribForecast(GribSource):
             colmet_prefix, colmet_files = self.colmet_names(cycle_start, colmet_files_utc)
 
             for f in grib_files:
-               logging.info('%s will retrive %s' % (self.id, f)) 
+                logging.info('%s will retrive %s' % (self.id, f)) 
 
             colmet_missing = self.colmet_missing(colmet_prefix,colmet_files)
             if len(colmet_missing) > 0:
@@ -90,14 +90,14 @@ class GribForecast(GribSource):
                 for url_base in url_bases:
                     logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
                     if url_base[:5] == 's3://':
-                        unavailables = [x for x in nonlocals if readhead(osp.join(osp.dirname(self.browse_aws), x), msg_level=0).status_code != 200]
+                        unavailables = [x for x in nonlocals if readhead(osp.join(osp.dirname(self.browse_aws), x), msg_level=2).status_code != 200]
                     else:
-                        unavailables = [x for x in nonlocals if readhead(osp.join(url_base, x), msg_level=0).status_code != 200]
+                        unavailables = [x for x in nonlocals if readhead(osp.join(url_base, x), msg_level=2).status_code != 200]
                     if len(unavailables) == 0:
                         break
                 if len(unavailables) > 0:
                     logging.warning('%s failed retrieving cycle data for cycle %s, unavailables %s'
-                                         % (self.id, cycle_start, repr(unavailables)))
+                                        % (self.id, cycle_start, repr(unavailables)))
                     cycle_shift += 1
                     continue
     

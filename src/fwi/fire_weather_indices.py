@@ -363,11 +363,11 @@ def calculate_hdw(T, q, P, u, v):
     # Find vapor pressure and saturated vapor pressure in Pa
     Pw = calculate_vp(q, P)
     Pws = calculate_svp(T)
-    # Find vapor pressure deficit (kPa)
-    vpd = (Pws - Pw) / 1000
+    # Find vapor pressure deficit (hPa)
+    vpd = (Pws - Pw) / 100
     # Wind speed (m/s)
     ws = np.sqrt(u**2 + v**2) 
-    # Find Hot, Dry, & Windy Index (kPa m s-1) 
+    # Find Hot, Dry, & Windy Index (hPa m s-1) 
     hdw = ws * vpd
     return hdw
 
@@ -588,13 +588,15 @@ def HDW(d, t):
     :return: HDW (hPa m s-1, but units should be ignored)
     """
     # Get the needed variables
-    q2 = d.variables['Q2'][t,:,:]        # Specific Humidity (kg/kg)
+    q2 = d.variables['Q2'][t,:,:]        # Water vapor mixing ratio (kg/kg)
     psfc = d.variables['PSFC'][t,:,:]    # Surface Pressure (Pa)
     t2 = d.variables['T2'][t,:,:]        # Temperature (K)
     u10 = d.variables['U10'][t,:,:]      # U-Component of the Wind at 10m (m/s)
     v10 = d.variables['V10'][t,:,:]      # V-Component of the Wind at 10m (m/s)
+    # Calculate specific humidity (kg/kg)
+    q = q2 / (1.0 + q2)
     # Calculate HDW
-    hdw = calculate_hdw(t2, q2, psfc, u10, v10)
+    hdw = calculate_hdw(t2, q, psfc, u10, v10)
     return hdw
 
 def LFP(d, t):

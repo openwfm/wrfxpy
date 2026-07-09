@@ -23,10 +23,10 @@ from wrf.wrf_exec import Geogrid, Ungrib, Metgrid, Real, WRF
 from wrf.wps_domains import WPSDomainConf
 
 from utils import utc_to_esmf, symlink_matching_files, symlink_unless_exists, update_time_control, \
-                  update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
-                  timespec_to_utc, round_time_to_hour, Dict, make_clean_dir, process_create_time, \
-                  load_sys_cfg, ensure_dir, move, json_join, number_minutes, serial_json, link2copy, \
-                  force_copy, process_ignitions
+                update_namelist, timedelta_hours, esmf_to_utc, render_ignitions, make_dir, \
+                timespec_to_utc, round_time_to_hour, Dict, make_clean_dir, process_create_time, \
+                load_sys_cfg, ensure_dir, move, json_join, number_minutes, serial_json, link2copy, \
+                force_copy, process_ignitions
 from geo.write_geogrid import wisdom_to_table, write_table
 from geo.geodriver import GeoDriver
 from geo.var_wisdom import get_wisdom
@@ -41,16 +41,17 @@ try:
 except:
     _fire_init_plugin = False
 
-from ingest.NAM218 import NAM218
-from ingest.HRRR import HRRR
-from ingest.NAM227 import NAM227
-from ingest.CFSR import CFSR_P, CFSR_S
-from ingest.NARR import NARR
-from ingest.GFSA import GFSA
 from ingest.GFSF import GFSF_P, GFSF_S
+from ingest.GFSA import GFSA
+from ingest.NARR import NARR
+from ingest.CFSR import CFSR_P, CFSR_S
+from ingest.RAP import RAP
+from ingest.NAM218 import NAM218
+from ingest.NAM227 import NAM227
+from ingest.HRRR import HRRR
 
 from ingest.MODIS import Terra, Aqua
-from ingest.VIIRS import SNPP, SNPPHR, NOAA20, NOAA20HR
+from ingest.VIIRS import SNPP, SNPPHR, NOAA20, NOAA20HR, NOAA21, NOAA21HR
 from ingest.GOES import GOES16, GOES17, GOES18
 
 from fmda.fuel_moisture_da import assimilate_fm10_observations
@@ -117,6 +118,7 @@ class JobState(Dict):
         self.domains = args['domains']
         self.ignitions = args.get('ignitions', {})
         self.fmda = args.get('fuel_moisture_da', None)
+        self.fmda_found = False
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
         self.clean_dir = args.get('clean_dir', True)
@@ -137,6 +139,8 @@ class JobState(Dict):
         """
         if gs_name == 'HRRR':
             return [HRRR(js)]
+        elif gs_name == 'RAP':
+            return [RAP(js)]
         elif gs_name == 'NAM' or gs_name == 'NAM218' :
             return [NAM218(js)]
         elif gs_name == 'NAM227':
@@ -643,7 +647,7 @@ def vars_add_to_geogrid(js):
             GeoDriver.from_file(tif_file).to_geogrid(geo_data_path, var, bbox)
         except Exception as e:
             if 'NFUEL_CAT' in var:
-                logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
+                logging.warning('vars_add_to_geogrid - cannot process variable {}'.format(var))
                 logging.warning('Exception: %s',e) 
                 logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path)) 
                 varname = 'NFUEL_CAT_{}_MODIS_20'.format(nfuelcats)
@@ -652,7 +656,7 @@ def vars_add_to_geogrid(js):
                 geogrid_tbl_json.update({varname: vartable}) 
                 continue
             elif 'ZSF' in var:
-                logging.critical('vars_add_to_geogrid - cannot process variable {}'.format(var))
+                logging.warning('vars_add_to_geogrid - cannot process variable {}'.format(var))
                 logging.warning('Exception: %s',e)
                 logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {} from global products'.format(geogrid_tbl_path)) 
                 varname = 'ZSF_GMTED2010_30S'
@@ -663,9 +667,12 @@ def vars_add_to_geogrid(js):
             else:
                 logging.warning('vars_add_to_geogrid - cannot process variable {}, will not be included'.format(var))
                 logging.warning('Exception: %s',e)
-    geogrid_tbl_json.update(json.load(open(geogrid_tbl_json_path,'r')))
+                
+    # Update geogrid table information from added variables
+    if osp.exists(geogrid_tbl_json_path):
+        geogrid_tbl_json.update(json.load(open(geogrid_tbl_json_path,'r')))
     
-    # update geogrid table
+    # Update geogrid table
     logging.info('vars_add_to_geogrid - updating GEOGRID.TBL at {0} from {1}'.format(geogrid_tbl_path,geogrid_tbl_json_path))
     for varname,vartable in geogrid_tbl_json.items():
         logging.info('vars_add_to_geogrid - writting table for variable {}'.format(varname))
@@ -703,6 +710,7 @@ def fmda_add_to_geogrid(js):
             sym_fmda_geogrid_path = osp.join(js.wps_dir,fmda_geogrid_basename)
             symlink_unless_exists(fmda_geogrid_path,sym_fmda_geogrid_path)
             logging.info('fmda_add_to_geogrid - fmda_geogrid_path is linked to %s' % sym_fmda_geogrid_path)
+            js.fmda_found = True
         else:
             logging.warning('fmda_add_to_geogrid - fmda_geogrid_path not exist')
             return
@@ -992,7 +1000,7 @@ def execute(args,job_args):
         js.wrf_nml['time_control']['iofields_filename'] = [osp.abspath('etc/iofields.cfg')] * js.num_doms
     update_namelist(js.wrf_nml, js.grib_source[0].namelist_keys())
     update_namelist(js.wrf_nml, render_ignitions(js, js.num_doms))
-    if 'fmda_geogrid_path' in js.args:
+    if 'fmda_geogrid_path' in js.args and js.fmda_found is True:
         moisture_classes = js.fire_nml['moisture'].get('moisture_classes', 5)
         fmc_gc_initialization = []
         for mc in range(moisture_classes):
@@ -1473,7 +1481,7 @@ def verify_inputs(args,sys_cfg):
     Check if arguments (eventually) supplied to execute(...) are valid - if not exception is thrown.
 
     Arguments:
-      args -- dictionary of arguments
+        args -- dictionary of arguments
     """
     # dump(sys_cfg,'sys_cfg')
     # dump(args,'args')
@@ -1482,7 +1490,7 @@ def verify_inputs(args,sys_cfg):
         if key in args:
             if  sys_cfg[key] != args[key]:
                 logging.error('system configuration %s=%s attempted change to %s'
-                   % (key, sys_cfg[key], args[key]))
+                    % (key, sys_cfg[key], args[key]))
                 raise ValueError('System configuration values may not be overwritten.')
 
     # we don't check if job_id is a valid path
@@ -1490,20 +1498,24 @@ def verify_inputs(args,sys_cfg):
         required_files = [('sys_install_path', 'Non-existent system installation directory %s')]
         optional_files = []
     elif 'ungrib_only' in args and args['ungrib_only']:
-        required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
-                      ('workspace_path', 'Non-existent workspace directory %s'),
-                      ('wps_install_path', 'Non-existent WPS installation directory %s'),
-                      ('wps_namelist_path', 'Non-existent WPS namelist template %s')]
+        required_files = [
+            ('sys_install_path', 'Non-existent system installation directory %s'),
+            ('workspace_path', 'Non-existent workspace directory %s'),
+            ('wps_install_path', 'Non-existent WPS installation directory %s'),
+            ('wps_namelist_path', 'Non-existent WPS namelist template %s')
+        ]
         optional_files = []
     else:
-        required_files = [('sys_install_path', 'Non-existent system installation directory %s'),
-                      ('workspace_path', 'Non-existent workspace directory %s'),
-                      ('wps_install_path', 'Non-existent WPS installation directory %s'),
-                      ('wrf_install_path', 'Non-existent WRF installation directory %s'),
-                      ('wps_namelist_path', 'Non-existent WPS namelist template %s'),
-                      ('wrf_namelist_path', 'Non-existent WRF namelist template %s'),
-                      ('fire_namelist_path', 'Non-existent fire namelist template %s'),
-                      ('wps_geog_path', 'Non-existent geogrid data (WPS-GEOG) path %s')]
+        required_files = [
+            ('sys_install_path', 'Non-existent system installation directory %s'),
+            ('workspace_path', 'Non-existent workspace directory %s'),
+            ('wps_install_path', 'Non-existent WPS installation directory %s'),
+            ('wrf_install_path', 'Non-existent WRF installation directory %s'),
+            ('wps_namelist_path', 'Non-existent WPS namelist template %s'),
+            ('wrf_namelist_path', 'Non-existent WRF namelist template %s'),
+            ('fire_namelist_path', 'Non-existent fire namelist template %s'),
+            ('wps_geog_path', 'Non-existent geogrid data (WPS-GEOG) path %s')
+        ]
         optional_files = [('emissions_namelist_path', 'Non-existent namelist template %s')]
 
     # check each path that should exist
@@ -1519,13 +1531,13 @@ def verify_inputs(args,sys_cfg):
 
     # check for valid grib source
     if 'grib_source' in args:
-        if args['grib_source'] not in ['HRRR', 'NAM','NAM218', 'NAM227', 'NARR','CFSR','GFSA','GFSF']:
-            raise ValueError('Invalid grib source %s, must be one of HRRR, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
+        if args['grib_source'] not in ['HRRR', 'RAP', 'NAM', 'NAM218', 'NAM227', 'NARR', 'CFSR', 'GFSA', 'GFSF']:
+            raise ValueError('Invalid grib source %s, must be one of HRRR, RAP, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
 
     # check for valid satellite source
     if 'satellite_source' in args:
         for sat in args['satellite_source']:
-            if sat not in ['Terra','Aqua','SNPP','SNPPHR','NOAA20','NOAA20HR','G16','G17','G18']:
+            if sat not in ['Terra', 'Aqua', 'SNPP', 'SNPPHR', 'NOAA20', 'NOAA20HR', 'NOAA21', 'NOAA21HR', 'G16', 'G17', 'G18']:
                 raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP, G16, G17' % sat)
 
     # if precomputed key is present, check files linked in

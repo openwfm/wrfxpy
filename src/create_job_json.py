@@ -10,6 +10,15 @@ sys_cfg = load_sys_cfg()
 clusters_path = osp.join(sys_cfg["sys_install_path"], "etc/clusters.json")
 clusters = json.load(open(clusters_path))
 
+grib_sources = {
+    "GFSF": 28, "RAP": 13, "NAM218": 12, 
+    "NAM227": 5, "HRRR": 3
+} # resolutions in km (roughly)
+
+profile_sizes = {
+    "S": 72, "M": 96, "L": 144, "XL": 192
+}
+
 # Functions #
 # Replaces the template json values with the user defined values
 #
@@ -81,9 +90,10 @@ def build_domain_conf(gribRes, n_domains, profileSize, center_latlon, ref_ratio=
     cell_size = int(round(gribRes * 1000))
     subgrid_ratio = int(np.ceil(cell_size / 3**(n_domains - 1) / subgrid_res / 2) * 2)
 
+    cell_sub_size = cell_size / ref_ratio
     domains = {
         "1": {
-            "cell_size": [cell_size, cell_size],
+            "cell_size": [cell_sub_size, cell_sub_size],
             "domain_size": [domain_size, domain_size],
             "center_latlon": center_latlon,
             "truelats": [center_latlon[0], center_latlon[0]],
@@ -94,13 +104,13 @@ def build_domain_conf(gribRes, n_domains, profileSize, center_latlon, ref_ratio=
             "subgrid_ratio": [0, 0],
         }
     }
-    dom_size = cell_size / ref_ratio
     for dom in range(2, n_domains + 1):
+        cell_sub_size /= ref_ratio
         domains[str(dom)] = {
             "parent_id": dom - 1,
             "parent_cell_size_ratio": ref_ratio,
             "parent_time_step_ratio": ref_ratio,
-            "geog_res": ".3s" if dom_size < 1000. else "30s",
+            "geog_res": ".3s" if cell_sub_size < 1000. else "30s",
             "subgrid_ratio": [
                 subgrid_ratio, subgrid_ratio
             ] if dom == n_domains else [0, 0],
@@ -108,7 +118,6 @@ def build_domain_conf(gribRes, n_domains, profileSize, center_latlon, ref_ratio=
             "parent_end": [parent_end, parent_end],
             "history_interval": 15 if dom == n_domains else 60,
         }
-        dom_size /= ref_ratio
 
     return domains
 
@@ -161,140 +170,128 @@ def build_job_json(cfg, gribRes, n_domains, profileSize, profileSizeInput, fireN
 ################################################################################
 # Create dictionary to hold user data and define current datetime in Local and UTC #
 cfg = {} # dictionary to hold user inputs
-now = datetime.now() # current datetime value
-utcNow = datetime.now(UTC) # current utc datetime value
-if utcNow.hour > 0 and utcNow.hour < 12:
-    currHour = 0
-else:
-    currHour = 12
 
 ################################################################################
 # Get the grib source from the user #
 while True:
-    gribSources = {
-        "GFSF": 28, "HRRR": 3, 
-        "NAM218": 12, "NAM227": 5
-    } # resolutions in km (roughly)
-    gribSourceInput = input("Enter a grib source {} (HRRR): ".format(gribSources.keys()))
-    if gribSourceInput == "":
-        gribSourceInput = "HRRR"
-    gribSourceInput = gribSourceInput.upper()
-    if not gribSourceInput in gribSources.keys():
+    grib_sources_input = input("Enter a grib source {} (HRRR): ".format(grib_sources.keys()))
+    if grib_sources_input == "":
+        grib_sources_input = "HRRR"
+    grib_sources_input = grib_sources_input.upper()
+    if not grib_sources_input in grib_sources.keys():
         print("Please enter a valid grib source.")
         continue
-    gribRes = gribSources[gribSourceInput]
-    print(f"You have selected {gribSourceInput} ({gribRes} km)")
+    grib_res = grib_sources[grib_sources_input]
+    print(f"You have selected {grib_sources_input} ({grib_res} km)")
     print()
-    cfg["grib_source"] = gribSourceInput
+    cfg["grib_source"] = grib_sources_input
     break
 
 ################################################################################
 # Get domain configuration and resolution based on target resolution
 while True:
-    innerRes = input("Select innermost atmospheric resolution in meters (300 m): ")
-    if innerRes == "":
-        innerRes = 300
+    inner_res = input("Select innermost atmospheric resolution in meters (300 m): ")
+    if inner_res == "":
+        inner_res = 300
     try:
-        innerRes = float(innerRes)
+        inner_res = float(inner_res)
     except:
         print("Please select a valid resolution")
         continue
     break
     
 ref_ratio = 3
-n_domains = 1 + round(np.log(gribRes * 1000. / innerRes) / np.log(ref_ratio))
-innerRes = gribRes * 1000. / ref_ratio**(n_domains - 1)
-print(f"Domain configuration with {n_domains} domains and inner most resolution of {innerRes} m\n")
+n_domains = round(np.log(grib_res * 1000. / inner_res) / np.log(ref_ratio))
+inner_res = grib_res * 1000. / ref_ratio**n_domains
+print(f"Domain configuration with {n_domains} domains and inner most resolution of {inner_res} m\n")
 
 ################################################################################
 # Get the profile size input from the user #
-profileSizes = {
-    "S": 72, "M": 96, "L": 144, "XL": 192
-}
 while True:
     print("Select size:")
-    print(make_profile_table(profileSizes, innerRes))
-    profileSizeInput = input("Enter a valid profile size [S, M, L, XL] (M): ")
-    if profileSizeInput == "":
-        profileSizeInput = "M"
-    profileSizeInput = profileSizeInput.upper()
-    if not profileSizeInput in profileSizes:
+    print(make_profile_table(profile_sizes, inner_res))
+    profile_size_input = input("Enter a valid profile size [S, M, L, XL] (M): ")
+    if profile_size_input == "":
+        profile_size_input = "M"
+    profile_size_input = profile_size_input.upper()
+    if not profile_size_input in profile_sizes:
         print("Please select a valid profile size")
         continue
-    print(f"You have selected the {profileSizeInput} profile size")
+    print(f"You have selected the {profile_size_input} profile size")
     print()
     break
 
 ################################################################################
 # Get the simulation start time from the user 
 while True:
-    utcnow = datetime.now(UTC).strftime("%Y-%m-%d_%H:%M:%S")
-    startUTC = input('Current UTC time is {}. Enter start time in UTC with format "%Y-%m-%d_%H:%M:%S": '.format(utcnow))
+    utc_now = datetime.now(UTC)
+    utc_now_str = utc_now.strftime("%Y-%m-%d_%H:%M:%S")
+    start_utc = input('Current UTC time is {}. Enter start time in UTC with format "%Y-%m-%d_%H:%M:%S": '.format(utc_now_str))
     try:
-        startUTC = datetime.strptime(startUTC, "%Y-%m-%d_%H:%M:%S").replace(tzinfo=UTC)
+        start_utc = datetime.strptime(start_utc, "%Y-%m-%d_%H:%M:%S").replace(tzinfo=UTC)
     except:
-        print(f"Enter a valid UTC time, not {startUTC}")
+        print(f"Enter a valid UTC time, not {start_utc}")
         continue
-    if abs(utcNow - startUTC) > timedelta(days=7):
+    if abs(utc_now - start_utc) > timedelta(days=7):
         print("WARNING: this is for forecasting operations, you might need to consider modifying some flags.")
     break
 
-print(startUTC.strftime("Simulation Start Time: %Y-%m-%d_%H:%M:%S"))
+print(start_utc.strftime("Simulation Start Time: %Y-%m-%d_%H:%M:%S"))
 print()
-cfg["start_utc"] = startUTC.strftime("%Y-%m-%d_%H:%M:%S")
+cfg["start_utc"] = start_utc.strftime("%Y-%m-%d_%H:%M:%S")
 
 ################################################################################
 # Get the end time and ignition time #
 while True:
-    timeInput = input("How many hours would you like to run the simulation for: ")
+    time_input = input("How many hours would you like to run the simulation for (48): ")
+    if time_input == "":
+        time_input = 48
     try:
-        hours = int(timeInput)
+        hours = int(time_input)
     except:
-        print(f"Please enter a valid hours value, not {timeInput}")
+        print(f"Please enter a valid hours value, not {time_input}")
         continue
     break
 
-endUTC = startUTC + timedelta(hours=hours)
-cfg["end_utc"] = endUTC.strftime("%Y-%m-%d_%H:%M:%S")
-# Make the ingition time the halfway point between the start and end times
-timeDiff = (endUTC-startUTC)/2
-ignUTC = startUTC + timeDiff
-cfg["time_utc"] = ignUTC.strftime("%Y-%m-%d_%H:%M:%S")
-print(f"The end time of the simulation: {endUTC}")
+end_utc = start_utc + timedelta(hours=hours)
+cfg["end_utc"] = end_utc.strftime("%Y-%m-%d_%H:%M:%S")
+print(f"The end time of the simulation: {end_utc}")
 print()
 
 ################################################################################
 # Get the central latitude and longitude values
 while True:
-    latInput = input("Enter latitude of the center of the fire as a decimal: ")
+    coord_input = input(
+        "Enter longitude, latitude of the center of the fire as decimal coordinates: "
+    )
+    # Remove all spaces, then split on comma
+    coord_input_clean = coord_input.replace(" ", "")
     try:
-        latInput = float(latInput)
-    except:
-        print(f"Enter a valid latitude value as a decimal, not {latInput}")
+        lon_input, lat_input = map(float, coord_input_clean.split(","))
+    except ValueError:
+        print(f"Enter valid coordinate values, not {coord_input}")
         continue
-    break
-
-while True:
-    lonInput = input("Enter longitude of the center of the fire as a decimal: ")
-    try:
-        lonInput = float(lonInput)
-    except:
-        print(f"Enter a valid longitude value as a decimal, not {lonInput}")
+    # Validate coordinate ranges
+    if not (-90.0 <= lat_input <= 90.0):
+        print(f"Latitude must be between -90 and 90 degrees, not {lat_input}")
+        continue
+    if not (-180.0 <= lon_input <= 180.0):
+        print(f"Longitude must be between -180 and 180 degrees, not {lon_input}")
         continue
     break
     
-cfg["center_latlon"] = [latInput,lonInput]
-cfg["truelats"] = [latInput,latInput]
-cfg["stand_lon"] = lonInput
-cfg["latlon"] = [latInput,lonInput]
+cfg["center_latlon"] = [lat_input, lon_input]
+cfg["truelats"] = [lat_input, lat_input]
+cfg["stand_lon"] = lon_input
+cfg["latlon"] = [lat_input, lon_input]
 print()
 
 ################################################################################
 # Get the fire name
-fireNameInput = input("Enter the name of the fire (Test): ")
-if fireNameInput == "":
-    fireNameInput = "Test"
-print(f"You have entered {fireNameInput} as the fire name")
+fire_name_input = input("Enter the name of the fire (Test): ")
+if fire_name_input == "":
+    fire_name_input = "Test"
+print(f"You have entered {fire_name_input} as the fire name")
 print()
 
 ################################################################################
@@ -311,13 +308,12 @@ while True:
 
 ################################################################################
 # Get the code for the fire
-hexCode = fireNameInput.encode("utf-8").hex()
-cfg["grid_code"] = datetime.now(UTC).strftime(f"%Y-%m-%d_%H-{fireNameInput.replace(" ", "_").upper()}")
+cfg["grid_code"] = datetime.now(UTC).strftime(f"%Y-%m-%d_%H-{fire_name_input.replace(" ", "_").upper()}")
 
 ################################################################################
 # Construct the description and fmda path for the json #
-cfg["description"] = startUTC.strftime(f"{fireNameInput.title()} {profileSizeInput} %Y-%m-%d %Hz")
-cfg["fmda_geogrid_path"] = startUTC.strftime("wksp_fmda/CONUS/%Y%m/fmda-CONUS-%Y%m%d-%H.geo")
+cfg["description"] = start_utc.strftime(f"{fire_name_input.title()} {profile_size_input} %Y-%m-%d %Hz")
+cfg["fmda_geogrid_path"] = start_utc.strftime("wksp_fmda/CONUS/%Y%m/fmda-CONUS-%Y%m%d-%H.geo")
 
 ################################################################################
 # Modify other flags #
@@ -328,23 +324,23 @@ else:
 
 ################################################################################
 # Generate the json #
-fireNameModified = fireNameInput.replace(" ", "_")
-jobID = startUTC.strftime("{}_{}_%y%m%d_%Hz".format(fireNameModified, profileSizeInput))
-destinationPath = osp.join("jobs", jobID + ".json")
+fire_name_modified = fire_name_input.replace(" ", "_")
+job_id = start_utc.strftime("{}_{}_%y%m%d_%Hz".format(fire_name_modified, profile_size_input))
+destination_path = osp.join("jobs", job_id + ".json")
 
-jsonData = build_job_json(
+json_data = build_job_json(
     cfg,
-    gribRes,
+    grib_res,
     n_domains,
-    profileSizes[profileSizeInput],
-    profileSizeInput,
-    fireNameInput,
+    profile_sizes[profile_size_input],
+    profile_size_input,
+    fire_name_input,
 )
 
 # Finalize the changes to the json
-os.makedirs(os.path.dirname(destinationPath), exist_ok=True)
-with open(destinationPath, "w") as jsonFile:
-    json.dump(jsonData, jsonFile, indent=4)
+os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+with open(destination_path, "w") as json_file:
+    json.dump(json_data, json_file, indent=4)
 
-print(f"JSON is ready here: {destinationPath}")
-print(f"./forecast.sh {destinationPath} >& logs/{jobID}.log")
+print(f"JSON is ready here: {destination_path}")
+print(f"./forecast.sh {destination_path} >& logs/{job_id}.log")
