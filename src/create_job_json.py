@@ -259,6 +259,28 @@ print(f"The end time of the simulation: {end_utc}")
 print()
 
 ################################################################################
+# Get the cycle start time from the user 
+while True:
+    utc_now = datetime.now(UTC)
+    utc_now_str = utc_now.strftime("%Y-%m-%d_%H:%M:%S")
+    cycle_start_utc = input('Enter the cycle start time in UTC with format "%Y-%m-%d_%H:%M:%S" ({}): '.format(start_utc))
+    if cycle_start_utc == '':
+        cycle_start_utc = start_utc
+    try:
+        cycle_start_utc = datetime.strptime(cycle_start_utc, "%Y-%m-%d_%H:%M:%S").replace(tzinfo=UTC)
+    except:
+        print(f"Enter a valid UTC time, not {cycle_start_utc}")
+        continue
+    if cycle_start_utc > start_utc:
+        print(f"Cycle start time {cycle_start_utc} needs to be <= start time {start_utc}")
+        continue
+    break
+
+print(cycle_start_utc.strftime("Simulation Cycle Start Time: %Y-%m-%d_%H:%M:%S"))
+print()
+cfg["cycle_start_utc"] = cycle_start_utc.strftime("%Y-%m-%d_%H:%M:%S")
+
+################################################################################
 # Get the central latitude and longitude values
 while True:
     coord_input = input(
