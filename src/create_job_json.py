@@ -263,9 +263,10 @@ print()
 while True:
     utc_now = datetime.now(UTC)
     utc_now_str = utc_now.strftime("%Y-%m-%d_%H:%M:%S")
-    cycle_start_utc = input('Enter the cycle start time in UTC with format "%Y-%m-%d_%H:%M:%S" ({}): '.format(start_utc))
+    start_utc_str = start_utc.strftime("%Y-%m-%d_%H:%M:%S")
+    cycle_start_utc = input('Enter the cycle start time in UTC with format "%Y-%m-%d_%H:%M:%S" ({}): '.format(start_utc_str))
     if cycle_start_utc == '':
-        cycle_start_utc = start_utc
+        cycle_start_utc = start_utc_str
     try:
         cycle_start_utc = datetime.strptime(cycle_start_utc, "%Y-%m-%d_%H:%M:%S").replace(tzinfo=UTC)
     except:
