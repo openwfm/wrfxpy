@@ -98,7 +98,7 @@ def build_domain_conf(grib_res, n_domains, profile_size, center_latlon, ref_rati
             "center_latlon": center_latlon,
             "truelats": [center_latlon[0], center_latlon[0]],
             "stand_lon": center_latlon[1],
-            "time_step": max(1, int(6 * cell_sub_size / 1000)),
+            "time_step": max(1, int(6 * cell_sub_size / 1000) - 1),
             "history_interval": 60,
             "geog_res": "30s",
             "subgrid_ratio": [0, 0],
