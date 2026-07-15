@@ -1618,6 +1618,11 @@ def process_arguments(job_args,sys_cfg):
 
     # sanity check, also that nothing in etc/conf got overrident
     verify_inputs(args,sys_cfg)
+    
+    if 'shuttle_remote_root' in sys_cfg.keys():
+        sys_cfg['wrfxweb_path'] = sys_cfg['shuttle_remote_root'].split('wrfxweb')[0]
+    else:
+        args['postproc']['shuttle'] = None
 
     return args
 

@@ -90,7 +90,7 @@ def build_domain_conf(grib_res, n_domains, profile_size, center_latlon, ref_rati
     cell_size = int(round(grib_res * 1000))
     subgrid_ratio = int(np.ceil(cell_size / 3**n_domains / subgrid_res / 2) * 2)
 
-    cell_sub_size = cell_size / ref_ratio
+    cell_sub_size = int(round(cell_size / ref_ratio))
     domains = {
         "1": {
             "cell_size": [cell_sub_size, cell_sub_size],
