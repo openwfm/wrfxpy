@@ -320,6 +320,18 @@ print()
 ################################################################################
 # Get if run or not the whole workflow
 while True:
+    run_conus = input("Is the fire from CONUS? [Y/N] (Y): ")
+    if run_conus == "":
+        run_conus = "Y"
+    if run_conus.upper() in ["Y", "N"]:
+        print(f"You have entered {run_conus} to run a CONUS wildfire")
+        break
+    print(f"Enter a valid answer (Y/N), not {run_conus}")
+print()
+
+################################################################################
+# Get if run or not the whole workflow
+while True:
     run_wrf = input("Do you want to run the whole workflow? [Y/N] (Y): ")
     if run_wrf == "":
         run_wrf = "Y"
@@ -327,7 +339,7 @@ while True:
         print(f"You have entered {run_wrf} to run the whole workflow")
         break
     print(f"Enter a valid answer (Y/N), not {run_wrf}")
-    print()
+print()
 
 ################################################################################
 # Get the code for the fire
@@ -340,6 +352,9 @@ cfg["fmda_geogrid_path"] = start_utc.strftime("wksp_fmda/CONUS/%Y%m/fmda-CONUS-%
 
 ################################################################################
 # Modify other flags #
+if run_conus.upper() == "N":
+    cfg["geo_vars_path"] = "etc/vtables/geo_vars_canada.json"
+    
 if run_wrf.upper() == "Y":
     cfg["run_wrf"] = True
 else:

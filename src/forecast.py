@@ -572,11 +572,13 @@ def make_job_file(js):
         jsub.tslist = None
     return jsub
 
-def make_kmz(args):
-    ssh_command('wrfxweb/make_kmz.sh ' + args)
+def make_kmz(js, args):
+    cmd = osp.join(js.get('wrfxweb_path',''), 'wrfxweb/make_kmz.sh ')
+    ssh_command(cmd + args)
 
-def make_zip(args):
-    ssh_command('wrfxweb/make_zip.sh ' + args)
+def make_zip(js):
+    cmd = osp.join(js.get('wrfxweb_path',''), 'wrfxweb/make_zip.sh ')
+    ssh_command(cmd + js.job_id)
 
 def read_namelist(path):
     logging.info('Reading namelist %s' % path)
@@ -610,7 +612,7 @@ def vars_add_to_geogrid(js):
     # load the variables to process
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
-    geo_vars_path = 'etc/vtables/geo_vars.json'
+    geo_vars_path = js.geo_vars_path
     geo_vars = None
     geogrid_tbl_json = {}
     if osp.exists(geo_vars_path):
@@ -1342,9 +1344,9 @@ def process_output(job_id):
         if js.postproc.get('shuttle', None) is not None:
             steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
             arg_inp = ' '.join([js.job_id,steps,'inc'])
-            make_kmz(arg_inp)
+            make_kmz(js, arg_inp)
             arg_inp = ' '.join([js.job_id,steps,'ref'])
-            make_kmz(arg_inp)
+            make_kmz(js, arg_inp)
 
         js.state = 'Completed'
 
@@ -1353,7 +1355,7 @@ def process_output(job_id):
         js.state = 'Postprocessing failed'
 
     if ts is not None:
-        make_zip(js.job_id)
+        make_zip(js)
 
     js.old_pid = js.pid
     js.pid = None
@@ -1466,9 +1468,9 @@ def process_sat_output(job_id):
     if js.postproc.get('shuttle', None) is not None:
         steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
         arg_inp = ' '.join([js.job_id,steps,'inc'])
-        make_kmz(arg_inp)
+        make_kmz(js, arg_inp)
         arg_inp = ' '.join([js.job_id,steps,'ref'])
-        make_kmz(arg_inp)
+        make_kmz(js, arg_inp)
 
     js.old_pid = js.pid
     js.pid = None
@@ -1617,12 +1619,16 @@ def process_arguments(job_args,sys_cfg):
         args['ref_utc'] = timespec_to_utc(args['ref_utc'], args['start_utc'])
 
     # sanity check, also that nothing in etc/conf got overrident
-    verify_inputs(args,sys_cfg)
+    verify_inputs(args, sys_cfg)
     
     if 'shuttle_remote_root' in sys_cfg.keys():
         sys_cfg['wrfxweb_path'] = sys_cfg['shuttle_remote_root'].split('wrfxweb')[0]
     else:
         args['postproc']['shuttle'] = None
+        
+    # build geo vars path
+    if 'geo_vars_path' not in args.keys():
+        args['geo_vars_path'] = osp.join(args['sys_install_path'] , 'etc/vtables/geo_vars.json')
 
     return args
 
