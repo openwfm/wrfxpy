@@ -144,6 +144,7 @@ def build_job_json(cfg, grib_res, n_domains, profile_size):
         "wrf_namelist_path": "etc/nlists/default.input",
         "fire_namelist_path": "etc/nlists/default.fire",
         "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+        "geo_vars_path": cfg["geo_vars_path"],
         "num_nodes": n_nodes,
         "ppn": ppn,
         "wall_time_hrs": 12,
@@ -352,7 +353,9 @@ cfg["fmda_geogrid_path"] = start_utc.strftime("wksp_fmda/CONUS/%Y%m/fmda-CONUS-%
 
 ################################################################################
 # Modify other flags #
-if run_conus.upper() == "N":
+if run_conus.upper() == "Y":
+    cfg["geo_vars_path"] = "etc/vtables/geo_vars.json"
+else:
     cfg["geo_vars_path"] = "etc/vtables/geo_vars_canada.json"
     
 if run_wrf.upper() == "Y":
