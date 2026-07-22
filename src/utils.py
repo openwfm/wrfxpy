@@ -437,9 +437,9 @@ def render_ignitions(js, max_dom):
     orig_start_time = js.orig_start_utc
 
     keys = [ "fire_ignition_start_lat", "fire_ignition_end_lat",
-             "fire_ignition_start_lon", "fire_ignition_end_lon",
-             "fire_ignition_start_time", "fire_ignition_end_time",
-             "fire_ignition_radius", "fire_ignition_ros" ]
+            "fire_ignition_start_lon", "fire_ignition_end_lon",
+            "fire_ignition_start_time", "fire_ignition_end_time",
+            "fire_ignition_radius", "fire_ignition_ros" ]
 
     nml_fire = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom,
                  'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom,

@@ -690,9 +690,9 @@ def vars_add_to_geogrid(js):
                 'name': 'HGT_M',
                 'priority': 1,
                 'dest_type': 'continuous',
-                'smooth_option': 'smth-desmth_special; smooth_passes=1',
+                'smooth_option': 'smth-desmth_special; smooth_passes=3',
                 'fill_missing': 0.,
-                'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+                'interp_option': 'default:average_gcell(8.0)+four_pt+average_4pt',
                 'rel_path': '30s:topo_gmted2010_30s/'
             }
             logging.info('GEOGRID abs_path={}'.format(vartable['abs_path']))

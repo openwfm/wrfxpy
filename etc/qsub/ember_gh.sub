@@ -10,4 +10,4 @@ export WORKDIR=%(cwd)s
 cd $WORKDIR
 
 source ~/.wrf_arm
-time mpirun -n $SLURM_NTASKS ./wrf.exe
+time mpirun -np $SLURM_NTASKS --mca pml ucx ./wrf.exe
