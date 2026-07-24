@@ -571,6 +571,13 @@ def make_job_file(js):
         jsub.tslist = None
     return jsub
 
+def add_to_catalog(js):
+    job_id = js.get('job_id','')
+    catalog_id = js.get('wrfxweb_catalog_id','public')
+    args = f'{job_id} {catalog_id}'
+    cmd = osp.join(js.get('wrfxweb_path',''), 'wrfxweb/process_simulation.sh', )
+    ssh_command(cmd, args)
+
 def make_kmz(js, args):
     cmd = osp.join(js.get('wrfxweb_path',''), 'wrfxweb/make_kmz.sh ')
     ssh_command(cmd + args)
@@ -714,17 +721,20 @@ def fmda_add_to_geogrid(js):
             symlink_unless_exists(fmda_geogrid_path,sym_fmda_geogrid_path)
             logging.info('fmda_add_to_geogrid - fmda_geogrid_path is linked to %s' % sym_fmda_geogrid_path)
         else:
-            logging.warning('fmda_add_to_geogrid - fmda_geogrid_path not exist')
+            logging.info('fmda_add_to_geogrid - fmda_geogrid_path not exist')
+            logging.warning('fmda_add_to_geogrid - skipping FMDA processing')
             return
     else:
         logging.info('fmda_add_to_geogrid - fmda_geogrid_path not given')
+        logging.warning('fmda_add_to_geogrid - skipping FMDA processing')
         return
     try:
         index_path = osp.join(fmda_geogrid_path,'index.json')
         index = json.load(open(index_path,'r'))
         logging.info('fmda_add_to_geogrid - loaded fmda geogrid index at %s' % index_path)
     except:
-        logging.error('fmda_add_to_geogrid - cannot open %s' % index_path)
+        logging.info('fmda_add_to_geogrid - cannot open %s' % index_path)
+        logging.warning('fmda_add_to_geogrid - skipping FMDA processing')
         return
     #TODO: improve how it finds the geolocation file
     geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
@@ -740,20 +750,21 @@ def fmda_add_to_geogrid(js):
     logging.info('fmda_add_to_geogrid - fmda bounding box is %s %s %s %s' % bbox)
     i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)  
     if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
-        logging.error('fmda_add_to_geogrid - WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
+        logging.info('fmda_add_to_geogrid - WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
+        logging.warning('fmda_add_to_geogrid - skipping FMDA processing')
         return
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
     geogrid_tbl_json_path = osp.join(fmda_geogrid_path,'geogrid_tbl.json')
     logging.info('fmda_add_to_geogrid - updating GEOGRID.TBL at %s from %s' % 
-        (geogrid_tbl_path,geogrid_tbl_json_path))
+        (geogrid_tbl_path, geogrid_tbl_json_path))
     geogrid_tbl_json = json.load(open(geogrid_tbl_json_path,'r'))
-    for varname,vartable in geogrid_tbl_json.items():
-        vartable['abs_path'] = osp.join(js.wps_dir,fmda_geogrid_basename,osp.basename(vartable['abs_path']))
-        vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
+    for varname, vartable in geogrid_tbl_json.items():
+        vartable['abs_path'] = osp.join(js.wps_dir, fmda_geogrid_basename, osp.basename(vartable['abs_path']))
+        vartable['abs_path'] = 'default:' + ensure_abs_path(vartable['abs_path'], js)
         logging.info('fmda_add_to_geogrid - GEOGRID abs_path=%s' % vartable['abs_path'])
-        write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
+        write_table(geogrid_tbl_path, vartable, mode='a', divider_after=True)
     js.fmda_found.value = True
     
 def execute(args,job_args):
@@ -1354,6 +1365,7 @@ def process_output(job_id):
             make_kmz(js, arg_inp)
             arg_inp = ' '.join([js.job_id,steps,'ref'])
             make_kmz(js, arg_inp)
+            add_to_catalog(js)
 
         js.state = 'Completed'
 
@@ -1462,6 +1474,7 @@ def process_sat_output(job_id):
                             desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
                             tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
                             sent_files_1 = send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, already_sent_files+tif_files)
+                            add_to_catalog(js)
                             already_sent_files = [x for x in already_sent_files + sent_files_1 if not x.endswith('json')]
                     except Exception as e:
                         logging.warning('Failed sending postprocess results to the server with error %s' % str(e))
@@ -1471,6 +1484,7 @@ def process_sat_output(job_id):
         desc = js.postproc['description'] if 'description' in js.postproc else js.job_id
         tif_files = [x for x in os.listdir(js.pp_dir) if x.endswith('tif')]
         send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
+        add_to_catalog(js)
 
     if js.postproc.get('shuttle', None) is not None:
         steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
@@ -1629,7 +1643,9 @@ def process_arguments(job_args,sys_cfg):
     verify_inputs(args, sys_cfg)
     
     if 'shuttle_remote_root' in sys_cfg.keys():
-        sys_cfg['wrfxweb_path'] = sys_cfg['shuttle_remote_root'].split('wrfxweb')[0]
+        sys_cfg['wrfxweb_path'] = osp.join(
+            sys_cfg['shuttle_remote_root'].split('wrfxweb')[0], 'wrfxweb'
+        )
     else:
         args['postproc']['shuttle'] = None
         

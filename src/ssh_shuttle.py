@@ -57,6 +57,7 @@ class SSHShuttle(object):
         self.lock_path = cfg['shuttle_lock_path']
         self.lock_file = None
         self.workspace_path = cfg['workspace_path']
+        self.wrfxweb_path = cfg.get('wrfxweb_path', 'wrfxweb')
         self.cat_local_path = osp.join(self.workspace_path, 'catalog.json')
         self.connected=False
 
@@ -204,7 +205,7 @@ class SSHShuttle(object):
         
         """
         logging.info('SHUTTLE retrieving catalog file.')
-        self.simple_command('wrfxweb/join_catalog.sh')
+        self.simple_command(f'{self.wrfxweb_path}/join_catalog.sh')
         self.get('catalog.json', self.cat_local_path)
         cat = json.load(open(self.cat_local_path))
         logging.info('SHUTTLE retrieve complete.')
@@ -231,7 +232,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
     logging.info('SHUTTLE manifest file name %s' % manifest_filename)
     logging.info('SHUTTLE description        %s' % description)
     logging.debug('SHUTTLE configuration:\n%s' % pprint.pformat(cfg,indent=4))
-   
+    
     s = SSHShuttle(cfg)
     s.connect()
 
@@ -271,8 +272,8 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
         json.dump(local_cat, open(local_cat_path, 'w'), indent=1, separators=(',',':'))
         remote_cat_path = remote_dir + '/catalog.json'
         s.put(local_cat_path, remote_cat_path)
-        # s.simple_command('ls -l %s' % osp.join(s.root,remote_cat_path))
-        s.simple_command('wrfxweb/join_catalog.sh')
+        
+        s.simple_command(f'{s.wrfxweb_path}/join_catalog.sh')
 
     s.disconnect()
 
