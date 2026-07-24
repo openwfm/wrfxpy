@@ -575,15 +575,15 @@ def add_to_catalog(js):
     job_id = js.get('job_id','')
     catalog_id = js.get('wrfxweb_catalog_id','public')
     args = f'{job_id} {catalog_id}'
-    cmd = osp.join(js.get('wrfxweb_path',''), 'wrfxweb/process_simulation.sh', )
+    cmd = osp.join(js.get('wrfxweb_path', 'wrfxweb'), 'process_simulation.sh')
     ssh_command(cmd, args)
 
 def make_kmz(js, args):
-    cmd = osp.join(js.get('wrfxweb_path',''), 'wrfxweb/make_kmz.sh ')
+    cmd = osp.join(js.get('wrfxweb_path', 'wrfxweb'), 'make_kmz.sh ')
     ssh_command(cmd + args)
 
 def make_zip(js):
-    cmd = osp.join(js.get('wrfxweb_path',''), 'wrfxweb/make_zip.sh ')
+    cmd = osp.join(js.get('wrfxweb_path', 'wrfxweb'), 'make_zip.sh ')
     ssh_command(cmd + js.job_id)
 
 def read_namelist(path):
@@ -1643,9 +1643,7 @@ def process_arguments(job_args,sys_cfg):
     verify_inputs(args, sys_cfg)
     
     if 'shuttle_remote_root' in sys_cfg.keys():
-        sys_cfg['wrfxweb_path'] = osp.join(
-            sys_cfg['shuttle_remote_root'].split('wrfxweb')[0], 'wrfxweb'
-        )
+        args['wrfxweb_path'] = sys_cfg['shuttle_remote_root'].split('wrfxweb')[0] + ''
     else:
         args['postproc']['shuttle'] = None
         
