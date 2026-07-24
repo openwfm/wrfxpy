@@ -572,11 +572,11 @@ def make_job_file(js):
     return jsub
 
 def add_to_catalog(js):
-    job_id = js.get('job_id','')
-    catalog_id = js.get('wrfxweb_catalog_id','public')
+    job_id = js.get('job_id', '')
+    catalog_id = js.get('wrfxweb_catalog_id', 'public')
     args = f'{job_id} {catalog_id}'
-    cmd = osp.join(js.get('wrfxweb_path', 'wrfxweb'), 'process_simulation.sh')
-    ssh_command(cmd, args)
+    cmd = osp.join(js.get('wrfxweb_path', 'wrfxweb'), 'process_simulation.sh ')
+    ssh_command(cmd + args)
 
 def make_kmz(js, args):
     cmd = osp.join(js.get('wrfxweb_path', 'wrfxweb'), 'make_kmz.sh ')
@@ -1362,9 +1362,9 @@ def process_output(job_id):
 
         if js.postproc.get('shuttle', None) is not None:
             steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
-            arg_inp = ' '.join([js.job_id,steps,'inc'])
+            arg_inp = ' '.join([js.job_id, steps, 'inc'])
             make_kmz(js, arg_inp)
-            arg_inp = ' '.join([js.job_id,steps,'ref'])
+            arg_inp = ' '.join([js.job_id, steps, 'ref'])
             make_kmz(js, arg_inp)
             add_to_catalog(js)
 

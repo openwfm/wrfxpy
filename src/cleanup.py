@@ -95,7 +95,7 @@ def forecast_process_running(js):
     if 'pid' in js and 'process_create_time' in js:
         fs =  js.process_create_time == process_create_time(js.pid)
         if fs:
-           logging.info('Forecast process is running. pid=%s' % (js.pid))
+            logging.info('Forecast process is running. pid=%s' % (js.pid))
         else:
             logging.info('Forecast process is not running')
         return fs
@@ -128,15 +128,15 @@ def parallel_job_running(js):
         ret = subprocess.check_output([qstat_cmd,qstat_arg],stderr=subprocess.STDOUT).decode()
     for line in ret.split('\n'):
         ls=line.split()
-        if len(ls) >0 and (str(js.job_num) in ls[0]):
-             logging.info(ls)
-             if len(ls) >4:
-                 status = ls[4]
-             else:
-                 status = '??'
-                 logging.warning(ret)
-             logging.info('WRF job %s status is %s' % (js.job_num, status))
-             return True
+        if len(ls) > 0 and (str(js.job_num) in ls[0]):
+            logging.info(ls)
+            if len(ls) > 4:
+                status = ls[4]
+            else:
+                status = '??'
+                logging.warning(ret)
+            logging.info('WRF job %s status is %s' % (js.job_num, status))
+            return True
     logging.info('WRF job %s is not running.' % js.job_num)
     return False 
 
@@ -198,7 +198,7 @@ def cancel(name):
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
 
 def delete_visualization(name):
-    local_rmdir(osp.join(name,'products'))
+    local_rmdir(osp.join(name, 'products'))
     s = SSHShuttle(cfg)
     s.connect()
     logging.info('Trying to delete all remote files of job %s' % name)
