@@ -203,7 +203,7 @@ def delete_visualization(name):
     s.connect()
     logging.info('Trying to delete all remote files of job %s' % name)
     s.rmdir(name)
-    s.simple_command('wrfxweb/join_catalog.sh')
+    s.simple_command(f'{s.wrfxweb_path}/join_catalog.sh')
     s.disconnect()
 
 def delete(s,name):
@@ -211,7 +211,7 @@ def delete(s,name):
     logging.info('Trying to delete all files of job %s' % name)
     remote_rmdir(s,name)
     local_rmdir(name)
-    s.simple_command('wrfxweb/join_catalog.sh')
+    s.simple_command(f'{s.wrfxweb_path}/join_catalog.sh')
     s.disconnect()
 
 def update(name):
@@ -228,21 +228,21 @@ def update(name):
             # js.job_num = None
         if js.state == 'Completed' or js.state == 'Cancelled':
             if js.pid is not None:
-                 js.state = 'Forecast runaway'
+                    js.state = 'Forecast runaway'
             if js.job_num is not None:
-                 js.state = 'WRF runaway'
+                    js.state = 'WRF runaway'
         elif js.state == 'Preparing':
-                 if js.pid is None:
-                      js.state = 'Stopped'
-                 if js.job_num is not None:
-                      js.state = 'Cannot happen'
+                    if js.pid is None:
+                        js.state = 'Stopped'
+                    if js.job_num is not None:
+                        js.state = 'Cannot happen'
         elif js.state == 'Processing':
-                 if js.pid is None and js.job_num is None:
-                      js.state = 'Stopped'
-                 if js.pid is not None and js.job_num is None:
-                      js.state = 'WRF stopped'
-                 if js.pid is None and js.job_num is not None:
-                      js.state = 'Forecast stopped'
+                    if js.pid is None and js.job_num is None:
+                        js.state = 'Stopped'
+                    if js.pid is not None and js.job_num is None:
+                        js.state = 'WRF stopped'
+                    if js.pid is None and js.job_num is not None:
+                        js.state = 'Forecast stopped'
 
         logging.info('State is: %s' % js.state)
 

@@ -1181,6 +1181,7 @@ def process_output(job_id):
         available_sats = []
         not_empty_sats = []
         pass
+    jsin.update({'job_id': job_id})
     jsin = process_arguments(jsin, args) 
     logging.info('process_output: available satellite data %s' % available_sats)
     logging.info('process_output: not empty satellite data %s' % not_empty_sats)
@@ -1643,7 +1644,7 @@ def process_arguments(job_args,sys_cfg):
     verify_inputs(args, sys_cfg)
     
     if 'shuttle_remote_root' in sys_cfg.keys():
-        args['wrfxweb_path'] = sys_cfg['shuttle_remote_root'].split('wrfxweb')[0] + ''
+        args['wrfxweb_path'] = osp.join(sys_cfg['shuttle_remote_root'].split('wrfxweb')[0], 'wrfxweb')
     else:
         args['postproc']['shuttle'] = None
         
