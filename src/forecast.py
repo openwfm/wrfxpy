@@ -64,7 +64,7 @@ import time, re, json, sys, logging
 import os.path as osp
 import os
 import stat
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Value
 from subprocess import check_call
 import glob
 import pickle
@@ -118,7 +118,6 @@ class JobState(Dict):
         self.domains = args['domains']
         self.ignitions = args.get('ignitions', {})
         self.fmda = args.get('fuel_moisture_da', None)
-        self.fmda_found = False
         self.postproc = args['postproc']
         self.wrfxpy_dir = args['sys_install_path']
         self.clean_dir = args.get('clean_dir', True)
@@ -698,12 +697,14 @@ def vars_add_to_geogrid(js):
             logging.info('GEOGRID abs_path={}'.format(vartable['abs_path']))
             vartable_hgt['abs_path'] = vartable['abs_path']                
             write_table(geogrid_tbl_path,vartable_hgt,mode='a',divider_after=True)
-
+            
 
 def fmda_add_to_geogrid(js):
     """
     Add fmda datasets to geogrid if specified
     """
+    js.fmda_found.value = False
+    
     if 'fmda_geogrid_path' in js:
         fmda_geogrid_path = osp.abspath(js['fmda_geogrid_path'])
         if osp.exists(fmda_geogrid_path):
@@ -712,7 +713,6 @@ def fmda_add_to_geogrid(js):
             sym_fmda_geogrid_path = osp.join(js.wps_dir,fmda_geogrid_basename)
             symlink_unless_exists(fmda_geogrid_path,sym_fmda_geogrid_path)
             logging.info('fmda_add_to_geogrid - fmda_geogrid_path is linked to %s' % sym_fmda_geogrid_path)
-            js.fmda_found = True
         else:
             logging.warning('fmda_add_to_geogrid - fmda_geogrid_path not exist')
             return
@@ -725,7 +725,7 @@ def fmda_add_to_geogrid(js):
         logging.info('fmda_add_to_geogrid - loaded fmda geogrid index at %s' % index_path)
     except:
         logging.error('fmda_add_to_geogrid - cannot open %s' % index_path)
-        raise Exception('fmda_add_to_geogrid - failed opening index file {}'.format(index_path))
+        return
     #TODO: improve how it finds the geolocation file
     geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
     if not osp.exists(geo_path):
@@ -741,7 +741,7 @@ def fmda_add_to_geogrid(js):
     i, j = np.unravel_index((np.abs(lats-lat)+np.abs(lons-lon)).argmin(),lats.shape)  
     if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
         logging.error('fmda_add_to_geogrid - WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
-        raise OSError('fmda_add_to_geogrid - {} is not correct geolocated compared to WRF domain'.format(fmda_geogrid_path))
+        return
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
@@ -754,7 +754,8 @@ def fmda_add_to_geogrid(js):
         vartable['abs_path'] = 'default:'+ensure_abs_path(vartable['abs_path'],js)
         logging.info('fmda_add_to_geogrid - GEOGRID abs_path=%s' % vartable['abs_path'])
         write_table(geogrid_tbl_path,vartable,mode='a',divider_after=True)
-
+    js.fmda_found.value = True
+    
 def execute(args,job_args):
     """
     Executes a weather/fire simulation.
@@ -796,6 +797,9 @@ def execute(args,job_args):
         if js.use_realtime:
             logging.info('using real-time data requested, ignoring specified ignitions')
             js.fire_init_dir = osp.abspath(osp.join(js.jobdir, 'fire_init'))
+
+    # Initialize the usage of FMDA
+    js.fmda_found = Value('b', False)
 
     # Parse and setup the domain configuration
     js.domain_conf = WPSDomainConf(js.domains)
@@ -922,8 +926,11 @@ def execute(args,job_args):
         return
     else:
         geogrid_proc.join()
+        js.fmda_found = bool(js.fmda_found.value)
+        
         if js.use_realtime:
             fire_init_proc.join()
+            
         if js.satellite_source:
             for satellite_source in js.satellite_source:
                 sat_proc[satellite_source.id].join()
