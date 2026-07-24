@@ -58,6 +58,7 @@ class SSHShuttle(object):
         self.lock_file = None
         self.workspace_path = cfg['workspace_path']
         self.wrfxweb_path = cfg.get('wrfxweb_path', 'wrfxweb')
+        self.wrfxweb_catalog_id = cfg.get('wrfxweb_catalog_id', 'public') 
         self.cat_local_path = osp.join(self.workspace_path, 'catalog.json')
         self.connected=False
 
@@ -242,7 +243,7 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
 
     # identify the start/end UTC time (all domains may not have the same simulation extent)
     # if more than one manifest file match, take the first one
-    manifest_file = glob.glob(osp.join(local_dir,manifest_filename)) 
+    manifest_file = glob.glob(osp.join(local_dir, manifest_filename)) 
     if len(manifest_file) == 0:
         logging.warning('SHUTTLE did not find manifest file %s, catalog update postponed' % manifest_filename)
     else:
@@ -274,6 +275,8 @@ def send_product_to_server(cfg, local_dir, remote_dir, sim_name, manifest_filena
         s.put(local_cat_path, remote_cat_path)
         
         s.simple_command(f'{s.wrfxweb_path}/join_catalog.sh')
+        job_id = cfg.get('job_id', '')
+        s.simple_command(f'{s.wrfxweb_path}/process_simulation.sh {job_id} {s.wrfxweb_catalog_id}')
 
     s.disconnect()
 
