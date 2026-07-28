@@ -126,3 +126,23 @@ class OperationalRNNPredictor(Model):
         return model
 
 
+
+def warp_weights(weights0, bi_warp, bf_warp):
+    """
+    Given LSTM layer weights and time-warp parameters, return a new list
+    of time-warped LSTM weights without modifying the input weights.
+    """
+    # Copy all arrays to avoid mutating the originals
+    w_warped = [w.copy() for w in weights0]
+    # Bias vector (Keras LSTM layout: [i, f, c, o])
+    b = w_warped[2]
+    # Infer number of LSTM units from bias length
+    if b.ndim != 1 or b.shape[0] % 4 != 0:
+        raise ValueError("Unexpected LSTM bias shape.")
+    lstm_units = b.shape[0] // 4
+    # Input gate biases (i)
+    b[0:lstm_units] += bi_warp
+    # Forget gate biases (f)
+    b[lstm_units:2 * lstm_units] += bf_warp
+
+    return w_warped

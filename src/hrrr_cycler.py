@@ -31,6 +31,7 @@ from fmda.moisture_rnn_operational import OperationalRNNPredictor
 
 import pandas as pd
 import netCDF4
+from netCDF4 import num2date
 import numpy as np
 import json
 import sys 
@@ -247,7 +248,7 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
                     mf, postproc_path, cycle_id, esmf_cycle, name, 
                     raster_png, coords, cb_png, levels, 0.5
                 )
-                
+               
             # Add other variables (Fire Weather Indices)
             # Get Temperature [K]
             T = d.variables["T2"][:]
@@ -342,6 +343,91 @@ def postprocess_cycle(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
 
     return postproc_path
 
+def postprocess_cycle_rnn(cycle, region_cfg, wksp_path, fcst_hour, bounds=None):
+    """
+    Build rasters from the computed fuel moisture RNN prediction. 
+    NOTE: As of June 29 2026, this is running after postprocessing onbly in forecast mode. This doubles up reading of weather vars like temp and ws
+    Skipping over other covariates, starting with just FM10 raster, then other fuel classes and Indices
+
+    :param cycle: the UTC cycle time
+    :param region_cfg: the region configuration
+    :param wksp_path: the workspace path
+    :param bounds: bounding box of the post-processing
+    :return: the postprocessing path
+    """
+    model_path = compute_model_path(cycle, region_cfg.code, wksp_path, fcst_hour)
+    rnn_path = compute_rnn_path(cycle, region_cfg.code, wksp_path, fcst_hour=0) # Saving all relative to 0 hr cycle for now, in future if we do cyclical RNN prediction this will change
+    model_path = compute_model_path(cycle, region_cfg.code, wksp_path, fcst_hour)
+    cycle_id = compute_fmda_id(cycle, region_cfg.code)
+    if fcst_hour >0:
+        cycle_id += f"-f{fcst_hour:02d}"
+    postproc_path = compute_postproc_path(cycle, region_cfg.code, wksp_path, fcst_hour)
+    manifest_name = cycle_id + ".json"
+    esmf_cycle = utc_to_esmf(cycle + timedelta(hours=fcst_hour))
+    mf = { "1" : {esmf_cycle : {}}}
+    ensure_dir(osp.join(postproc_path, manifest_name))
+    # TODO: add check for already existing postproc here
+    if False:
+        pass
+    else:
+        if bounds is None:
+            bounds = (
+                region_cfg.bbox[1], region_cfg.bbox[3],
+                region_cfg.bbox[0], region_cfg.bbox[2]
+            )
+        # read in the longitudes and latitudes
+        geo_path = osp.join(wksp_path, "{}-geo.nc".format(region_cfg.code))
+        logging.info(f"CYCLER reading longitudes and latitudes from NetCDF file {geo_path}")
+        gd = netCDF4.Dataset(geo_path)
+        lats = gd.variables["XLAT"][:,:]
+        lons = gd.variables["XLONG"][:,:]       
+        # read weather vars for FFWI
+        with netCDF4.Dataset(model_path) as dat: 
+            T = dat.variables["T2"][:]
+            rh = dat.variables["RH"][:]/100
+            ws = dat.variables["WINDSPD"][:]        
+        # read and process RNN Predictions
+        with netCDF4.Dataset(rnn_path) as rnn:
+            fuel_classes = [(0, "1-hr DFM"), (1, "10-hr DFM"), (2, "100-hr DFM"), (3, "1000-hr DFM")]
+            fuel_classes = [(0, "1-hr DFM"), (1, "10-hr DFM")]
+            shortname = ["FM1", "FM10"]
+            for i,name in fuel_classes:
+                wisdom = get_wisdom("dfm").copy()
+                fm_wisdom = wisdom
+                fm_wisdom["name"] = f"Estimated {name} (RNN)"
+                time_var = rnn.variables["time"]
+                times = num2date(
+                    time_var[:],
+                    units=time_var.units,
+                    calendar=time_var.calendar,
+                )
+                target_time = cycle + timedelta(hours=fcst_hour)
+                tindex = np.where(times == target_time)[0].item()
+                raster_png, coords, cb_png, levels = scalar_field_to_raster(
+                    rnn.variables[shortname[i]][:,:,tindex]*1/100, lats, lons, fm_wisdom
+                )
+                write_postprocess(
+                    mf, postproc_path, cycle_id, esmf_cycle, f"{name} (RNN)",
+                    raster_png, coords, cb_png, levels, 0.5
+                )
+            # Compute FFWI
+            fm1 = rnn.variables['FM1'][:,:,tindex]*1/100
+            eta = calculate_eta(fm1)
+            ws_mph = ws * 2.23694
+            ffwi = (eta * np.sqrt(1 + ws_mph**2)) / 0.3002
+            # Visualization
+            fosberg_wisdom = get_wisdom("FFWI").copy()
+            raster_png, coords, cb_png, levels = scalar_field_to_raster(
+                ffwi, lats, lons, fosberg_wisdom
+            )
+            write_postprocess(
+                mf, postproc_path, cycle_id, esmf_cycle, "FFWI (RNN)",
+                raster_png, coords, cb_png, levels, 0.5
+            )
+            
+
+
+
 
 def compute_fmda_id(cycle, region_code):
     """
@@ -385,6 +471,27 @@ def compute_model_path(cycle, region_code, wksp_path, fcst_hour=0, ext="nc"):
         filename = f"{fmda_id}-f{fcst_hour:02d}.{ext}"
     else:
         filename = f"{fmda_id}.{ext}" 
+    return osp.join(cycle_path, filename)
+
+
+def compute_rnn_path(cycle, region_code, wksp_path, fcst_hour=0, ext="nc"):
+    """
+    Construct a relative path to the fuel moisture RNN predictions file
+    for the region code and cycle.
+    
+    :param cycle: the UTC cycle time
+    :param region_code: the code of the region
+    :param wksp_path: the workspace path
+    :param fcst_hour: forecast hour
+    :return: a relative path (w.r.t. workspace and region) of the fuel model file
+    """
+    fmda_id = compute_fmda_id(cycle, region_code)
+    cycle_path = compute_cycle_path(cycle, region_code, wksp_path)
+    ymd = cycle.strftime('%Y%m%d')
+    hr = cycle.strftime('%H')
+    to_ymd = to_utc.strftime('%Y%m%d')
+    to_hr = to_utc.strftime('%H')
+    filename = f"rnn_preds_{ymd}-{hr}_{to_ymd}-{to_hr}.{ext}"
     return osp.join(cycle_path, filename)
 
 def compute_postproc_path(cycle, region_code, wksp_path, fcst_hour=0, ext="nc"):
@@ -950,11 +1057,13 @@ def predict_auto_batch(model,
         "All batch sizes failed during prediction."
     ) from last_exception
 
-def to_netcdf(path, arr, valid_times):
+def to_netcdf(path, arr, valid_times, fuel_vars=("FM1", "FM10")):
     d = netCDF4.Dataset(path, "w", format="NETCDF4")
     
-    arr = arr.squeeze()
-    ny, nx, nt = arr.shape
+    arr = np.asarray(arr)
+    ny, nx, nt, nfuel = arr.shape
+    if len(fuel_vars) != nfuel: raise ValueError( f"len(fuel_vars)={len(fuel_vars)} must match last dim nfuel={nfuel}" )
+
 
     d.createDimension("south_north", ny)
     d.createDimension("west_east", nx)
@@ -968,24 +1077,36 @@ def to_netcdf(path, arr, valid_times):
         units=time.units,
         calendar=time.calendar,
     )
-
-    fm10 = d.createVariable(
-        "FM10",
-        "f4",
-        ("south_north", "west_east", "time"),
-        zlib=True,
-        complevel=4,
-    )
-    fm10.long_name = "10-hour fuel moisture"
-    fm10.coordinates = "time"
-    fm10[:] = arr
+    for i, var_name in enumerate(fuel_vars): 
+        v = d.createVariable( var_name, "f4", ("south_north", "west_east", "time"), zlib=True, complevel=4, ) 
+        v.long_name = f"{var_name} fuel moisture prediction" 
+        v.coordinates = "time" 
+        v[:] = arr[..., i]
 
     d.Conventions = "CF-1.8"
 
     d.close()
 
 
+def warp_weights(weights0, bi_warp, bf_warp):
+    """
+    Given LSTM layer weights and time-warp parameters, return a new list
+    of time-warped LSTM weights without modifying the input weights.
+    """
+    # Copy all arrays to avoid mutating the originals
+    w_warped = [w.copy() for w in weights0]
+    # Bias vector (Keras LSTM layout: [i, f, c, o])
+    b = w_warped[2]
+    # Infer number of LSTM units from bias length
+    if b.ndim != 1 or b.shape[0] % 4 != 0:
+        raise ValueError("Unexpected LSTM bias shape.")
+    lstm_units = b.shape[0] // 4
+    # Input gate biases (i)
+    b[0:lstm_units] += bi_warp
+    # Forget gate biases (f)
+    b[lstm_units:2 * lstm_units] += bf_warp
 
+    return w_warped
 
 if __name__ == "__main__":
     
@@ -1044,6 +1165,7 @@ if __name__ == "__main__":
     # current time
     #now = datetime.now(timezone.utc)
     now = datetime(2026, 5, 18, 17, 20, 11, 202708, tzinfo=timezone.utc) # DEBUG STEP
+    #now = datetime(2026, 7, 13, 18, 0, 0, 0, tzinfo=timezone.utc) # DEBUG STEP
     cycle = (now - timedelta(minutes=59)).replace(minute=0, second=0, microsecond=0, tzinfo=None)
     # print statements
     logging.info(
@@ -1253,7 +1375,8 @@ if __name__ == "__main__":
                 wrapped_cfg = Dict(region_cfg)
                 wrapped_cfg.update({"region_id": region_id})
                 wrapped_cfg.update({"forecast_length": forecast_length})
-                rdir = get_rnn_dir(models_root=cfg.rnn_model_dir, region_code=wrapped_cfg.region_id)
+                #rdir = get_rnn_dir(models_root=cfg.rnn_model_dir, region_code=wrapped_cfg.region_id)
+                rdir = cfg.rnn_model_dir
                 logging.info(f"Running RNN Forecast with trained model: {rdir}")
                 region_params = Dict(read_yml(osp.join(rdir, "params.yaml")))
                 region_params.update({'timesteps': None}) # Pred model uses flexible time dimension
@@ -1314,16 +1437,40 @@ if __name__ == "__main__":
                 logging.info(f"Predictor Data Shape: {X_gridded.shape}")
                 logging.info(f"    (ny, nx): {(ny, nx)}\n    ntimes: {ntimes}\n    nfeatures:{nfeatures}")
                 logging.info(f"RNN Input Shape: {X.shape}")
-                # Predict, utility function tries largest batch size param for perfomrance
-                preds = predict_auto_batch(rnn, X)
-                preds_gridded = preds.reshape(ny, nx, ntimes, 1)        
-            
+                # Predict FM10, utility function tries largest batch size param for perfomrance
+                logging.info(f"Predicting FM10")
+                preds10 = predict_auto_batch(rnn, X)
+                # Predict FM1 with twarped
+                ## NOTE Hard coding for seed 29 with bi and bf warps, make flexible TODO
+                fm1_info = Path(osp.join(cfg.transfer_dir, "fm1_median_rep_report.txt")).read_text().splitlines()
+                bs = {'bi': 5.0, 'bf': -1.25}
+                #weights10 = rnn.get_layer("lstm").get_weights()
+                lstm_layer = next(layer for layer in rnn.layers if layer.name.startswith("lstm"))
+                weights10 = lstm_layer.get_weights()
+                logging.info(f"Predicting FM1")
+                logging.info(f"Time-warping with bi={bs['bi']}, bf={bs['bf']}")
+                weights1 = warp_weights(weights10, bi_warp = bs["bi"], bf_warp = bs["bf"])
+                lstm_layer.set_weights(weights1)
+                #rnn.get_layer("lstm").set_weights(weights1) 
+                preds1 = predict_auto_batch(rnn, X)
+                preds_gridded = np.concatenate([
+                            preds1.reshape(ny, nx, ntimes, 1),
+                            preds10.reshape(ny, nx, ntimes, 1), 
+                            ], axis=-1
+                        )
+
+
                 # Write output in the right directory
                 outdir = Path(compute_model_path(cycle, wrapped_cfg.code, cfg.workspace_path, 0)).parent
                 filename = f"rnn_preds_{from_utc.strftime('%Y%m%d')}-{from_utc.strftime('%H')}_{to_utc.strftime('%Y%m%d')}-{to_utc.strftime('%H')}.nc"
-                logging.info("Writing RNN Predictions for forecast period to: {osp.join(outdir, filename)}")
+                logging.info(f"Writing RNN Predictions for forecast period to: {osp.join(outdir, filename)}")
                 to_netcdf(osp.join(outdir, filename), preds_gridded, valid_times.tz_localize(None))
 
+                # Run postprocessing with RNN Predictions
+                # Reuse postprocess_cycle looping over fcst_hours
+                bounds = compute_hrrr_bounds(wrapped_cfg.bbox)
+                for fhr in range(0, fcst_hour-1):
+                    pp_path = postprocess_cycle_rnn(cycle, wrapped_cfg, cfg.workspace_path, fhr, bounds)
 
 
     # done
