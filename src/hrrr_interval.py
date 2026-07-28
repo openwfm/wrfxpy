@@ -72,7 +72,7 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print(f"Invalid arguments. {len(sys.argv)} was given but 2 expected")
         print(('Usage: %s  <config_path>' % sys.argv[0]))
-        print("Example: python src/hrrr_interval.py etc/hrrr_interval.yaml")
+        print("Example: python src/hrrr_interval.py fmda_interval_TEST.json")
         sys.exit(-1)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
