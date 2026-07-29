@@ -28,6 +28,10 @@ from ingest.NAM227 import NAM227
 from ingest.CFSR import CFSR_P, CFSR_S
 from ingest.GFSA import GFSA
 from ingest.GFSF import GFSF_P, GFSF_S
+from ingest.RRFS import (
+    RRFS_CONUS_P, RRFS_CONUS_S,
+    RRFS_NA_P, RRFS_NA_S
+)
 from utils import esmf_to_utc, load_sys_cfg
 
 import logging
@@ -73,6 +77,14 @@ if __name__ == '__main__':
         grib_src = GFSF_P(js)
     elif grib_src_name == 'GFSF_S':
         grib_src = GFSF_S(js)
+    elif grib_src_name == 'RRFS_CONUS_P':
+        grib_src = RRFS_CONUS_P(js)
+    elif grib_src_name == 'RRFS_CONUS_S':
+        grib_src = RRFS_CONUS_S(js) 
+    elif grib_src_name == 'RRFS_NA_P':
+        grib_src = RRFS_NA_P(js)
+    elif grib_src_name == 'RRFS_NA_S':
+        grib_src = RRFS_NA_S(js)
     else:
         raise ValueError('Invalid GRIB source %s' % grib_src_name)
 
