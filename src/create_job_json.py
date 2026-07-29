@@ -150,6 +150,7 @@ def build_job_json(cfg, grib_res, n_domains, profile_size):
         "wall_time_hrs": 12,
         "start_utc": cfg["start_utc"],
         "end_utc": cfg["end_utc"],
+        "cycle_start_utc": cfg["cycle_start_utc"],
         "domains": build_domain_conf(
             grib_res,
             n_domains,
