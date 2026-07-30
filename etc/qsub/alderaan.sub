@@ -14,6 +14,23 @@
 export WORKDIR=%(cwd)s 
 cd $WORKDIR
 
+# DSHIELD supplies these variables when this WRF job belongs to its workflow.
+# Ordinary wrfxpy submissions leave them unset and keep their existing behavior.
+if [ -n "${DSHIELD_REPO_ROOT:-}" ] && [ -n "${DSHIELD_JOB_NAME:-}" ] && [ -n "${DSHIELD_CASE_DIR:-}" ]; then
+    dshield_job_event() {
+        python3 "$DSHIELD_REPO_ROOT/src/event_log.py" \
+            "$DSHIELD_JOB_NAME" "$1" "$DSHIELD_CASE_DIR" || true
+    }
+    dshield_finish_job() {
+        status=$?
+        trap - EXIT
+        dshield_job_event "ended:$status"
+        exit "$status"
+    }
+    dshield_job_event started
+    trap dshield_finish_job EXIT
+fi
+
 #
 
 ###
