@@ -13,6 +13,10 @@ class GribForecast(GribSource):
         """First forecast hour allowed for a historical run."""
         return 0
 
+    def cycle_forecast_hours(self, cycle_start):
+        """Last forecast hour available from this cycle."""
+        return self.max_forecast_hours
+
     def __init__(self, arg):
         super(GribForecast, self).__init__(arg)
         self.max_forecast_hours = self.grib_forecast_hours_periods[-1]['hours']
@@ -66,9 +70,20 @@ class GribForecast(GribSource):
         last_missing = {}
         for cycle_shift in range(attempts):
             cycle_start = first_cycle - timedelta(hours=self.cycle_hours * cycle_shift)
-            if (not explicit_cycle and not download_whole_cycle
-                    and timedelta_hours(to_utc - cycle_start) > self.max_forecast_hours):
-                break
+            cycle_forecast_hours = self.cycle_forecast_hours(cycle_start)
+            if not download_whole_cycle:
+                requested_hours = timedelta_hours(to_utc - cycle_start)
+                if not explicit_cycle and requested_hours > self.max_forecast_hours:
+                    break
+                if requested_hours > cycle_forecast_hours:
+                    if explicit_cycle:
+                        raise GribError(
+                            '%s cycle %s is only available through f%02d'
+                            % (self.id, cycle_start, cycle_forecast_hours))
+                    logging.info(
+                        '%s cycle %s ends at f%02d; trying an older cycle'
+                        % (self.id, cycle_start, cycle_forecast_hours))
+                    continue
 
             if explicit_cycle:
                 logging.info('forecast cycle start given as %s' % cycle_start)
@@ -77,7 +92,7 @@ class GribForecast(GribSource):
 
             if download_whole_cycle:
                 logging.info('%s downloading whole cycle' % self.id)
-                fc_start, fc_hours = 0, self.max_forecast_hours
+                fc_start, fc_hours = 0, cycle_forecast_hours
             else:
                 logging.info('%s downloading from %s to %s' % (self.id, from_utc, to_utc))
                 fc_start, fc_hours = self.forecast_times(cycle_start, from_utc, to_utc)

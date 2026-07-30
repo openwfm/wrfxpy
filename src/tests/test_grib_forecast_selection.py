@@ -55,7 +55,8 @@ def test_hrrr_selects_one_extended_cycle_after_short_cycles(tmp_path, monkeypatc
         ref_utc=datetime(2026, 7, 30, tzinfo=timezone.utc),
     )
 
-    assert checked[:2] == [(7, 27), (6, 28)]
+    assert checked[0] == (6, 28)
+    assert all(cycle_hour == 6 for cycle_hour, _ in checked)
     assert downloaded[0].endswith('hrrr.t06z.wrfprsf02.grib2')
     assert downloaded[-1].endswith('hrrr.t06z.wrfprsf28.grib2')
     assert all('hrrr.t06z.' in path for path in manifest.grib_files)

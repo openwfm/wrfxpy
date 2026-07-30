@@ -13,6 +13,10 @@ class HRRR(GribForecast):
         """Use f01 or older because HRRR f00 has initialization artifacts."""
         return self.hours_behind_real_time
 
+    def cycle_forecast_hours(self, cycle_start):
+        """00/06/12/18Z cycles reach f48; other hourly cycles stop at f18."""
+        return 48 if cycle_start.hour % 6 == 0 else 18
+
     def vtables(self):
         """
         Returns the variable tables that must be linked in for use with the HRRR data source.
