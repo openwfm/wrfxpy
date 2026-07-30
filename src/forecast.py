@@ -49,6 +49,7 @@ from ingest.RAP import RAP
 from ingest.NAM218 import NAM218
 from ingest.NAM227 import NAM227
 from ingest.HRRR import HRRR
+from ingest.RRFS import RRFS_CONUS_P, RRFS_CONUS_S, RRFS_NA_P, RRFS_NA_S
 
 from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP, SNPPHR, NOAA20, NOAA20HR, NOAA21, NOAA21HR
@@ -105,6 +106,7 @@ class JobState(Dict):
         if 'job_id' in args:
             logging.info('job_id %s given in the job description' % args['job_id'])
             self.job_id = args['job_id']
+            self.grid_code = self.job_id.split('-')[1]
         else:
             logging.info('job_id not given, creating.')
             self.job_id = 'wfc-' + self.grid_code + '-' + utc_to_esmf(self.start_utc) + '-{0:02d}'.format(int(self.fc_hrs))
@@ -140,6 +142,10 @@ class JobState(Dict):
             return [HRRR(js)]
         elif gs_name == 'RAP':
             return [RAP(js)]
+        elif gs_name == 'RRFS':
+            return [RRFS_CONUS_P(js), RRFS_CONUS_S(js)]
+        elif gs_name == 'RRFSNA':
+            return [RRFS_NA_P(js), RRFS_NA_S(js)]
         elif gs_name == 'NAM' or gs_name == 'NAM218' :
             return [NAM218(js)]
         elif gs_name == 'NAM227':
@@ -1554,15 +1560,17 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
+    available_grib_sources = ['HRRR', 'RAP', 'RRFS', 'NAM', 'NAM227', 'NARR', 'CFSR', 'GFSA', 'GFSF']
     if 'grib_source' in args:
-        if args['grib_source'] not in ['HRRR', 'RAP', 'NAM', 'NAM218', 'NAM227', 'NARR', 'CFSR', 'GFSA', 'GFSF']:
-            raise ValueError('Invalid grib source %s, must be one of HRRR, RAP, NAM, NAM227, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
+        if args['grib_source'] not in available_grib_sources:
+            raise ValueError('Invalid grib source %s, must be one of %s' % (args['grib_source'], ', '.join(available_grib_sources)))
 
     # check for valid satellite source
+    available_sat_sources = ['Terra', 'Aqua', 'SNPP', 'SNPPHR', 'NOAA20', 'NOAA20HR', 'NOAA21', 'NOAA21HR', 'G16', 'G17', 'G18']
     if 'satellite_source' in args:
         for sat in args['satellite_source']:
-            if sat not in ['Terra', 'Aqua', 'SNPP', 'SNPPHR', 'NOAA20', 'NOAA20HR', 'NOAA21', 'NOAA21HR', 'G16', 'G17', 'G18']:
-                raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP, G16, G17' % sat)
+            if sat not in available_sat_sources:
+                raise ValueError('Invalid satellite source %s, must be one of %s' % (sat, ', '.join(available_sat_sources)))
 
     # if precomputed key is present, check files linked in
     if 'precomputed' in args:

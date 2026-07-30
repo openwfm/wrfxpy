@@ -42,7 +42,7 @@ import os.path as osp
 if __name__ == '__main__':
     if len(sys.argv) != 5:
         print(('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
-        print('       supported GRIB sources: HRRR_S, HRRR, NAM, CFSR_P, CFSR_S, NARR, GFSA, GFSF_P, GFSF_S')
+        print('       supported GRIB sources: HRRR_S, HRRR, NAM, CFSR_P, CFSR_S, NARR, GFSA, GFSF_P, GFSF_S, RAP, RRFS_CONUS_P, RRFS_CONUS_S, RRFS_NA_P, RRFS_NA_S')
         sys.exit(-1)
 
 

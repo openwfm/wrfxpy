@@ -1,0 +1,120 @@
+{
+    "job_id": "testing-RAP",
+    "wall_time_hrs": 12,
+    "grib_source": "RAP",
+    "start_utc": "T-60",
+    "end_utc": "T+120",
+    "cycle_start_utc": "T-60",
+    "download_whole_cycle": false,
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "fire_namelist_path": "etc/nlists/default.fire",
+    "postproc": {
+        "1": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "SMOKE_INT"
+        ],
+        "2": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "SMOKE_INT"
+        ],
+        "3": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "FIRE_AREA",
+            "FGRNHFX",
+            "SMOKE_INT"
+        ],
+        "description": "Testing RAP"
+    },
+    "num_nodes": 1,
+    "ppn": 144,
+    "grid_code": "testing-RAP",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "domains": {
+        "1": {
+            "cell_size": [
+                4333,
+                4333
+            ],
+            "domain_size": [
+                97,
+                97
+            ],
+            "center_latlon": [
+                50.912,
+                -121.735
+            ],
+            "truelats": [
+                50.912,
+                50.912
+            ],
+            "stand_lon": -121.735,
+            "time_step": 24,
+            "history_interval": 60,
+            "geog_res": "30s",
+            "subgrid_ratio": [
+                0,
+                0
+            ]
+        },
+        "2": {
+            "parent_id": 1,
+            "parent_cell_size_ratio": 3,
+            "parent_time_step_ratio": 3,
+            "geog_res": "30s",
+            "subgrid_ratio": [
+                0,
+                0
+            ],
+            "parent_start": [
+                33,
+                33
+            ],
+            "parent_end": [
+                64,
+                64
+            ],
+            "history_interval": 60
+        },
+        "3": {
+            "parent_id": 2,
+            "parent_cell_size_ratio": 3,
+            "parent_time_step_ratio": 3,
+            "geog_res": "30s",
+            "subgrid_ratio": [
+                18,
+                18
+            ],
+            "parent_start": [
+                33,
+                33
+            ],
+            "parent_end": [
+                64,
+                64
+            ],
+            "history_interval": 15
+        }
+    },
+    "ignitions": {
+        "3": [
+            {
+                "time_utc": "T+30",
+                "latlon": [
+		    50.912,
+                    -121.735
+                ],
+                "duration_s": 240
+            }
+        ]
+    }
+}

@@ -12,7 +12,8 @@ clusters = json.load(open(clusters_path))
 
 grib_sources = {
     "GFSF": 28, "RAP": 13, "NAM218": 12, 
-    "NAM227": 5, "HRRR": 3
+    "NAM227": 5, "RRFSNA": 3, "RRFS": 3, 
+    "HRRR": 3
 } # resolutions in km (roughly)
 
 profile_sizes = {
@@ -175,6 +176,16 @@ cfg = {} # dictionary to hold user inputs
 
 ################################################################################
 # Get the grib source from the user #
+print(
+    "Long-range forecast lead-time limitations by forcing:\n"
+    " - GFSF (00/06/12/18 UTC): 384 h\n"
+    " - RAP (03/09/15/21 UTC): 51 h\n"
+    " - NAM218 (00/06/12/18 UTC): 84 h\n"
+    " - NAM227 (00/06/12/18 UTC): 60 h\n"
+    " - RRFSNA (00/06/12/18 UTC): 84 h\n"
+    " - RRFS (00/06/12/18 UTC): 84 h\n"
+    " - HRRR (00/06/12/18 UTC): 48 h"
+)
 while True:
     grib_sources_input = input("Enter a grib source {} (HRRR): ".format(grib_sources.keys()))
     if grib_sources_input == "":

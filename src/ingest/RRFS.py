@@ -18,7 +18,7 @@ class RRFS(GribForecast):
     domain = None
     grid = None
     product = None
-    product_root = "rrfs_a"
+    product_root = "rrfs_public"
 
     def __init__(self, arg):
         super(RRFS, self).__init__(arg)
@@ -39,8 +39,8 @@ class RRFS(GribForecast):
         """
         return {
             'geogrid_vtable': 'GEOGRID.TBL',
-            'ungrib_vtable': 'Vtable.HRRR',
-            'metgrid_vtable': 'METGRID.TBL.HRRR',
+            'ungrib_vtable': 'Vtable.RRFS',
+            'metgrid_vtable': 'METGRID.TBL.RRFS',
         }
 
     def namelist_keys(self):
@@ -52,7 +52,7 @@ class RRFS(GribForecast):
         """
         return {
             'domains': {
-                'num_metgrid_levels': 41,
+                'num_metgrid_levels': 46,
                 'num_metgrid_soil_levels': 9,
             }
         }

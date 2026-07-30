@@ -1,10 +1,11 @@
 {
-    "job_id": "testing-HRRR",
+    "job_id": "testing-RRFS",
     "wall_time_hrs": 12,
-    "grib_source": "HRRR",
-    "start_utc": "T-60",
-    "end_utc": "T+120",
-    "cycle_start_utc": "T-60",
+    "grib_source": "RRFS",
+    "use_wgrib2": true,
+    "start_utc": "2026-07-30_18:00:00",
+    "end_utc": "2026-07-31_00:00:00",
+    "cycle_start_utc": "2026-07-30_18:00:00",
     "download_whole_cycle": false,
     "wrf_namelist_path": "etc/nlists/default.input",
     "wps_namelist_path": "etc/nlists/default.wps",
@@ -89,6 +90,6 @@
             "SMOKE_INT"
         ],
         "shuttle": "incremental",
-        "description": "Testing HRRR"
+        "description": "Testing RRFS"
     }
 }
