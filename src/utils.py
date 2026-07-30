@@ -679,16 +679,20 @@ class response_object(object):
 def readhead(url,msg_level=1,retries=10):
     if msg_level > 0:
         logging.info('reading http head of %s ' % url)
+    ret = response_object(-1)
     for n in range(retries):
         try:
-            ret=requests.head(url)
-            ret.raise_for_status()
+            ret = requests.head(url)
         except Exception as e:
             if msg_level > 0:
                 logging.error(e)
             ret = response_object(-1)
-        if ret.status_code == 200:
-            break
+            continue
+        # Return 404 so GRIB selection may try an older forecast cycle.
+        if ret.status_code < 500:
+            return ret
+        if msg_level > 0:
+            logging.error('HTTP status %s reading %s' % (ret.status_code, url))
     return ret
 
 def json2xml(d):

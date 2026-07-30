@@ -9,6 +9,10 @@ class HRRR(GribForecast):
     def __init__(self, arg):
         super(HRRR, self).__init__(arg)
 
+    def minimum_forecast_lead_hours(self):
+        """Use f01 or older because HRRR f00 has initialization artifacts."""
+        return self.hours_behind_real_time
+
     def vtables(self):
         """
         Returns the variable tables that must be linked in for use with the HRRR data source.
@@ -52,6 +56,8 @@ class HRRR(GribForecast):
     cycle_hours = 1
     period_hours = 1
     hours_behind_real_time = 1     # choose forecast cycle at least one hour behind
+    # Try older hourly cycles until the request would extend beyond f48.
+    cycle_search_attempts = 48
     # HRRR provides hourly GRIB2 files up to hour 48.
     grib_forecast_hours_periods = [{'hours':48, 'period':1}]
     # more general info: https://rapidrefresh.noaa.gov/internal/pdfs/RAPX_HRRRX_NWS-13sep2016-pub.pdf

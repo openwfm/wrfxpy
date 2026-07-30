@@ -9,6 +9,10 @@ class GribForecast(GribSource):
     Common part for all grib forecast products.
     """
 
+    def minimum_forecast_lead_hours(self):
+        """First forecast hour allowed for a historical run."""
+        return 0
+
     def __init__(self, arg):
         super(GribForecast, self).__init__(arg)
         self.max_forecast_hours = self.grib_forecast_hours_periods[-1]['hours']
@@ -17,10 +21,10 @@ class GribForecast(GribSource):
         """
         Attempts to retrieve the files to satisfy the simulation request from_utc - to_utc.
 
-        Starts with the most recent cycle available an hour ago, then moves further
-        into the past.  For each candidate cycle, the filenames are computed, the local cache is
+        Starts with the newest eligible cycle.  For each candidate cycle, the
+        filenames are computed, the local cache is
         checked for files that are already there.  The presence of remaining files is checked
-        on server, if not available, we try an older cycle, if yes, download is attempted.
+        on every server.  If every server returns 404, we try an older cycle.
         Once all files are downloaded, the manifest is returned, or if retrieval fails, an error is raised.
 
         :param from_utc: forecast start time
@@ -42,22 +46,33 @@ class GribForecast(GribSource):
         logging.info('retrieve_gribs %s from_utc=%s to_utc=%s ref_utc=%s cycle_start=%s download_whole_cycle=%s' %
             (self.id, from_utc, to_utc, ref_utc, cycle_start, download_whole_cycle ))
 
-        # it is possible that a cycle output is delayed and unavailable when we expect it (3 hours after cycle time)
-        # in this case, the grib source supports using previous cycles (up to 2)
-        cycle_shift = 0
-        while cycle_shift < 3:
-    
-            if cycle_start is not None:
-                cycle_start = cycle_start.replace(minute=0, second=0, microsecond=0)
+        explicit_cycle = cycle_start is not None
+        if explicit_cycle:
+            first_cycle = cycle_start.replace(minute=0, second=0, microsecond=0)
+            minimum_lead = 0 if download_whole_cycle else self.minimum_forecast_lead_hours()
+            if timedelta_hours(from_utc - first_cycle, False) < minimum_lead:
+                raise GribError('%s cycle %s starts before f%02d'
+                                % (self.id, first_cycle, minimum_lead))
+        else:
+            minimum_lead = 0 if download_whole_cycle else self.minimum_forecast_lead_hours()
+            ref_utc_2 = ref_utc - timedelta(hours=self.hours_behind_real_time)
+            ref_utc_2 = ref_utc_2.replace(minute=0, second=0, microsecond=0)
+            first_cycle = min(from_utc - timedelta(hours=minimum_lead), ref_utc_2)
+            first_cycle = first_cycle.replace(
+                hour=first_cycle.hour - first_cycle.hour % self.cycle_hours)
+
+        attempts = 1 if explicit_cycle else (
+            3 if download_whole_cycle else self.cycle_search_attempts)
+        last_missing = {}
+        for cycle_shift in range(attempts):
+            cycle_start = first_cycle - timedelta(hours=self.cycle_hours * cycle_shift)
+            if (not explicit_cycle and not download_whole_cycle
+                    and timedelta_hours(to_utc - cycle_start) > self.max_forecast_hours):
+                break
+
+            if explicit_cycle:
                 logging.info('forecast cycle start given as %s' % cycle_start)
             else:
-                # select cycle (at least hours_behind_real_time behind)
-                # for NAM218 which occurr at [0, 6, 12, 18] hours
-                ref_utc_2 = ref_utc - timedelta(hours=self.hours_behind_real_time)
-                ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
-                cycle_start = min(from_utc, ref_utc_2)
-                cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % self.cycle_hours)
-                cycle_start -= timedelta(hours=self.cycle_hours*cycle_shift)
                 logging.info('forecast cycle start selected as %s' % cycle_start)
 
             if download_whole_cycle:
@@ -83,29 +98,42 @@ class GribForecast(GribSource):
                 # check what's available locally
                 nonlocals = [x for x in grib_files if not self.grib_available_locally(osp.join(self.ingest_dir, x))]
     
-                # check if GRIBs we don't are available remotely
+                # Use one complete server copy. Only 404 permits an older cycle.
                 url_bases = self.remote_url
                 if isinstance(url_bases,str):
                     url_bases = [url_bases]
+                selected_url = None
+                missing = {}
+                check_order = nonlocals[-1:] + nonlocals[:-1]
                 for url_base in url_bases:
-                    logging.info('Retrieving %s GRIBs from %s' % (self.id, url_base))
-                    if url_base[:5] == 's3://':
-                        unavailables = [x for x in nonlocals if readhead(osp.join(osp.dirname(self.browse_aws), x), msg_level=0).status_code != 200]
+                    logging.info('Checking %s GRIBs at %s' % (self.id, url_base))
+                    check_base = osp.dirname(self.browse_aws) if url_base[:5] == 's3://' else url_base
+                    for path in check_order:
+                        status = readhead(osp.join(check_base, path), msg_level=0).status_code
+                        if status == 404:
+                            missing[url_base] = path
+                            break
+                        if status != 200:
+                            raise GribError('%s availability check returned %s for %s'
+                                            % (self.id, status, osp.join(check_base, path)))
                     else:
-                        unavailables = [x for x in nonlocals if readhead(osp.join(url_base, x), msg_level=0).status_code != 200]
-                    if len(unavailables) == 0:
+                        selected_url = url_base
                         break
-                if len(unavailables) > 0:
-                    logging.warning('%s failed retrieving cycle data for cycle %s, unavailables %s'
-                                         % (self.id, cycle_start, repr(unavailables)))
-                    cycle_shift += 1
+
+                if selected_url is None:
+                    last_missing = missing
+                    if explicit_cycle:
+                        raise GribError('%s cycle %s is unavailable: %s'
+                                        % (self.id, cycle_start, repr(missing)))
+                    logging.warning('%s cycle %s is unavailable: %s'
+                                    % (self.id, cycle_start, repr(missing)))
                     continue
     
                 # download all gribs not available remotely
-                if url_base[:5] == 's3://':
-                    self.download_grib_many(url_base, nonlocals, workers=32)
+                if selected_url[:5] == 's3://':
+                    self.download_grib_many(selected_url, nonlocals, workers=32)
                 else:
-                    list(map(lambda x: self.download_grib(url_base, x), nonlocals))
+                    list(map(lambda x: self.download_grib(selected_url, x), nonlocals))
 
             # return manifest
             return Dict({'grib_files': [osp.join(self.ingest_dir, x) for x in grib_files], 
@@ -114,10 +142,12 @@ class GribForecast(GribSource):
                 'colmet_files': [osp.join(self.cache_dir, colmet_prefix, f) for f in colmet_files],
                 'colmet_missing': [osp.join(self.cache_dir, colmet_prefix, f) for f in colmet_missing]})
 
-        raise GribError('Unsatisfiable: failed to retrieve GRIB2 files in eligible cycles %s' % repr(unavailables))
+        raise GribError('Unsatisfiable: no complete %s cycle: %s'
+                        % (self.id, repr(last_missing)))
 
     # GribForecast instance variables
     hours_behind_real_time = 3     # choose forecast cycle at least this much behind
+    cycle_search_attempts = 3      # try this cycle and two older cycles
     
 
     def forecast_times(self, cycle_start, from_utc, to_utc):  
