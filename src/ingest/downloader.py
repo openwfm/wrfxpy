@@ -116,8 +116,8 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
             logging.warning(e)
             logging.info('download_url - sleeping %s seconds' % sleep_seconds)
             time.sleep(sleep_seconds)
-            download_url(url, local_path, max_retries = max_retries-1, token = token, min_size = min_size)
-        return
+            return download_url(url, local_path, max_retries = max_retries-1, token = token, min_size = min_size)
+        raise DownloadError('download_url - failed to access file %s' % url)
 
     logging.info('download_url %s as %s' % (url,local_path))
     remove(local_path)

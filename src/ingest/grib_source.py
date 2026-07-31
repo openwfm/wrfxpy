@@ -151,7 +151,7 @@ class GribSource(object):
         info_path = path + '.size' 
         if osp.exists(path) and osp.exists(info_path):
             content_size = int(open(info_path).read())
-            return osp.getsize(path) == content_size
+            return content_size > 0 and osp.getsize(path) == content_size
         else:
             return False
 
