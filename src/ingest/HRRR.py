@@ -9,10 +9,6 @@ class HRRR(GribForecast):
     def __init__(self, arg):
         super(HRRR, self).__init__(arg)
 
-    def minimum_forecast_lead_hours(self):
-        """Use f01 or older because HRRR f00 has initialization artifacts."""
-        return self.hours_behind_real_time
-
     def cycle_forecast_hours(self, cycle_start):
         """00/06/12/18Z cycles reach f48; other hourly cycles stop at f18."""
         return 48 if cycle_start.hour % 6 == 0 else 18

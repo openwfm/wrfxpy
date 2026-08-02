@@ -9,10 +9,6 @@ class GribForecast(GribSource):
     Common part for all grib forecast products.
     """
 
-    def minimum_forecast_lead_hours(self):
-        """First forecast hour allowed for a historical run."""
-        return 0
-
     def cycle_forecast_hours(self, cycle_start):
         """Last forecast hour available from this cycle."""
         return self.max_forecast_hours
@@ -53,15 +49,10 @@ class GribForecast(GribSource):
         explicit_cycle = cycle_start is not None
         if explicit_cycle:
             first_cycle = cycle_start.replace(minute=0, second=0, microsecond=0)
-            minimum_lead = 0 if download_whole_cycle else self.minimum_forecast_lead_hours()
-            if timedelta_hours(from_utc - first_cycle, False) < minimum_lead:
-                raise GribError('%s cycle %s starts before f%02d'
-                                % (self.id, first_cycle, minimum_lead))
         else:
-            minimum_lead = 0 if download_whole_cycle else self.minimum_forecast_lead_hours()
             ref_utc_2 = ref_utc - timedelta(hours=self.hours_behind_real_time)
             ref_utc_2 = ref_utc_2.replace(minute=0, second=0, microsecond=0)
-            first_cycle = min(from_utc - timedelta(hours=minimum_lead), ref_utc_2)
+            first_cycle = min(from_utc, ref_utc_2)
             first_cycle = first_cycle.replace(
                 hour=first_cycle.hour - first_cycle.hour % self.cycle_hours)
 

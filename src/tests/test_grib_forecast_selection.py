@@ -62,14 +62,22 @@ def test_hrrr_selects_one_extended_cycle_after_short_cycles(tmp_path, monkeypatc
     assert all('hrrr.t06z.' in path for path in manifest.grib_files)
 
 
-def test_hrrr_rejects_explicit_f00_cycle(tmp_path, monkeypatch):
+def test_hrrr_accepts_explicit_f00_cycle(tmp_path, monkeypatch):
     hrrr = hrrr_without_local_files(tmp_path, monkeypatch, lambda url: 200)
-    with pytest.raises(GribError, match='starts before f01'):
-        hrrr.retrieve_gribs(
-            datetime(2026, 6, 27, 8, tzinfo=timezone.utc),
-            datetime(2026, 6, 27, 12, tzinfo=timezone.utc),
-            cycle_start=datetime(2026, 6, 27, 8, tzinfo=timezone.utc),
-        )
+    downloaded = []
+    monkeypatch.setattr(
+        hrrr, 'download_grib_many',
+        lambda url, paths, workers: downloaded.extend(paths))
+
+    manifest = hrrr.retrieve_gribs(
+        datetime(2026, 6, 27, 0, tzinfo=timezone.utc),
+        datetime(2026, 6, 29, 0, tzinfo=timezone.utc),
+        cycle_start=datetime(2026, 6, 27, 0, tzinfo=timezone.utc),
+    )
+
+    assert downloaded[0].endswith('hrrr.t00z.wrfprsf00.grib2')
+    assert downloaded[-1].endswith('hrrr.t00z.wrfprsf48.grib2')
+    assert len(manifest.grib_files) == 49
 
 
 def test_access_error_does_not_select_an_older_cycle(tmp_path, monkeypatch):
@@ -102,7 +110,7 @@ def test_normal_cycle_search_stops_after_three_attempts(tmp_path, monkeypatch):
             datetime(2026, 6, 27, 8, tzinfo=timezone.utc),
             datetime(2026, 6, 27, 12, tzinfo=timezone.utc),
         )
-    assert checked == [7, 6, 5]
+    assert checked == [8, 7, 6]
 
 
 def test_readhead_returns_404_without_retrying(monkeypatch):
