@@ -3,6 +3,9 @@
 #SBATCH --ntasks=%(np)d   # number of MPI tasks, abbreviated by -n
 #SBATCH --mem-per-cpu=7G
 
+#SBATCH --reservation=demo     # JM temporary add
+
+
 ##SBATCH --nodes=%(nodes)d     # number of cluster nodes, abbreviated by -N  #KH: comment out
 ##SBATCH -o  # name of the stdout
 # additional information for allocated clusters
