@@ -798,6 +798,9 @@ def execute(args,job_args):
                 sat_proc[satellite_source.id].start()
             for satellite_source in js.satellite_source:
                 sat_proc[satellite_source.id].join()
+            for satellite_source in js.satellite_source:
+                if proc_q.get() != 'SUCCESS':
+                    raise RuntimeError('satellite retrieval failed; see earlier log messages')
             proc_q.close()
             # create satellite manifest
             create_sat_manifest(js)
@@ -805,8 +808,7 @@ def execute(args,job_args):
             process_sat_output(js.job_id)
             return
         else:
-            logging.error('any available sat source specified')
-            return
+            raise ValueError('sat_only requires at least one satellite source')
     else:
         # read in all namelists
         js.wps_nml = read_namelist(js.args['wps_namelist_path'])
@@ -881,7 +883,7 @@ def execute(args,job_args):
     if js.ungrib_only:
         for grib_source in js.grib_source:
             if proc_q.get() != 'SUCCESS':
-                return
+                raise RuntimeError('GRIB2/UNGRIB failed; see earlier log messages')
         return
     else:
         geogrid_proc.join()
@@ -894,18 +896,18 @@ def execute(args,job_args):
     if js.satellite_source:
         for satellite_source in js.satellite_source:
             if proc_q.get() != 'SUCCESS':
-                return
+                raise RuntimeError('satellite retrieval failed; see earlier log messages')
 
     if js.use_realtime:
         if proc_q.get() != 'SUCCESS':
-            return
+            raise RuntimeError('fire initialization retrieval failed; see earlier log messages')
 
     for grib_source in js.grib_source:
         if proc_q.get() != 'SUCCESS':
-            return
+            raise RuntimeError('GRIB2/UNGRIB failed; see earlier log messages')
 
     if proc_q.get() != 'SUCCESS':
-        return
+        raise RuntimeError('GEOGRID failed; see earlier log messages')
 
     proc_q.close()
 
@@ -945,10 +947,10 @@ def execute(args,job_args):
 
     if js.use_realtime:
         if proc_q.get() != 'SUCCESS':
-            return
+            raise RuntimeError('fire initialization failed; see earlier log messages')
 
     if proc_q.get() != 'SUCCESS':
-        return
+        raise RuntimeError('METGRID failed; see earlier log messages')
 
     proc_q.close()
 
@@ -1210,10 +1212,11 @@ def process_output(job_id):
                 send_product_to_server(jsin, js.pp_dir, js.job_id, js.job_id, js.manifest_filename, desc, tif_files)
 
         else:
-            logging.error('All postprocessing steps failed')
             js.state = 'Postprocessing failed'
 
         json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+        if cases == failures:
+            raise RuntimeError('All postprocessing steps failed')
         return
 
     # step 9: wait for appearance of rsl.error.0000 and open it
@@ -1239,8 +1242,7 @@ def process_output(job_id):
         line = wrf_out.readline().strip()
         if not line:
             if wait_lines > 10 and not parallel_job_running(js):
-                logging.error('WRF did not run to completion.')
-                break
+                raise RuntimeError('WRF did not run to completion')
             if not wait_lines:
                 logging.info('Waiting for more output lines')
             wait_lines = wait_lines + 1
@@ -1314,7 +1316,6 @@ def process_output(job_id):
         js.state = 'Completed'
 
     else:
-        logging.error('All postprocessing steps failed')
         js.state = 'Postprocessing failed'
 
     if ts is not None:
@@ -1323,6 +1324,8 @@ def process_output(job_id):
     js.old_pid = js.pid
     js.pid = None
     json.dump(js, open(jobfile,'w'), indent=4, separators=(',', ': '))
+    if cases == failures:
+        raise RuntimeError('All postprocessing steps failed')
 
 def create_process_output_script(job_id):
     cfg = load_sys_cfg()
