@@ -148,7 +148,7 @@ _var_wisdom = {
         'description': 'Forest Canopy Height from LANDFIRE',
         'type': 'continuous',
         'signed': 'yes',
-        'scale': 1.,
+        'scale': 0.1,
         'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
@@ -160,7 +160,7 @@ _var_wisdom = {
         'description': 'Forest Canopy Base Height from LANDFIRE',
         'type': 'continuous',
         'signed': 'yes',
-        'scale': 1.,
+        'scale': 0.1,
         'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
@@ -172,7 +172,7 @@ _var_wisdom = {
         'description': 'Forest Canopy Bulk Density from LANDFIRE',
         'type': 'continuous',
         'signed': 'yes',
-        'scale': 1.,
+        'scale': 0.01,
         'unit_scale': 0.01, # scale the array to be in kg/m3 (original data is multiplied by 100)
         'bits': 32,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',

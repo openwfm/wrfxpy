@@ -11,8 +11,8 @@ clusters_path = osp.join(sys_cfg["sys_install_path"], "etc/clusters.json")
 clusters = json.load(open(clusters_path))
 
 grib_sources = {
-    "GFSF": 28, "RAP": 13, "NAM218": 12, 
-    "NAM227": 5, "RRFSNA": 3, "RRFS": 3, 
+    "GFSF": 28, "RAP": 13, "RRFSNA": 3,
+    "NAM218": 12, "NAM227": 5, "RRFS": 3, 
     "HRRR": 3
 } # resolutions in km (roughly)
 
@@ -178,13 +178,13 @@ cfg = {} # dictionary to hold user inputs
 # Get the grib source from the user #
 print(
     "Long-range forecast lead-time limitations by forcing:\n"
-    " - GFSF (00/06/12/18 UTC): 384 h\n"
-    " - RAP (03/09/15/21 UTC): 51 h\n"
-    " - NAM218 (00/06/12/18 UTC): 84 h\n"
-    " - NAM227 (00/06/12/18 UTC): 60 h\n"
-    " - RRFSNA (00/06/12/18 UTC): 84 h\n"
-    " - RRFS (00/06/12/18 UTC): 84 h\n"
-    " - HRRR (00/06/12/18 UTC): 48 h"
+    " - GFSF (00/06/12/18 UTC): 384 h: 5h latency\n"
+    " - RAP (03/09/15/21 UTC): 51 h: 1h latency\n"
+    " - NAM218 (00/06/12/18 UTC): 84 h: 3h latency\n"
+    " - NAM227 (00/06/12/18 UTC): 60 h: 3h latency\n"
+    " - RRFSNA (00/06/12/18 UTC): 84 h: 4h latency\n"
+    " - RRFS (00/06/12/18 UTC): 84 h: 4h latency\n"
+    " - HRRR (00/06/12/18 UTC): 48 h: 2h latency\n"
 )
 while True:
     grib_sources_input = input("Enter a grib source {} (HRRR): ".format(grib_sources.keys()))
@@ -392,6 +392,20 @@ json_data = build_job_json(
 os.makedirs(os.path.dirname(destination_path), exist_ok=True)
 with open(destination_path, "w") as json_file:
     json.dump(json_data, json_file, indent=4)
+    
+# Create overnight json
+overnight_hour = 7
+json_data_overnight = json_data.copy()
+json_data_overnight["grid_code"] = start_utc.replace(hour=overnight_hour).strftime(f"%Y-%m-%d_%H-{fire_name_input.replace(' ', '_').upper()}")
+json_data_overnight["start_utc"] = start_utc.replace(hour=overnight_hour).strftime("%Y-%m-%d_%H:%M:%S")
+json_data_overnight["end_utc"] = end_utc.replace(hour=6).strftime("%Y-%m-%d_%H:%M:%S")
+json_data_overnight["cycle_start_utc"] = start_utc.replace(hour=6).strftime("%Y-%m-%d_%H:%M:%S")
+json_data_overnight["fmda_geogrid_path"] = start_utc.replace(hour=overnight_hour).strftime("wksp_fmda/CONUS/%Y%m/fmda-CONUS-%Y%m%d-%H.geo")
+json_data_overnight["postproc"]["description"] = start_utc.replace(hour=overnight_hour).strftime(f"{fire_name_input.title()} {profile_size_input} %Y-%m-%d %Hz")
+overnight_job_id = start_utc.replace(hour=overnight_hour).strftime("{}_{}{}_%y%m%d_%Hz".format(fire_name_modified, profile_size_input))
+overnight_destination_path = osp.join("jobs", overnight_job_id + ".json")
+with open(overnight_destination_path, "w") as json_file:
+    json.dump(json_data_overnight, json_file, indent=4)
 
 print(f"JSON is ready here: {destination_path}")
 print(f"./forecast.sh {destination_path} >& logs/{job_id}.log")

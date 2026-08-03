@@ -107,11 +107,6 @@ class RRFS(GribForecast):
     remote_url = ["s3://noaa-rrfs-pds/"]
     browse_aws = "https://noaa-rrfs-pds.s3.amazonaws.com/index.html"
 
-    cycle_hours = 1
-    period_hours = 1
-    hours_behind_real_time = 1
-    grib_forecast_hours_periods = [{'hours': 84, 'period': 1}]
-
 
 class RRFS_CONUS(RRFS):
     """
@@ -130,6 +125,10 @@ class RRFS_CONUS(RRFS):
     domain = "conus"
     grid = "3km"
     info_text = "NOAA RRFSv1 CONUS 3-km Forecast"
+    cycle_hours = 3
+    period_hours = 1
+    hours_behind_real_time = 1
+    grib_forecast_hours_periods = [{'hours': 84, 'period': 1}]
 
 
 class RRFS_CONUS_P(RRFS_CONUS):
@@ -185,8 +184,12 @@ class RRFS_NA(RRFS):
 
     id = "RRFS_NA"
     domain = "na"
-    grid = "3km"
+    grid = "13km"
     info_text = "NOAA RRFSv1 North America Forecast"
+    cycle_hours = 6
+    period_hours = 3
+    hours_behind_real_time = 1
+    grib_forecast_hours_periods = [{'hours': 84, 'period': 3}]
 
 
 class RRFS_NA_P(RRFS_NA):
