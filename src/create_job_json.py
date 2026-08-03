@@ -402,7 +402,7 @@ json_data_overnight["end_utc"] = end_utc.replace(hour=6).strftime("%Y-%m-%d_%H:%
 json_data_overnight["cycle_start_utc"] = start_utc.replace(hour=6).strftime("%Y-%m-%d_%H:%M:%S")
 json_data_overnight["fmda_geogrid_path"] = start_utc.replace(hour=overnight_hour).strftime("wksp_fmda/CONUS/%Y%m/fmda-CONUS-%Y%m%d-%H.geo")
 json_data_overnight["postproc"]["description"] = start_utc.replace(hour=overnight_hour).strftime(f"{fire_name_input.title()} {profile_size_input} %Y-%m-%d %Hz")
-overnight_job_id = start_utc.replace(hour=overnight_hour).strftime("{}_{}{}_%y%m%d_%Hz".format(fire_name_modified, profile_size_input))
+overnight_job_id = start_utc.replace(hour=overnight_hour).strftime("{}_{}_%y%m%d_%Hz".format(fire_name_modified, profile_size_input))
 overnight_destination_path = osp.join("jobs", overnight_job_id + ".json")
 with open(overnight_destination_path, "w") as json_file:
     json.dump(json_data_overnight, json_file, indent=4)
