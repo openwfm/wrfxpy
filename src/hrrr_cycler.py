@@ -1032,7 +1032,7 @@ def build_fcst_paths(code, from_utc, fcst_hours, wksp_dir="wksp"):
 def predict_auto_batch(model,
                        X,
                        batch_sizes=(16384, 8192, 4096, 2048, 1024, 512, 256, 128, 32),
-                       verbose=1):
+                       verbose=1, reset_state=True):
     """
     Predict using the largest batch size that fits in memory.
 
@@ -1044,7 +1044,7 @@ def predict_auto_batch(model,
         try:
             if verbose:
                 print(f"Trying predict batch_size={bs}")
-            preds = model.predict(X, batch_size=bs, verbose=verbose)
+            preds = model.predict_cycle(X, batch_size=bs, verbose=verbose, reset_state=reset_state)
             if verbose:
                 print(f"Success with batch_size={bs}")
             return preds
@@ -1368,6 +1368,7 @@ if __name__ == "__main__":
 
         # RNN Forecast
         if run_rnn:
+            import tensorflow as tf
             logging.info(f"Running RNN Forecast")
             for region_id,region_cfg in cfg.regions.items():
                 wrapped_cfg = Dict(region_cfg)
@@ -1437,20 +1438,19 @@ if __name__ == "__main__":
                 logging.info(f"RNN Input Shape: {X.shape}")
                 # Predict FM10, utility function tries largest batch size param for perfomrance
                 logging.info(f"Predicting FM10")
-                preds10 = predict_auto_batch(rnn, X)
+                preds10 = predict_auto_batch(rnn, X, reset_state=True)
                 # Predict FM1 with twarped
                 ## NOTE Hard coding for seed 29 with bi and bf warps, make flexible TODO
                 fm1_info = Path(osp.join(cfg.transfer_dir, "fm1_median_rep_report.txt")).read_text().splitlines()
                 bs = {'bi': 5.0, 'bf': -1.25}
-                #weights10 = rnn.get_layer("lstm").get_weights()
-                lstm_layer = next(layer for layer in rnn.layers if layer.name.startswith("lstm"))
+                lstm_layer = next(layer for layer in rnn.layers if isinstance(layer, tf.keras.layers.LSTM))
                 weights10 = lstm_layer.get_weights()
                 logging.info(f"Predicting FM1")
                 logging.info(f"Time-warping with bi={bs['bi']}, bf={bs['bf']}")
                 weights1 = warp_weights(weights10, bi_warp = bs["bi"], bf_warp = bs["bf"])
                 lstm_layer.set_weights(weights1)
                 #rnn.get_layer("lstm").set_weights(weights1) 
-                preds1 = predict_auto_batch(rnn, X)
+                preds1 = predict_auto_batch(rnn, X, reset_state=True)
                 preds_gridded = np.concatenate([
                             preds1.reshape(ny, nx, ntimes, 1),
                             preds10.reshape(ny, nx, ntimes, 1), 
