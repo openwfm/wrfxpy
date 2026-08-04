@@ -3,7 +3,8 @@
 #SBATCH --job-name=hrrri
 #SBATCH --partition=math-alderaan
 #SBATCH --output=logs/hinterval_%j.out
-#SBATCH --ntasks=4
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=64G
 
 if [ "$#" -ne 1 ]; then
