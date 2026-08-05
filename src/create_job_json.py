@@ -89,7 +89,7 @@ def build_domain_conf(grib_res, n_domains, profile_size, center_latlon, ref_rati
     parent_start = profile_size // ref_ratio + 1
     parent_end = parent_start + profile_size // ref_ratio - 1
     cell_size = int(round(grib_res * 1000))
-    subgrid_ratio = int(np.ceil(cell_size / 3**n_domains / subgrid_res / 2) * 2)
+    subgrid_ratio = int(np.ceil(cell_size / ref_ratio**n_domains / subgrid_res / 2) * 2)
 
     cell_sub_size = int(round(cell_size / ref_ratio))
     domains = {
@@ -355,6 +355,18 @@ while True:
 print()
 
 ################################################################################
+# Get if generate overnight json
+while True:
+    generate_overnight = input("Do you want to generate an overnight JSON? [Y/N] (Y): ")
+    if generate_overnight == "":
+        generate_overnight = "Y"
+    if generate_overnight.upper() in ["Y", "N"]:
+        print(f"You have entered {generate_overnight} to generate an overnight JSON")
+        break
+    print(f"Enter a valid answer (Y/N), not {generate_overnight}")
+print()
+
+################################################################################
 # Get the code for the fire
 cfg["grid_code"] = datetime.now(UTC).strftime(f"%Y-%m-%d_%H-{fire_name_input.replace(" ", "_").upper()}")
 
@@ -394,18 +406,20 @@ with open(destination_path, "w") as json_file:
     json.dump(json_data, json_file, indent=4)
     
 # Create overnight json
-overnight_hour = 7
-json_data_overnight = json_data.copy()
-json_data_overnight["grid_code"] = start_utc.replace(hour=overnight_hour).strftime(f"%Y-%m-%d_%H-{fire_name_input.replace(' ', '_').upper()}")
-json_data_overnight["start_utc"] = start_utc.replace(hour=overnight_hour).strftime("%Y-%m-%d_%H:%M:%S")
-json_data_overnight["end_utc"] = end_utc.replace(hour=6).strftime("%Y-%m-%d_%H:%M:%S")
-json_data_overnight["cycle_start_utc"] = start_utc.replace(hour=6).strftime("%Y-%m-%d_%H:%M:%S")
-json_data_overnight["fmda_geogrid_path"] = start_utc.replace(hour=overnight_hour).strftime("wksp_fmda/CONUS/%Y%m/fmda-CONUS-%Y%m%d-%H.geo")
-json_data_overnight["postproc"]["description"] = start_utc.replace(hour=overnight_hour).strftime(f"{fire_name_input.title()} {profile_size_input} %Y-%m-%d %Hz")
-overnight_job_id = start_utc.replace(hour=overnight_hour).strftime("{}_{}_%y%m%d_%Hz".format(fire_name_modified, profile_size_input))
-overnight_destination_path = osp.join("jobs", overnight_job_id + ".json")
-with open(overnight_destination_path, "w") as json_file:
-    json.dump(json_data_overnight, json_file, indent=4)
+if generate_overnight.upper() == "Y":
+    overnight_hour = 8
+    json_data_overnight = json_data.copy()
+    start_utc_overnight = (start_utc + timedelta(days=1)).replace(hour=overnight_hour)
+    json_data_overnight["grid_code"] = start_utc_overnight.strftime(f"%Y-%m-%d_%H-{fire_name_input.replace(' ', '_').upper()}")
+    json_data_overnight["start_utc"] = start_utc_overnight.strftime("%Y-%m-%d_%H:%M:%S")
+    json_data_overnight["end_utc"] = end_utc.replace(hour=6).strftime("%Y-%m-%d_%H:%M:%S")
+    json_data_overnight["cycle_start_utc"] = start_utc_overnight.replace(hour=6).strftime("%Y-%m-%d_%H:%M:%S")
+    json_data_overnight["fmda_geogrid_path"] = start_utc_overnight.strftime("wksp_fmda/CONUS/%Y%m/fmda-CONUS-%Y%m%d-%H/fmda-CONUS-%Y%m%d-%H.geo")
+    json_data_overnight["postproc"]["description"] = start_utc_overnight.strftime(f"{fire_name_input.title()} {profile_size_input} %Y-%m-%d %Hz")
+    overnight_job_id = start_utc_overnight.strftime("{}_{}_%y%m%d_%Hz".format(fire_name_modified, profile_size_input))
+    overnight_destination_path = osp.join("jobs", overnight_job_id + ".json")
+    with open(overnight_destination_path, "w") as json_file:
+        json.dump(json_data_overnight, json_file, indent=4)
 
 print(f"JSON is ready here: {destination_path}")
 print(f"./forecast.sh {destination_path} >& logs/{job_id}.log")

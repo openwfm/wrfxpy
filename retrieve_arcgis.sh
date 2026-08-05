@@ -3,4 +3,4 @@ source ~/.bashrc
 conda activate arcgis
 cd $(dirname "$0")
 export PYTHONPATH=src
-python src/fire_init/acq_arcgis.py $*
+python src/fire_init/acq_fire_data.py $*
