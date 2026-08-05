@@ -22,6 +22,10 @@ if [ -n "${DSHIELD_REPO_ROOT:-}" ] && [ -n "${DSHIELD_JOB_NAME:-}" ] && [ -n "${
         python3 "$DSHIELD_REPO_ROOT/src/event_log.py" \
             "$DSHIELD_JOB_NAME" "$1" "$DSHIELD_CASE_DIR" || true
     }
+    dshield_link_output() {
+        ln -sfn "$WORKDIR/slurm-$SLURM_JOB_ID.out" \
+            "$DSHIELD_CASE_DIR/slurm/slurm-$SLURM_JOB_ID.out" || true
+    }
     dshield_finish_job() {
         status=$?
         trap - EXIT
@@ -29,6 +33,7 @@ if [ -n "${DSHIELD_REPO_ROOT:-}" ] && [ -n "${DSHIELD_JOB_NAME:-}" ] && [ -n "${
         exit "$status"
     }
     dshield_job_event started
+    dshield_link_output
     trap dshield_finish_job EXIT
 fi
 
