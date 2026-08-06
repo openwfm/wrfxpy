@@ -446,7 +446,8 @@ def render_ignitions(js, max_dom):
                  'fmoist_run' : [0] * max_dom, 'fmoist_interp' : [0] * max_dom,
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
                  'fire_viscosity' : [0] * max_dom, 'fire_wind_log_interp': [0] * max_dom,
-                 'fire_use_windrf': [0] * max_dom, 'fire_upwinding': [0] * max_dom }
+                 'fire_use_windrf': [0] * max_dom, 'fire_upwinding': [0] * max_dom,
+                 'fire_can_fuel_read': [0] * max_dom }
     
     if js.use_realtime:
         fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
@@ -483,6 +484,7 @@ def render_ignitions(js, max_dom):
         nml_fire['fmoist_interp'][dom_id-1] = 1 # interpolate fm onto fire mesh
         nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
         nml_fire['fire_upwinding'][dom_id-1] = 3 # use ENO1
+        nml_fire['fire_can_fuel_read'][dom_id-1] = 1 # get canopy data from wrfinput file
 
         # for each ignition
         for ndx,ign in enumerate(dom_igns):
@@ -517,6 +519,7 @@ def render_ignitions(js, max_dom):
             nml_fire['fmoist_interp'][dom_id-1] = 1 # interpolate fm onto fire mesh
             nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
             nml_fire['fire_upwinding'][dom_id-1] = 3 # use ENO1
+            nml_fire['fire_can_fuel_read'][dom_id-1] = 1 # get canopy data from wrfinput file
 
     return { 'fire' : nml_fire }
 
