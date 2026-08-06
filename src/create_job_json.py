@@ -17,7 +17,7 @@ grib_sources = {
 } # resolutions in km (roughly)
 
 profile_sizes = {
-    "S": 72, "M": 96, "L": 144, "XL": 192
+    "S": 72, "M": 96, "L": 144, "XL": 192, "XXL": 288
 }
 
 # Functions #
