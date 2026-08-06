@@ -586,6 +586,16 @@ _var_wisdom = {
         'retrieve_as' : lambda d,t: np.ma.filled(np.ma.log10(np.ma.masked_less_equal(d.variables['FGRNHFX'][t,:,:], 0)), 0),
         'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:]),
     },
+    'FCANHFX' : {
+        'name' : 'Canopy heat flux [log]',
+        'native_unit' : 'W/m^2',
+        'colorbar' : 'W/m^2',
+        'colormap' : 'jet',
+        'transparent_values' : [-np.inf, 1],
+        'scale' : [0, 6],
+        'retrieve_as' : lambda d,t: np.ma.filled(np.ma.log10(np.ma.masked_less_equal(d.variables['FCANHFX'][t,:,:], 0)), 0),
+        'grid' : lambda d: (d.variables['FXLAT'][0,:,:], d.variables['FXLONG'][0,:,:]),
+    },
     'SMOKE_INT' : {
         'name' : 'vertically integrated smoke',
         'native_unit' : smoke_integrated_unit,

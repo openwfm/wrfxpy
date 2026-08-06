@@ -81,7 +81,7 @@ INNER_POSTPROC = [
     "PM25_SFC_D", "PLUME_HEIGHT_kft", "SMOKE1000FT_AGL_D",
     "SMOKE4000FT_AGL_D", "SMOKE6000FT_AGL_D", "VR_SFC",
     "VR1000FT_AGL", "VR4000FT_AGL", "VR6000FT_AGL", "HDW", "FOSBERG",
-    "FIRE_AREA", "FGRNHFX", "FLINEINT_btupftps", "ROS_chsph",
+    "FIRE_AREA", "FGRNHFX", "FCANHFX"
 ]
 
 def build_domain_conf(grib_res, n_domains, profile_size, center_latlon, ref_ratio=3, subgrid_res=30):    

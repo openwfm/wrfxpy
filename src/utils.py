@@ -161,7 +161,7 @@ def ensure_dir(path):
     """
     path_dir = osp.dirname(path)
     if not osp.exists(path_dir):
-        os.makedirs(path_dir)
+        os.makedirs(path_dir, exist_ok=True)
     return path
 
 def delete(dir):
