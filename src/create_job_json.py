@@ -129,7 +129,7 @@ def build_job_json(cfg, grib_res, n_domains, profile_size):
     patch_size = 8
     n_cores = (profile_size / patch_size)**2
     ppn = clusters[sys_cfg["qsys"]].get("ppn", 64)
-    n_nodes = int(np.floor(n_cores / ppn))
+    n_nodes = min(4, int(np.floor(n_cores / ppn)))
     if n_nodes == 0:
         n_nodes = 1
         ppn = n_cores
