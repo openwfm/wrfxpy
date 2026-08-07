@@ -484,7 +484,7 @@ def render_ignitions(js, max_dom):
         nml_fire['fmoist_interp'][dom_id-1] = 1 # interpolate fm onto fire mesh
         nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
         nml_fire['fire_upwinding'][dom_id-1] = 3 # use ENO1
-        nml_fire['fire_can_fuel_read'][dom_id-1] = 1 # get canopy data from wrfinput file
+        #nml_fire['fire_can_fuel_read'][dom_id-1] = 1 # get canopy data from wrfinput file
 
         # for each ignition
         for ndx,ign in enumerate(dom_igns):
@@ -519,7 +519,7 @@ def render_ignitions(js, max_dom):
             nml_fire['fmoist_interp'][dom_id-1] = 1 # interpolate fm onto fire mesh
             nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
             nml_fire['fire_upwinding'][dom_id-1] = 3 # use ENO1
-            nml_fire['fire_can_fuel_read'][dom_id-1] = 1 # get canopy data from wrfinput file
+            #nml_fire['fire_can_fuel_read'][dom_id-1] = 1 # get canopy data from wrfinput file
 
     return { 'fire' : nml_fire }
 

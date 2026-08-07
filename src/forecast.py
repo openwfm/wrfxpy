@@ -641,7 +641,8 @@ def vars_add_to_geogrid(js):
             var = 'NFUEL_CAT_13'
         wisdom = get_wisdom(var)
         if (
-            wisdom['name'] == 'NFUEL_CAT'
+            'name' in wisdom.keys()
+            and wisdom['name'] == 'NFUEL_CAT'
             and 'category_range' in wisdom
             and nfuelcats != wisdom['category_range'][1]
         ):
