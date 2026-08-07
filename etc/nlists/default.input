@@ -156,6 +156,7 @@ fire_viscosity                      =   0,      0
 fire_boundary_guard                 =   0,      0
 fire_upwinding                      =   0,      0
 use_diag_hf                         =   1
+hfx_grn_scale                       =   2
 /
 
   &bdy_control
