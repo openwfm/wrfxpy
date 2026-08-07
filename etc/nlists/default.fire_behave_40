@@ -3,7 +3,7 @@ fire_wind_height = 6.096           ! height to interpolate wind to (m), 6.096 Be
 cmbcnst  = 1.8605e+07              ! J/kg combustion heat dry fuel
 hfgl     = 17.e4                   ! W/m^2 heat flux to ignite canopy
 fuelmc_g = 0.40                    ! ground fuel moisture, set = 0 for dry
-fuelmc_c = 1.00                    ! canopy fuel moisture, set = 0 for dry
+fuelmc_c = 0.80                    ! canopy fuel moisture, set = 0 for dry
 nfuelcats = 40                     ! number of fuel categories used
 veg_ros_model = 4                  ! ROS formula: 0 =  MacArthur, 1 = Rothermel, 2 = Balbi, 3 = WIRC, 4 = Behave
 /
