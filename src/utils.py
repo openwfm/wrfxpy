@@ -447,8 +447,8 @@ def render_ignitions(js, max_dom):
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
                  'fire_viscosity' : [0] * max_dom, 'fire_wind_log_interp': [0] * max_dom,
                  'fire_use_windrf': [0] * max_dom, 'fire_upwinding': [0] * max_dom,
-                 'fire_can_fuel_read': [0] * max_dom }
-    
+                 'fire_can_fuel_read': [-1] * max_dom }
+
     if js.use_realtime:
         fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
         nml_fire.update({'fire_perimeter_time': [0] * max_dom})
