@@ -56,6 +56,7 @@ class SSHShuttle(object):
         self.key = cfg['shuttle_ssh_key']
         self.lock_path = cfg['shuttle_lock_path']
         self.lock_file = None
+        self.jump_ssh = None
         self.workspace_path = cfg['workspace_path']
         self.wrfxweb_path = cfg.get('wrfxweb_path', 'wrfxweb')
         self.wrfxweb_catalog_id = cfg.get('wrfxweb_catalog_id', 'public') 
@@ -119,6 +120,10 @@ class SSHShuttle(object):
         logging.info('SHUTTLE operations completed, closing connection.')
         self.sftp.close()
         self.ssh.close()
+
+        if self.jump_ssh is not None:
+            self.jump_ssh.close()
+            
         self.connected = False
 
     
