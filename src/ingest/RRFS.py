@@ -18,7 +18,6 @@ class RRFS(GribForecast):
     domain = None
     grid = None
     product = None
-    product_root = "rrfs_public"
 
     def __init__(self, arg):
         super(RRFS, self).__init__(arg)
@@ -76,13 +75,12 @@ class RRFS(GribForecast):
             )
 
         path_tmpl = (
-            '{root}/rrfs.%04d%02d%02d/%02d/'
+            'rrfs.%04d%02d%02d/%02d/'
             'rrfs.t%02dz.{product}.{grid}.f%03d.{domain}.grib2'
         )
 
         grib_files = [
             path_tmpl.format(
-                root=self.product_root,
                 product=self.product,
                 grid=self.grid,
                 domain=self.domain,
@@ -101,11 +99,11 @@ class RRFS(GribForecast):
 
     id = "RRFS"
     info_url = "https://rapidrefresh.noaa.gov/RRFS/"
-    info_aws = "https://registry.opendata.aws/noaa-rrfs/"
+    info_aws = "https://registry.opendata.aws/noaa-rrfs-ops/"
     info_text = "NOAA RRFSv1 Rapid Refresh Forecast System"
     info = "The Rapid Refresh Forecast System (RRFSv1)"
-    remote_url = ["s3://noaa-rrfs-pds/"]
-    browse_aws = "https://noaa-rrfs-pds.s3.amazonaws.com/index.html"
+    remote_url = ["s3://noaa-rrfs-ops-pds/"]
+    browse_aws = "https://noaa-rrfs-ops-pds.s3.amazonaws.com/index.html"
 
 
 class RRFS_CONUS(RRFS):

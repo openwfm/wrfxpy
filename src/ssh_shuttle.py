@@ -72,7 +72,38 @@ class SSHShuttle(object):
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.load_system_host_keys()
         #ssh.load_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
-        ssh.connect(self.host, username=self.user, key_filename=self.key)
+        jump_host = os.environ.get("SSH_JUMP_HOST")
+
+        if jump_host:
+            logging.info('SHUTTLE connecting through jump host %s' % jump_host)
+
+            jump = paramiko.SSHClient()
+            jump.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            jump.load_system_host_keys()
+            jump.connect(jump_host)
+
+            channel = jump.get_transport().open_channel(
+                "direct-tcpip",
+                (self.host, 22),
+                ("127.0.0.1", 0)
+            )
+
+            ssh.connect(
+                self.host,
+                username=self.user,
+                key_filename=self.key,
+                sock=channel
+            )
+
+            self.jump_ssh = jump
+        else:
+            ssh.connect(
+                self.host,
+                username=self.user,
+                key_filename=self.key
+            )
+
+
         self.ssh = ssh
         self.sftp = ssh.open_sftp()
         # change to the remote root immediately
