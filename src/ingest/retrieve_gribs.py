@@ -61,7 +61,7 @@ if __name__ == '__main__':
         grib_src = HRRR_S(js)
     elif grib_src_name == 'HRRR':
         grib_src = HRRR(js)
-    elif grib_src_name == 'NAM':
+    elif grib_src_name == 'NAM218':
         grib_src = NAM218(js)
     elif grib_src_name == 'NAM227':
         grib_src = NAM227(js)
