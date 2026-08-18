@@ -240,19 +240,11 @@ while True:
     if run_conus == "":
         run_conus = "Y"
     if run_conus.upper() == "Y":
-<<<<<<< HEAD
-        print(f"You have entered {run_conus} to run a CONUS wildfire\nRunning CONUS Wildfire")
-        default_grib_source = defaults_grib_sources["CONUS"]
-        break
-    elif run_conus.upper() == "N":
-        print(f"You have entered N to run a CONUS wildfire\nRunning Canada Wildfire")
-=======
         print(f"You have selected to run a CONUS wildfire\nCreating CONUS Wildfire job json")
         default_grib_source = defaults_grib_sources["CONUS"]
         break
     elif run_conus.upper() == "N":
         print(f"You have selected to run a Canada wildfire\nCreating Canada Wildfire job json")
->>>>>>> origin/improve_job_json_creation
         default_grib_source = defaults_grib_sources["Canada"]
         break
 
