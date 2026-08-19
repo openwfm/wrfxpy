@@ -1561,7 +1561,7 @@ def verify_inputs(args,sys_cfg):
                 raise OSError(err % args[key])
 
     # check for valid grib source
-    available_grib_sources = ['HRRR', 'RAP', 'RRFS', 'RRFSNA', 'NAM218', 'NAM227', 'NARR', 'CFSR', 'GFSA', 'GFSF']
+    available_grib_sources = ['HRRR', 'RAP', 'RRFS', 'RRFSNA', 'NAM', 'NAM218', 'NAM227', 'NARR', 'CFSR', 'GFSA', 'GFSF']
     if 'grib_source' in args:
         if args['grib_source'] not in available_grib_sources:
             raise ValueError('Invalid grib source %s, must be one of %s' % (args['grib_source'], ', '.join(available_grib_sources)))
