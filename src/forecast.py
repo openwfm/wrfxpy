@@ -379,7 +379,7 @@ def run_fire_init(js, q):
         q.put('FAILURE')
 
 
-def retrieve_gribs_and_run_ungrib(js, grib_source, q):
+def retrieve_gribs_and_run_ungrib(js, grib_source, q, download_q):
     """
     This function retrieves required GRIB files and runs ungrib.
 
@@ -397,7 +397,15 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
         logging.info("retrieving GRIB files from %s" % grib_source.id)
 
         download_whole_cycle = js.get('download_whole_cycle',False)
-        manifest = grib_source.retrieve_gribs(js.start_utc, js.end_utc, js.ref_utc, js.cycle_start_utc, download_whole_cycle)
+        try:
+            manifest = grib_source.retrieve_gribs(
+                js.start_utc, js.end_utc, js.ref_utc, js.cycle_start_utc, download_whole_cycle
+            )
+        except Exception as e:
+            download_q.put(("FAILURE", grib_source.id, repr(e)))
+            raise
+
+        download_q.put(("SUCCESS", grib_source.id, None))
         logging.info('manifest: ' + str(manifest))
         grib_file = grib_source.id+'.json'
         json.dump(manifest, open(osp.join(js.jobdir,grib_file),'w'), indent=4, separators=(',', ': '), default=serial_json)
@@ -898,6 +906,7 @@ def execute(args,job_args):
     #  -> GRIB2 download ->  UNGRIB ->
 
     proc_q = Queue()
+    download_q = Queue()
 
     if js.satellite_source:
         sat_proc = {}
@@ -914,7 +923,7 @@ def execute(args,job_args):
 
     grib_proc = {}
     for grib_source in js.grib_source:
-        grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib, args=(js, grib_source, proc_q))
+        grib_proc[grib_source.id] = Process(target=retrieve_gribs_and_run_ungrib,args=(js, grib_source, proc_q, download_q),)
     
     logging.info('execute: starting parallel GEOGRID, GRIB2/UNGRIB, and Satellite retrieval')
 
@@ -930,9 +939,31 @@ def execute(args,job_args):
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].start()
+    logging.info("execute: waiting for all GRIB downloads to complete")
+
+    completed_downloads = set()
+
+    while len(completed_downloads) < len(js.grib_source):
+        status, source_id, error = download_q.get()
+
+        if status != "SUCCESS":
+            logging.error(
+                "GRIB download failed for %s before completion: %s",
+                source_id,
+                error,
+            )
+            return
+
+        completed_downloads.add(source_id)
+
+    logging.info(
+        "ALL_GRIB_DOWNLOADS_COMPLETE job_id=%s sources=%s",
+        js.job_id,
+        ",".join(sorted(completed_downloads)),
+    )
 
     # wait until all tasks are done
-    logging.info('execute: waiting until all tasks are done')
+    logging.info('execute: waiting until all remaining tasks are done')
 
     for grib_source in js.grib_source:
         grib_proc[grib_source.id].join()
