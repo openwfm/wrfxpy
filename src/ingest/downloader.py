@@ -125,6 +125,7 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
         command=['aws','s3','cp',url,ensure_dir(local_path)]
         if token is None:
             command.append('--no-sign-request')
+        command.append('--no-progress')
     else:
         command=[wget,'-O',ensure_dir(local_path),url]
         for opt in wget_options:
