@@ -361,7 +361,7 @@ print()
 cfg["cycle_start_utc"] = cycle_start_utc.strftime("%Y-%m-%d_%H:%M:%S")
 
 ################################################################################
-# Get the end time and ignition time #
+# Get the end time #
 while True:
     time_input = input(f"How many hours would you like to run the simulation for ({max_forecast_time}): ")
     if time_input == "":
