@@ -9,13 +9,51 @@ import os
 sys_cfg = load_sys_cfg()
 clusters_path = osp.join(sys_cfg["sys_install_path"], "etc/clusters.json")
 clusters = json.load(open(clusters_path))
-
-grib_sources = {
-    "GFSF": 28, "RAP": 13, "RRFSNA": 3,
-    "NAM218": 12, "NAM227": 5, "RRFS": 3, 
-    "HRRR": 3
-} # resolutions in km (roughly)
-
+grib_info = {
+    "GFSF" : {
+        "cycle" : ("00", "06", "12", "18"),
+        "lead-time" : 384,
+        "latency" : 5,
+        "resolution" : 28
+    },
+    "RRFS" : {
+        "cycle" : ("00", "06", "12", "18"),
+        "lead-time" : 84,
+        "latency" : 4,
+        "resolution" : 3
+    },
+    "RRFSNA" : {
+        "cycle" : ("00", "06", "12", "18"),
+        "lead-time" : 84,
+        "latency" : 4,
+        "resolution" : 3
+    },
+    "NAM218" : {
+        "cycle" : ("00", "06", "12", "18"),
+        "lead-time" : 84,
+        "latency" : 3,
+        "resolution" : 12
+    },
+    "NAM227" : {
+        "cycle" : ("00", "06", "12", "18"),
+        "lead-time" : 60,
+        "latency" : 3,
+        "resolution" : 5
+    },
+    "HRRR" : {
+        "cycle" : ("00", "06", "12", "18"),
+        "lead-time" : 48,
+        "latency" : 2,
+        "resolution" : 3
+    },
+    "RAP" : {
+        "cycle" : ("03", "09", "15", "21"),
+        "lead-time" : 51,
+        "latency" : 1,
+        "resolution" : 13
+    },
+}
+defaults_grib_sources = {"CONUS": "RRFS", "Canada": "RAP"}
 profile_sizes = {
     "S": 72, "M": 96, "L": 144, "XL": 192, "XXL": 288
 }
@@ -169,37 +207,73 @@ def build_job_json(cfg, grib_res, n_domains, profile_size):
             f"wksp_fmda/CONUS/%Y%m/fmda-CONUS-%Y%m%d-%H/fmda-CONUS-%Y%m%d-%H.geo"
         ),
     }
+def get_max_forecast_time(start_utc, selected_grib):
+    cycle_hours = [int(hour) for hour in selected_grib["cycle"]]
+    max_lead_hours = selected_grib["lead-time"]
+    # Only grab earlier cycles
+    valid_hours = [hour for hour in cycle_hours if hour <= start_utc.hour]
+    
+    # Earlier run today
+    if valid_hours:
+        cycle_hour = max(valid_hours)
+        cycle_time = start_utc.replace(hour=cycle_hour,minute=0,second=0,microsecond=0)
+    else: #Prior day run
+        cycle_hour = max(cycle_hours)
+        previous_day = start_utc - timedelta(days=1)
+        cycle_time = previous_day.replace(hour=cycle_hour,minute=0,second=0,microsecond=0)
 
+    elapsed_hours = (start_utc - cycle_time).total_seconds() / 3600
+    available_forecast_hours = max_lead_hours - elapsed_hours
+
+    return cycle_time, available_forecast_hours
 ################################################################################
 # Create dictionary to hold user data and define current datetime in Local and UTC #
 cfg = {} # dictionary to hold user inputs
 
+
+
+print('Launching create_job_json.py\n')
+################################################################################
+# Get if run or not the whole workflow
+while True:
+    run_conus = input("Is the fire from CONUS? [Y/N] (Y): ")
+    if run_conus == "":
+        run_conus = "Y"
+    if run_conus.upper() == "Y":
+        print(f"You have selected to run a CONUS wildfire\nCreating CONUS Wildfire job json")
+        default_grib_source = defaults_grib_sources["CONUS"]
+        break
+    elif run_conus.upper() == "N":
+        print(f"You have selected to run a Canada wildfire\nCreating Canada Wildfire job json")
+        default_grib_source = defaults_grib_sources["Canada"]
+        break
+
+    print(f"Enter a valid answer (Y/N), not {run_conus}")
+print()
+
 ################################################################################
 # Get the grib source from the user #
-print(
-    "Long-range forecast lead-time limitations by forcing:\n"
-    " - GFSF (00/06/12/18 UTC): 384 h: 5h latency\n"
-    " - RAP (03/09/15/21 UTC): 51 h: 1h latency\n"
-    " - NAM218 (00/06/12/18 UTC): 84 h: 3h latency\n"
-    " - NAM227 (00/06/12/18 UTC): 60 h: 3h latency\n"
-    " - RRFSNA (00/06/12/18 UTC): 84 h: 4h latency\n"
-    " - RRFS (00/06/12/18 UTC): 84 h: 4h latency\n"
-    " - HRRR (00/06/12/18 UTC): 48 h: 2h latency\n"
-)
+
+print("Long-range forecast lead-time limitations by forcing:")
+for forcing, value in grib_info.items():
+    cycles = "/".join(value["cycle"])
+    print(f" - {forcing:<7} ({cycles} UTC): {value['lead-time']:>3} h: {value['latency']}h latency")
+
 while True:
-    grib_sources_input = input("Enter a grib source {} (HRRR): ".format(grib_sources.keys()))
+
+    grib_sources_input = input(f"Enter a grib source {grib_info.keys()} ({default_grib_source}): ")
     if grib_sources_input == "":
-        grib_sources_input = "HRRR"
+        grib_sources_input = default_grib_source
     grib_sources_input = grib_sources_input.upper()
-    if not grib_sources_input in grib_sources.keys():
+    if not grib_sources_input in grib_info.keys():
         print("Please enter a valid grib source.")
         continue
-    grib_res = grib_sources[grib_sources_input]
+    grib_res = grib_info[grib_sources_input]["resolution"]
     print(f"You have selected {grib_sources_input} ({grib_res} km)")
     print()
     cfg["grib_source"] = grib_sources_input
     break
-
+forcing_info = grib_info[grib_sources_input]
 ################################################################################
 # Get domain configuration and resolution based on target resolution
 while True:
@@ -238,9 +312,18 @@ while True:
 # Get the simulation start time from the user 
 while True:
     utc_now = datetime.now(UTC)
-    utc_now_str = utc_now.strftime("%Y-%m-%d_%H:%M:%S")
-    start_utc = input('Current UTC time is {}. Enter start time in UTC with format "%Y-%m-%d_%H:%M:%S": '.format(utc_now_str))
+    utc_now_str = utc_now.strftime("%Y-%m-%d_%H:%M:%S") 
+    
+    default_hour = 21 if grib_sources_input == "RAP" else 20
+    utc_default_dt = utc_now.replace(hour=default_hour,minute=0,second=0,microsecond=0)
+    if utc_now < utc_default_dt:
+        utc_default_dt -= timedelta(days=1)
+    utc_default = utc_default_dt.strftime("%Y-%m-%d_%H:%M:%S")
+    
+    start_utc = input(f'Current UTC time is {utc_now_str}. Enter start time in UTC with format "%Y-%m-%d_%H:%M:%S" ({utc_default}): ')
     try:
+        if start_utc == "":
+            start_utc = utc_default
         start_utc = datetime.strptime(start_utc, "%Y-%m-%d_%H:%M:%S").replace(tzinfo=UTC)
     except:
         print(f"Enter a valid UTC time, not {start_utc}")
@@ -252,32 +335,12 @@ while True:
 print(start_utc.strftime("Simulation Start Time: %Y-%m-%d_%H:%M:%S"))
 print()
 cfg["start_utc"] = start_utc.strftime("%Y-%m-%d_%H:%M:%S")
-
-################################################################################
-# Get the end time and ignition time #
-while True:
-    time_input = input("How many hours would you like to run the simulation for (48): ")
-    if time_input == "":
-        time_input = 48
-    try:
-        hours = int(time_input)
-    except:
-        print(f"Please enter a valid hours value, not {time_input}")
-        continue
-    break
-
-end_utc = start_utc + timedelta(hours=hours)
-cfg["end_utc"] = end_utc.strftime("%Y-%m-%d_%H:%M:%S")
-print(f"The end time of the simulation: {end_utc}")
-print()
-
+cycle_time, max_forecast_time = get_max_forecast_time(start_utc, forcing_info)
 ################################################################################
 # Get the cycle start time from the user 
 while True:
-    utc_now = datetime.now(UTC)
-    utc_now_str = utc_now.strftime("%Y-%m-%d_%H:%M:%S")
-    start_utc_str = start_utc.strftime("%Y-%m-%d_%H:%M:%S")
-    cycle_start_utc = input('Enter the cycle start time in UTC with format "%Y-%m-%d_%H:%M:%S" ({}): '.format(start_utc_str))
+    start_utc_str = cycle_time.strftime("%Y-%m-%d_%H:%M:%S")
+    cycle_start_utc = input(f'Enter the cycle start time in UTC with format "%Y-%m-%d_%H:%M:%S" ({start_utc_str}): ')
     if cycle_start_utc == '':
         cycle_start_utc = start_utc_str
     try:
@@ -288,11 +351,36 @@ while True:
     if cycle_start_utc > start_utc:
         print(f"Cycle start time {cycle_start_utc} needs to be <= start time {start_utc}")
         continue
+    if not cycle_start_utc.hour in tuple(map(int, forcing_info["cycle"])):
+        print(f"Start hour ({cycle_start_utc.hour}) is not a valid cycle start hour for {grib_sources_input}. Accepted values are: ({cycles})")
+        continue
     break
 
 print(cycle_start_utc.strftime("Simulation Cycle Start Time: %Y-%m-%d_%H:%M:%S"))
 print()
 cfg["cycle_start_utc"] = cycle_start_utc.strftime("%Y-%m-%d_%H:%M:%S")
+
+################################################################################
+# Get the end time #
+while True:
+    time_input = input(f"How many hours would you like to run the simulation for ({max_forecast_time}): ")
+    if time_input == "":
+        time_input = max_forecast_time
+    try:
+        hours = int(time_input)
+    except:
+        print(f"Please enter a valid hours value, not {time_input}")
+        continue
+    if hours > max_forecast_time:
+        print(f'Duration exceeds maximum lead time {max_forecast_time} for {grib_sources_input}')
+        continue
+    break
+
+end_utc = start_utc + timedelta(hours=hours)
+cfg["end_utc"] = end_utc.strftime("%Y-%m-%d_%H:%M:%S")
+print(f"The end time of the simulation: {cfg["end_utc"]}")
+print()
+
 
 ################################################################################
 # Get the central latitude and longitude values
@@ -330,17 +418,6 @@ if fire_name_input == "":
 print(f"You have entered {fire_name_input} as the fire name")
 print()
 
-################################################################################
-# Get if run or not the whole workflow
-while True:
-    run_conus = input("Is the fire from CONUS? [Y/N] (Y): ")
-    if run_conus == "":
-        run_conus = "Y"
-    if run_conus.upper() in ["Y", "N"]:
-        print(f"You have entered {run_conus} to run a CONUS wildfire")
-        break
-    print(f"Enter a valid answer (Y/N), not {run_conus}")
-print()
 
 ################################################################################
 # Get if run or not the whole workflow
@@ -407,13 +484,25 @@ with open(destination_path, "w") as json_file:
     
 # Create overnight json
 if generate_overnight.upper() == "Y":
-    overnight_hour = 8
+    if grib_sources_input == "RAP":
+        overnight_cycle_start = 9
+        overnight_hour = 9
+        overnight_run_time = 51
+        overnight_grib = "RAP"
+
+    else:
+        overnight_cycle_start = 6
+        overnight_hour = 8
+        overnight_run_time = 46
+        overnight_grib = "HRRR"
+
     json_data_overnight = json_data.copy()
     start_utc_overnight = (start_utc + timedelta(days=1)).replace(hour=overnight_hour)
     json_data_overnight["grid_code"] = start_utc_overnight.strftime(f"%Y-%m-%d_%H-{fire_name_input.replace(' ', '_').upper()}")
+    json_data_overnight["grib_source"] = overnight_grib
     json_data_overnight["start_utc"] = start_utc_overnight.strftime("%Y-%m-%d_%H:%M:%S")
-    json_data_overnight["end_utc"] = end_utc.replace(hour=6).strftime("%Y-%m-%d_%H:%M:%S")
-    json_data_overnight["cycle_start_utc"] = start_utc_overnight.replace(hour=6).strftime("%Y-%m-%d_%H:%M:%S")
+    json_data_overnight["end_utc"] = (start_utc_overnight + timedelta(hours=overnight_run_time)).strftime("%Y-%m-%d_%H:%M:%S")
+    json_data_overnight["cycle_start_utc"] = start_utc_overnight.replace(hour=overnight_cycle_start).strftime("%Y-%m-%d_%H:%M:%S")
     json_data_overnight["fmda_geogrid_path"] = start_utc_overnight.strftime("wksp_fmda/CONUS/%Y%m/fmda-CONUS-%Y%m%d-%H/fmda-CONUS-%Y%m%d-%H.geo")
     json_data_overnight["postproc"]["description"] = start_utc_overnight.strftime(f"{fire_name_input.title()} {profile_size_input} %Y-%m-%d %Hz")
     overnight_job_id = start_utc_overnight.strftime("{}_{}_%y%m%d_%Hz".format(fire_name_modified, profile_size_input))
