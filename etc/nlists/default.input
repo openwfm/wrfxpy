@@ -105,13 +105,13 @@
  /
 
 &fire ! be sure to set sr_x,sr_y in domains-namelist (to set refinement in x,y)
-ifire                               =   0,     2
+ifire                               =   0,      2
 fire_fuel_read                      =   0,      -1
 fire_fuel_cat                       =   3,      1
 fire_print_msg                      =   0,      0
 fire_print_file                     =   0,      0
-fmoist_run                          =   .false.,        .true.
-fmoist_interp                       =   .false.,        .true.
+fmoist_run                          =   0,      1
+fmoist_interp                       =   0,      1
 fire_fmc_read                       =   0,      0
 fmoist_freq                         =   0,      0
 fmoist_dt                           =   0,      600
@@ -152,8 +152,9 @@ fire_ignition_end_lat5              =   0,      0
 fire_ignition_radius5               =   0,      0
 fire_ignition_start_time5           =   0,      0
 fire_ignition_end_time5             =   0,      0
-fire_viscosity                      =   0
+fire_viscosity                      =   0,      0
 fire_boundary_guard                 =   0,      0
+fire_upwinding                      =   0,      0
 /
 
   &bdy_control
