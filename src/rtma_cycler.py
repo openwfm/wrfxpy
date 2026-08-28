@@ -636,10 +636,10 @@ if __name__ == '__main__':
             logging.warning(e)
     else:
         print('Usage: to use domains configured in etc/fmda_cycler.json:')
-        print('./rtma_cycler.sh anything')
+        print('wrfx cycle rtma anything')
         print('To use a custom domain named FIRE by giving a bounding box:')
-        print('./rtma_cycler.sh lat1 lon1 lat2 lon2')
-        print('Example: ./rtma_cycler.sh 42, -124.6, 49, -116.4')
+        print('wrfx cycle rtma lat1 lon1 lat2 lon2')
+        print('Example: wrfx cycle rtma 42 -124.6 49 -116.4')
         exit(1) 
 
     logging.info('regions: %s' % json.dumps(cfg.regions))

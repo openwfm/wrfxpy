@@ -1,10 +1,10 @@
 Forecasting 
 ******************
 
-The script ``forecast.sh`` serves to run weather forecasts, fire danger forecasts and fire
+The command ``wrfx forecast`` runs weather forecasts, fire danger forecasts and fire
 simulations depending on its settings.
 
-The script requires a JSON configuration file to control its execution, for an example refer
+The command requires a JSON configuration file to control its execution, for an example refer
 to the :doc:`quickstart`.  The configuration file is JSON dictionary with the keys described
 in the following sections.  Not all keys are required.
 
@@ -265,4 +265,3 @@ Example with remote shuttling::
 The second example will send the complete visualization package to the remote server after the forecast is complete.
 The ``description`` string should be a short descriptive identifier of the simulation.
 This text will be shown to the user in the initial catalog menu on *wrfxweb* and thus also shouldn't be too long.
-

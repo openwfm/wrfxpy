@@ -39,8 +39,8 @@ if __name__ == '__main__':
 		to_utc = esmf_to_utc(et_esmf)
 		sat_sources = ['Terra', 'Aqua', 'SNPP']
 	else:
-		print('Usage: ./retrieve_sat.sh input.json')
-		print('   or: ./retrieve_sat.sh coord start_time end_time')
+		print('Usage: wrfx ingest satellite input.json')
+		print('   or: wrfx ingest satellite coord start_time end_time')
 		print('	  notes:')
 		print('	  	*) coord - min_lon,max_lon,min_lat,max_lat')
 		print('	  	*) start_time - string, YYYYMMDDHHMMSS')
@@ -83,4 +83,3 @@ if __name__ == '__main__':
 		noaa20=NOAA20(sys_cfg)
 		# retrieve granules
 		m_noaa20=noaa20.retrieve_data_sat(bounds, from_utc, to_utc)
-

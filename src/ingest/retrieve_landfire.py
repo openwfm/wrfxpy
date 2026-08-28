@@ -101,8 +101,8 @@ def retrieve_landfire(opt_search,local_path,file_name):
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print('Usage: ./retrieve_landfire.sh min_lon,max_lon,min_lat,max_lat')
-        print('Example: ./retrieve_landfire.sh -112.8115,-112.1661,39.4820,39.9750')
+        print('Usage: wrfx ingest landfire min_lon max_lon min_lat max_lat')
+        print('Example: wrfx ingest landfire -112.8115 -112.1661 39.4820 39.9750')
         sys.exit(-1)
     else:
         coords = sys.argv[1].split(',')
@@ -110,13 +110,13 @@ if __name__ == '__main__':
             bbox = tuple([float(c) for c in coords])
         else:
             print('Invalid argument: {}'.format(sys.argv[1]))
-            print('Usage: ./retrieve_landfire.sh min_lon,max_lon,min_lat,max_lat')
-            print('Example: ./retrieve_landfire.sh -112.55,-112.4,39.65,39.8')
+            print('Usage: wrfx ingest landfire min_lon max_lon min_lat max_lat')
+            print('Example: wrfx ingest landfire -112.55 -112.4 39.65 39.8')
             sys.exit(-1)
         if not check_bbox(bbox):
             print('Invalid bounding box: {}'.format(sys.argv[1]))
-            print('Usage: ./retrieve_landfire.sh min_lon,max_lon,min_lat,max_lat')
-            print('Example: ./retrieve_landfire.sh -112.55,-112.4,39.65,39.8')
+            print('Usage: wrfx ingest landfire min_lon max_lon min_lat max_lat')
+            print('Example: wrfx ingest landfire -112.55 -112.4 39.65 39.8')
             sys.exit(-1)
 
     file_name = 'retrieve_landfire_{0:.4f}_{1:.4f}_{2:.4f}_{3:.4f}'.format(*bbox)

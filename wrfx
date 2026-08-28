@@ -1,0 +1,306 @@
+#!/usr/bin/env python3
+"""Command-line interface for WRFxPy."""
+
+import argparse
+import os
+from pathlib import Path
+import runpy
+import subprocess
+import sys
+import tempfile
+import zipfile
+
+
+INSTALL_DIR = Path(__file__).resolve().parent
+SOURCE_DIR = INSTALL_DIR / "src"
+CALLER_DIR = Path.cwd()
+
+
+def user_path(value):
+    """Resolve a user-supplied path before commands enter INSTALL_DIR."""
+    path = Path(value).expanduser()
+    return str((CALLER_DIR / path).resolve()) if not path.is_absolute() else str(path)
+
+
+def variable_instructions(value):
+    """Resolve an @instruction file while leaving a variable list unchanged."""
+    return "@" + user_path(value[1:]) if value.startswith("@") else value
+
+
+def run_script(script, arguments):
+    """Run one existing Python entry point with the supplied arguments."""
+    old_argv = sys.argv
+    old_cwd = Path.cwd()
+    sys.path.insert(0, str(SOURCE_DIR))
+    os.chdir(str(INSTALL_DIR))
+    sys.argv = [str(SOURCE_DIR / script)] + [str(value) for value in arguments]
+    try:
+        runpy.run_path(sys.argv[0], run_name="__main__")
+    finally:
+        sys.argv = old_argv
+        os.chdir(str(old_cwd))
+        if sys.path[0] == str(SOURCE_DIR):
+            sys.path.pop(0)
+    return 0
+
+
+def dispatch_script(args):
+    values = list(args._prefix)
+    for name in args._argument_names:
+        value = getattr(args, name)
+        if value is None:
+            continue
+        if isinstance(value, list):
+            values.extend(value)
+        else:
+            values.append(value)
+    return run_script(args._script, values)
+
+
+def dispatch_satellite_output(args):
+    run_script("process_sat_output.py", [args.job_id])
+    return run_script("make_kmz.py", [args.job_id])
+
+
+def dispatch_landfire(args):
+    bbox = ",".join(str(value) for value in (
+        args.min_lon, args.max_lon, args.min_lat, args.max_lat))
+    return run_script("ingest/retrieve_landfire.py", [bbox])
+
+
+def dispatch_geogrid_convert(args):
+    arguments = [args.geotiff, args.geogrid_directory, args.variable]
+    if args.bounds:
+        arguments.append(",".join(str(value) for value in args.bounds))
+    return run_script("geo/convert_geotiff.py", arguments)
+
+
+def dispatch_arcgis(args):
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(SOURCE_DIR)
+    command = [
+        "conda", "run", "--no-capture-output", "-n", "arcgis", "python",
+        str(SOURCE_DIR / "fire_init/acq_arcgis.py"),
+    ] + args.arguments
+    return subprocess.call(command, cwd=str(INSTALL_DIR), env=environment)
+
+
+def dispatch_satellite(args):
+    arguments = list(args.arguments)
+    if len(arguments) == 1:
+        arguments[0] = user_path(arguments[0])
+    return run_script("ingest/retrieve_sat.py", arguments)
+
+
+def dispatch_csv_kmz(args):
+    output = Path(args.output)
+    with tempfile.TemporaryDirectory(prefix="wrfx-kmz-") as tmp_dir:
+        kml_path = Path(tmp_dir) / "doc.kml"
+        run_script("vis/csv2kml.py", [args.csv_file, kml_path])
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(str(output), "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.write(str(kml_path), "doc.kml")
+    return 0
+
+
+def add_script(parser, script, argument_names, prefix=()):
+    parser.set_defaults(
+        _handler=dispatch_script,
+        _script=script,
+        _argument_names=argument_names,
+        _prefix=prefix,
+    )
+
+
+def add_job_command(subparsers, name, help_text, cleanup_command):
+    parser = subparsers.add_parser(name, help=help_text)
+    parser.add_argument("job_id")
+    add_script(parser, "cleanup.py", ["job_id"], [cleanup_command])
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="wrfx",
+        description="Run WRFxPy forecasts and supporting operations.",
+    )
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    configure = commands.add_parser("configure", help="create a forecast configuration interactively")
+    add_script(configure, "simple_forecast.py", [])
+
+    forecast = commands.add_parser("forecast", help="run a forecast from a JSON configuration")
+    forecast.add_argument("configuration", type=user_path)
+    add_script(forecast, "forecast.py", ["configuration"])
+
+    listing = commands.add_parser("list", help="list simulations")
+    add_script(listing, "cleanup.py", [], ["list"])
+    add_job_command(commands, "cancel", "cancel a simulation without deleting files", "cancel")
+    add_job_command(commands, "update", "update a simulation's recorded state", "update")
+    add_job_command(commands, "send", "send simulation products to the configured server", "send")
+
+    clean = commands.add_parser("clean", help="delete simulation data")
+    clean_commands = clean.add_subparsers(dest="clean_command", required=True)
+    add_job_command(clean_commands, "output", "delete WRF output and visualization files", "output")
+    add_job_command(clean_commands, "visualization", "delete visualization-server files", "vis")
+    add_job_command(clean_commands, "all", "delete all files for a simulation", "all")
+    clean_workspace = clean_commands.add_parser("workspace", help="delete jobs absent from the visualization server")
+    add_script(clean_workspace, "cleanup.py", [], ["workspace"])
+
+    domain = commands.add_parser("domain", help="domain configuration tools")
+    domain_commands = domain.add_subparsers(dest="domain_command", required=True)
+    domain_setup = domain_commands.add_parser("setup", help="apply a domain configuration to WPS and WRF namelists")
+    domain_setup.add_argument("configuration", type=user_path)
+    domain_setup.add_argument("wps_namelist", type=user_path)
+    domain_setup.add_argument("wrf_namelist", type=user_path)
+    add_script(domain_setup, "wrf/wps_domains.py", ["configuration", "wps_namelist", "wrf_namelist"])
+    domain_bbox = domain_commands.add_parser("bbox", help="print a domain bounding box")
+    domain_bbox.add_argument("configuration", type=user_path)
+    add_script(domain_bbox, "tests/test_domains.py", ["configuration"])
+
+    mesh = commands.add_parser("mesh", help="WRF mesh tools")
+    mesh_commands = mesh.add_subparsers(dest="mesh_command", required=True)
+    clamp = mesh_commands.add_parser("clamp", help="find or add subgrid coordinates")
+    clamp.add_argument("wrf_file", type=user_path)
+    clamp.add_argument("coordinates", nargs="*", metavar="COORDINATE")
+    add_script(clamp, "clamp2mesh.py", ["wrf_file", "coordinates"])
+    fill = mesh_commands.add_parser("fill-subgrid", help="fill subgrid fields")
+    fill.add_argument("wrf_path", type=user_path)
+    add_script(fill, "fill_subgrid.py", ["wrf_path"])
+
+    geogrid = commands.add_parser("geogrid", help="geogrid data tools")
+    geogrid_commands = geogrid.add_subparsers(dest="geogrid_command", required=True)
+    convert = geogrid_commands.add_parser("convert", help="convert a GeoTIFF to geogrid format")
+    convert.add_argument("geotiff", type=user_path)
+    convert.add_argument("geogrid_directory", type=user_path)
+    convert.add_argument("variable")
+    convert.add_argument(
+        "--bounds",
+        nargs=4,
+        type=float,
+        metavar=("MIN_LON", "MAX_LON", "MIN_LAT", "MAX_LAT"),
+    )
+    convert.set_defaults(_handler=dispatch_geogrid_convert)
+
+    ingest = commands.add_parser("ingest", help="retrieve input data")
+    ingest_commands = ingest.add_subparsers(dest="ingest_command", required=True)
+    gribs = ingest_commands.add_parser("gribs", help="retrieve GRIB files")
+    gribs.add_argument("source")
+    gribs.add_argument("from_utc")
+    gribs.add_argument("to_utc")
+    gribs.add_argument("target_directory", type=user_path)
+    add_script(gribs, "ingest/retrieve_gribs.py", ["source", "from_utc", "to_utc", "target_directory"])
+    satellite = ingest_commands.add_parser("satellite", help="retrieve satellite data")
+    satellite.add_argument("arguments", nargs=argparse.REMAINDER, metavar="ARGUMENT")
+    satellite.set_defaults(_handler=dispatch_satellite)
+    hdfs = ingest_commands.add_parser("hdfs", help="retrieve HDF satellite data")
+    hdfs.add_argument("satellite")
+    hdfs.add_argument("from_utc")
+    hdfs.add_argument("to_utc")
+    hdfs.add_argument("target_directory", type=user_path)
+    hdfs.add_argument("bounds", nargs="*", metavar="BOUND")
+    add_script(hdfs, "ingest/retrieve_hdfs.py", ["satellite", "from_utc", "to_utc", "target_directory", "bounds"])
+    landfire = ingest_commands.add_parser("landfire", help="retrieve LANDFIRE data")
+    landfire.add_argument("min_lon", type=float)
+    landfire.add_argument("max_lon", type=float)
+    landfire.add_argument("min_lat", type=float)
+    landfire.add_argument("max_lat", type=float)
+    landfire.set_defaults(_handler=dispatch_landfire)
+    arcgis = ingest_commands.add_parser("arcgis", help="retrieve ArcGIS fire data")
+    arcgis.add_argument("arguments", nargs=argparse.REMAINDER, metavar="ARGUMENT")
+    arcgis.set_defaults(_handler=dispatch_arcgis)
+
+    earthdata = commands.add_parser("earthdata", help="authorize this host for Earthdata")
+    earthdata.add_argument("username")
+    earthdata.add_argument("password")
+    add_script(earthdata, "ingest/earthdata.py", ["username", "password"])
+
+    grib = commands.add_parser("grib", help="inspect or convert GRIB files")
+    grib_commands = grib.add_subparsers(dest="grib_command", required=True)
+    grib_list = grib_commands.add_parser("list", help="list messages in a GRIB file")
+    grib_list.add_argument("grib_file", type=user_path)
+    add_script(grib_list, "ingest/grib_file.py", ["grib_file"], ["list"])
+    to_netcdf = grib_commands.add_parser("to-netcdf", help="convert one GRIB message to NetCDF")
+    to_netcdf.add_argument("grib_file", type=user_path)
+    to_netcdf.add_argument("message")
+    to_netcdf.add_argument("netcdf_file", type=user_path)
+    add_script(to_netcdf, "ingest/grib_file.py", ["grib_file", "message", "netcdf_file"], ["to_netcdf"])
+
+    process = commands.add_parser("process", help="postprocess WRFxPy output")
+    process_commands = process.add_subparsers(dest="process_command", required=True)
+    process_file = process_commands.add_parser("file", help="postprocess a WRF output file")
+    process_file.add_argument("wrf_file", type=user_path)
+    process_file.add_argument("variables", type=variable_instructions)
+    process_file.add_argument("prefix", type=user_path)
+    process_file.add_argument("skip", nargs="?")
+    add_script(process_file, "vis/postprocess.py", ["wrf_file", "variables", "prefix", "skip"])
+    process_output = process_commands.add_parser("output", help="process all output for a job")
+    process_output.add_argument("job_id")
+    add_script(process_output, "process_output.py", ["job_id"])
+    process_satellite = process_commands.add_parser("satellite", help="process satellite output and make KMZ files")
+    process_satellite.add_argument("job_id")
+    process_satellite.set_defaults(_handler=dispatch_satellite_output)
+    process_tiffs = process_commands.add_parser("tiffs", help="process TIFF output for a job")
+    process_tiffs.add_argument("job_id")
+    add_script(process_tiffs, "process_tiffs.py", ["job_id"])
+
+    fmda = commands.add_parser("fmda", help="fuel-moisture data assimilation")
+    fmda_commands = fmda.add_subparsers(dest="fmda_command", required=True)
+    fmda_apply = fmda_commands.add_parser("apply", help="assimilate observations into a WRF file")
+    fmda_apply.add_argument("wrf_file", type=user_path)
+    add_script(fmda_apply, "fmda/fuel_moisture_da.py", ["wrf_file"])
+
+    cycle = commands.add_parser("cycle", help="run a fuel-moisture cycling workflow")
+    cycle_commands = cycle.add_subparsers(dest="cycle_command", required=True)
+    hrrr = cycle_commands.add_parser("hrrr", help="run the HRRR cycler")
+    hrrr.add_argument("arguments", nargs="*", metavar="ARGUMENT")
+    add_script(hrrr, "hrrr_cycler.py", ["arguments"])
+    rtma = cycle_commands.add_parser("rtma", help="run the RTMA cycler")
+    rtma.add_argument("arguments", nargs="*", metavar="ARGUMENT")
+    add_script(rtma, "rtma_cycler.py", ["arguments"])
+
+    kmz = commands.add_parser("kmz", help="create KMZ products")
+    kmz_commands = kmz.add_subparsers(dest="kmz_command", required=True)
+    kmz_make = kmz_commands.add_parser("make", help="make KMZ products for a job")
+    kmz_make.add_argument("job_id")
+    add_script(kmz_make, "make_kmz.py", ["job_id"])
+    csv_kmz = kmz_commands.add_parser("from-csv", help="convert a CSV file to KMZ")
+    csv_kmz.add_argument("csv_file", type=user_path)
+    csv_kmz.add_argument("output", type=user_path)
+    csv_kmz.set_defaults(_handler=dispatch_csv_kmz)
+
+    catalog = commands.add_parser("catalog", help="catalog maintenance")
+    catalog_commands = catalog.add_subparsers(dest="catalog_command", required=True)
+    recover = catalog_commands.add_parser("recover", help="recover catalog entries from forecast JSON files")
+    recover.add_argument("inputs", nargs="+", type=user_path, metavar="JSON")
+    add_script(recover, "recover_catalog.py", ["inputs"])
+
+    remote = commands.add_parser("remote", help="remote visualization-server operations")
+    remote_commands = remote.add_subparsers(dest="remote_command", required=True)
+    remote_command = remote_commands.add_parser("command", help="run a configured remote command")
+    remote_command.add_argument("arguments", nargs=argparse.REMAINDER, metavar="ARGUMENT")
+    add_script(remote_command, "ssh_command.py", ["arguments"])
+    upload = remote_commands.add_parser("upload", help="upload products and register a simulation")
+    upload.add_argument("local_directory", type=user_path)
+    upload.add_argument("remote_directory")
+    upload.add_argument("simulation_name")
+    add_script(upload, "ssh_shuttle.py", ["local_directory", "remote_directory", "simulation_name"])
+
+    internal = commands.add_parser("internal", help="internal job operations")
+    internal_commands = internal.add_subparsers(dest="internal_command", required=True)
+    execute_wrf = internal_commands.add_parser("execute-wrf", help="execute WRF and process its output")
+    execute_wrf.add_argument("job_id")
+    add_script(execute_wrf, "execute_wrf.py", ["job_id"])
+    make_job = internal_commands.add_parser("make-job", help="create a scheduler job description")
+    make_job.add_argument("configuration", type=user_path)
+    add_script(make_job, "make_job_file.py", ["configuration"])
+
+    return parser
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    return args._handler(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

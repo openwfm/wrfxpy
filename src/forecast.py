@@ -62,6 +62,7 @@ from datetime import timedelta
 import time, re, json, sys, logging
 import os.path as osp
 import os
+import shlex
 import stat
 from multiprocessing import Process, Queue
 from subprocess import check_call
@@ -308,7 +309,7 @@ def retrieve_fire_init(js, q):
     try:
         make_dir(js.fire_init_dir)
         logging.info("running ArcGIS acquisition")
-        args = [osp.join(js.wrfxpy_dir, 'retrieve_arcgis.sh')] + \
+        args = [osp.join(js.wrfxpy_dir, 'wrfx'), 'ingest', 'arcgis'] + \
             '{},{},{},{}'.format(*js.bounds[str(js.max_dom)]).split(',') + [js.fire_init_dir]
         stdout_path = osp.join(js.fire_init_dir, 'acq_arcgis.stdout')
         stderr_path = osp.join(js.fire_init_dir, 'acq_arcgis.stderr')
@@ -1331,12 +1332,11 @@ def create_process_output_script(job_id):
     cfg = load_sys_cfg()
     script_path = osp.join(cfg.workspace_path, job_id,'job_process_output.sh')
     log_path = osp.join(cfg.workspace_path, job_id,'job_process_output.log')
-    process_script = osp.join(cfg.sys_install_path,'process_output.sh')
+    wrfx = osp.join(cfg.sys_install_path, 'wrfx')
     with open(script_path,'w') as f:
         f.write('#!/usr/bin/env bash\n')
-        f.write('cd ' + cfg.sys_install_path + '\n')
-        f.write('LOG=' + log_path + '\n')
-        f.write(process_script + ' ' + job_id + ' &> $LOG \n')
+        f.write('%s process output %s &> %s\n' % (
+            shlex.quote(wrfx), shlex.quote(job_id), shlex.quote(log_path)))
 
     # make it executable
     st = os.stat(script_path)
@@ -1608,4 +1608,3 @@ if __name__ == '__main__':
     execute(args,job_args)
 
     logging.info('forecast.py done')
-

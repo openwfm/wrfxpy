@@ -1,19 +1,19 @@
-Standalone scripts
+Command-line tools
 ******************
 
-Although *wrfxpy* is meant to be an integrated system, some functionalities
-are exposed through separate scripts.  These are detailed in this section.
+The ``wrfx`` command exposes the complete forecast workflow and supporting
+tools through subcommands. These are detailed in this section.
 
 Domain setup
 ============
 
-The script ``domain_setup.sh`` accepts a domain configuration description and
+The command ``wrfx domain setup`` accepts a domain configuration description and
 injects the domain configuration into a WPS nmelist file and into an input
 namelist file.  Please refer to the domain configuration description in :doc:`forecasting`.
 
 Example::
 
-  ./domain_setup.sh my_domains.json namelist.wps namelist.input
+  ./wrfx domain setup my_domains.json namelist.wps namelist.input
 
 Assuming that ``my_domains.json`` contains the following::
 
@@ -41,12 +41,12 @@ cell size, 91 x 91 domain size, 20m fire grid).
 Grib retrieval and examination
 ==============================
 
-The script ``grib_retr.sh`` accepts fourth arguments, the grib source identifier,
+The command ``wrfx ingest gribs`` accepts four arguments: the GRIB source identifier,
 the UTC start, the end time of a simulation in ESMF format and the ingest directory.
 
 Example::
 
-  ./grib_retr.sh HRRR 2016-03-26_14:00:00 2016-03-26_19:00:00 ingest
+  ./wrfx ingest gribs HRRR 2016-03-26_14:00:00 2016-03-26_19:00:00 ingest
 
 This will find out which GRIB2 files are required to perform this simulation and
 will download them into subdirectories of the ``ingest`` directory.
@@ -56,33 +56,33 @@ will download them into subdirectories of the ``ingest`` directory.
   best use of the transparent local caching functionality.  Any files that have already
   been downloaded are not re-downloaded.
 
-The script ``grib_tool.sh`` allows the user to list the contents of a GRIB1/2 file and
+The ``wrfx grib`` commands allow the user to list the contents of a GRIB1/2 file and
 to convert it to a netCDF file.
 
 Examples::
 
-  ./grib_tool.sh list <grib-filename>
+  ./wrfx grib list <grib-filename>
 
-  ./grib_tool.sh to_netcdf <input-grib-filename> <message-to-convert> <output-netcdf-file>
+  ./wrfx grib to-netcdf <input-grib-filename> <message-to-convert> <output-netcdf-file>
 
 
 
 Postprocessing
 ==============
 
-The script ``postprocess.sh`` accepts four arguments, the wrfout file to process,
+The command ``wrfx process file`` accepts four arguments, the wrfout file to process,
 the variables to postprocess (or an instruction file, see below), the prefix on which
-to base the filenames and the skip (the script will process every skip-th frame).
-The script always generates PNG files and KMZ files for each variable and timestamp.
+to base the filenames and the skip (the command will process every skip-th frame).
+The command always generates PNG files and KMZ files for each variable and timestamp.
 
 Example::
 
-  ./postprocess.sh /path/to/wrfout T2,PSFC my_directory/file_prefix 1
+  ./wrfx process file /path/to/wrfout T2,PSFC my_directory/file_prefix 1
 
 Alternatively, instead of listing the variables, a more detailed configuration controlling
 the colormaps, ranges and other parameters can be specified::
 
-  ./postprocess.sh /path/to/wrfout @var_instructions my_directory/file_prefix 1
+  ./wrfx process file /path/to/wrfout @var_instructions my_directory/file_prefix 1
 
 Where the file ``var_instructions`` contains::
 
@@ -107,14 +107,14 @@ are not shown and fix the scale from 0 to 6.
 Fuel moisture DA
 ================
 
-The script ``apply_fmda.sh`` accepts a single wrfinput path argument and
+The command ``wrfx fmda apply`` accepts a single wrfinput path argument and
 performs a data assimilation step using background covariance.
 
 Example::
 
-  ./apply_fmda.sh wrfinput_d01
+  ./wrfx fmda apply wrfinput_d01
 
-The script will read in the timestamp from the wrfinput file, determine it's
+The command will read in the timestamp from the wrfinput file, determine its
 physical extent (lat/lon) and download all observations of 10-hr fuel moisture
 valid at that time available in the region.  Then the equilibrium fuel moisture
 content is computed and adjusted with respect to the observations using the
@@ -125,27 +125,25 @@ file.
 SSH Shuttle
 ===========
 
-The script ``ssh_shuttle.sh`` accepts a local directory a remote directory name and an identifier
+The command ``wrfx remote upload`` accepts a local directory, a remote directory name, and an identifier,
 and uploads the entire local directory with simulation results to the remote host configured in ``conf.json`` and registers the simulation in the ``catalog.json`` file on the remote server.
 
 Examples::
 
-  ./ssh_shuttle.sh wksp/my-simulation/products test_fire_april test_fire_april
+  ./wrfx remote upload wksp/my-simulation/products test_fire_april test_fire_april
 
-The script scans all the files in ``wksp/my-simulation/products`` and uses SFTP to put them onto the remote host.  The remote directory must be either an absolute path or (recommended) should be relative to the remote host root setup in ``conf.json``.  The identifier will be used as the description and also as the key under which the simulation is stored in ``catalog.json`` on the remote host.
+The command scans all the files in ``wksp/my-simulation/products`` and uses SFTP to put them onto the remote host. The remote directory must be either an absolute path or (recommended) should be relative to the remote host root setup in ``conf.json``. The identifier will be used as the description and also as the key under which the simulation is stored in ``catalog.json`` on the remote host.
 
 Data cleanup
 ============
 
-The script ``cleanup.sh`` provides functionality to:
+The ``wrfx list`` and ``wrfx clean`` commands provide functionality to:
 
 * list all simulations that are available on a configured visualization server,
 * remove a selected simulation, freeing up diskspace.
 
 Examples::
 
-  ./cleanup.sh list
+  ./wrfx list
 
-  ./cleanup.sh delete <simulation-id-from-list>
-
-
+  ./wrfx clean all <simulation-id-from-list>

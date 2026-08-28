@@ -11,14 +11,14 @@ Quickstart
 First fire forecast
 ===================
 
-The simplest way to start is to invoke the standalone script
+The simplest way to start is to invoke the interactive configuration command
 
 ::
 
-  ./simple_forecast.sh
+  ./wrfx configure
 
 
-The script will ask you a series of questions with sensible defaults and at the
+The command will ask you a series of questions with sensible defaults and at the
 end will create a JSON configuration file and finish with instructions on how to
 run the simulation.
 
@@ -26,15 +26,15 @@ run the simulation.
 Example fire forecast
 =====================
 
-To perform a fire forecast, the script ``forecast.sh`` has to be executed with
-a JSON configuration file as an argument, for example:
+To perform a fire forecast, execute ``wrfx forecast`` with a JSON
+configuration file as an argument, for example:
 
 ::
 
-  ./forecast.sh <json-configuration-file>
+  ./wrfx forecast <json-configuration-file>
 
-An example configuration script is ``examples/simple_fire.json``, also listed here for
-convenience.  The script has most of the values filled out but there are some placeholders.
+An example configuration file is ``examples/simple_fire.json``, also listed here for
+convenience. The file has most of the values filled out but there are some placeholders.
 
 Please set the following values:
 
@@ -99,5 +99,3 @@ This example configuration runs a fire simulation with the following settings:
 
 .. tip::
   To learn how to configure jobs in more detail, refer to :doc:`forecasting`.
-
-

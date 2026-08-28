@@ -136,7 +136,7 @@ if __name__ == '__main__':
 
 
     if len(sys.argv) < 3 or not sys.argv[2]:
-        print('usage: csv2kml.sh csv_file_path kml_file_path')
+        print('usage: wrfx kmz from-csv csv_file_path kmz_file_path')
         #print('usage: python csv2kml.py csv_file_path kml_file_path')
         sys.exit(1)
 

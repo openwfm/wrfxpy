@@ -107,12 +107,11 @@ if __name__ == '__main__':
     sys_cfg = load_sys_cfg()
 
     if len(sys.argv) != 3: 
-         print('Usage: ./earthdata.sh username password')
+         print('Usage: wrfx earthdata username password')
          sys.exit(1)
 
     e = Earthdata()
     e.login(sys.argv[1],sys.argv[2])
     e.logout()
-
 
 

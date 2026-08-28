@@ -270,7 +270,7 @@ if __name__ == '__main__':
     commands = [ 'list', 'cancel', 'output', 'vis', 'all', 'workspace', 'update', 'send' ]
 
     if len(sys.argv) < 2 or sys.argv[1] not in commands: 
-        print(('usage: ./cleanup.sh ' + '|'.join(commands) +' [job_id]'))
+        print(('usage: wrfx ' + '|'.join(commands) +' [job_id]'))
         print('list            : show list of current simulations with their job_id and description')
         print('cancel <job_id> : kill all processes and the WRF parallel job, do not delete any files')
         print('output <job id> : cancel, and delete all WRF output and visualization files only')

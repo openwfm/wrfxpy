@@ -11,10 +11,9 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     
     if len(sys.argv) < 4 or len(sys.argv) > 5:
-        print('Usage: ./convert_geotiff.sh geotiff_file geogrid_folder var_name [bbox]')
-        print('             bbox - min_lon,max_lon,min_lat,max_lat')
-        print('Example: ./convert_geotiff.sh ./fuel.tif ./geo_data NFUEL_CAT')
-        print('         ./convert_geotiff.sh ./fuel.tif ./geo_data NFUEL_CAT -112.8115,-112.1661,39.4820,39.9750')
+        print('Usage: wrfx geogrid convert geotiff_file geogrid_folder var_name [--bounds min_lon max_lon min_lat max_lat]')
+        print('Example: wrfx geogrid convert ./fuel.tif ./geo_data NFUEL_CAT')
+        print('         wrfx geogrid convert ./fuel.tif ./geo_data NFUEL_CAT --bounds -112.8115 -112.1661 39.4820 39.9750')
         print('Available var_name options are %s' % get_wisdom_variables())
         exit(1)
     elif not file_exists(sys.argv[1]):

@@ -257,5 +257,4 @@ if __name__ == '__main__':
 
     newline()
 
-    print(('INT to start the simulation, execute ./forecast.sh %s' % filename))
-
+    print(('To start the simulation, execute ./wrfx forecast %s' % filename))

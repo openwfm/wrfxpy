@@ -6,9 +6,9 @@ https://wiki.openwfm.org/wiki/Running_WRF-SFIRE_with_real_data_in_the_WRFx_syste
 ==Smoke test==
 
 conda activate wrfx
-./simple_forecast.sh
+./wrfx configure
    press enter for all questions - leave at default except as noted
-./forecast.sh jobs/experiment.json
+./wrfx forecast jobs/experiment.json
 ```
 
 Customizations currently needed:
