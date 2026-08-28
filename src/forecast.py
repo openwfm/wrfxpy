@@ -309,7 +309,7 @@ def retrieve_fire_init(js, q):
     try:
         make_dir(js.fire_init_dir)
         logging.info("running ArcGIS acquisition")
-        args = [osp.join(js.wrfxpy_dir, 'wrfx'), 'ingest', 'arcgis'] + \
+        args = [osp.join(js.wrfxpy_dir, 'wrfx'), 'retrieve_arcgis'] + \
             '{},{},{},{}'.format(*js.bounds[str(js.max_dom)]).split(',') + [js.fire_init_dir]
         stdout_path = osp.join(js.fire_init_dir, 'acq_arcgis.stdout')
         stderr_path = osp.join(js.fire_init_dir, 'acq_arcgis.stderr')
@@ -1335,7 +1335,7 @@ def create_process_output_script(job_id):
     wrfx = osp.join(cfg.sys_install_path, 'wrfx')
     with open(script_path,'w') as f:
         f.write('#!/usr/bin/env bash\n')
-        f.write('%s process output %s &> %s\n' % (
+        f.write('%s process_output %s &> %s\n' % (
             shlex.quote(wrfx), shlex.quote(job_id), shlex.quote(log_path)))
 
     # make it executable

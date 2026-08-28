@@ -17,9 +17,9 @@ except:
 if __name__ == '__main__':
 
     if len(sys.argv) < 2:
-        print('Usage: wrfx catalog recover 1.json 2.json ....')
+        print('Usage: wrfx recover_catalog 1.json 2.json ....')
         print('x.json are inputs to wrfx forecast as from wrfxctrl')
-        print('Example: wrfx catalog recover ~/Projects/wrfxctrl/jobs/*.json')
+        print('Example: wrfx recover_catalog ~/Projects/wrfxctrl/jobs/*.json')
         print('Important: must be run from the wrfxpy directory. Before using:')
         print('In wrfxweb/fdds/simulations: tar cvfz ~/c.tgz <simulations to recove>/*.json catalog.json')
         print('Transfer the file c.tgz and  untar here')

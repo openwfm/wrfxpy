@@ -291,6 +291,6 @@ def ncwrfmeta(ds):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        raise SystemExit('usage: wrfx process tiffs job_id')
+        raise SystemExit('usage: wrfx process_tiffs_output job_id')
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     process_outputs_tiff(sys.argv[1])

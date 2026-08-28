@@ -15,7 +15,7 @@ The simplest way to start is to invoke the interactive configuration command
 
 ::
 
-  ./wrfx configure
+  ./wrfx simple_forecast
 
 
 The command will ask you a series of questions with sensible defaults and at the

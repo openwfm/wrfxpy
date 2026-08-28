@@ -39,8 +39,8 @@ if __name__ == '__main__':
 		to_utc = esmf_to_utc(et_esmf)
 		sat_sources = ['Terra', 'Aqua', 'SNPP']
 	else:
-		print('Usage: wrfx ingest satellite input.json')
-		print('   or: wrfx ingest satellite coord start_time end_time')
+		print('Usage: wrfx retrieve_sat input.json')
+		print('   or: wrfx retrieve_sat coord start_time end_time')
 		print('	  notes:')
 		print('	  	*) coord - min_lon,max_lon,min_lat,max_lat')
 		print('	  	*) start_time - string, YYYYMMDDHHMMSS')

@@ -864,8 +864,8 @@ if __name__ == "__main__":
         print(f"{sys.argv[0]} mode code")
         print("The supported modes are: analysis (a) and forecast (f)")
         print("To use a custom domain named FIRE by giving a bounding box:")
-        print("wrfx cycle hrrr mode lat1 lon1 lat2 lon2")
-        print("Example: wrfx cycle hrrr a 42 -124.6 49 -116.4")
+        print("wrfx hrrr_cycler mode lat1 lon1 lat2 lon2")
+        print("Example: wrfx hrrr_cycler a 42 -124.6 49 -116.4")
         exit(1) 
 
     # get parameters from configuration
