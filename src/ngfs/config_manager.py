@@ -8,7 +8,6 @@ import json
 import utils
 import simple_forecast as sf
 import time
-from ngfs_start import make_geo_folder
 
 
 
@@ -120,6 +119,10 @@ def get_fmda_path(cfg):
    fmda_geo_folder = base_folder + date_folder
    #
    if not os.path.exists(fmda_geo_folder):
+      #imported here rather than at module scope so this module does not depend
+      #on ngfs_incident's heavy imports, and so no import cycle can form; the
+      #same deferred-import pattern is used by persistence.get_old_incidents
+      from ngfs.ngfs_incident import make_geo_folder
       make_geo_folder(fmda_geo_folder)
    #
    return fmda_geo_folder
