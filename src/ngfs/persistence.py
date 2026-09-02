@@ -1,5 +1,7 @@
 #Functionality for storing and retrieving the system state, saving maps, etc
 import glob
+import gzip
+import hashlib
 import time
 import os
 import pandas as pd
@@ -23,6 +25,169 @@ def state_pickle_files(ngfs_directory):
     for pattern in cons.PICKLE_PATTERNS:
         paths.extend(glob.glob(os.path.join(ngfs_directory, pattern)))
     return sorted(paths, key=os.path.getmtime)
+
+
+#Pickles record the module path of the class they hold. Files written by this
+#package name ngfs.ngfs_day; files written by the precursor src/ngfs_start.py
+#name __main__, because that script defines its classes in the script namespace.
+#That distinction matters for compression: ngfs_start.py globs only '*.pkl', so
+#compressing a file it owns would hide that state from it entirely.
+PACKAGE_PICKLE_MARKER = b'ngfs.ngfs_day'
+MONOLITH_PICKLE_MARKER = b'__main__'
+
+
+def pickle_writer(path):
+    """
+    Identifies which program wrote a state pickle, by reading its class path.
+
+    Returns 'package' for pickles this package can read back, 'monolith' for
+    ones belonging to src/ngfs_start.py, or 'unknown' when neither marker is
+    found in the header.
+    """
+    with open(path, 'rb') as handle:
+        header = handle.read(128)
+    if PACKAGE_PICKLE_MARKER in header:
+        return 'package'
+    if MONOLITH_PICKLE_MARKER in header:
+        return 'monolith'
+    return 'unknown'
+
+
+def file_digest(path, opener=open):
+    """Returns the SHA-256 of a file's contents, read through `opener`."""
+    digest = hashlib.sha256()
+    with opener(path, 'rb') as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def compress_state_pickles(ngfs_directory, min_age_hours=6, delete=False,
+                           limit=None):
+    """
+    Compresses previously saved uncompressed state pickles in place.
+
+    Each file is gzipped at the byte level rather than being unpickled and
+    re-saved: that preserves the contents exactly, needs no class to resolve,
+    and produces the same gzip-wrapped pickle that pandas reads back. The
+    compressed copy is verified by comparing the SHA-256 of its decompressed
+    bytes against the original, and the original is removed only when that
+    matches and `delete` is set.
+
+    Refuses any directory holding pickles written by src/ngfs_start.py, whose
+    reader globs only '*.pkl' and would lose sight of a compressed file.
+
+    `min_age_hours` skips recently written state so a run in progress is never
+    touched; `limit` caps how many files are processed, for a cautious first
+    pass. Files that already have a compressed counterpart are skipped, so an
+    interrupted sweep can simply be run again.
+    """
+    uncompressed = sorted(glob.glob(os.path.join(ngfs_directory, '*.pkl')),
+                          key=os.path.getmtime)
+    if not uncompressed:
+        print(f'No uncompressed state pickles found in {ngfs_directory}')
+        return {}
+
+    #Guard on the newest pickle, since that is the one a reader picks up: if it
+    #belongs to the monolith then this is a directory the monolith serves, and
+    #compressing anything here risks hiding state from a reader that globs only
+    #'*.pkl'. Individual stray files are skipped in the loop instead.
+    newest_owner = pickle_writer(uncompressed[-1])
+    if newest_owner != 'package':
+        raise ValueError(
+            f'Refusing to compress {ngfs_directory}: its most recent pickle was '
+            f'written by {newest_owner} (src/ngfs_start.py names its classes '
+            f'__main__). That reader globs only "*.pkl", so compressing state '
+            f'it owns would hide it and cause re-forecasting. Point this at the '
+            f'directory used by ngfs_start_2.py instead.')
+
+    cutoff = time.time() - min_age_hours * 3600
+    summary = {'compressed': 0, 'skipped': 0, 'failed': [], 'deleted': 0,
+               'bytes_before': 0, 'bytes_after': 0, 'bytes_freed': 0}
+
+    for path in uncompressed:
+        target = path + '.gz'
+        if os.path.getmtime(path) > cutoff:
+            print(f'\tSkipping {os.path.basename(path)}: newer than '
+                  f'{min_age_hours} h')
+            summary['skipped'] += 1
+            continue
+        owner = pickle_writer(path)
+        if owner != 'package':
+            print(f'\tSkipping {os.path.basename(path)}: written by {owner}')
+            summary['skipped'] += 1
+            continue
+        if os.path.exists(target):
+            #compressed by an earlier pass, so this run can still finish the job:
+            #re-verify that copy against the original before discarding it, which
+            #also lets an interrupted sweep be cleaned up by running again
+            if delete:
+                original_size = os.path.getsize(path)
+                if file_digest(target, opener=gzip.open) == file_digest(path):
+                    os.remove(path)
+                    summary['deleted'] += 1
+                    summary['bytes_freed'] += original_size
+                    print(f'\tRemoved {os.path.basename(path)}: verified '
+                          f'against existing compressed copy')
+                else:
+                    print(f'\tFAILED {os.path.basename(path)}: existing '
+                          f'{os.path.basename(target)} does not match; '
+                          f'original kept')
+                    summary['failed'].append(path)
+            summary['skipped'] += 1
+            continue
+        if limit is not None and summary['compressed'] >= limit:
+            break
+
+        original_size = os.path.getsize(path)
+        stat = os.stat(path)
+        tmp_target = f'{target}.{os.getpid()}.tmp'
+        try:
+            with open(path, 'rb') as source:
+                with gzip.open(tmp_target, 'wb',
+                               compresslevel=cons.PICKLE_COMPRESSION['compresslevel']) as sink:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b''):
+                        sink.write(chunk)
+            #keep the original timestamps: both readers sort candidates by mtime
+            #and apply an age filter, so a fresh mtime would promote old state
+            os.utime(tmp_target, (stat.st_atime, stat.st_mtime))
+            if file_digest(tmp_target, opener=gzip.open) != file_digest(path):
+                raise ValueError('decompressed contents differ from original')
+            os.replace(tmp_target, target)
+        except Exception as exc:
+            if os.path.exists(tmp_target):
+                os.remove(tmp_target)
+            print(f'\tFAILED {os.path.basename(path)}: {exc!r}')
+            summary['failed'].append(path)
+            continue
+
+        compressed_size = os.path.getsize(target)
+        summary['compressed'] += 1
+        summary['bytes_before'] += original_size
+        summary['bytes_after'] += compressed_size
+        print(f'\t{os.path.basename(path)}: '
+              f'{original_size / 1048576.0:.1f} MB -> '
+              f'{compressed_size / 1048576.0:.1f} MB '
+              f'({original_size / float(compressed_size):.1f}x)')
+
+        if delete:
+            os.remove(path)
+            summary['deleted'] += 1
+            summary['bytes_freed'] += original_size
+
+    print(f'Compressed {summary["compressed"]} pickle(s), '
+          f'skipped {summary["skipped"]}, failed {len(summary["failed"])}')
+    if summary['compressed']:
+        print(f'\tcompressed {summary["bytes_before"] / 1073741824.0:.2f} GB '
+              f'down to {summary["bytes_after"] / 1073741824.0:.2f} GB')
+    if delete:
+        print(f'\tremoved {summary["deleted"]} verified original(s), freeing '
+              f'{summary["bytes_freed"] / 1073741824.0:.2f} GB')
+    else:
+        pending = summary['bytes_before'] / 1073741824.0
+        print(f'\toriginals kept; re-running with delete=True would verify and '
+              f'remove them, freeing {pending:.2f} GB')
+    return summary
 
 
 def get_old_incidents(ngfs_directory):
@@ -259,4 +424,21 @@ def save_incident_text(ngfs_day):
          ign_pix.to_csv(csv_save_str, index=False)
 
 if __name__ == '__main__':
-    pass
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='Compress previously saved uncompressed state pickles. '
+                    'Reports what it would do unless --delete is given.')
+    parser.add_argument('directory',
+                        help='directory of state pickles, e.g. ngfs')
+    parser.add_argument('--min-age-hours', type=float, default=6,
+                        help='leave pickles newer than this alone (default 6)')
+    parser.add_argument('--limit', type=int, default=None,
+                        help='stop after this many files, for a cautious pass')
+    parser.add_argument('--delete', action='store_true',
+                        help='remove each original once its compressed copy '
+                             'has been verified byte-for-byte')
+    args = parser.parse_args()
+
+    compress_state_pickles(args.directory, min_age_hours=args.min_age_hours,
+                           delete=args.delete, limit=args.limit)
