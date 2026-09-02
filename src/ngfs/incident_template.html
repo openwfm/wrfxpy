@@ -1,0 +1,46 @@
+<!-- incident_template.html -->
+<html>
+<head>
+    <title>{{ incident_name }}</title>
+</head>
+<body>
+
+<h3>{{ incident_name }}</h3>
+
+<div id="map" style="height: 90vh;"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+var map = L.map('map').setView([{{ lat }}, {{ lon }}], 8);
+
+// base map
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+// load forecast GeoJSON
+fetch("{{ forecast_geojson }}")
+    .then(r => r.json())
+    .then(data => {
+        let layer = L.geoJSON(data);
+        layer.addTo(map);
+        map.fitBounds(layer.getBounds());
+    });
+
+// load VIIRS
+fetch("{{ viirs_geojson }}")
+    .then(r => r.json())
+    .then(data => {
+        L.geoJSON(data, {
+            pointToLayer: function(f, latlng) {
+                return L.circleMarker(latlng, {
+                    radius: 4,
+                    color: "orange"
+                });
+            }
+        }).addTo(map);
+    });
+
+</script>
+
+</body>
+</html>
