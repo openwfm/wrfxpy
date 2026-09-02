@@ -75,6 +75,10 @@ def make_base_configuration(force,ngfs_cfg):
       # /data/WRFXPY/wksp_fmda/CONUS/202307/
       if 'fmda_geogrid_path' in temp_cfg or ngfs_cfg['fmda_cfg']['use_fmda']:
          print('Will use FMDA for fuel moisture')
+         #imported here rather than at module scope so this module does not depend
+         #on ngfs_incident's heavy imports, and so no import cycle can form; the
+         #same deferred-import pattern is used by persistence.get_old_incidents
+         from ngfs.ngfs_incident import get_fmda_path
          temp_cfg['fmda_geogrid_path'] = get_fmda_path(temp_cfg)#base_folder + date_folder
 
       if force:
@@ -100,33 +104,6 @@ def make_base_configuration(force,ngfs_cfg):
    
    return base_cfg
    
-def get_fmda_path(cfg):
-   #
-   fmda_year = cfg['start_utc'][:4]
-   fmda_month = cfg['start_utc'][5:7]
-   fmda_day = cfg['start_utc'][8:10]
-   fmda_hour = cfg['start_utc'][11:13]
-   #
-   if 'cawfe' in cfg['fire_namelist_path']:
-      base_folder = f'/data/WRFXPY/wksp_fmda/CONUS/{fmda_year}{fmda_month}/'
-   elif 'behave' in cfg['fire_namelist_path']:
-      base_folder = f'/data/jhaley/wrfxpy/wksp_fmda/CONUS/{fmda_year}{fmda_month}/'
-   else:
-      return 'ngfs'
-   #
-   date_folder = f'fmda-CONUS-{fmda_year}{fmda_month}{fmda_day}-{fmda_hour}.geo'
-   #
-   fmda_geo_folder = base_folder + date_folder
-   #
-   if not os.path.exists(fmda_geo_folder):
-      #imported here rather than at module scope so this module does not depend
-      #on ngfs_incident's heavy imports, and so no import cycle can form; the
-      #same deferred-import pattern is used by persistence.get_old_incidents
-      from ngfs.ngfs_incident import make_geo_folder
-      make_geo_folder(fmda_geo_folder)
-   #
-   return fmda_geo_folder
-
 if __name__ == '__main__':
    print('Testsing the configuration manager')
    try:
