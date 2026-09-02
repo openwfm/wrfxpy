@@ -22,6 +22,7 @@ except:
    from pyproj import Proj, transform # Transformer
 from PIL import Image
 from datetime import timedelta, datetime
+from ngfs import constants as cons
 from ngfs import ngfs_api as ngfs_api
 from ngfs import ngfs_ftp as ngfs_ftp
 from ngfs import firms_data
@@ -808,14 +809,14 @@ class ngfs_day():
             f"{str(now.hour).zfill(2)}_"
             f"{str(now.minute).zfill(2)}"
          )
-         self.pickle_save_str = f'{self.ngfs_directory}/pkl_ngfs_day_{self.date_str}_{time_str}_testing.pkl' ## <<<<<--------------------------------------- remove
+         self.pickle_save_str = f'{self.ngfs_directory}/pkl_ngfs_day_{self.date_str}_{time_str}_testing{cons.PICKLE_SUFFIX}' ## <<<<<--------------------------------------- remove
       else:
          try:
             self.sat_name = self.sats[0].replace('-','_')
          except:
             self.sat_name = 'No_Incidents'
          self.map_save_str = f'ngfs/NGFS_{self.date_str}_{self.sat_name}_testing.png'                 ## <<<<<--------------------------------------- remove
-         self.pickle_save_str = f'ngfs/pkl_ngfs_day_{self.date_str}_{self.sat_name}_testing.pkl'
+         self.pickle_save_str = f'ngfs/pkl_ngfs_day_{self.date_str}_{self.sat_name}_testing{cons.PICKLE_SUFFIX}'
 
    def incident_ign_latlons(self):
       return np.array([incident.ign_latlon for incident in self.incidents])
@@ -830,8 +831,11 @@ class ngfs_day():
       cutoff_time  = pd.Timestamp.now('UTC') - timedelta(hours = 48)
       self.data = self.data[self.data[time_key] > cutoff_time]
       print('Saving as ',self.pickle_save_str)
-      with open(self.pickle_save_str,'wb') as f:
-         pickle.dump(self,f)
+      #write to a private temporary name and rename into place, so an interrupted
+      #save cannot leave a truncated pickle where the next run looks for state
+      tmp_save_str = f'{self.pickle_save_str}.{os.getpid()}.tmp'
+      pd.to_pickle(self,tmp_save_str,compression=cons.PICKLE_COMPRESSION,protocol=3)
+      os.replace(tmp_save_str,self.pickle_save_str)
 
 
    def save_incident_text(self):
