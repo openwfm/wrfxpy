@@ -296,7 +296,7 @@ class ngfs_incident():
 
    def add_nifc_perims(self):
       if not self.ngfs_cfg is None:
-         perim_directory = self.ngfs_cfg['perim_cfg']['perim_dir'] # can be a list
+         perim_directory = self.ngfs_cfg['perims_cfg']['perim_dir'] # can be a list
          p = glob.glob(f'{perim_directory}*{self.incident_id_string}*')
          if len(p) > 0:
             print('Found matching perimeters')
