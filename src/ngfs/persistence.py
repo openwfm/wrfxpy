@@ -209,20 +209,35 @@ def get_old_incidents(ngfs_directory):
 
     #take most recent pickle file, even if it is older than 7 days
     if not len(pick_list):
-      pick_list = [full_pick_list[-1]] #make sure its a list
-      print(pick_list)
+      pick_list = [i for i in full_pick_list[-1:] if 'GOES' not in i]
+
+    #no previous state at all: a first run, or a fresh ngfs_directory
+    if not len(pick_list):
+        print(f'No previous state pickles found in {ngfs_directory}; '
+              f'starting with no history')
+        return [], [], None
 
     print(f'Number of pickle files to possibly look at: {len(pick_list)}')
-    
+
     # Reverse the list to get the newest files first
     pick_list.reverse()
-    
+
     old_ngfs_incidents = []
     started_inc_ids = []
+    latest_day = None
 
     for i in pick_list:
         print(f'\tReading {i}')
-        df = pd.read_pickle(i)
+        try:
+            df = pd.read_pickle(i)
+        except Exception as exc:
+            #a pickle can be unreadable because it is truncated, or because it
+            #belongs to src/ngfs_start.py, whose classes are named __main__ and
+            #cannot be resolved here. Either way, try the next candidate rather
+            #than losing the whole ledger.
+            print(f'\tCould not read {i}: {exc!r}')
+            continue
+        latest_day = df
         old_ngfs_incidents.extend(df.incidents)
 
         if hasattr(df, 'started_inc_ids'):
@@ -233,7 +248,13 @@ def get_old_incidents(ngfs_directory):
             print('\tPickle file does not have started_inc_ids')
         print(len(started_inc_ids))
 
-    print(f'\tTimestamp of of loaded ngfs_day object: {df.timestamp} with data size: {len(df.data)}')
+    if latest_day is None:
+        print(f'None of the {len(pick_list)} candidate pickle(s) could be read; '
+              f'starting with no history')
+        return [], [], None
+
+    print(f'\tTimestamp of loaded ngfs_day object: {latest_day.timestamp} '
+          f'with data size: {len(latest_day.data)}')
     # Process and print old incidents
     print('Found the previous incidents:')
     for inc in old_ngfs_incidents:
@@ -242,9 +263,9 @@ def get_old_incidents(ngfs_directory):
             if inc.incident_id_string not in started_inc_ids:
                 started_inc_ids.append(inc.incident_id_string)
         print(f'\t{inc.incident_id_string} {inc.incident_name} Started = {inc.started}')
-    
-    
-    return list(set(started_inc_ids)), old_ngfs_incidents, df
+
+
+    return list(set(started_inc_ids)), old_ngfs_incidents, latest_day
 
 def detection_summary(ngfs_day, hours=24):
     """

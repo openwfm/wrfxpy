@@ -46,7 +46,11 @@ if __name__ == "__main__":
 
    #add detection and other data
    print('Adding data')
-   csv.add_goes_data(df = old_ngfs_day.data.drop_duplicates() if len(old_ngfs_day.data) > 0 else None)
+   #old_ngfs_day is None when there is no previous state to carry forward
+   old_goes_data = None
+   if old_ngfs_day is not None and len(old_ngfs_day.data) > 0:
+      old_goes_data = old_ngfs_day.data.drop_duplicates()
+   csv.add_goes_data(df = old_goes_data)
    #print(csv.data.keys())
    #add polar data for today forecasts
    #csv.add_polar_data()    <<-------------------------- Remove, this is being handled with add_viirs_data
