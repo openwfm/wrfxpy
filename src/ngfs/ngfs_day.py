@@ -265,10 +265,10 @@ class ngfs_day():
       #add override for burn model, forecast length, 
       sys_args = self.sys_args
       if 'ftp' in sys_args:
-         self.ngfs_cfg['goes_cfg']['data_source'] == 'ftp'
+         self.ngfs_cfg['goes_cfg']['data_source'] = 'ftp'
          self.data_source = 'ftp'
       elif 'api' in sys_args:
-         self.ngfs_cfg['goes_cfg']['data_source'] == 'api'
+         self.ngfs_cfg['goes_cfg']['data_source'] = 'api'
          self.data_source = 'api'
       for sa in self.sys_args:
          if '.csv' in sa:
@@ -277,9 +277,9 @@ class ngfs_day():
       if 'now' in sys_args:
          self.ngfs_cfg['run_cfg']['today_forecasts'] = True
          self.today = True
-      if 'behave' is sys_args:
+      if 'behave' in sys_args:
          self.ngfs_cfg["fire_namelist_path"] = "etc/nlists/default.fire_behave_13"
-      if 'cawfe' is sys_args:
+      if 'cawfe' in sys_args:
          self.ngfs_cfg["fire_namelist_path"] = "etc/nlists/default.fire_cawfe_13"
 
 
