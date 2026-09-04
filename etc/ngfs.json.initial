@@ -1,0 +1,98 @@
+{
+"comment" : "Example NGFS configuration. Copy to etc/ngfs.json and edit for your installation. Paths without a leading / are resolved against the working directory the system is run from, so run it from the wrfxpy installation root.",
+"ngfs_directory" : "ngfs",
+"wrfxpy_cfg" : "etc/conf.json",
+"base_cfg": "jobs/base_ngfs_cfg.json",
+"pop_data": "ingest/NGFS/Population_by_US_County_July_2024.txt",
+"run_cfg" : {
+   "fire_namelist_path": "etc/nlists/default.fire_behave_13",
+   "lookback_time": 24,
+   "num_starts" : 30,
+   "prioritize_by_pop": false,
+   "today_forecasts" : true,
+   "force_process": false,
+   "auto_start_forecasts": false,
+   "red_flag_settings": false,
+   "job_sleep": 150,
+   "frp_cutoff": 5000
+   },
+"perims_cfg" : {
+   "perim_dir" : "ngfs/perims/"
+   },
+"fmda_cfg_comment" : "Fuel moisture data assimilation. Set use_fmda false to run with equilibrium fuel moisture instead. fmda_path and second_path are absolute and must be edited for your system.",
+"fmda_cfg" : {
+   "use_fmda" : false,
+   "fmda_path": "/path/to/WRFXPY/wksp_fmda/",
+   "second_path" : "/path/to/your/wrfxpy/wksp_fmda/",
+   "fmda_regions" : ["CONUS"]
+   },
+"fuels_comment" : "CONUS fuels are NOT selected here. They come from geo_vars_path in base_cfg, which should point at a LANDFIRE mosaic built by src/ingest/landfire_mosaic.py. LANDFIRE updates its releases by region and those regions cut across state lines, so no state list can select the right release. region_cfg below is only for areas that need their own fuels, elevation AND grib source.",
+"region_comment" : "Include any regions where the default landfire or grib sources will not be used",
+"region_cfg" : {
+   "alaska" : {
+      "state" : ["AK"],
+      "geo_vars_path" : "etc/vtables/geo_vars.json_alaska",
+      "msg" : "\tAlaska incident detected, using NAM198 and Alaska Landfire data",
+      "grib_source" : "NAM198"
+      },
+   "hawaii" : {
+      "state" : ["HI"],
+      "geo_vars_path" : "etc/vtables/geo_vars.json_hawaii",
+      "msg" : "\tHawaii incident detected, using NAM196 and Hawaii Landfire data",
+      "grib_source" : "NAM196"
+      },
+   "prvi" : {
+      "state" : ["PR","VI"],
+      "geo_vars_path" : "etc/vtables/geo_vars.json_prvi",
+      "msg" : "\tPuerto Rico or Virgin Islands incident detected, using GFSF and PRVI Landfire data",
+      "grib_source" : "GFSF"
+      }
+   },
+"goes_cfg_comment" : "GOES detections from NGFS. data_source is ftp or api; ftp reads the CSV products from host/remote_directory, api uses api_directory.",
+"goes_cfg" : {
+   "data_source" : "ftp",
+   "data_format" : "csv",
+   "collection": "daily",
+   "host" : "bin.ssec.wisc.edu",
+   "remote_directory": "pub/volcat/fire_csv/NGFS_scene",
+   "sat_dir" : "GOES-EAST/CONUS",
+   "api_directory" : "https://fire.data.nesdis.noaa.gov/api/ogc/detections/collections/",
+   "ingest_directory" : "ingest/NGFS/scene",
+   "ingest_directory_daily" : "ingest/NGFS/",
+   "days_to_get" : 2,
+   "sat_sectors" : {
+      "18":["CONUS","Full-Disk"],
+      "19":["CONUS"]
+      },
+   "sats" : ["GOES-18","GOES-19"],
+   "scene_dirs": {
+      "18" : ["CONUS","Subdomains/Alaska-Full-Disk"],
+      "19" : ["CONUS"]
+      }
+   },
+"viirs_cfg" : {
+   "data_source" : "ftp",
+   "data_format" : "csv",
+   "host" : "bin.ssec.wisc.edu",
+   "remote_directory": "pub/volcat/fire_csv/NGFS_scene/",
+   "sat_dir" : "VIIRS/SSEC-DB",
+   "api_directory" : " ",
+   "ingest_directory" : "ingest/NGFS/VIIRS",
+   "days_to_get" : 2,
+   "sats" : ["NOAA-20","NOAA-21","SNPP"]
+   },
+"firms_cfg_comment" : "NASA FIRMS URT/NRT VIIRS, used to top up detections NGFS has not published yet. Needs a MAP_KEY in tokens_path.",
+"firms_cfg": {
+   "sats" : ["noaa_20", "noaa_21", "suomi","landsat","noaa_20_Alaska", "noaa_21_Alaska","suomi_Alaska"],
+   "ingest_directory" : "ingest/FIRMS/",
+   "days_to_get" : 3,
+   "tokens_path": "etc/tokens.json"
+   },
+"unknown_comment" : "For forecasting possible wildfires that NGFS has not named. Detections are only picked up inside the listed NWS forecast offices, and use the shorter, cheaper job configuration in unknown_cfg_file.",
+"unknown": {
+   "unknown_cfg_file": "jobs/base_ngfs_cfg_short.json",
+   "run": false,
+   "wfo_list" : ["KBOU"],
+   "red_flags": false
+   }
+}

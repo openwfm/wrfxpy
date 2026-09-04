@@ -68,6 +68,7 @@ temp/
 etc/conf.json
 etc/tokens.json
 etc/clusters.json
+etc/ngfs.json
 
 # Apple
 .DS_Store
