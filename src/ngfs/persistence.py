@@ -1,4 +1,37 @@
-#Functionality for storing and retrieving the system state, saving maps, etc
+"""
+Storing and retrieving the system state, and writing each run's output files.
+
+State is one gzip-compressed pickle of the whole ngfs_day object per run, in the
+configured ngfs_directory. get_old_incidents rebuilds a run's starting point
+from the last seven days of those files: the union of every started_inc_ids
+list, the incident objects, and the newest run's detection frame.
+
+Things that are easy to get wrong here:
+
+  * mtime is load-bearing. Both the seven-day filter and the choice of "newest
+    state" sort by mtime, so any tool that rewrites a state file must preserve
+    its timestamp, or it promotes stale state to newest and corrupts the ledger.
+  * Pickles record different class paths depending on their writer. The monolith
+    runs as a script, so its pickles name __main__.ngfs_day, while
+    package-written ones name ngfs.ngfs_day.ngfs_day; reading the former from
+    the package raises AttributeError. pickle_writer determines ownership from
+    the file's first 128 bytes rather than from its name -- do not rely on the
+    '_testing' filename suffix.
+  * ngfs_start.py globs only *.pkl, so compressing state in the monolith's own
+    directory would hide it and cause fires to be forecast a second time.
+    compress_state_pickles refuses such directories.
+
+Also holds the run's output writers -- detection_summary, print_base_map and
+save_incident_text -- which ngfs_day delegates to.
+
+Run as a module to compress a backlog of uncompressed pickles. It verifies each
+compressed copy by SHA-256 of the decompressed bytes and deletes the original
+only on a match; without --delete it reports and changes nothing, and files
+newer than --min-age-hours are never touched, so it is safe to run while the
+loop is live:
+
+    python -m ngfs.persistence <directory> [--delete] [--limit N]
+"""
 import glob
 import gzip
 import hashlib

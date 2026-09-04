@@ -1,4 +1,37 @@
-#ngfs_incident class
+"""
+One fire, from detections to a wrfxpy job description.
+
+An ngfs_incident is created per NGFS incident id -- the IRWIN UUID, or a
+synthesized id for an unnamed 'possible wildland fire' -- and holds that fire's
+detections, its estimated ignition point and time, and the job configuration
+derived from them.
+
+Two methods carry the scientific weight:
+
+  process_incident            recovers detections predating the incident id by
+                              matching the feature tracking id back through the
+                              full GOES record, estimates the ignition point and
+                              time, then refines that estimate with VIIRS.
+  make_incident_configuration specializes the base wrfxpy job description:
+                              ignition, domain center and projection, forecast
+                              window, GRIB source and Landfire tables by region,
+                              GRIB cycle start for cycle-based sources, and FMDA
+                              versus equilibrium fuel moisture.
+
+Ignition location is the mean of the SWIR (band 5) terrain-corrected pixel
+positions over the first three hours of detections, falling back to the mean of
+the nominal pixel centers when the two estimates disagree by more than 0.04
+degrees. -999 marks an undetermined band 5 position. Ignition time is the
+earliest of acq_date_time, incident_start_time and pixel_date_time. When a VIIRS
+detection falls inside the GOES ignition pixel, polar_ign_estimate sets
+new_ign_latlon / new_ign_utc, which then take priority in the job
+configuration -- the domain is deliberately left unchanged, so a GOES and a
+VIIRS-refined ignition can be compared over the same grid.
+
+start_forecast currently does not submit: the two lines that would launch the
+job are commented out, so this package writes job files for comparison against
+the production monolith without issuing forecasts. See README section 2.
+"""
 from __future__ import absolute_import
 from __future__ import print_function
 import geopandas as gpd

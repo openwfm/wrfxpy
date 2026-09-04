@@ -1,3 +1,32 @@
+"""
+One run of the NGFS forecasting cycle.
+
+The ngfs_day class owns everything belonging to a single execution: the
+detection data, the incidents built from it, and the ledger of incident ids
+already forecast. The entry point calls its methods in order -- acquire data,
+add_incidents, process_incidents, start_incidents, save_outputs.
+
+Two detection streams are kept separate. self.data holds GOES; self.viirs_data
+holds NGFS VIIRS plus a NASA FIRMS URT top-up for detections NGFS has not
+published yet. Incident ids appearing only in the VIIRS stream are picked up by
+add_incidents as VIIRS-only incidents, which the GOES-driven production
+monolith cannot see.
+
+self.data is carried forward from the previous run's saved state rather than
+re-downloaded from scratch, and deduplicated on
+(latitude, longitude, acq_date_time), so an incident's detection history
+survives across cycles. save_pickle trims it to the most recent 48 hours before
+writing.
+
+add_incidents is where old and new state meet: for each incident id in the data
+it either revives the ngfs_incident object from the previous run and appends new
+detections to it, or builds a fresh one. An id already in started_inc_ids is
+built fresh but immediately marked started, which is what prevents a second
+forecast for a fire that dropped out of the data and came back.
+
+cluster_data, add_polar_data and prioritize_incidents have no callers; they are
+retained from earlier versions. See README section 9.
+"""
 from __future__ import absolute_import
 from __future__ import print_function
 import os, sys, glob

@@ -1,4 +1,26 @@
-#makes configuration for incidents and ngfs setup
+"""
+Loads the configuration the NGFS system runs from.
+
+load_cfgs reads two layers:
+
+  * etc/ngfs.json -- NGFS-specific settings: data sources and ingest
+    directories, run limits, region overrides, unnamed-fire handling. See
+    README section 5 for the keys.
+  * the wrfxpy configuration it names in 'wrfxpy_cfg', normally etc/conf.json.
+
+Both paths are relative, so the process working directory decides which
+installation is configured.
+
+make_base_configuration supplies the base wrfxpy job description that every
+incident forecast is derived from, read from jobs/base_ngfs_cfg.json. If that
+file is missing it falls through to simple_forecast's interactive
+questionnaire, which will hang a cron run -- keep it in place.
+
+get_fmda_path is imported from ngfs_incident at call time rather than at module
+scope, so this module stays free of that module's heavy imports and no import
+cycle can form. persistence.get_old_incidents uses the same deferred-import
+pattern.
+"""
 from __future__ import absolute_import
 from __future__ import print_function
 import os, sys, glob

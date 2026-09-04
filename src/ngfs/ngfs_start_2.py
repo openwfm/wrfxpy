@@ -1,3 +1,26 @@
+"""
+Entry point for the NGFS automated forecasting system.
+
+Runs once per cycle, every 30 minutes from cron_ngfs.sh. Loads configuration,
+restores state from the previous run, acquires GOES and VIIRS detections,
+groups them into incidents, estimates an ignition point and time for each new
+one, writes a wrfxpy job description, and saves state for the next cycle.
+
+The body below is the whole pipeline in order; each line is one stage owned by
+an ngfs_day method.
+
+Configuration paths are relative, so this must be run from the installation
+root with src/ on PYTHONPATH and the wrf_test environment active:
+
+    cd /data/jhaley/new_wrfxpy/wrfxpy
+    conda activate wrf_test
+    export PYTHONPATH=src
+    python /data/jhaley/wrfxpy/src/ngfs/ngfs_start_2.py now
+
+Recognized arguments are 'now', 'ftp', 'api', a path ending in .csv, and
+'full_process'; they are matched by substring against sys.argv in
+ngfs_day.sys_args_override. See src/ngfs/README.md.
+"""
 from __future__ import absolute_import
 from __future__ import print_function
 import os, sys, glob
