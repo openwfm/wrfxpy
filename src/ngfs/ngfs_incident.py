@@ -519,38 +519,21 @@ class ngfs_incident():
          if 'behave_13' in cfg['fire_namelist_path']:
             cfg['domains']['1']['time_step'] = 6
 
-      if 'region_cfg_REMOVE_THIS' in ngfs_cfg.keys():       # <<<< ------------------------------------------------    FIX
-         for r in ngfs_cfg['region_cfg']:
-            print(r)
-            if self.data.state.unique() in ngfs_cfg['region_cfg'][r]['state']:
-               cfg['grib_source'] = ngfs_cfg['region_cfg'][r]['grib_source']
-               cfg['geo_vars_path'] = ngfs_cfg['region_cfg'][r]['geo_vars_path']
-               print(ngfs_cfg['region_cfg'][r]['msg'])
-      else:
-         update_states = ['CA','AZ','NV','UT', 'NM'] #['OR','WA','ID','MT','WY','CO']
-         data_states = self.data.state.unique()
-         update_list = [us for us in data_states if us in update_states]
-         if len(update_list) > 0:
-               cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_2024'
-               print('\tUsing updated Landfire maps')
-         #look for Alaska/Hawaii and updated regions to use latest Landfire and appropriate weather products
-         if any(self.data.state == 'AK'):
-            cfg['grib_source'] = 'NAM198'
-            print('\tAlaska incident detected, using NAM198 and Alaska Landfire data')
-            cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_alaska'
-         if any(self.data.state == 'HI'):
-            cfg['grib_source'] = 'NAM196'
-            print('\tHawaii incident detected, using NAM196 and Hawaii Landfire data')
-            cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_hawaii'
-         if any(self.data.state == 'PR'):
-            cfg['grib_source'] = 'GFSF'
-            print('\tPuerto Rico incident detected, using GFSF and PRVI Landfire data')
-            cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_prvi'
-         if any(self.data.state == 'VI'):
-            cfg['grib_source'] = 'GFSF'
-            print('\tVirgin Islands incident detected, using GFSF and PRVI Landfire data')
-            cfg['geo_vars_path'] = 'etc/vtables/geo_vars.json_prvi'
-            #maybe use the old adrjrw here because there is so much ocean in the domain?
+      #CONUS fuels come from the wrfxpy default geo_vars, which points at a
+      #LANDFIRE mosaic carrying the newest release available at each pixel
+      #(see ingest/landfire_mosaic.py). No state list is needed for fuels:
+      #LANDFIRE updates its releases by region, and those regions cut across
+      #state boundaries, so selecting a release by state cannot be correct.
+      #region_cfg holds only the genuinely regional cases -- Alaska, Hawaii
+      #and PRVI -- which need their own fuels, elevation and grib source.
+      data_states = [s for s in self.data.state.unique() if isinstance(s,str)]
+      for name, region in ngfs_cfg.get('region_cfg',{}).items():
+         if any(s in region['state'] for s in data_states):
+            cfg['grib_source'] = region['grib_source']
+            cfg['geo_vars_path'] = region['geo_vars_path']
+            print(region['msg'])
+            #maybe use the old adrjrw for PRVI because there is so much ocean
+            #in the domain?
             #cfg['wrf_namelist_path']  = "etc/nlists/default.input_adjrw"
             #cfg['fire_namelist_path'] = "etc/nlists/default.fire_adjrw"
       try:
