@@ -1,0 +1,44 @@
+{
+    "_comment": "Host paths the ForeFire driver (src/ingest/forefire.py) runs from. Copy to etc/forefire.json and edit for this install.",
+    "run_dir": "/home/jhaley/forefire/tests/ffwksp",
+    "_comment_run_dir": "Where the FF netcdf files, .ff scripts and results are written. MUST sit under apptainer.bind_host or the container cannot see it.",
+    "templates": {
+        "ignition": "/home/jhaley/forefire/tests/ignition_template.ff",
+        "restart": "/home/jhaley/forefire/tests/restart_template.ff"
+    },
+    "apptainer": {
+        "sif_image": "/home/jhaley/forefire/forefire.sif",
+        "bind_host": "/home/jhaley/forefire/tests",
+        "bind_container": "/forefire/tests",
+        "timeout_s": 240
+    },
+    "_comment_apptainer": "bind_host:bind_container is the --bind flag; the container working directory is derived by mapping run_dir through it. fuelsTableFile in the .ff templates is a container-side path under bind_container.",
+    "wksp_root": "/data/jhaley/wrfxpy/wksp",
+    "min_timesteps": 20,
+    "perim_copy_dir": "/home/jhaley/Documents/Fall_2023/forefire_perims",
+    "fuels_table": "/home/jhaley/forefire/tests/fuelstrans.csv",
+    "_comment_fuels_table": "Host path of the base ForeFire fuel table. The .ff templates point at its container path; when moisture.enabled a per-run copy is written with Md replaced.",
+    "moisture": {
+        "enabled": false,
+        "source": "fmda_geogrid",
+        "class_index": 0,
+        "radius_km": 10,
+        "valid_range": [
+            0.02,
+            0.5
+        ],
+        "fallback_md": null,
+        "weighting": "sav",
+        "dead_classes": [
+            0,
+            1,
+            2
+        ],
+        "sav_weights": [
+            2000.0,
+            109.0,
+            30.0
+        ]
+    },
+    "_comment_moisture": "Dead fuel moisture for the run. source fmda_geogrid reads FMC_GC from the fmda_geogrid_path named in the job input.json -- available before wrf.exe starts. weighting 'sav' combines dead_classes (0=1h, 1=10h, 2=100h) by sav_weights, the standard size-class surface-area-to-volume ratios, which is what Rothermel's single dead moisture represents; 'single' instead uses class_index alone. Outside valid_range, or on any read failure, the run falls back to fallback_md, or to the fuel table unchanged when that is null."
+}
