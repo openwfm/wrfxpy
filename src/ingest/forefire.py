@@ -1323,25 +1323,33 @@ def prob_forecast(json_directory):
 
 
 def read_ff_geojson(path):
-    """Read a ForeFire geojson honouring ForeFire's ring convention.
+    """Read a ForeFire geojson, deciding burning vs unburned by CONTAINMENT.
 
     ForeFire's dumpMode=geojson packs every separate fire front as a RING of one
     polygon and records the count in properties.numberOfPolygons -- a merged
     multi-ignition step can carry hundreds. GeoJSON says ring 0 is the shell and
-    the rest are holes, so gpd.read_file subtracts them: a 472-front step read
-    as one outline with 471 holes punched out, and its area collapsed from
-    106,869 ha to 5,857 ha while the vertex count actually rose.
+    the rest are holes, so gpd.read_file subtracts them: a 472-front step read as
+    one outline with 471 holes punched out and its area collapsed from 106,869 ha
+    to 5,857 ha while the vertex count actually rose.
 
-    ForeFire signs the rings instead. A positive signed area is burning, a
-    negative one is a genuine unburned island. Returns a GeoDataFrame in EPSG:4326
-    with one row per ring, plus a 'burning' column, so callers can either keep the
-    fronts separate (KML placemarks) or difference the islands out (areas).
+    Ring winding is NOT a reliable discriminator either, which is how this was
+    first written and it was wrong: ForeFire does not wind merged fronts
+    consistently, so a 31,079 ha burning front came through with negative
+    shoelace area, was taken for an unburned island and differenced out. Areas
+    then oscillated between steps -- 33,257 ha, 9,003, 45,028, 12,632 -- purely
+    from that misclassification.
 
-    Single-front output is unaffected: one positive ring in, one row out.
+    The robust rule is nesting depth under the even-odd convention: a ring
+    enclosed by an even number of other rings is burning, an odd number means an
+    unburned island inside a burn. That holds whatever the winding.
+
+    Returns a GeoDataFrame in EPSG:4326 with one row per ring plus a 'burning'
+    column, so callers can keep fronts separate for KML or difference the islands
+    out for areas. Single-front output is one burning row, as before.
     """
     with open(path,'r') as fh:
         content = json.load(fh)
-    shells, islands = [], []
+    rings = []
     for feature in content.get('features',[]):
         geometry = feature.get('geometry') or {}
         coords = geometry.get('coordinates') or []
@@ -1350,19 +1358,32 @@ def read_ff_geojson(path):
             for ring in polygon:
                 if len(ring) < 4:
                     continue
-                pts = np.asarray(ring,dtype=float)
-                #shoelace: sign gives the winding direction
-                area2 = float(np.sum(pts[:-1,0]*pts[1:,1] - pts[1:,0]*pts[:-1,1]))
-                (shells if area2 >= 0.0 else islands).append(Polygon(ring))
-    rows = [(g,True) for g in shells] + [(g,False) for g in islands]
-    if not rows:
+                poly = Polygon(ring)
+                if not poly.is_valid:
+                    poly = poly.buffer(0)
+                if poly.is_empty:
+                    continue
+                rings.append(poly)
+    if not rings:
         return gpd.GeoDataFrame({'burning':[]},geometry=[],crs={'init':'epsg:4326'})
-    frame = gpd.GeoDataFrame({'burning':[b for _,b in rows]},
-                             geometry=[g for g,_ in rows],
-                             crs={'init':'epsg:4326'})
-    invalid = ~frame.is_valid
-    if invalid.any():
-        frame.loc[invalid,'geometry'] = frame.loc[invalid,'geometry'].buffer(0)
+
+    #largest first, so a ring can only be contained by one already seen
+    order = sorted(range(len(rings)),key=lambda i: -rings[i].area)
+    depth = [0]*len(rings)
+    seen = []
+    for i in order:
+        point = rings[i].representative_point()
+        #only rings strictly larger can enclose this one
+        d = 0
+        for j in seen:
+            if rings[j].bounds[0] <= point.x <= rings[j].bounds[2] and \
+               rings[j].bounds[1] <= point.y <= rings[j].bounds[3] and \
+               rings[j].contains(point):
+                d += 1
+        depth[i] = d
+        seen.append(i)
+    frame = gpd.GeoDataFrame({'burning':[d % 2 == 0 for d in depth]},
+                             geometry=rings,crs={'init':'epsg:4326'})
     return frame
 
 

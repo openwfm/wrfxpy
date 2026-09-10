@@ -844,7 +844,236 @@ way rather than as a wind bias correction.
    without crossing the cap gate at 1.0. That is the concrete reason the knob was
    added to the netcdf rather than the script.
 
-## 18. Open items
+## 18. The NWS summary settles the wind: a double reduction, not a WRF error
+
+You supplied the NWS Amarillo event summary. The relevant facts for Feb 27:
+
+- morning: west to southwest winds **25–35 mph**, gusts exceeding 58 mph by late
+  morning
+- afternoon: frequent gusts **65–70 mph**, some areas sustained **40–45 mph** for
+  a few hours
+- relative humidity **12–15%**, afternoon temperatures in the 70s F
+- a cold front pushed in from the north; **"fires that once were moving from west
+  to east soon started to move from north to south behind the front"**
+- roughly **9 named fires**, several merging; Smokehouse Creek finished at
+  **1,058,482 acres = 428,350 ha**
+- a forward flank **~100 miles long**
+
+### WRF's winds are right in both direction and magnitude
+
+**Direction and frontal timing:** averaged over the fire footprint, WRF holds
+westerly (252–258°) through 23:30Z, swings NW at 00:30Z, and is northerly
+(351–12°) from 01:00Z onward. That is the described frontal shift, in the right
+place in the forecast window. WRF's synoptic evolution is correct.
+
+**Magnitude:** the namelist settles it.
+
+```
+fire_wind_log_interp = 1
+fire_use_windrf      = 2
+windrf = 0.36, 0.36, 0.44, 0.55, 0.42, ...
+```
+
+`fire_use_windrf = 2` means **WRF-SFIRE has already applied the fuel-dependent
+wind reduction factor**, 0.36 for category 2. So `UF`/`VF` are already midflame
+winds. The implied 10 m wind is
+
+    4.15 / 0.36 = 11.5 m/s = 25.8 mph
+
+which lands exactly in the NWS's "sustained 25 to 35 mph". **WRF's wind magnitude
+is not the problem.**
+
+### The problem is that ForeFire reduces the wind a second time
+
+ForeFire's `windReductionFactor = 0.4` multiplies `UF`/`VF` again, so the total
+reduction from the 10 m wind is
+
+    0.36 (WRF-SFIRE) x 0.40 (ForeFire) = 0.144
+
+where it should be 0.36. The effective midflame wind is **1.48 m/s** on a day
+that warranted 4–6 m/s. That is a factor of **2.5**, i.e. `1/0.4`, and it is most
+of the 4.3× the wind probe needed (§17).
+
+**Correction, and it supersedes §17's framing.** I wrote there that 4.3× "is not
+a wind correction" because 16 m/s at flame height is not credible. That reasoning
+was wrong: at `wind_scale` 4.3 the netcdf carries 15.9 m/s, but ForeFire then
+applies `wRF` 0.4, so the midflame wind is 6.4 m/s — entirely credible for a
+25–45 mph day. I compared the pre-`wRF` field against a flame-height expectation.
+
+**The right fix is `wRF = 1.0`, not a wind scaling** — because the reduction is
+already in the data. But `wRF ≥ 1.0` switches off the Andrews cap gate
+(`Rothermel.cpp:217`), so the clean way to express it without changing two things
+is `wind_scale = 2.5` with `wRF` left at 0.4. Those are numerically equivalent in
+the spread term and differ only in the cap.
+
+### The residual after the double reduction is ~1.7x
+
+4.3 / 2.5 = **1.7**, and that is the part the fuels have to carry — which is
+where you pointed.
+
+## 19. The fuels: your hypothesis measured
+
+Both fuel corrections you proposed are supported by the NWS text independently of
+any tuning argument.
+
+**Loading.** *"A good growing season through spring and summer of 2023 led to
+decent grass fuel loading compared to the previous couple of years."* The domain
+is **86% NFUEL_CAT 2**, "timber (grass and understory)" — a model presuming a
+timber overstory the Texas panhandle largely lacks, and built from a static map
+that cannot know 2023 was a good growing year. Anderson 3, tall grass, has 2.7×
+the bed depth, a lower packing ratio (so a larger `phiV` from the same wind) and
+`me` 0.25 against 0.15.
+
+**Moisture.** *"Two weeks without precipitation"*, dormant vegetation, RH 12–15%
+at 70s F. Simard EMC for those conditions is **0.030–0.041**, against the fuel
+table's default **Md = 0.10**. But moisture is a weaker lever than it looks here:
+`Etam` only rises 0.501 → 0.658 from Md 0.10 → 0.03 in fuel 2, i.e. **1.31×**,
+because 0.10 is already well below `me` 0.15. The 09-08 knee is above this range,
+not below it.
+
+`fuel_remap` was added to `make_FF_nc` (and `cfg['fuel_remap']`) to test the type
+change; scaled/remapped netcdfs cache under `nc_<grid_code>[_w<scale>][_f2to3]/`.
+
+### Measured, all at wind_scale 1 unless noted, 3.3 h, same seeds and clock
+
+| case | fuel | Md | wind | area | vs base |
+|---|---|---|---|---|---|
+| `fuel_base` | 2 | 0.10 | 1 | 8,430 ha | 1.00× |
+| `fuel_tall` | **2→3** | 0.10 | 1 | **19,625 ha** | **2.33×** |
+
+Tall grass alone gives **2.33×**. With the 2.5× double-reduction correction that
+is 5.8×, against the 4.3× needed — so between them the levers more than cover the
+gap, and the question becomes how to split it rather than where to find it.
+
+### Where the ForeFire fuel table comes from, and what is actually wrong
+
+I first called the ForeFire/WRF-SFIRE table mismatch a defect and suggested
+raising category 2's load as "correcting a transcription". That was too broad.
+You identified the cause: **`fuelstrans.csv` is mapped from the 40-category
+Scott & Burgan models into the closest of the 13 Anderson categories**, so it is
+a translation, and its parameters are not expected to equal Anderson's.
+
+The evidence supports that, and narrows the problem to one cell.
+
+**`fuelstrans.csv` shares a source with WRF's `namelist.fire`:**
+
+| column | agreement with `namelist.fire` |
+|---|---|
+| `me` | **identical** for all 11 comparable categories |
+| `e` | `fueldepthm` rounded, all 9 (0.305→0.3, 0.762→0.8, 1.829→1.8, 0.061→0.1) |
+| `Sigmad` | `fgi` within ±20% for **7 of 9** |
+| `sd` | matches neither — binned to six levels (7800/6500/5500/4500/4000/3500) |
+
+The `sd` binning is the translation fingerprint: the values are SI (1/m) but do
+not equal Anderson's characteristic SAV in either 1/ft or 1/m, and they collapse
+13 distinct values into six. That is a deliberate lossy mapping, not an error.
+
+**There is also a second table, `fuels13.csv`**, which *is* a direct
+transcription of `namelist.fire` — `Sigmad` = `fgi` (0.166, 0.896, 0.674, …),
+`e` = `fueldepthm` exactly, `sd` = `savr` exactly. But it is **not usable as-is**:
+its `sd` is in **1/ft** while every other column is SI, so SAV would be 3.28×
+too small, and row 13's load is `1.00E-07`. `fuelstrans.csv` is the right file to
+be using.
+
+**The one thing that does look wrong is category 2's load:**
+
+| | value |
+|---|---|
+| `fuelstrans.csv` | **0.400** |
+| `fuels13.csv` | 0.896 |
+| WRF `fgi` | 0.897 |
+| ratio to `fgi` | **0.45×**, against 0.71–1.41× for every other category |
+
+Category 9 is the only other outlier (1.41×). Since the SMOKEHOUSE domain is
+**86% category 2**, this single cell carries the domain. Whether correcting it
+helps is not obvious from the formulation — raising the load raises reaction
+intensity but also the bulk density in `R0`'s denominator — so it was measured
+rather than argued (§20).
+
+**Caveat on the whole comparison:** because `fuelstrans.csv` is a 40→13
+translation and WRF-SFIRE uses Anderson 13 directly, the two models are not
+simulating identical fuels even given the same `NFUEL_CAT` map. That is a
+structural limit on ForeFire-vs-WRF-SFIRE comparison, including the pRes tuning
+idea from 09-09, and it is not something a single edit fixes.
+
+## 20. Corrections: the ring reader, and the Andrews cap
+
+### `read_ff_geojson` was wrong twice, and the second version is committed broken
+
+`daecd00` decided burning-vs-island by **ring winding** (positive shoelace area =
+burning). That is not reliable: ForeFire does not wind merged fronts consistently,
+so a **31,079 ha burning front came through negative**, was taken for an unburned
+island and differenced out. The symptom was area oscillating between steps in the
+`wfix_tall` run:
+
+    3,473 -> 11,837 -> 22,234 -> 33,257 -> 9,003 -> 45,028 -> 12,632 ha
+
+Every collapse coincided with exactly one "island" appearing, and at those steps
+the island was 4.7–5.1× the size of the largest "shell" — which is the tell.
+
+**The correct rule is nesting depth under the even-odd convention**: a ring
+enclosed by an even number of other rings is burning, odd means an unburned
+island inside a burn. That holds whatever the winding. `read_ff_geojson` now
+computes containment depth via representative points with a bounding-box
+prefilter. With it, `wfix_tall` grows monotonically to 47,488 ha.
+
+**This is uncommitted and supersedes the committed version.** Anything scored
+between `daecd00` and this fix that had merged fronts is suspect.
+
+### Numbers that change
+
+| result | was | now |
+|---|---|---|
+| `wfix_tall` (wind fix + tall grass) | 12,632 ha | **47,488 ha** |
+| `goes_incr` final, masked, 8.3 h | 90,495 ha | **120,763 ha** |
+| `goes2_first` final, unmasked | 31,284 ha | 31,305 ha |
+| everything single- or few-front | — | unchanged |
+
+Sections 1–6 are unaffected: SINLAHEKIN never had inner fronts, and its areas are
+identical either way (136.9 / 169.1 / 205.3 ha).
+
+### The Andrews cap is NOT binding — measured at last
+
+I invoked the cap three times this session as a reason to prefer `wind_scale`
+over `wRF = 1.0`, and once claimed it explained SINLAHEKIN's flattening (it did
+not). It is now measured directly. Both configurations give the same midflame
+wind and differ *only* in the cap gate at `Rothermel.cpp:217`:
+
+| | midflame | cap | area |
+|---|---|---|---|
+| `wind_scale` 2.5, `wRF` 0.4 | ×1.0 | **active** | 27,691 ha |
+| `wind_scale` 1.0, `wRF` 1.0 | ×1.0 | **off** | 27,868 ha |
+
+**0.6% apart.** The cap does not bind on this fire, the two knobs are
+interchangeable, and **`wRF = 1.0` is the simpler and more honest fix** than a
+wind scaling. `wind_scale` remains useful for sensitivity work, but it is not
+needed to express the double-reduction correction.
+
+## 21. Where the correction should come from: the balance sheet
+
+Target: **ROS 2.34×** (area 5.46×, ~46,000 ha at 3.3 h), from the
+connectivity-guarded leading edge of the best-connected first-scan cluster (§15).
+
+| correction | area | ROS | basis |
+|---|---|---|---|
+| category 2 load 0.400 → 0.896 | 1.21× | 1.10× | correctness — outlier cell |
+| Md 0.10 → 0.035 | 1.83× | 1.35× | **observed** — NWS RH 12–15% |
+| `wRF` 0.4 → 1.0 | 3.28× | 1.81× | **correctness** — `namelist.fire` |
+| `wRF` fix + Md 0.035 | 4.77× | **2.18×** | both justified from inputs |
+| `wRF` fix + Anderson 2→3 | 5.63× | 2.37× | needs a reclassification |
+| Anderson 2→3 + Md 0.035, no wind fix | 4.05× | 2.01× | fuels only |
+
+**The two corrections that need no hypothesis — the `wRF` double reduction and
+moisture from observed RH — reach 93% of the target on their own.** The residual
+7% is well inside the target's uncertainty, which derives from one cluster of a
+complex the NWS confirms was merging ("roughly 9 named wildfires with some of
+these merging"). So a fuel reclassification is **not required** to explain this
+fire, which matters given it is the least defensible of the levers.
+
+Levers are **sub-multiplicative** when combined: tall+dry+wind×2 measures 6.92×
+where multiplying the singles gives 9.72×. Combinations must be run, not inferred.
+
+## 22. Open items
 
 Carried from 09-09 §7, plus:
 
