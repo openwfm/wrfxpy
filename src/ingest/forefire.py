@@ -184,6 +184,167 @@ def resolve_md(wksp_dir,ign_latlon,cfg):
     return md,f"Md={md:.4f} from {src} ({how}, {mc.get('radius_km',10)} km)"
 
 
+def read_namelist_fire(path):
+    """Parse a WRF-SFIRE namelist.fire into {key: [values]}.
+
+    Only what is needed: numeric arrays from &fuel_scalars and &fuel_categories.
+    Fortran namelists wrap arrays across lines and end them at the next key, so
+    values accumulate until another 'name =' appears.
+    """
+    values, key = {}, None
+    for raw in open(path,'r'):
+        line = raw.split('!')[0].strip()
+        if not line or line.startswith('&') or line == '/':
+            continue
+        if '=' in line:
+            name,_,rest = line.partition('=')
+            key = name.strip()
+            values[key] = []
+            line = rest
+        if key is None:
+            continue
+        for token in line.replace(',',' ').split():
+            if token.startswith("'") or token.startswith('"'):
+                continue
+            try:
+                values[key].append(float(token))
+            except ValueError:
+                pass
+    return values
+
+
+def fuel_table_from_namelist(namelist_path,cfg,md=None,split_live=True):
+    """Write a ForeFire fuel table whose Rothermel inputs come from namelist.fire.
+
+    The shipped fuelstrans.csv is a mapping of the 40-category Scott & Burgan
+    models onto the nearest of the 13 Anderson categories -- category 2's sd
+    6500, e 0.30, me 0.15 is Scott & Burgan GR2 fully cured. Its SAV is binned to
+    six levels and its category 2 load is inconsistent with its own neighbours.
+    Every WRF-SFIRE run, meanwhile, ships a namelist.fire stating exactly which
+    fuel properties it used. That namelist is essentially static across forecasts,
+    so this is a ONE-TIME generation, not a per-run step: run it once against a
+    canonical namelist.fire, review the result, check it in, and point
+    cfg['fuels_table'] at it. write_fuel_table then substitutes Md per run as
+    before. Calling it per forecast would work but would rewrite an identical
+    file every time.
+
+    The aim is not to make ForeFire reproduce WRF-SFIRE -- the two use different
+    spread formulations and never will -- only to stop them disagreeing about the
+    fuel they were both handed.
+
+    Mapped, with units:
+
+        Sigmad, Sigmal  <- fgi         kg/m2, split by the live moisture-class
+                                       weight fmc_gw05 when split_live
+        e               <- fueldepthm  m
+        sd, sl          <- savr        1/ft -> 1/m, x 3.28084
+        me              <- fuelmce
+        Rhod, Rhol      <- fueldens    lb/ft3 -> kg/m3, x 16.0185
+        DeltaH, Deltah  <- cmbcnst     J/kg
+
+    Everything else stays as the base table has it: Ta, Tau0, Cp, Cpa, Ti, X0,
+    r00, stoch and Blai are ForeFire formulation constants with no namelist
+    counterpart, and inventing them would be worse than leaving them.
+
+    Categories absent from the namelist keep their base-table row. no_fuel_cat is
+    left alone -- its e = 0 is what makes it non-burnable.
+
+    Written as plain text with LF endings. csv.writer is not used: it emits CRLF,
+    which ForeFire reads as part of the final field, silently breaking 'me' and
+    clamping every fire to zero area.
+    """
+    nml = read_namelist_fire(namelist_path)
+    ncats = int(nml.get('nfuelcats',[0])[0]) if nml.get('nfuelcats') else 0
+    no_fuel = int(nml.get('no_fuel_cat',[0])[0]) if nml.get('no_fuel_cat') else None
+    if not ncats:
+        print(f"No nfuelcats in {namelist_path}, keeping the base fuel table")
+        return cfg['fuels_table']
+
+    FT_TO_M = 3.28084                #1/ft -> 1/m
+    LBFT3_TO_KGM3 = 16.0185
+    live_w = nml.get('fmc_gw05') or []
+
+    lines = open(cfg['fuels_table'],'r').read().replace('\r\n','\n').rstrip('\n').split('\n')
+    header = lines[0].split(';')
+    #a 40-category run (default.fire_behave_40) needs a 40-row base table; the
+    #shipped fuelstrans.csv has 13 plus no_fuel, and silently overriding only the
+    #first 13 would leave the rest translated and the map mismatched
+    available = set()
+    for line in lines[1:]:
+        if line.strip():
+            available.add(int(float(line.split(';')[0])))
+    missing = [n for n in range(1,ncats+1) if n not in available]
+    if missing:
+        #Refuse rather than warn. A table where categories 1-14 carry
+        #40-category values and 15-40 are absent is worse than the untouched one:
+        #every run using it would look fine and be wrong. This is the same class
+        #of failure as the CRLF fuel table, which silently broke 'me' and clamped
+        #six completed parameter sets to zero area.
+        print(f"{os.path.basename(namelist_path)} declares nfuelcats={ncats} but "
+              f"{cfg['fuels_table']} has no rows for {missing[0]}-{missing[-1]}. "
+              f"A {ncats}-category run needs a {ncats}-row base table; keeping the "
+              f"base table unchanged.")
+        return cfg['fuels_table']
+    def put(fields,name,value):
+        if name in header:
+            fields[header.index(name)] = value
+
+    out, changed = [lines[0]], 0
+    for line in lines[1:]:
+        if not line.strip():
+            continue
+        fields = line.split(';')
+        index = int(float(fields[0]))
+        if md is not None:
+            put(fields,'Md',f"{md:g}")
+        i = index - 1
+        if 1 <= index <= ncats and index != no_fuel:
+            load = nml['fgi'][i] if len(nml.get('fgi',[])) > i else None
+            if load is not None and load > 1e-6:
+                if split_live and len(live_w) > i and 0.0 < live_w[i] < 1.0:
+                    put(fields,'Sigmad',f"{load*(1.0-live_w[i]):.4g}")
+                    put(fields,'Sigmal',f"{load*live_w[i]:.4g}")
+                else:
+                    #fgi is WRF's TOTAL load over all moisture classes, so with no
+                    #split available it all goes in the dead pool and the live pool
+                    #is zeroed. Leaving Sigmal at the base value would make the
+                    #total exceed fgi -- for category 2 that is 0.897 + 0.1.
+                    #default.fire_behave_13 has no fmc_gw05, so this is the path a
+                    #Behave run takes.
+                    put(fields,'Sigmad',f"{load:.4g}")
+                    put(fields,'Sigmal','0.0')
+            if len(nml.get('fueldepthm',[])) > i and nml['fueldepthm'][i] > 1e-6:
+                put(fields,'e',f"{nml['fueldepthm'][i]:.4g}")
+            if len(nml.get('savr',[])) > i and nml['savr'][i] > 0:
+                sav = nml['savr'][i]*FT_TO_M
+                put(fields,'sd',f"{sav:.0f}")
+                put(fields,'sl',f"{sav:.0f}")
+            if len(nml.get('fuelmce',[])) > i and nml['fuelmce'][i] > 0:
+                put(fields,'me',f"{nml['fuelmce'][i]:g}")
+            if len(nml.get('fueldens',[])) > i and nml['fueldens'][i] > 0:
+                rho = nml['fueldens'][i]*LBFT3_TO_KGM3
+                put(fields,'Rhod',f"{rho:.1f}")
+                put(fields,'Rhol',f"{rho:.1f}")
+            if nml.get('cmbcnst'):
+                put(fields,'DeltaH',f"{nml['cmbcnst'][0]:.0f}")
+                put(fields,'Deltah',f"{nml['cmbcnst'][0]:.0f}")
+            changed += 1
+        out.append(';'.join(fields))
+
+    tag = 'nml' + (f"_Md{md:g}" if md is not None else '')
+    dest = f"{cfg['run_dir']}/fueltables/fuels_{tag}.csv"
+    os.makedirs(os.path.dirname(dest),exist_ok=True)
+    with open(dest,'w',newline='\n') as fh:
+        fh.write('\n'.join(out) + '\n')
+    #the ROS-formula selector is the reliable tell: ibeh is present in
+    #default.fire_behave_13 and absent from default.fire_cawfe_13
+    variant = 'Behave' if nml.get('ibeh') else ('CAWFE' if nml.get('fmc_gw05') else 'unknown')
+    print(f"Fuel table from {os.path.basename(namelist_path)} ({variant}, "
+          f"cmbcnst {nml.get('cmbcnst',[float('nan')])[0]:.4g}): "
+          f"{changed} categories overridden -> {dest}")
+    return dest
+
+
 def write_fuel_table(md,cfg):
     """Copies the base fuel table with Md replaced in every fuel class.
 
