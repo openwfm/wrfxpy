@@ -40,5 +40,11 @@
             30.0
         ]
     },
-    "_comment_moisture": "Dead fuel moisture for the run. source fmda_geogrid reads FMC_GC from the fmda_geogrid_path named in the job input.json -- available before wrf.exe starts. weighting 'sav' combines dead_classes (0=1h, 1=10h, 2=100h) by sav_weights, the standard size-class surface-area-to-volume ratios, which is what Rothermel's single dead moisture represents; 'single' instead uses class_index alone. Outside valid_range, or on any read failure, the run falls back to fallback_md, or to the fuel table unchanged when that is null."
+    "_comment_moisture": "Dead fuel moisture for the run. source fmda_geogrid reads FMC_GC from the fmda_geogrid_path named in the job input.json -- available before wrf.exe starts. weighting 'sav' combines dead_classes (0=1h, 1=10h, 2=100h) by sav_weights, the standard size-class surface-area-to-volume ratios, which is what Rothermel's single dead moisture represents; 'single' instead uses class_index alone. Outside valid_range, or on any read failure, the run falls back to fallback_md, or to the fuel table unchanged when that is null.",
+    "multi_ignition": {
+        "enabled": false,
+        "min_separation_m": 800,
+        "max_per_step": 400
+    },
+    "_comment_multi_ignition": "Detection-driven ignition. When enabled, every point in input.json ignitions is used, each emitted in the step whose model-time window contains it. min_separation_m thins co-located points: ForeFire seeds each as a triangle of 2*perimeterResolution, so closer points make degenerate fronts and it segfaults. max_per_step caps a single script; measured limit is between 500 and 2000 fronts."
 }

@@ -253,7 +253,357 @@ parameter space independent of any timing assumption.
 
 ---
 
-## 7. Open items
+## 7. The timing bug, and the fix
+
+**The intent** (stated by you, and it is the right convention): ForeFire's `t=0`
+is the timestamp of the latest wrfout that exists *before* the fire's ignition
+time. WRF-SFIRE instead sets its `t=0` to the *first* wrfout of the run, which
+can be several hours earlier.
+
+`make_timing_table` was assigning `ig_s = ws`, i.e. seconds from the first
+wrfout. For SMOKEHOUSE CREEK (WRF from 18:00Z, ignition 20:41:17Z) that handed
+every run a **2 h 41 min head start**; for SINLAHEKIN it was about 3 h.
+
+The fix keys off the step that brackets the ignition and re-references
+everything to it:
+
+```python
+ws_ignition = 0.0
+...
+elif (ws < ignition_seconds) and (ws + t_step > ignition_seconds):
+    ws_ignition = ws          #this wrfout is ForeFire's t=0
+    ig_s = ignition_seconds - ws
+else:
+    ig_s = ws - ws_ignition   # was: ig_s = ws
+```
+
+Verified on SMOKEHOUSE: row 5 is the 20:30Z wrfout and gets
+`ign_seconds = 677`, which is exactly 20:41:17 − 20:30:00. Row 6 (21:00Z) gets
+1800. Both correct.
+
+**Before this, I twice claimed a wrong magnitude for this bug** — first "2×",
+then "corrected" it to 1.25× using a `valid_at` field I had misread. Neither was
+right. The real defect only became findable once you stated the intended
+convention; I had been inferring it from the code, which is the thing that was
+wrong.
+
+### What this invalidates
+
+Sensitivities (elasticities, knee positions, the pRes scaling law) are ratios
+between runs that all shared the same offset, so they stand. **Absolute
+model-vs-observation numbers do not.** Specifically:
+
+| Result | Status |
+|---|---|
+| 09-09 §5f, 6.2× vs WRF-SFIRE | invalid, ran with a ~3 h head start |
+| 09-10 §2, 1.74×/1.83× oversize | invalid, same cause |
+| the pSAF ≈ 0.4 calibration | invalid, rests on the above |
+| all wRF / pSAF / Md elasticities | unaffected |
+| IoU and the shape/origin work (§3–6) | unaffected — matched-area comparison |
+
+The IoU work is safe precisely *because* it compares at matched area rather than
+matched time, which was luck rather than foresight.
+
+## 8. Multi-point ignition
+
+Three new functions in `forefire.py`, plus a `multi_ignition` config block
+(`enabled`, `min_separation_m`, `max_per_step`), off by default:
+
+- `read_ignitions(wksp_dir)` — every point in `input.json`, not just
+  `ignitions['1'][0]`, sorted by time.
+- `thin_ignitions(points, min_separation_m)` — grid-hashed greedy thinning.
+  **Not optional**: ForeFire builds each seed as a triangle of
+  `2*perimeterResolution`, so co-located seeds make degenerate fronts, which it
+  trashes and then segfaults on.
+- `ignition_schedule(points, timing_table, max_per_step)` — assigns each point to
+  the step whose `[ign_seconds[i], ign_seconds[i+1])` window contains it. This is
+  the shape you described: each restart waits on the next wrfout, and detections
+  arriving during the wait get added to that step.
+- `apply_ignitions(text, entries)` — strips the template's single
+  `startFire[lonlat=...]` and inserts the batch before the first `goTo[`.
+
+`sweep_ff_params(..., ignitions=points)` threads it through; `run_forecasts`
+picks it up automatically when `multi_ignition.enabled` is true.
+
+**Bug found and fixed during testing:** `thin_ignitions` first scaled each
+point's longitude by *its own* `cos(lat)`, which is not a projection — over a
+35 km latitude span the same longitude lands tens of km apart and the distance
+test silently fails. Measured 492 m separation against an 800 m target. Using one
+reference latitude for the whole cloud makes it exact (400/800/1600 m all hit).
+
+### Capacity and front collisions
+
+Measured on SMOKEHOUSE, short runs:
+
+- 500 **distinct** points run fine; 2000 distinct segfault. 500 *duplicated*
+  points crash, which is the degenerate-triangle path, not a count limit.
+- Fronts merge correctly. Over one step with **no new ignitions**, polygon count
+  fell 1552 → 1427 while area grew ~10,000 ha — fronts coalescing, not vanishing.
+- Same effect over 8 h at lower seed counts: 42 seeds → 4 polygons.
+- 6 steps with 400 ignitions per script completed in 2.6 min.
+
+So collisions are handled; the practical limit is a few hundred *distinct*
+concurrent fronts, and thinning is what keeps you under it.
+
+## 9. SMOKEHOUSE CREEK's `input.json` is a hindcast, not a forecast input
+
+The workspace carries **17,645 ignition points**, all at a single time
+(2024-02-27 20:41:17Z). You noted these were artificially augmented from
+detections toward the fire centre. The numbers confirm that seeding from them
+cannot test forecast skill:
+
+| quantity | value |
+|---|---|
+| convex hull of the 17,645 seeds | 366,396 ha |
+| WRF-SFIRE total burn, same workspace | 353,989 ha |
+| WRF-SFIRE burn within the **first hour** | 309,493 ha |
+| GOES detected footprint, full event | 477,449 ha |
+
+The seed cloud is already the size of the final fire. WRF-SFIRE burns 87% of its
+total in hour one because it is *told* where the fire is, not because it spreads
+there. Thinning does not rescue this: 800 m thinning drops the seeded area from
+43,760 ha to 5,674 ha, discarding 87% of it, because the points are far finer
+than the 100 m fire grid.
+
+Note also that the real Smokehouse Creek fire ignited on **2024-02-26**, a day
+before this workspace's nominal ignition. The 20:41:17Z timestamp is simply when
+NGFS first associated detections with the named incident.
+
+## 10. A real GOES-driven forecast
+
+Source: `ingest/NGFS/NGFS_FIRE_DETECTIONS_GOES-16_ABI_CONUS_2024_02_27_058.csv`
+(69,979 rows, 52 columns, 274 scans at the 5-minute ABI CONUS cadence).
+
+### Selection rule
+
+Rows with `known_incident_id = {4A55159B-D06F-4574-A689-CC4CDCCDC097}`: **6,437
+detections**, 20:41:17Z–23:56:17Z, 35 scans. Deduplicated at 2 km (one ABI pixel
+is 7.4 km², about 2.7 km across, and detections sit on a ~2.4 km grid) → **558
+distinct pixels**. Note 800 m thinning is a **no-op** on real GOES data: all 558
+survive it. The thinning code matters for augmented point clouds, not for raw
+GOES.
+
+### `feature_tracking_id` back-tracing: tried, and rejected
+
+You noted the tracking id is assigned to a location *before* that location is
+associated with a known incident, so back-tracing should recover pre-association
+detections. It does — but it is contaminated:
+
+- The ids are timestamped strings (`ID-2024-02-27T20:36:30Z_0029`), globally
+  unique, **not** recycled integers. 2,156 distinct in the file.
+- The 12 ids on Smokehouse rows appear in 15,179 rows spanning the whole day.
+- Within 10 km of the origin and before 20:00Z, that pull returns **30 pixels
+  present on 218 of the day's 274 scans at steady 200–350 MW FRP**. Those are
+  persistent heat sources — gas flares, which the Texas panhandle has many of —
+  not fire.
+- One id (`…02-26T21:21:30Z_0024`, 2,714 rows) has a mean position 57 km away.
+
+**A persistence filter is required before tracking-id back-tracing is usable in
+the pipeline**: reject any pixel detected on more than some fraction of the
+preceding scans. This is worth building — it is exactly the failure that would
+otherwise seed phantom fires on flares.
+
+### The first scan is three fires, not one
+
+Clustered at 6 km linkage, the 42 detections at 20:41:17Z resolve to:
+
+| cluster | px | centre | span | ΣFRP |
+|---|---|---|---|---|
+| 0 | 19 | 35.807, −101.207 | 21.4 km | 8,142 MW |
+| 1 | 18 | 35.792, −101.466 | 12.4 km | 11,363 MW |
+| 2 | 5 | 35.827, −100.921 | 6.9 km | 1,116 MW |
+
+The workspace's single ignition point is cluster 2 — the **smallest** of the
+three, at 1,116 MW, with the two larger fires 25 km and 50 km further west. Any
+single-point run on this workspace is seeded on the least significant part of the
+complex.
+
+### Detection arrival is front-loaded
+
+42 new pixels at 20:41, then 151 more at 21:11, then roughly 10 per scan. The
+21:11 jump is NGFS re-associating a batch, not fire growth — it shows up in the
+observed area curve as a 35,968 → 162,408 ha step in 30 minutes, so growth rates
+must be fitted **after** it or they are meaningless.
+
+### Verification data — use the incident cache, not the daily CSV
+
+`ngfs/incident_data/SMOKEHOUSE_CREEK_{4A55159B-...}.pkl` is much better for
+scoring than the daily CSV:
+
+- **12,004 detections running to 2024-02-28 13:12Z**, where the single-day CSV
+  stops at 23:56Z after only 3.25 h. It covers the whole 8 h forecast window.
+- It carries **true pixel corner coordinates** (`lat_tc_c1..c4`,
+  `lon_tc_c1..c4`), so the observed footprint is the union of exact ABI
+  quadrilaterals rather than squares of equal area.
+- All GOES-16 CONUS; there is **no VIIRS** in this cache, so there is no finer
+  observation available for this fire from here.
+
+The observed footprint remains an **upper bound** on burned area: a 7.4 km² pixel
+flags if any part of it is hot. Its 477,449 ha against WRF-SFIRE's 353,989 ha
+suggests roughly 35% over-coverage, which is the right order for whole-pixel
+unions.
+
+### Result: cold start from the first scan
+
+42 seeds at 20:41:17Z, no further information, 8.3 h forward on the corrected
+clock, template parameters (wRF 0.4, pSAF 0.6, pRes 100 m, spatialIncrement 5).
+Ran in **1.2 minutes** for 17 chained steps — comfortably inside the low-latency
+budget.
+
+| h | model ha | observed ha | ratio | IoU |
+|---|---|---|---|---|
+| 0.3 | 456 | 35,968 | 0.013 | 0.013 |
+| 0.8 | 624 | 162,408 | 0.004 | 0.004 |
+| 2.3 | 1,224 | 304,089 | 0.004 | 0.004 |
+| 4.3 | 2,094 | 447,873 | 0.005 | 0.005 |
+| 8.3 | 5,383 | 476,068 | 0.011 | 0.011 |
+
+Over the clean window (0.8–8.3 h, after the re-association step):
+
+- model **634 ha/h**, observed **41,821 ha/h** — a **66× shortfall** in area
+  growth rate.
+- equivalent-radius rate: model 0.107 m/s, observed 0.547 m/s — **5.1×** in
+  linear terms.
+- at 8.3 h the model has burned **1.5%** of WRF-SFIRE's total for the same fire.
+
+**Do not read this as a Rothermel result.** §11 shows most of it is an input
+defect: 86% of these seeds were placed on non-burnable fuel. The numbers above
+are what the workspace produces, not what the model is capable of.
+
+The separate claim that Rothermel cannot reach 10 m/s still stands, but on the
+independent evidence of 09-09 §5b — a measured ceiling of **2.66 m/s in fuel 2**,
+because `phiV` saturates — not on this run.
+
+## 11. The SMOKEHOUSE workspace's fuel map has the fire scar in it
+
+This is the important finding of the session, and it invalidates §11 as a growth
+test.
+
+`wrfinput_d01`'s `NFUEL_CAT` puts **5.2% of the domain in fuel category 14**. In
+`fuelstrans.csv`, category 14 has **`e = 0`** — zero fuel bed depth — so
+Rothermel returns no spread there. It is effectively "no fuel", and WRF-SFIRE
+sets `UF`/`VF` to exactly 0.00 m/s in those cells, which is how I first noticed
+it.
+
+Those cells are not scattered roads or fields. They are one contiguous block:
+
+| quantity | value |
+|---|---|
+| largest fuel-14 connected component | 248,817 ha |
+| its span | lon −101.517..−100.083, lat 35.744..36.029 |
+| GOES detected footprint, full event | 477,449 ha |
+| IoU(block, footprint) | **0.392** |
+| fraction of the block inside the fire perimeter | **0.823** |
+| fraction of the fire's footprint that is non-burnable | **0.429** |
+
+A 248,817 ha contiguous non-burnable block, 82% contained within the fire
+perimeter, is the fire's own scar. Cropland does not align with a fire perimeter.
+
+Consequences:
+
+- **86% of the first-scan GOES seeds (36 of 42) land in it** and cannot spread.
+  Of 42, only 6 sit on fuel 2. Across all 558 deduplicated detections, 53% are
+  non-burnable.
+- **43% of the fire's spread path is blocked**, so even correctly placed seeds
+  cannot cross the domain.
+- The §11 66× shortfall therefore measures seed placement and a corrupted fuel
+  map, not Rothermel's ceiling. §12 quantifies how much of it was placement.
+
+### Cause: wrfxpy's own scars mask (confirmed in the code)
+
+This is not a Landfire artifact — wrfxpy puts it there deliberately, and you
+identified it immediately:
+
+- `src/fire_init/tools.py:363` — `NFUEL_CAT[FUEL_MASK] = no_fuel_cat`, with
+  `no_fuel_cat = 14` by default (`tools.py:345`).
+- `src/fire_init/process_perimeter_masks.py:298-300` supplies that mask from
+  `scars_mask.pkl`, built at `:148` as `insidepastperims`.
+- `src/forecast.py:343-347` carries `scars_mask.pkl` forward from
+  `js.prev_forecast`, so a continuation forecast inherits every earlier scar.
+
+The workspace has `perim1.pkl` and `perim2.pkl` at its top level, so it is a
+**perimeter-initialized continuation forecast**: the already-burned area is
+masked to no-fuel so WRF-SFIRE does not re-burn it. That is correct behaviour for
+what it was built to do.
+
+It also explains the other oddity in §10 — the 17,645 "ignition points" are
+perimeter-derived, which is why they paint the observed fire.
+
+**So this workspace cannot test cold-start forecast skill for any model**, and
+that includes ForeFire. It was never meant to. Testing the low-latency pipeline
+needs an *initial* forecast whose fuel map has no scars mask, ideally one built
+at the true ignition (Smokehouse Creek started 2024-02-26, a day before this
+workspace's nominal start).
+
+A cheap guard for the driver: on load, report the fraction of the domain in the
+no-fuel category and the fraction of the seeds landing in it. Both are one line
+to compute and would have flagged this immediately instead of after a full run.
+
+### A pipeline requirement falls out of this
+
+Even on a clean fuel map, a 2.7 km ABI pixel is 27× coarser than the 100 m fuel
+grid, so a detection centroid lands on a non-burnable cell often. The pipeline
+must **snap each detection to the nearest burnable cell within its own pixel
+footprint** (~1.35 km) and drop it if there is none. Without that, seeds are
+silently inert — no error, no warning, just a fire that does not grow.
+
+### How I found it, and a correction to my own method
+
+I first mapped lat/lon linearly onto the 2400×2400 grid. That is wrong:
+`make_FF_nc` builds the grid in Lambert Conformal metres and only stores the
+inverse-projected corners in `BBoxWSEN`, so a linear lat/lon mapping skews the
+lookup. Redoing it through the same LCC (`TRUELAT1/2`, `CEN_LAT/LON`,
+`a=b=6370000`, spanning ±`nx*DX/2`) changed the first-scan figure from 81% to
+86% — the conclusion survived, but the first number was not trustworthy.
+
+I also verified the netcdf row order before trusting any of it: `make_FF_nc`
+writes `NFUEL_CAT`/`ZSF`/`UF`/`VF` straight from WRF with no flip, and WRF's
+`south_north` index 0 is southernmost, so `j` increases northward. A geographic
+transect test was *not* decisive here; reading the code was.
+
+## 12. How much of the shortfall was seed placement? Almost none
+
+`goes_snap` repeats the §10 cold start with one change: each first-scan detection
+is moved to the nearest burnable cell within its own pixel footprint (1,350 m),
+and dropped if there is none. **33 of 42 were dropped** — the masked scar is
+kilometres deep, not a road network, which is independent confirmation of §11.
+Nine seeds survived. Same clock, same parameters, 1.1 min to run.
+
+| h | goes_first (42 as detected) | polys | goes_snap (9 on burnable) | polys |
+|---|---|---|---|---|
+| 0.3 | 456 | 42 | 154 | 9 |
+| 2.3 | 1,224 | 42 | 1,043 | 8 |
+| 4.3 | 2,094 | 40 | 1,948 | 6 |
+| 6.3 | 4,020 | 38 | 3,958 | 4 |
+| 8.3 | **5,383** | 4 | **5,424** | 1 |
+
+Nine correctly placed seeds reach the *same total* as forty-two as-detected ones:
+**603 ha per seed against 128 ha**, a 4.7× improvement in seed efficiency. So the
+33 seeds on masked fuel were genuinely inert — as expected from `e = 0` — and in
+`goes_first` the six seeds that happened to land on fuel 2 did nearly all the
+work.
+
+**But the growth shortfall is unchanged.** 5,424 ha against an observed footprint
+of 476,068 ha. Seed placement was not the binding constraint; the masked domain
+is. The fronts spread until they reach the scar wall and stop, and 43% of the
+fire's path is wall.
+
+Front merging is confirmed again, and more cleanly than in §8: polygon counts
+fall monotonically as fronts coalesce — 9 → 1 for `goes_snap`, 42 → 4 for
+`goes_first` — while area rises throughout. No fronts are lost.
+
+### What this leaves
+
+Nothing in §10–§12 measures ForeFire's spread physics, because the domain cannot
+support spread. What it does establish is the machinery: the corrected clock, the
+detection-driven multi-ignition path, front merging at scale, and a runtime of
+about a minute for an 8 h forecast. Those are the pieces the low-latency pipeline
+needs, and they work. The physics question — whether Rothermel can approach the
+rates you have seen on explosive fires — still rests on the independent 2.66 m/s
+ceiling in fuel 2 from 09-09 §5b, and needs an unmasked initial forecast to test
+properly.
+
+## 13. Open items
 
 Carried from 09-09 §7, plus:
 
@@ -267,3 +617,34 @@ Carried from 09-09 §7, plus:
 4. Scratch scripts remain ephemeral: `shape_compare.py`, `overlay_plot.py`,
    `grid_ign2.py`, `grid_plot.py`. `sweep_analyze.py` is still the one most worth
    promoting into the repo.
+
+---
+
+### Added this session
+
+5. **Recompute the absolute numbers on the corrected clock.** 09-09 §5f
+   (6.2× vs WRF-SFIRE), 09-10 §2 (1.74×/1.83×) and the pSAF ≈ 0.4 calibration all
+   ran with a ~3 h head start (§7). Sensitivities and the IoU/shape work are
+   unaffected; those three results need redoing before they are quoted.
+6. **The SMOKEHOUSE workspace is a continuation forecast** with the scar masked
+   to no-fuel (§11), so it cannot test cold-start skill. To exercise the
+   low-latency pipeline properly, pick an *initial* forecast — no `prev_forecast`,
+   no `perim1.pkl`/`perim2.pkl` — ideally at the fire's true ignition.
+7. **Add a no-fuel diagnostic to the driver.** Report the fraction of the domain
+   in category 14 and the fraction of ignition seeds landing in it, at load. Two
+   lines, and it would have caught §11 before a full run rather than after.
+8. **Snap detections to burnable fuel** in the ignition path: a 2.7 km ABI pixel
+   is 27× coarser than the 100 m fuel grid, so seeds land on non-burnable cells
+   even on a clean map. Move each to the nearest burnable cell within its own
+   pixel footprint and drop it if there is none.
+9. **Build a persistence filter before using `feature_tracking_id` back-tracing**
+   (§10). Without one it seeds phantom fires on gas flares — 30 such pixels sit
+   within 10 km of this fire, detected on 218 of the day's 274 scans.
+10. **Throughput is not the constraint.** A 42-seed, 17-step, 8 h forecast runs
+    in 1.2 min on one core; the machine has 32. The 558-seed incremental run is
+    far slower because each restart serialises the whole front state (`.ff`
+    scripts reach 1 MB), which is the thing to watch as seed counts grow.
+11. Commit status: the timing fix (§7) and multi-point ignition (§8) are
+    **uncommitted**. Not committed without an explicit ask.
+12. New scratch scripts, still ephemeral: `goes_run.py`, `goes_snap.py`,
+    `goes_verify2.py`, `goes_plot.py`, `goes_fuel.py`.

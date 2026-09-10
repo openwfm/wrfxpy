@@ -11,6 +11,7 @@ import fiona
 from datetime import timedelta, datetime
 import signal
 import re
+import math
 import shutil
 
 #---------------------------------------------------------------------------
@@ -214,6 +215,132 @@ def moisture_params(wksp_dir,ign_latlon,cfg):
     return {'fuelsTableFile': container_path(write_fuel_table(md,cfg),cfg)}
 
 
+def read_ignitions(wksp_dir):
+    """Every ignition point in the job's input.json, not just the first.
+
+    read_input deliberately returns only ignitions['1'][0] because most jobs have
+    one. Detection-driven jobs carry thousands: SMOKEHOUSE CREEK has 17,645 across
+    21 times. Returns a list of {'latlon', 'time_utc', ...} sorted by time.
+    """
+    path = glob.glob(f'{wksp_dir}/input.json')
+    if not path:
+        print('No input file found...')
+        return []
+    with open(path[0],'r') as openfile:
+        cfg = json.load(openfile)
+    points = []
+    for group in cfg.get('ignitions',{}).values():
+        points.extend(group)
+    points.sort(key=lambda p: p.get('time_utc',''))
+    return points
+
+
+def thin_ignitions(points,min_separation_m):
+    """Drop ignitions closer together than min_separation_m, earliest kept first.
+
+    Needed, not optional. ForeFire builds each seed as a triangle of
+    2*perimeterResolution, so co-located points make degenerate fronts -- it
+    trashes them and then segfaults. Measured on SMOKEHOUSE CREEK: 500 distinct
+    points run fine, 500 duplicated points crash, and 2000 distinct crash too.
+    Points finer than the fire grid carry no information the model can use.
+
+    Grid-hashed so this is linear; a cell of min_separation_m means only the 3x3
+    neighbourhood needs checking.
+    """
+    if not min_separation_m or min_separation_m <= 0:
+        return list(points)
+    cell = float(min_separation_m)
+    limit = float(min_separation_m)**2
+    #one reference latitude for the whole cloud. Scaling each point's longitude by
+    #its own cos(lat) is not a projection: over a 35 km latitude span the same
+    #longitude lands tens of km apart, and the distance test silently fails.
+    lat_ref = sum(p['latlon'][0] for p in points)/float(len(points))
+    x_scale = 111320.0*math.cos(math.radians(lat_ref))
+    kept, grid = [], {}
+    for p in sorted(points,key=lambda q: q.get('time_utc','')):
+        lat,lon = p['latlon']
+        y = lat*111320.0
+        x = lon*x_scale
+        cx,cy = int(x//cell), int(y//cell)
+        crowded = False
+        for ax in (-1,0,1):
+            for ay in (-1,0,1):
+                for ox,oy in grid.get((cx+ax,cy+ay),()):
+                    if (x-ox)**2 + (y-oy)**2 < limit:
+                        crowded = True
+                        break
+                if crowded: break
+            if crowded: break
+        if crowded:
+            continue
+        kept.append(p)
+        grid.setdefault((cx,cy),[]).append((x,y))
+    return kept
+
+
+def ignition_schedule(points,timing_table,max_per_step=None):
+    """Assign ignitions to the step whose model-time window contains them.
+
+    ForeFire's t is seconds from the ignition step's loadData reference, so a
+    detection at wall time T gets t = T - that reference. Step i spans
+    [ign_seconds[i], ign_seconds[i+1]), matching what make_script_set emits.
+
+    This is the shape of a real pipeline: each restart waits on the next wrfout,
+    and any detections that arrived meanwhile are added to that step.
+
+    Returns {row index: [(lon, lat, t), ...]}.
+    """
+    runnable = [i for i,r in timing_table.iterrows()
+                if i < len(timing_table)-1 and r['ign_seconds'] > 0]
+    if not runnable or not len(points):
+        return {}
+    ref = pd.Timestamp(timing_table.loc[runnable[0],'UTC_str'])
+    windows = [(i,float(timing_table.loc[i,'ign_seconds']),
+                float(timing_table.loc[i+1,'ign_seconds'])) for i in runnable]
+    schedule = {}
+    dropped_late = 0
+    for p in points:
+        t = (pd.Timestamp(make_UTC_string(p['time_utc'])) - ref).total_seconds()
+        placed = False
+        for i,lo,hi in windows:
+            if lo <= t < hi or (i == runnable[0] and t < lo):
+                #anything before the nominal ignition rides with the first step
+                schedule.setdefault(i,[]).append(
+                    (p['latlon'][1],p['latlon'][0],max(t,lo)))
+                placed = True
+                break
+        if not placed:
+            dropped_late += 1
+    if dropped_late:
+        print(f"{dropped_late} ignitions fall past the last step and were dropped")
+    if max_per_step:
+        for i,entries in schedule.items():
+            if len(entries) > max_per_step:
+                stride = len(entries)/max_per_step
+                schedule[i] = [entries[int(k*stride)] for k in range(max_per_step)]
+                print(f"step {i}: {len(entries)} ignitions capped to {max_per_step}")
+    return schedule
+
+
+def apply_ignitions(text,entries):
+    """Replace the template's single startFire with a batch of them.
+
+    Inserted immediately before the first goTo, which puts them after the
+    restart template's include[] so new detections join the existing front
+    rather than replacing it. Works on both templates untouched.
+    """
+    if not entries:
+        return text
+    lines = [l for l in text.splitlines()
+             if not l.strip().startswith('startFire[lonlat=')]
+    batch = [f"startFire[lonlat=({lon}, {lat}, 0);t={t:.0f}]"
+             for lon,lat,t in entries]
+    for k,line in enumerate(lines):
+        if line.strip().startswith('goTo['):
+            return '\n'.join(lines[:k] + batch + [''] + lines[k:]) + '\n'
+    return '\n'.join(lines + batch) + '\n'
+
+
 def apply_ff_params(text,params):
     #overrides setParameter[key=value] lines in a .ff script; a key the template
     #does not already set is added next to the other tuning parameters
@@ -273,7 +400,15 @@ def make_timing_table(wksp_dir,ign_utc):
     wrf_seconds = []
     ign_seconds = []
     UTC_str = []
-    
+
+    #ForeFire's t=0 is the wrfout that precedes the ignition, because each step's
+    #loadData re-references the clock to that step's own timestamp. WRF-SFIRE
+    #instead counts from its first wrfout, which can be hours earlier, so the two
+    #must not be conflated: measuring ign_seconds from the first wrfout makes the
+    #ignition step run from t=0(=first wrfout) to t=(seconds of the next wrfout),
+    #simulating the whole spinup gap in one step and handing the fire a head start.
+    ws_ignition = 0.0
+
     for i,gg in enumerate(g):
         UTC_str.append(make_UTC_string(gg[-19:]))
         wt = pd.Timestamp(UTC_str[-1])
@@ -285,9 +420,10 @@ def make_timing_table(wksp_dir,ign_utc):
         if ws + t_step < ignition_seconds:
             ig_s = -9999 # negative numbers indicate spinup period
         elif (ws < ignition_seconds) and (ws + t_step > ignition_seconds):
+            ws_ignition = ws          #this wrfout is ForeFire's t=0
             ig_s = ignition_seconds - ws
         else:
-            ig_s = ws
+            ig_s = ws - ws_ignition
 
         ign_seconds.append(int(ig_s))
     df = pd.DataFrame({
@@ -338,8 +474,12 @@ def make_UTC_string(ign_utc):
      ign_utc = ign_utc.replace('_','T')
      return f'{ign_utc}Z'
 
-def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,params=None):
+def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,params=None,
+                    ignitions=None):
     #params overrides ForeFire setParameter values, e.g. {'windReductionFactor':0.6}
+    #ignitions is a list of detection points; each is emitted in the step whose
+    #model-time window contains it, so detections arriving between wrfouts join
+    #the run as they would in a live pipeline
     #make individual ignition or restart scripts and save them, addtheir names to the timming_table to restart o
     #forefire_dir = '/home/jhaley/forefire/tests/rosenbaum'
 
@@ -353,6 +493,14 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
         cfg = load_ff_cfg()
     restart_template = cfg['templates']['restart']
     ignition_template = cfg['templates']['ignition']
+    mi = cfg.get('multi_ignition',{})
+    schedule = {}
+    if ignitions:
+        thinned = thin_ignitions(ignitions,mi.get('min_separation_m',800))
+        schedule = ignition_schedule(thinned,timing_table,mi.get('max_per_step',400))
+        print(f"multi-point ignition: {len(ignitions)} points -> {len(thinned)} after "
+              f"thinning -> {sum(len(v) for v in schedule.values())} placed across "
+              f"{len(schedule)} steps")
     #time of the last wrfout, ign_seconds
     end_time = timing_table['ign_seconds'].max()
     #number of time steps
@@ -422,6 +570,10 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
                 #override tuning parameters for a parameter-variation run
                 if params:
                     file_content = apply_ff_params(file_content,params)
+
+                #detections belonging to this step's window
+                if i in schedule:
+                    file_content = apply_ignitions(file_content,schedule[i])
                 
                 #save new file
                 if True: #not os.path.exists(restart_file):
@@ -743,7 +895,8 @@ def stage_ff_nc(wksp_dir,timing_table,grid_code,cfg):
     return stage_dir
 
 
-def sweep_ff_params(wksp_dir,param_sets,cfg=None,overwrite=False,reuse_nc=True,tags=None):
+def sweep_ff_params(wksp_dir,param_sets,cfg=None,overwrite=False,reuse_nc=True,tags=None,
+                    ignitions=None):
     """Runs one fire once per ForeFire parameter set, each in its own directory.
 
     param_sets is a list of dicts of setParameter names to values, e.g.
@@ -792,7 +945,8 @@ def sweep_ff_params(wksp_dir,param_sets,cfg=None,overwrite=False,reuse_nc=True,t
 
         print(f"\n=== ForeFire parameter set {tag} in {run_dir}")
         set_params = dict(base_params); set_params.update(params or {})
-        tt = make_script_set(run_dir,timing_table.copy(),ign_latlon,grid_code,cfg=cfg,params=set_params)
+        tt = make_script_set(run_dir,timing_table.copy(),ign_latlon,grid_code,cfg=cfg,
+                             params=set_params,ignitions=ignitions)
         tt.to_csv(f"{run_dir}/timing_table.csv",index=False)
         run_timing_table(tt,overwrite=overwrite,cfg=cfg,run_dir=run_dir,
                          dest_dir=f"{wksp_dir}/forefire/{tag}")
@@ -1212,7 +1366,8 @@ def merge_geojson_to_kml(input_folder, output_kml_path,final=False,cfg=None,grid
     #delete any file that is there already
     if os.path.exists(output_kml_path):
         os.system(f"rm {output_kml_path}")
-    combined_gdf.to_file(output_kml_path, driver='KML')
+    if len(combined_gdf) > 0:
+        combined_gdf.to_file(output_kml_path, driver='KML')
     #copy to the perimeter collection directory, if one is configured
     if cfg is None:
         cfg = load_ff_cfg()
@@ -1223,11 +1378,6 @@ def merge_geojson_to_kml(input_folder, output_kml_path,final=False,cfg=None,grid
         else:
             print(f"perim_copy_dir {perim_dir} does not exist, not copying the kml there")
     print("Success!")
-
-
-
-
-
 
 
 def remove_z_coordinate(geojson_data):
@@ -1253,7 +1403,8 @@ def remove_z_coordinate(geojson_data):
   return geojson_data
 
 
-def run_forecasts(wksp_dir,forefire_dir = None, overwrite = False, cfg = None, params = None):
+def run_forecasts(wksp_dir,forefire_dir = None, overwrite = False, cfg = None, params = None,
+                  ignitions = None):
     #forefire_dir defaults to run_dir in etc/forefire.json
     #params overrides ForeFire setParameter values for this run
     if cfg is None:
@@ -1281,8 +1432,12 @@ def run_forecasts(wksp_dir,forefire_dir = None, overwrite = False, cfg = None, p
         #dead fuel moisture from FMDA, if configured; an explicit params entry wins
         run_params = dict(moisture_params(wksp_dir,ign_latlon,cfg))
         run_params.update(params or {})
+        #detection-driven ignitions, if the job has them and it is switched on
+        if ignitions is None and cfg.get('multi_ignition',{}).get('enabled'):
+            ignitions = read_ignitions(wksp_dir)
         #generate set of NC files and scripts for ForeFire
-        timing_table = make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=cfg,params=run_params)
+        timing_table = make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=cfg,
+                                       params=run_params,ignitions=ignitions)
         timing_table.to_csv(f"{forefire_dir}/timing_table.csv",index=False)
         #run the forecasts
         run_timing_table(timing_table,overwrite=overwrite,cfg=cfg,run_dir=forefire_dir)
@@ -1314,7 +1469,7 @@ def run_days(days2run=1,overwrite=False,cfg=None):
         wksp_dirs.extend(g)
         print(f"{len(g)} wrksp directoriess for {date_string}")
 
-    for gg in g:
+    for gg in wksp_dirs:
         print(f"Running forecasts for {gg}")
         run_forecasts(gg,overwrite=overwrite,cfg=cfg)
 
@@ -1334,7 +1489,7 @@ def run_days(days2run=1,overwrite=False,cfg=None):
 
 
 if __name__ == "__main__":
-    run_days(days2run=40)
+    run_days(days2run=7)
     '''
     l = [
         '/data/jhaley/wrfxpy/wksp/wfc-LITTLE_GIANT_2026-07-16_09_00_00_091081ED-BD23-4610-AE4A-270F95D1711E-2026-07-16_09:00:00-27',
