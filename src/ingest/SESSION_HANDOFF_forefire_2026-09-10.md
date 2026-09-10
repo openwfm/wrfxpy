@@ -784,7 +784,67 @@ since the workspace copy is unscaled.
    (same md5 across the scale-1, `_w2` and `_w4` caches), which is the check that
    settled it. Compare the *inputs* before theorising about the physics.
 
-## 17. Open items
+## 17. The wind probe: what scaling actually buys
+
+`wind_scale` swept over 1, 2, 3, 4, 6 on the unmasked workspace, 42 first-scan
+seeds snapped to burnable fuel, 3.3 h horizon, template parameters otherwise.
+
+| scale | mean \|w\| | area at 3.3 h | vs ×1 | cluster 1 edge | runtime |
+|---|---|---|---|---|---|
+| 1 | 3.70 m/s | 8,430 ha | 1.00 | 0.128 m/s | 0.7 min |
+| 2 | 7.40 | 20,239 | 2.40 | 0.392 | 1.3 min |
+| 3 | 11.10 | 34,364 | 4.08 | 0.401 | 1.9 min |
+| 4 | 14.80 | 45,987 | 5.45 | **0.487** | 2.3 min |
+| 6 | 22.19 | 69,173 | 8.21 | 0.557 | 3.6 min |
+
+Observed target, cluster 1 over the same window: **0.500 m/s** at 95%
+connectivity (§15).
+
+### Findings
+
+- **Area goes as `scale^1.17`** and is cleanly monotone. There is **no Andrews
+  cap saturation** even at a 22 m/s mean wind, despite the cap being active at
+  `wRF` 0.4. I claimed a plateau after seeing scales 1–3, where the 2→3 step
+  happens to be flat; scales 4 and 6 disproved it. Three points were not enough.
+- **`wind_scale ≈ 4.3` reproduces the observed leading-edge rate**, interpolating
+  between 0.487 at scale 4 and 0.557 at scale 6.
+- Cost scales gently: 3.6 min at scale 6 against 0.7 min at scale 1, so this is
+  affordable inside a low-latency budget.
+
+### But 4.3× is not a wind correction
+
+A mean *fire-level* wind of ~16 m/s is not physically credible. `UF`/`VF` are
+coupled winds near flame height, which are normally **lower** than the 10 m wind,
+and 16 m/s at flame height would imply a 10 m wind well above what this event is
+reported to have had. So the honest reading is:
+
+**~4.3× is the total multiplier the spread formulation needs, expressed in the
+only units this experiment varied.** It is not evidence that WRF's winds are 4.3×
+too low. Some plausible split: WRF fire-level winds genuinely low in complex
+coupling, `pSAF` at 0.6 being conservative, moisture too high, and — the piece
+Rothermel structurally cannot supply — spotting, which this fire certainly did
+(09-09 §5b).
+
+Treating the whole 4.3× as wind would be calibrating one error with another. It
+is a usable *effective* tuning for low-latency work, and should be labelled that
+way rather than as a wind bias correction.
+
+### What to do next with it
+
+1. Split the multiplier: sweep `pSAF` and `Md` at `wind_scale` 1 on this unmasked
+   workspace and see how much of the 4.3× they can absorb at physically sensible
+   values. Both scale `R` more directly than wind does, and 09-08/09-09 showed
+   they transfer between fires whereas `wRF` does not.
+2. Re-derive the target on a fire with a **single** origin. Every rate here comes
+   from one cluster of a mature complex; the method in §15 will be much better
+   constrained on a genuinely new detection, which is also the pipeline's real
+   case.
+3. Check the equivalence numerically: `wind_scale` 4.3 at `wRF` 0.4 implies an
+   effective midflame factor of 1.72, which is unreachable via `wRF` alone
+   without crossing the cap gate at 1.0. That is the concrete reason the knob was
+   added to the netcdf rather than the script.
+
+## 18. Open items
 
 Carried from 09-09 §7, plus:
 
@@ -832,15 +892,23 @@ Carried from 09-09 §7, plus:
     numerically, but each restart writes the whole front state and the `.ff`
     scripts reach ~1 MB, taking the incremental run to 27.3 min against 1.2 min
     for the cold start. Front *count* was never the limit; state I/O is.
-12. **Still open: the residual ~10× growth gap** on the unmasked domain (§14).
-    Candidates, in the order worth testing: WRF wind magnitude (domain mean
-    3.5 m/s, max 6.5 m/s over the fire, for an event with reported sustained
-    winds several times that), then moisture, then `pSAF`. Scaling `UF`/`VF` in
-    the netcdf is the experiment you proposed on 09-09 and it is now the obvious
-    next one.
-13. **Uncommitted:** `read_ff_geojson` and the `merge_geojson_to_kml` change
-    (§13). The timing fix and multi-point ignition are committed as `d6b03a8`.
+12. **Partly answered (§16, §17): the residual gap needs an effective 4.3×.**
+    `wind_scale` is implemented and swept; area goes as `scale^1.17` with no
+    Andrews saturation to 22 m/s, and `wind_scale ≈ 4.3` reproduces the observed
+    leading-edge rate. But 16 m/s at flame height is not credible as a wind
+    correction, so 4.3× is the multiplier the *formulation* needs, not a wind
+    bias. **Next: sweep `pSAF` and `Md` at `wind_scale` 1 on the unmasked
+    workspace to see how much of the 4.3× they absorb at sensible values**, then
+    re-derive the target on a single-origin fire.
+13. **All committed:** `d6b03a8` timing fix + multi-point ignition, `daecd00`
+    the geojson ring reader, `282fa86` `wind_scale`. Handoff sections 7–17 are in
+    those commits.
 14. New scratch scripts, still ephemeral: `goes_run.py`, `goes_run2.py`,
     `goes_snap.py`, `goes_verify3.py`, `goes_verify4.py`, `goes_plot.py`,
-    `goes_fuel.py`. `goes_verify3.py` carries the orientation-aware reader and
-    the scoring against GOES pixel polygons; it is the one most worth promoting.
+    `goes_fuel.py`, `ros_estimate2.py`, `wind_probe.py`. The two worth promoting
+    are `ros_estimate2.py` (the connectivity-guarded ROS estimator from §15,
+    which the pipeline needs) and `goes_verify3.py` (scoring against GOES pixel
+    polygons).
+15. **`goes2_incr` was still running** when the session ended — 558 seeds on the
+    unmasked workspace, considerably slower than the masked run because the fire
+    actually spreads. Score it with `goes_verify4.py`.
