@@ -1073,7 +1073,77 @@ fire, which matters given it is the least defensible of the levers.
 Levers are **sub-multiplicative** when combined: tall+dry+wind×2 measures 6.92×
 where multiplying the singles gives 9.72×. Combinations must be run, not inferred.
 
-## 22. Open items
+## 22. Recommendation: correct the inputs, leave the fuel categories alone
+
+Your position, and it is the right one: *"It's good to avoid any unjustified fuel
+category changes. That's black magic that might work for one fire but fail in
+every other circumstance."* The measurements support it — the fuels are not
+needed for this fire.
+
+### What to change
+
+| # | change | basis | ROS |
+|---|---|---|---|
+| 1 | `windReductionFactor` 0.4 → **1.0** | `namelist.fire` has `fire_use_windrf = 2` with `windrf = 0.36`, so WRF-SFIRE already reduced the wind. ForeFire reducing it again is a double count. | 1.81× |
+| 2 | `Md` 0.10 → **~0.035** | Simard EMC from the NWS's RH 12–15% at 70s F, vegetation dormant, two weeks dry. | 1.35× |
+| | **together** | | **2.18× of the 2.34× target (93%)** |
+
+Neither is a tuning choice. (1) is a code correctness fix demonstrable from the
+namelist without reference to any fire; (2) is an observed input replacing a
+placeholder. The residual 7% sits inside the target's own uncertainty, which came
+from one cluster of a complex the NWS confirms was merging.
+
+Use `wRF = 1.0` rather than `wind_scale` 2.5: they are equivalent (§20), and the
+Andrews cap does not bind, so the simpler expression is the honest one.
+
+### What NOT to change, and why
+
+- **Fuel category remapping (Anderson 2→3).** Gives 1.53× and is not needed. The
+  physical argument is real — the NWS notes a good 2023 growing season, and
+  category 2 presumes a timber overstory the panhandle lacks — but it is a
+  judgement that would not transfer to another fire. `fuel_remap` was implemented
+  in `make_FF_nc` and is **deliberately left uncommitted**; the experiments are in
+  the handoff, the facility is not in the repo.
+- **Category 2's fuel load.** I called 0.400 an outlier cell and recommended
+  raising it to 0.896 as "correcting a transcription". That was overstated twice
+  over. It is ambiguous:
+
+  | | value |
+  |---|---|
+  | Anderson FM2 **1-hour** load | 0.448 |
+  | Anderson FM2 **total** load (= WRF `fgi`) | 0.897 |
+  | `fuelstrans.csv` | **0.400** |
+
+  8 of 9 categories in `fuelstrans.csv` follow the **total** convention and
+  category 2 alone follows **1-hour** — so it is inconsistent with its
+  neighbours, but 0.400 is exactly what a 1h-only reading gives, so it may be
+  intentional. **Measured effect: 1.10× in ROS.** Not worth guessing over.
+
+### Where `fuelstrans.csv` comes from (confirmed)
+
+You identified it: mapped from the 40-category Scott & Burgan models into the
+nearest of the 13 Anderson categories. `wildfire_ROS_models/fuels_database.py`
+(`CB2005_t7_csv`) carries the S&B table and makes the fingerprint clear —
+category 2's `sd` 6500, `e` 0.30, `me` 0.15 is essentially **GR2 fully cured**
+(6562, 0.305, 0.15), and the binned SAV levels 7800/6500/5500/4500 map onto S&B's
+2200/2000/1800/1500 1/ft.
+
+One observation worth keeping, not acting on: GR2 cured carries a load of
+**0.247 kg/m²** at that depth, against `fuelstrans`' 0.400 — a bulk density of
+0.809 vs 1.333, so category 2 as shipped is denser than any cured S&B grass
+model, and bulk density sits in `R0`'s denominator. That is a lead for whoever
+reconciles the table properly, with a source, rather than a change to make now.
+
+**Structural caveat that no edit fixes:** because `fuelstrans.csv` is a 40→13
+translation and WRF-SFIRE uses Anderson 13 directly, the two models are not
+simulating identical fuels even given the same `NFUEL_CAT` map. Any
+ForeFire-vs-WRF-SFIRE comparison inherits that, including the pRes tuning idea
+from 09-09.
+
+Grass-fire behaviour is an active research area and the loading/curing question
+here sits squarely in it; that is the reading to do before touching the table.
+
+## 23. Open items
 
 Carried from 09-09 §7, plus:
 
