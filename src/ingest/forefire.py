@@ -718,7 +718,7 @@ def ff_ideal_nc(nc_path,out_path):
         windV[:] = w[:,1,:,:]
 
 
-def make_FF_nc(nc_path,out_path):
+def make_FF_nc(nc_path,out_path,wind_scale=1.0):
     #takes in a wrf file (wrfout) and writes something compatible with ForeFire
         # Open the WRF Input file containing pre-sliced Landfire data
     #f = '/data/jhaley/wrfxpy/wksp/wfc-TITAN_2023-06-28_22:00:00_4A7E0BD9-1D57-4263-B49D-547B19BB2A38-2023-06-28_21:00:00-27/wrf/wrfout_d01_2023-06-30_00:00:00'
@@ -782,6 +782,16 @@ def make_FF_nc(nc_path,out_path):
     #fuel_matrix[:,:] = 82
     u_matrix = np.array(wrf_in.variables['UF'][0,:-sry,:-srx]) 
     v_matrix = np.array(wrf_in.variables['VF'][0,:-sry,:-srx]) 
+    #Optional uniform scaling of the coupled fire-level winds. WRF's UF/VF over
+    #SMOKEHOUSE CREEK average 3.7 m/s and peak at 6.5 m/s, for an event whose
+    #observed connected leading edge ran at 0.5-0.8 m/s that Rothermel does not
+    #reach from that wind. Scaling here rather than raising windReductionFactor
+    #is deliberate: wRF multiplies the same midflame wind, but crossing wRF = 1.0
+    #also switches on the Andrews/Cruz/Rothermel cap (Rothermel.cpp:217), so a
+    #large wRF changes two things at once. Scaling UF/VF changes only the wind.
+    if wind_scale != 1.0:
+        u_matrix = u_matrix*float(wind_scale)
+        v_matrix = v_matrix*float(wind_scale)
 
     # --- WRITE THE FOREFIRE COMPATIBLE DATASET ---
     #put in block to extract the p-ath of the original nc file
@@ -870,7 +880,12 @@ def stage_ff_nc(wksp_dir,timing_table,grid_code,cfg):
     linked, because the workspace filesystem is not bound into the container and
     a link there would dangle. Returns the staging directory.
     """
-    stage_dir = f"{cfg['run_dir']}/nc_{grid_code}"
+    #a scaled-wind netcdf must not be served from the unscaled cache, so the
+    #scale goes in the DIRECTORY name and the filenames stay as the .ff scripts
+    #expect them
+    wind_scale = float(cfg.get('wind_scale',1.0) or 1.0)
+    suffix = '' if wind_scale == 1.0 else f"_w{wind_scale:g}"
+    stage_dir = f"{cfg['run_dir']}/nc_{grid_code}{suffix}"
     container_path(stage_dir,cfg)
     if not os.path.exists(stage_dir):
         os.makedirs(stage_dir)
@@ -884,13 +899,15 @@ def stage_ff_nc(wksp_dir,timing_table,grid_code,cfg):
         if os.path.exists(target):
             continue
         from_wksp = f"{wksp_dir}/forefire/{name}"
-        if os.path.exists(from_wksp):
+        #the workspace copy is unscaled, so it can only be reused at scale 1
+        if wind_scale == 1.0 and os.path.exists(from_wksp):
             print(f"Staging {name} from the workspace")
             shutil.copy2(from_wksp,target)
         else:
-            print(f"Building {name}")
+            print(f"Building {name}"
+                  + (f" with winds scaled {wind_scale:g}x" if wind_scale != 1.0 else ''))
             try:
-                make_FF_nc(row['wrfout'],target)
+                make_FF_nc(row['wrfout'],target,wind_scale=wind_scale)
             except Exception:
                 ff_ideal_nc(row['wrfout'],target)
     return stage_dir

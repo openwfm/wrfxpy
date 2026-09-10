@@ -686,7 +686,105 @@ So the scars mask alone accounted for a factor of **5.5** in area. The remaining
 ~10× gap is the real question, and it is now being asked on a domain that can
 actually burn.
 
-## 15. Open items
+## 15. Estimating rate of spread from the detection feed
+
+Your proposal: the distance from the first detection to the furthest later
+detection, over the elapsed time, estimates the maximum spread rate, and that
+gives a target for `windReductionFactor` or a `UF`/`VF` scaling. The method
+works, but it needs two guards, and finding them was most of the work.
+
+### Guard 1: cluster the first scan
+
+Applied naively, the method gives **1.09 m/s** here — from the first-scan
+centroid to the furthest last detection, 64.8 km in 16.5 h. That number is
+meaningless, because the first scan is already **three fires spanning 96 km**
+(§10). Distance from a single origin measures cluster separation, not spread.
+
+Clustering scan 1 at 6 km linkage and assigning each later detection to its
+nearest origin gives per-cluster rates instead.
+
+### Guard 2: require connectivity, or the answer is nonsense
+
+Per-cluster is still not enough. Cluster 2 (the small eastern one, 5 px) reported
+**2.65 m/s** over 8.3 h and **9.96 m/s** with a p98 edge — physically absurd. The
+test that exposes it: at each scan, check what fraction of a cluster's assigned
+detections connect back to its origin through a chain of ≤4 km hops.
+
+| cluster | px | connectivity (8.3 h) | reach | rate |
+|---|---|---|---|---|
+| 0 | 19 | 0.30 | 19.5 km | 0.750 m/s |
+| 1 | 18 | **0.73** | 12.1 km | **0.197 m/s** |
+| 2 | 5 | **0.05** | 90.3 km | 9.96 m/s ← junk |
+
+Cluster 2's leading edge oscillates — 70 → 90 → 38 → 47 → 34 → 74 → 36 km — with
+gaps of 24–52 km behind it. It is not a front. The nearest-origin rule was
+handing it the *main* fire's eastern head, because cluster 2 happens to be the
+easternmost origin. A front that genuinely spreads stays connected; a newly
+associated patch appears at a distance with a gap behind it.
+
+**Connectivity is the discriminator, and any pipeline use of this method needs
+it.** Without it the method silently returns the diameter of the whole fire
+complex divided by elapsed time.
+
+### The window matters too
+
+Over the shorter 3.3 h window connectivity is much better, because the complex
+has not yet fragmented and NGFS has not yet swept in distant parts:
+
+| cluster | connectivity (3.3 h) | rate |
+|---|---|---|
+| 0 | **0.80** | **0.827 m/s** |
+| 1 | **0.95** | **0.500 m/s** |
+| 2 | 0.20 | 9.96 m/s ← still junk |
+
+So the defensible observed target is **0.5–0.83 m/s**, from the two coherent
+clusters over 3.3 h. Both sit **below** ForeFire's 2.66 m/s ceiling in fuel 2
+(09-09 §5b), so this is reachable by wind — which was not obvious beforehand.
+
+Note this is an *average* rate along the fastest axis. It is a lower bound on the
+instantaneous maximum, because a 2.7 km pixel locates the front only to within
+half a pixel and the fire can burn between scans without lighting a new pixel.
+Peak rates cannot be extracted from GOES this way — scan-to-scan differencing
+gave 23–55 m/s, which is entirely association noise.
+
+### Caveat on this fire specifically
+
+Smokehouse Creek on Feb 27 is a mature complex, not a set of fresh ignitions, so
+even the "coherent" clusters are parts of an existing fire. The method will work
+far better on a genuinely new detection with a single origin, which is also the
+case the low-latency pipeline actually serves.
+
+## 16. `wind_scale`: scaling UF/VF in the netcdf
+
+Added to `make_FF_nc(nc_path, out_path, wind_scale=1.0)` and driven from
+`cfg['wind_scale']`, default 1.0.
+
+**Why UF/VF and not `windReductionFactor`.** They multiply the same midflame
+wind, so for the spread term they are interchangeable — but `wRF` also gates the
+Andrews/Cruz/Rothermel wind cap at `Rothermel.cpp:217`, which is active only for
+`wRF < 1.0`. Reaching a large multiple by raising `wRF` from 0.4 would cross 1.0
+and switch the cap off, changing two things at once. Scaling `UF`/`VF` changes
+only the wind, so the experiment stays clean.
+
+Scaled files are cached under `nc_<grid_code>_w<scale>/` — the scale goes in the
+**directory** name so the filenames the `.ff` scripts reference stay unchanged —
+and the "reuse the workspace copy" shortcut is skipped when the scale is not 1,
+since the workspace copy is unscaled.
+
+### Two bugs found while validating it, both mine
+
+1. I put the scaling in **`ff_ideal_nc`** instead of `make_FF_nc`. Both functions
+   contain a near-identical `u_matrix = np.array(wrf_in.variables['UF']...)`
+   block, and `ff_ideal_nc` is defined first. Worse, `ff_ideal_nc` has no
+   `wind_scale` parameter, so the edit left a latent `NameError` on its fallback
+   path. **If you are editing either of these, note that the UF/VF read appears
+   twice in the file.**
+2. The probe reported identical rates at every scale and I nearly read that as
+   the Andrews cap saturating. It was not — the netcdfs were byte-identical
+   (same md5 across the scale-1, `_w2` and `_w4` caches), which is the check that
+   settled it. Compare the *inputs* before theorising about the physics.
+
+## 17. Open items
 
 Carried from 09-09 §7, plus:
 

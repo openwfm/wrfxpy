@@ -46,5 +46,7 @@
         "min_separation_m": 800,
         "max_per_step": 400
     },
-    "_comment_multi_ignition": "Detection-driven ignition. When enabled, every point in input.json ignitions is used, each emitted in the step whose model-time window contains it. min_separation_m thins co-located points: ForeFire seeds each as a triangle of 2*perimeterResolution, so closer points make degenerate fronts and it segfaults. max_per_step caps a single script; measured limit is between 500 and 2000 fronts."
+    "_comment_multi_ignition": "Detection-driven ignition. When enabled, every point in input.json ignitions is used, each emitted in the step whose model-time window contains it. min_separation_m thins co-located points: ForeFire seeds each as a triangle of 2*perimeterResolution, so closer points make degenerate fronts and it segfaults. max_per_step caps a single script; measured limit is between 500 and 2000 fronts.",
+    "wind_scale": 1.0,
+    "_comment_wind_scale": "Uniform multiplier on the coupled fire-level winds UF/VF when building the FF netcdf. 1.0 leaves WRF untouched. Scaled files are cached under nc_<grid_code>_w<scale>/ so they never mix with unscaled ones. Prefer this over a large windReductionFactor: wRF scales the same midflame wind but crossing 1.0 also switches on the Andrews wind cap, changing two things at once."
 }
