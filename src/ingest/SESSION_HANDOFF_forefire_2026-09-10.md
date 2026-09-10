@@ -1145,6 +1145,10 @@ here sits squarely in it; that is the reading to do before touching the table.
 
 ## 23. Deriving the fuel table from `namelist.fire`
 
+> **The configuration measured in this section did not generalise.** SINLAHEKIN
+> was run through it and got worse: see §24 before adopting anything here. The
+> fuel table itself survived that test; the `windReductionFactor` change did not.
+
 Your suggestion, and it removes the guesswork rather than adding a knob: every
 WRF-SFIRE run ships a `namelist.fire` stating the fuel properties it used, so the
 ForeFire table can be derived from that instead of from a 40→13 translation
@@ -1231,38 +1235,130 @@ anomalous in §19: it carries GR2's *geometry* with a load nearer Anderson FM2's
 which is precisely why deriving from the namelist is better than adjudicating the
 cell.
 
-## 24. Recommended configuration
+## 24. The recommended configuration FAILED its generalisation test
 
-Every element traceable to a source, nothing tuned:
+**Read this before §23.** SINLAHEKIN was run through the §23 configuration and it
+made that fire substantially worse. The configuration was fitted to SMOKEHOUSE
+CREEK and does not transfer.
 
-| setting | value | basis |
-|---|---|---|
-| `windReductionFactor` | **1.0** | `namelist.fire` already applies `windrf = 0.36`; 0.4 double-counts it |
-| `Md` | **~0.035** | Simard EMC at the NWS's RH 12–15%, 70s F, dormant, two weeks dry |
-| fuel table | **derived from `default.fire`** | the Behave symlink, matching the operational default |
-| fuel categories | **unchanged** | remapping is a per-fire judgement that would not transfer |
+SINLAHEKIN preflight was clean: no `perim1`/`perim2.pkl`, category 14 at 1.77%
+(not scar-masked), Behave namelist matching the system default, clock correct
+(679 s = 21:11:19 − 21:00). Observation is the 183.4 ha IR perimeter at +5.91 h
+(`poly_PolygonDateTime`). With the clock fixed this is the first comparison at
+**matched time** rather than only matched area.
 
-Result: ROS **2.63×** where the GOES detections imply **2.34×** — 12% high, and
-the target itself carries at least 10–15% uncertainty. **Do not tune anything back
-down to close that**; it would be fitting to a number that is not that precise.
+| configuration | wRF | table | at +5.91 h | IoU time | IoU area |
+|---|---|---|---|---|---|
+| observation | | | **183 ha** | | |
+| 09-10 baseline | 0.4 | `fuelstrans` | 298 (1.6×) | 0.409 | 0.439 |
+| namelist table only | 0.4 | namelist | 379 (2.1×) | 0.374 | **0.469** |
+| wind fix only | **1.0** | `fuelstrans` | 742 (4.1×) | **0.188** | 0.329 |
+| §23 recommendation | 1.0 | namelist | **866 (4.7×)** | **0.168** | 0.336 |
 
-### Still open
+**The wind fix is the damage**: alone it takes 298 → 742 ha and IoU 0.409 →
+0.188. The fuel table is mild (298 → 379) and gives the best matched-area IoU of
+the four.
 
-- **One fire, one 3.3 h window, one seed set.** The wind and moisture corrections
-  should generalise because they are input fixes, and so should the fuel table;
-  none of it is demonstrated yet. Run SINLAHEKIN and Ranger Road through the same
-  configuration next — both already have workspaces and one has an IR perimeter.
-- **Everything sits on `pRes` 100**, where 09-09 found area ~ `pRes^-0.26` and the
-  numerics not converged. The comparisons here are internally consistent; the
-  target-matching is not resolution-independent.
-- **`goes2_incr` never finished** — 558 seeds on the unmasked domain, abandoned
-  around step 11 of 17 at ~15 min/step. The lesson is §13's: restart state
-  serialisation, not front count, limits the incremental path.
-- **Grass-fire behaviour is active research.** The loading and curing questions
-  here sit squarely in it, and that reading should come before anyone edits the
-  fuel table by hand again.
+### What went wrong in my reasoning, not the code
 
-## 25. Open items
+ForeFire was already **over**-predicting on SINLAHEKIN (298 against 183 ha), so
+raising the wind moved it further from the answer. I predicted the wind fix would
+"help less" here; it actively hurt. Two signals were already pointing that way
+and I set both aside:
+
+1. 09-09 established ForeFire generally predicts **larger** growth than
+   WRF-SFIRE and suggested coarsening `perimeterResolution` to compensate. Every
+   correction I proposed increases spread, against that.
+2. `wRF` 1.0 overshot SMOKEHOUSE too — 2.63× against a 2.34× target. I called
+   12% "within uncertainty", which was true but beside the point: a correction
+   that overshoots on the only fire it was tested against is unconstrained, not
+   validated.
+
+The likely truth is that SMOKEHOUSE's apparent deficit was mostly artefact — the
+scar mask blocking 43% of the spread path (§11) plus a target derived from a
+poorly-connected detection cluster (§15). SINLAHEKIN, with a clean domain and a
+real IR perimeter, is the better-constrained case.
+
+**The double-reduction observation remains factually true of the code** —
+`fire_use_windrf = 2` with `windrf = 0.36`, then ForeFire's 0.4 on top — but it
+must not be acted on alone. Something in ForeFire's chain compensates for it.
+
+### `pSAF` is where the size correction belongs
+
+`pSAF` bracketed against the IR perimeter, namelist table, wRF 0.4:
+
+| `pSAF` | at +5.91 h | IoU time | spill | IoU area |
+|---|---|---|---|---|
+| 0.6 | 379 (2.1×) | 0.374 | 0.60 | 0.469 |
+| 0.5 | 271 (1.5×) | **0.468** | 0.47 | 0.466 |
+| **0.42** | **211 (1.15×)** | **0.467** | 0.41 | 0.453 |
+| 0.35 | 158 (0.86×) | 0.434 | 0.35 | 0.454 |
+
+Matched-area IoU is flat (0.453–0.469) while matched-time IoU varies widely —
+confirming `pSAF` scales size and not shape, and that the two metrics measure
+different things.
+
+**`pSAF` ≈ 0.42 now agrees with the 09-09 and 09-10 estimates of ≈ 0.4**, from
+different data, which I had written off as timing-bug casualties. Three
+concordant estimates is a real signal in a way the single-fire wind figure never
+was.
+
+Absolute IoU here is capped by the origin error: this run uses the original
+`input.json` ignition, which 09-10 §5 showed is ~500 m off, and §6 reached 0.70
+from a corrected origin. 0.467 and 0.70 are not comparable, and the origin
+remains the largest single error source (§4).
+
+### Verdicts
+
+| element | verdict |
+|---|---|
+| `wRF` 1.0 | **withdrawn as a universal setting** |
+| namelist-derived fuel table | **keep** — best matched-area IoU, grounded provenance |
+| Md from the run's own `FMC_GC` | keep — sound method, near-neutral here (0.0967 vs 0.100) |
+| `pSAF` ≈ 0.42 | the size correction, concordant across three sessions |
+| fuel category remapping | never adopted |
+
+## 25. Parameter sets by fire class, not one global set
+
+Your read, and the measurements support it: *"Most likely the optimal adjustments
+will vary from one fire to the next… maybe a reasonable set of values could be
+derived for a class of fire that are loosely defined. Maybe a parameter set for
+'plains fires during red-flag warning conditions'."*
+
+The evidence for classes rather than a global set:
+
+- **`wRF` leverage differs by 3.4× between regimes.** 09-08/09-09 measured
+  elasticity **1.300 on Ranger Road** (plains, `phiV`-dominated) against **0.383
+  on SINLAHEKIN** (complex terrain, where `phiP` carries more of the bracket).
+  Both were predicted from the `phiV`/`phiP` balance before running. No single
+  `wRF` can serve both, which is exactly why §23's recommendation failed.
+- **`pSAF` and `Md` scale `R` uniformly and 09-08 found they transfer between
+  fires; `wRF` acts on one bracket term and does not.** So a class-level default
+  should lean on `pSAF`, with `wRF` set per regime.
+- SINLAHEKIN needed *less* spread and SMOKEHOUSE appeared to need *more* — the
+  two fires demand opposite corrections, which no global set can express.
+
+A plausible first classification axis is therefore the `phiV`/`phiP` balance,
+which is computable from the domain's terrain and wind before any run — that is
+how the two elasticities above were predicted in the first place. Combined with a
+fire-weather criterion (red-flag conditions, RH, sustained wind) it would give
+exactly the "loosely defined class" framing. The available cases run from Texas
+to Montana.
+
+### Ranger Road: prediction on record, deferred to the next session
+
+Your expectation is that **Ranger Road will be a fire where a `wRF` adjustment is
+decisive**, and the 1.300 elasticity supports it directly. Recording it here
+before the run so it can be tested rather than rationalised afterwards:
+
+- `wRF` should have far more leverage on Ranger Road than the 0.383 elasticity
+  gave on SINLAHEKIN.
+- `pSAF` ≈ 0.42 should transfer better than any `wRF` value, if 09-08's
+  transfer finding holds.
+- Ranger Road's absolute numbers from 09-08 are **invalid** on the corrected
+  clock (§7) and need redoing regardless.
+
+## 26. Open items
 
 Carried from 09-09 §7, plus:
 
