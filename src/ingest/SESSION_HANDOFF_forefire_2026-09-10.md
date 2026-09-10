@@ -603,7 +603,90 @@ rates you have seen on explosive fires — still rests on the independent 2.66 m
 ceiling in fuel 2 from 09-09 §5b, and needs an unmasked initial forecast to test
 properly.
 
-## 13. Open items
+## 13. ForeFire's geojson packs separate fronts as rings — a reader bug
+
+Found while checking what looked like a catastrophic front loss in the
+incremental run: between 7.3 h and 7.8 h its area fell from 94,624 ha to
+5,857 ha and its feature count from 510 to 4. **Nothing was lost.** The vertex
+count went *up* over the same step, 17,180 → 17,608.
+
+`dumpMode=geojson` writes every separate front as a **ring of a single polygon**
+and puts the count in `properties.numberOfPolygons`. At t = 28,800 s one feature
+carried **472 rings**. GeoJSON convention says ring 0 is the shell and the rest
+are holes, so `gpd.read_file` subtracted 471 fires as holes.
+
+ForeFire signs the rings instead: a positive shoelace area is burning, a negative
+one is a genuine unburned island. At that step there was exactly **one** real
+island among the 472.
+
+Fixed with `read_ff_geojson(path)` in `forefire.py`, which returns one row per
+ring plus a `burning` column, so callers can keep fronts separate for KML or
+difference the islands out for areas. `merge_geojson_to_kml` now uses it and
+drops the islands — a hole drawn as a KML placemark reads as a fire in Google
+Earth.
+
+Verified:
+
+| | rows | area |
+|---|---|---|
+| `gpd.read_file` on the 472-ring step | 4 | 5,857 ha |
+| `read_ff_geojson` | 475 | **106,987 ha** |
+
+Single-front output is unchanged — SINLAHEKIN `windReductionFactor_0.4` gives
+136.9 / 169.1 / 205.3 ha either way — so nothing in §1–§6 is affected. **This bug
+only bites multi-front runs, which means it arrived with §8 and would have
+corrupted every KML the multi-ignition path produced.**
+
+### Corrected results for §10
+
+| variant | area at 8.3 h | peak IoU | fronts |
+|---|---|---|---|
+| `goes_first` — 42 seeds as detected | 5,726 ha | 0.012 | 35 |
+| `goes_snap` — 9 seeds on burnable | 5,456 ha | 0.011 | 2 |
+| `goes_incr` — fed every scan, 558 seeds | 90,495 ha (peak 106,869 at 7.8 h) | **0.218** | 429 |
+
+So **the ongoing detection feed is worth about 19× in area and 18× in IoU** over
+a cold start. That is the single most useful number for the pipeline: for a fire
+like this, continuing to ingest detections matters far more than any parameter
+choice measured in earlier sessions. And front merging is orderly throughout —
+counts fall monotonically (558 → 429) while area rises.
+
+Cost: `goes_incr` took 27.3 min against 1.2 min for `goes_first`, because each
+restart serialises the whole front state and the `.ff` scripts reach ~1 MB. That
+is the scaling limit to watch, not the front count itself.
+
+## 14. The unmasked workspace — the mask was costing 5.5×
+
+`wfc-SMOKEHOUSE_CREEK_..._points-2024-02-27_18:00:00-30` (no `_behave`) is the
+initial forecast: **no `perim1.pkl`/`perim2.pkl`, and category 14 is 0.92% of the
+domain against 5.2%.** It has 61 wrfouts plus saveouts through 2024-02-29, and
+its `input.json` carries the same 17,645 points but across **21 distinct times**
+(20:41:17–22:41:17) rather than all at one.
+
+The seeds confirm the diagnosis of §11 outright:
+
+| | masked `_points_behave` | unmasked `_points` |
+|---|---|---|
+| first-scan seeds dropped (no burnable fuel within 1,350 m) | **33 of 42** | **0 of 42** |
+| all 558 seeds: snapped / dropped | 303 non-burnable | **2 snapped, 0 dropped** |
+
+The detections were always on good fuel. The masked workspace was rejecting them.
+
+Cold start, same 42 seeds, same clock, same parameters:
+
+| | masked | unmasked |
+|---|---|---|
+| area at 8.3 h | 5,726 ha | **31,284 ha** |
+| IoU | 0.012 | **0.063** |
+| growth, 0.8–8.3 h | 634 ha/h | **3,960 ha/h** |
+| shortfall vs observed 41,821 ha/h | 66× | **10.6×** |
+| runtime | 1.2 min | 3.4 min |
+
+So the scars mask alone accounted for a factor of **5.5** in area. The remaining
+~10× gap is the real question, and it is now being asked on a domain that can
+actually burn.
+
+## 15. Open items
 
 Carried from 09-09 §7, plus:
 
@@ -624,27 +707,42 @@ Carried from 09-09 §7, plus:
 
 5. **Recompute the absolute numbers on the corrected clock.** 09-09 §5f
    (6.2× vs WRF-SFIRE), 09-10 §2 (1.74×/1.83×) and the pSAF ≈ 0.4 calibration all
-   ran with a ~3 h head start (§7). Sensitivities and the IoU/shape work are
-   unaffected; those three results need redoing before they are quoted.
-6. **The SMOKEHOUSE workspace is a continuation forecast** with the scar masked
-   to no-fuel (§11), so it cannot test cold-start skill. To exercise the
-   low-latency pipeline properly, pick an *initial* forecast — no `prev_forecast`,
-   no `perim1.pkl`/`perim2.pkl` — ideally at the fire's true ignition.
-7. **Add a no-fuel diagnostic to the driver.** Report the fraction of the domain
-   in category 14 and the fraction of ignition seeds landing in it, at load. Two
-   lines, and it would have caught §11 before a full run rather than after.
-8. **Snap detections to burnable fuel** in the ignition path: a 2.7 km ABI pixel
-   is 27× coarser than the 100 m fuel grid, so seeds land on non-burnable cells
-   even on a clean map. Move each to the nearest burnable cell within its own
-   pixel footprint and drop it if there is none.
+   ran with a ~3 h head start (§7). Sensitivities and the matched-area IoU work
+   are unaffected; those three need redoing before they are quoted.
+6. **Use the unmasked workspace for anything Smokehouse.** `_points` is the
+   initial forecast; `_points_behave` is a continuation with the scar masked to
+   no-fuel and is unusable for forecast skill (§11, §14). Check any other
+   retrospective case the same way: `perim1.pkl`/`perim2.pkl` present, or
+   category 14 above ~1%, means masked.
+7. **Done, and worth keeping:** the no-fuel diagnostic. `goes_run2.py` reports
+   the category-14 fraction of the domain and the snapped/dropped seed counts at
+   load. Two lines; promote them into `forefire.py` rather than leaving them in
+   a scratch script.
+8. **Done:** seeds are snapped to the nearest burnable cell within their own ABI
+   pixel footprint (1,350 m). Keep it even on clean fuel maps — a 2.7 km pixel is
+   27× coarser than the 100 m fuel grid. On the unmasked domain it moves only 2
+   of 558 seeds, so it costs nothing when it is not needed.
 9. **Build a persistence filter before using `feature_tracking_id` back-tracing**
    (§10). Without one it seeds phantom fires on gas flares — 30 such pixels sit
-   within 10 km of this fire, detected on 218 of the day's 274 scans.
-10. **Throughput is not the constraint.** A 42-seed, 17-step, 8 h forecast runs
-    in 1.2 min on one core; the machine has 32. The 558-seed incremental run is
-    far slower because each restart serialises the whole front state (`.ff`
-    scripts reach 1 MB), which is the thing to watch as seed counts grow.
-11. Commit status: the timing fix (§7) and multi-point ignition (§8) are
-    **uncommitted**. Not committed without an explicit ask.
-12. New scratch scripts, still ephemeral: `goes_run.py`, `goes_snap.py`,
-    `goes_verify2.py`, `goes_plot.py`, `goes_fuel.py`.
+   within 10 km of this fire, detected on 218 of the day's 274 scans at steady
+   200–350 MW.
+10. **The detection feed is the biggest lever measured so far** — 19× in area,
+    18× in IoU over a cold start (§13). Ingesting detections continuously
+    outranks every parameter choice from 09-08/09-09. Design the pipeline around
+    that.
+11. **Watch restart serialisation, not front count.** 558 fronts are fine
+    numerically, but each restart writes the whole front state and the `.ff`
+    scripts reach ~1 MB, taking the incremental run to 27.3 min against 1.2 min
+    for the cold start. Front *count* was never the limit; state I/O is.
+12. **Still open: the residual ~10× growth gap** on the unmasked domain (§14).
+    Candidates, in the order worth testing: WRF wind magnitude (domain mean
+    3.5 m/s, max 6.5 m/s over the fire, for an event with reported sustained
+    winds several times that), then moisture, then `pSAF`. Scaling `UF`/`VF` in
+    the netcdf is the experiment you proposed on 09-09 and it is now the obvious
+    next one.
+13. **Uncommitted:** `read_ff_geojson` and the `merge_geojson_to_kml` change
+    (§13). The timing fix and multi-point ignition are committed as `d6b03a8`.
+14. New scratch scripts, still ephemeral: `goes_run.py`, `goes_run2.py`,
+    `goes_snap.py`, `goes_verify3.py`, `goes_verify4.py`, `goes_plot.py`,
+    `goes_fuel.py`. `goes_verify3.py` carries the orientation-aware reader and
+    the scoring against GOES pixel polygons; it is the one most worth promoting.

@@ -7,6 +7,7 @@ import json
 import pandas as pd
 import subprocess
 import geopandas as gpd
+from shapely.geometry import Polygon
 import fiona
 from datetime import timedelta, datetime
 import signal
@@ -1304,6 +1305,50 @@ def prob_forecast(json_directory):
 
 
 
+def read_ff_geojson(path):
+    """Read a ForeFire geojson honouring ForeFire's ring convention.
+
+    ForeFire's dumpMode=geojson packs every separate fire front as a RING of one
+    polygon and records the count in properties.numberOfPolygons -- a merged
+    multi-ignition step can carry hundreds. GeoJSON says ring 0 is the shell and
+    the rest are holes, so gpd.read_file subtracts them: a 472-front step read
+    as one outline with 471 holes punched out, and its area collapsed from
+    106,869 ha to 5,857 ha while the vertex count actually rose.
+
+    ForeFire signs the rings instead. A positive signed area is burning, a
+    negative one is a genuine unburned island. Returns a GeoDataFrame in EPSG:4326
+    with one row per ring, plus a 'burning' column, so callers can either keep the
+    fronts separate (KML placemarks) or difference the islands out (areas).
+
+    Single-front output is unaffected: one positive ring in, one row out.
+    """
+    with open(path,'r') as fh:
+        content = json.load(fh)
+    shells, islands = [], []
+    for feature in content.get('features',[]):
+        geometry = feature.get('geometry') or {}
+        coords = geometry.get('coordinates') or []
+        polygons = coords if geometry.get('type') == 'MultiPolygon' else [coords]
+        for polygon in polygons:
+            for ring in polygon:
+                if len(ring) < 4:
+                    continue
+                pts = np.asarray(ring,dtype=float)
+                #shoelace: sign gives the winding direction
+                area2 = float(np.sum(pts[:-1,0]*pts[1:,1] - pts[1:,0]*pts[:-1,1]))
+                (shells if area2 >= 0.0 else islands).append(Polygon(ring))
+    rows = [(g,True) for g in shells] + [(g,False) for g in islands]
+    if not rows:
+        return gpd.GeoDataFrame({'burning':[]},geometry=[],crs={'init':'epsg:4326'})
+    frame = gpd.GeoDataFrame({'burning':[b for _,b in rows]},
+                             geometry=[g for g,_ in rows],
+                             crs={'init':'epsg:4326'})
+    invalid = ~frame.is_valid
+    if invalid.any():
+        frame.loc[invalid,'geometry'] = frame.loc[invalid,'geometry'].buffer(0)
+    return frame
+
+
 def merge_geojson_to_kml(input_folder, output_kml_path,final=False,cfg=None,grid_code=None):
 
 
@@ -1326,12 +1371,15 @@ def merge_geojson_to_kml(input_folder, output_kml_path,final=False,cfg=None,grid
             continue
         file_path = os.path.join(input_folder, file)
         try:
-            gdf = gpd.read_file(file_path)
-            # Ensure everything uses the standard KML coordinate system (WGS84)
-            if gdf.crs is None:
-                gdf.set_crs(epsg=4326, inplace=True)
-            else:
-                gdf = gdf.to_crs(epsg=4326)
+            #not gpd.read_file: ForeFire packs separate fronts as rings, which
+            #the GeoJSON hole convention would subtract. See read_ff_geojson.
+            gdf = read_ff_geojson(file_path)
+            if len(gdf) == 0:
+                print(f"No fronts in {file}, skipping")
+                continue
+            #unburned islands stay out of the KML; a hole drawn as a placemark
+            #reads as a fire in Google Earth
+            gdf = gdf[gdf['burning']].drop(columns=['burning'])
             
             # Optional: Add a column to track which file the feature came from
             gdf['source_file'] = file
