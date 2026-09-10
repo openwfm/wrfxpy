@@ -1143,7 +1143,126 @@ from 09-09.
 Grass-fire behaviour is an active research area and the loading/curing question
 here sits squarely in it; that is the reading to do before touching the table.
 
-## 23. Open items
+## 23. Deriving the fuel table from `namelist.fire`
+
+Your suggestion, and it removes the guesswork rather than adding a knob: every
+WRF-SFIRE run ships a `namelist.fire` stating the fuel properties it used, so the
+ForeFire table can be derived from that instead of from a 40→13 translation
+nobody can audit.
+
+`fuel_table_from_namelist(namelist_path, cfg, md=None, split_live=True)` and
+`read_namelist_fire(path)` (committed in `7595aa3`) map:
+
+| ForeFire | namelist.fire | conversion |
+|---|---|---|
+| `Sigmad`, `Sigmal` | `fgi` | kg/m², split by `fmc_gw05` where present |
+| `e` | `fueldepthm` | m |
+| `sd`, `sl` | `savr` | × 3.28084, 1/ft → 1/m |
+| `me` | `fuelmce` | — |
+| `Rhod`, `Rhol` | `fueldens` | × 16.0185, lb/ft³ → kg/m³ |
+| `DeltaH`, `Deltah` | `cmbcnst` | J/kg |
+
+`Ta`, `Tau0`, `Cp`, `Cpa`, `Ti`, `X0`, `r00`, `stoch` and `Blai` are left alone —
+ForeFire formulation constants with no namelist counterpart, and inventing them
+would be worse than keeping values that were at least chosen together.
+
+**The namelist is static across forecasts, so this is a one-time generation.**
+Run it once, review, check the result in, point `cfg['fuels_table']` at it, and
+let `write_fuel_table` keep substituting Md per run.
+
+### Measured, at wRF 1.0 and Md 0.035 (the two input-justified corrections)
+
+| fuel table | area at 3.3 h | ROS vs baseline | vs 2.34× target |
+|---|---|---|---|
+| `fuelstrans.csv` (translated 40→13) | 40,156 ha | 2.18× | 93% |
+| derived from `default.fire_cawfe_13` | 51,750 ha | 2.48× | 106% |
+| derived from `default.fire_behave_13` | **58,443 ha** | **2.63×** | 112% |
+
+Reproducible: the CAWFE table gave 51,750 ha on two independent runs.
+
+### The variants differ less than the spread models do
+
+| key | behave_13 | cawfe_13 | |
+|---|---|---|---|
+| `fgi`, `savr`, `fuelmce`, `fueldens` | | | **identical** |
+| `fueldepthm` | 0.00305 | 0.305 | category **14** only — `no_fuel`, skipped |
+| `cmbcnst` | 18,605,000 | 17,433,000 | 6.7% |
+| `fuelmc_g` | 0.40 | 0.30 | unused; Md comes from EMC |
+| `fmc_gw05` | **absent** | present | live/dead split |
+| `ibeh` | 4 | absent | ROS-formula selector, the reliable tell |
+
+Workspace provenance: `_points` matches **cawfe 5/5**, `_points_behave` matches
+**behave 5/5**. Everything calibrated in §14–§22 came from the CAWFE run.
+
+**Behave is the system default** (`default.fire` → `default.fire_behave_13`).
+It is slower but stable at larger timesteps without violating CFL — a WRF-SFIRE
+property, but it means the Behave-derived table is the one to generate for
+operational use.
+
+The 6.3% rate difference between variants comes from `cmbcnst` and from category
+2 going all-dead under Behave (`Sigmad` 0.897, `Sigmal` 0) rather than split
+0.552/0.345. **The all-dead state is the more defensible one for this fire**
+regardless of which is default: CAWFE's `fmc_gw05` puts 38% of category 2's load
+in the live herbaceous class, and the NWS says the vegetation "went into winter
+dormancy". A 38% live fraction in a panhandle grassland in late February is wrong
+on the ground.
+
+### Two bugs the second namelist exposed
+
+1. **`Sigmal` was not zeroed** on the no-`fmc_gw05` path, so a Behave run would
+   have given category 2 a total of 0.897 + 0.1 = 0.997 against `fgi`'s 0.897 —
+   an 11% overcount. `fgi` is WRF's total over all moisture classes, so with no
+   split available it all belongs in the dead pool. Found only because you
+   mentioned the variants.
+2. **A category-count mismatch is now refused**, not warned about.
+   `default.fire_behave_40` declares `nfuelcats = 40` while `fuelstrans.csv` has
+   13 rows plus `no_fuel`; emitting a table with 40-category values in rows 1–14
+   and nothing beyond would look fine and be wrong everywhere. That is the CRLF
+   failure mode again, so the function returns the base table untouched.
+
+### `behave_40` settles the provenance question
+
+Its category 2 load is **0.247 kg/m²** — exactly Scott & Burgan **GR2 fully
+cured**, the same model whose `sd` 6562, `e` 0.305 and `me` 0.15 match
+`fuelstrans.csv` category 2 (6500, 0.30, 0.15). So `fuelstrans.csv` is built from
+the 40-category set, as you said. It also explains why category 2's load looked
+anomalous in §19: it carries GR2's *geometry* with a load nearer Anderson FM2's
+**1-hour** value (0.448) than the total its neighbours use. Mixed provenance,
+which is precisely why deriving from the namelist is better than adjudicating the
+cell.
+
+## 24. Recommended configuration
+
+Every element traceable to a source, nothing tuned:
+
+| setting | value | basis |
+|---|---|---|
+| `windReductionFactor` | **1.0** | `namelist.fire` already applies `windrf = 0.36`; 0.4 double-counts it |
+| `Md` | **~0.035** | Simard EMC at the NWS's RH 12–15%, 70s F, dormant, two weeks dry |
+| fuel table | **derived from `default.fire`** | the Behave symlink, matching the operational default |
+| fuel categories | **unchanged** | remapping is a per-fire judgement that would not transfer |
+
+Result: ROS **2.63×** where the GOES detections imply **2.34×** — 12% high, and
+the target itself carries at least 10–15% uncertainty. **Do not tune anything back
+down to close that**; it would be fitting to a number that is not that precise.
+
+### Still open
+
+- **One fire, one 3.3 h window, one seed set.** The wind and moisture corrections
+  should generalise because they are input fixes, and so should the fuel table;
+  none of it is demonstrated yet. Run SINLAHEKIN and Ranger Road through the same
+  configuration next — both already have workspaces and one has an IR perimeter.
+- **Everything sits on `pRes` 100**, where 09-09 found area ~ `pRes^-0.26` and the
+  numerics not converged. The comparisons here are internally consistent; the
+  target-matching is not resolution-independent.
+- **`goes2_incr` never finished** — 558 seeds on the unmasked domain, abandoned
+  around step 11 of 17 at ~15 min/step. The lesson is §13's: restart state
+  serialisation, not front count, limits the incremental path.
+- **Grass-fire behaviour is active research.** The loading and curing questions
+  here sit squarely in it, and that reading should come before anyone edits the
+  fuel table by hand again.
+
+## 25. Open items
 
 Carried from 09-09 §7, plus:
 
