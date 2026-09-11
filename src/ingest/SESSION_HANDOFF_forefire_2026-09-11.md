@@ -526,7 +526,66 @@ all). That work is not reviewed here.
 
 ---
 
-## 7. Open items
+## 7. `pSAF` on TELEPHONE: the exponent transfers
+
+§5 ruled out the input corrections, leaving `pSAF` — a flat multiplier on node
+speed (`FireDomain.cpp:1348`), outside the Rothermel bracket, so it scales ROS
+uniformly and touches neither the wind cap nor the slope term. Swept 0.05–0.6 on
+the derived table at `Md` 0.10, scored at the last VIIRS scan.
+
+**Prediction recorded before the runs**, from SINLAHEKIN's `area ~ pSAF^2.00`:
+closing 7.6× needs `pSAF ≈ 0.6/√7.6 = 0.22`, and the 168.6 ha bound `≈ 0.28`.
+
+| pSAF | area ha | /WRF | /bound | reach km | /obs |
+|---|---|---|---|---|---|
+| 0.05 | 4.3 | 0.0× | 0.0× | 0.19 | 0.3× |
+| 0.10 | 16.6 | 0.2× | 0.1× | 0.37 | 0.5× |
+| 0.15 | 28.6 | 0.3× | 0.2× | 0.45 | 0.7× |
+| 0.20 | 50.5 | 0.5× | 0.3× | 0.60 | 0.9× |
+| **0.25** | **86.7** | **0.8×** | 0.5× | **0.81** | **1.2×** |
+| 0.30 | 145.3 | 1.4× | 0.9× | 1.01 | 1.5× |
+| 0.45 | 375.0 | 3.6× | 2.2× | 1.97 | 2.9× |
+| 0.60 | 798.5 | 7.6× | 4.7× | 2.87 | 4.2× |
+
+### The result worth keeping
+
+```
+area  ~ pSAF^2.09        SINLAHEKIN measured 2.00
+reach ~ pSAF^1.08
+```
+
+Two fires in different states, fuels and grids give **2.00 and 2.09**. The pair is
+also internally consistent — a flat ROS multiplier should move reach linearly
+(1.08) and area as its square (2.09 ≈ 2 × 1.08) — so the physics and the
+measurement agree with nothing fitted.
+
+**Consequence: the required `pSAF` can be derived rather than searched.**
+`pSAF_new = pSAF_old / ratio^0.48`. The pre-registered predictions of 0.22 and
+0.28 came out at 0.255 and 0.319, within 15%, the gap explained by 2.09 vs 2.00.
+
+### The value, and how far to trust it
+
+Three targets: **0.255** (WRF-SFIRE), **0.319** (footprint bound), **0.192**
+(observed reach). SINLAHEKIN's re-baseline, same table and `Md`, put the ridge at
+**≈ 0.30**. Two independent fires landing in **0.25–0.32** is the first parameter
+value in this work that has transferred at all.
+
+**It is not recommended, per the standing rule.** SINLAHEKIN was scored against a
+real IR perimeter; TELEPHONE against WRF-SFIRE plus a detection bound, which is
+weaker. Both are complex-terrain fires, so this may be a *fire-class* result.
+**Ranger Road is the test** — the plains regime is where `wRF` elasticity differed
+threefold (1.22 vs 0.40).
+
+The reach target (0.192) sitting below the area targets means that at matched
+reach ForeFire carries less area than WRF-SFIRE: the modelled fire is narrower
+than the observed footprint. A size correction does not address that.
+
+Kept with the workspace: `…TELEPHONE…/forefire/psaf_telephone.csv`,
+`telephone_psaf.py`, `telephone_score.py`.
+
+---
+
+## 8. Open items
 
 Carried from 09-10 §26, minus what closed today. Items 3-5 below are covered in
 full by §4.
@@ -571,8 +630,20 @@ full by §4.
 9. **`write_fuel_table` names its output by `Md` alone**, so two arms at the same
    `Md` from different base tables collide (§5). Give each arm its own `run_dir`,
    or put the base table in the filename.
-10. **`FMC_GC` tile_z goes 6 → 8** (§6). Verify geogrid accepts the extra levels
-    on the first `behave` run after `1bbe877`.
+10. **CLOSED — `FMC_GC` tile_z 6 → 8 works end to end.** Verified on the
+    Corralitos 2026-09-07 07Z forecast, the first `behave` run after `1bbe877`.
+    `fmda-CONUS-20260907-07.geo` was regenerated (renamed to
+    `.bak-20260911`, not deleted; two jobs read it, Corralitos and `Bug_…`),
+    clamping 9,129 values, 0.11%. `GEOGRID complete` with no errors, and
+    `geo_em.d01.nc` carries `FMC_GC (1, 8, 30, 30)` with levels 0–2 the real
+    moisture all positive (0.061–0.317), level 3 = 0.1, levels 4–5 = 0.3, levels
+    6–7 zero, and `FMEP (1, 2, 30, 30)` = `[dEd, dEw]`. The wrfout then carries
+    `FMC_GC (1, 6, 30, 30)` — WRF takes exactly the first `moisture_classes = 6`
+    and drops the two reserved slots — with levels 0–2 the real moisture and
+    3–5 the standing values. No all-zeros fallback. The whole chain is verified:
+    netcdf → `make_geo_folder` → `to_geogrid` → `geogrid.exe` → `geo_em` → WRF.
+    (`FMC_G` on the fire grid is zero in the first frame; that is the documented
+    spin-up, not a failure.)
 11. **`get_fmda_path`'s guard is existence-only**, so the z=5 folders written by
     the other producer are never regenerated — 70 `.geo` against 254 `.nc`
     sources. An hour must be deleted by hand to rebuild it. A shape-aware guard
