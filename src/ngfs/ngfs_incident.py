@@ -83,9 +83,10 @@ def get_fmda_path(cfg):                                                         
    fmda_day = cfg['start_utc'][8:10]
    fmda_hour = cfg['start_utc'][11:13]
 
+   behave = 'behave' in cfg['fire_namelist_path']
    if 'cawfe' in cfg['fire_namelist_path']:
       base_folder = '/data/WRFXPY/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
-   elif 'behave' in cfg['fire_namelist_path']:
+   elif behave:
       base_folder = '/data/jhaley/wrfxpy/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
    else:
       return 'ngfs'
@@ -94,7 +95,10 @@ def get_fmda_path(cfg):                                                         
 
    fmda_geo_folder = base_folder + date_folder
 
-   if not os.path.exists(fmda_geo_folder):
+   #only the behave path needs converting. The cawfe path points at the running
+   #FMDA instance, which writes the older-style files that path already reads, so
+   #generating a folder there would shadow it with a conversion nothing asked for.
+   if behave and not os.path.exists(fmda_geo_folder):
       make_geo_folder(fmda_geo_folder)
 
    return fmda_geo_folder
@@ -111,9 +115,33 @@ def make_geo_folder(fmda_geo_folder):                                           
       return
    #load the model 
    fm = FuelMoistureModel.from_netcdf(nc_path)
-   # Extend the array to have 6 dimensions
-   m_ext = np.zeros(fm.m_ext.shape[:2] + (6, ))
-   m_ext[:,:,:-1] = fm.m_ext
+   #m_ext arrives as [m1, m10, m100, dEd, dEw]: the dead moisture classes first,
+   #then the two equilibrium parameters. namelist.fire declares
+   #moisture_classes = 6, so three more classes have to be added -- and they
+   #belong after m100 and BEFORE the parameters. Widening the whole array instead
+   #left [.., dEd, dEw, 0], which put dEd where geogrid reads a moisture class:
+   #mean -0.065, negative over 94% of CONUS.
+   #Standing values, not analysis: 1000h fuel and live vegetation are wetter than
+   #fine dead fuel, and zero is not a neutral default -- it is the most flammable
+   #one the model can be handed.
+   STANDING = (0.1,0.3,0.3)                  #1000h, live herbaceous, live woody
+   #to_geogrid copies m_ext[:,:,:-2] into FMC_GC and keeps the last two slices for
+   #its lon/lat test, so six filled classes need m_ext eight wide.
+   n = fm.m_ext.shape[2]
+   m_ext = np.zeros(fm.m_ext.shape[:2] + (n-2+len(STANDING)+2, ))
+   m_ext[:,:,:n-2] = fm.m_ext[:,:,:n-2]      #m1, m10, m100
+   for k,value in enumerate(STANDING):
+      m_ext[:,:,n-2+k] = value
+   m_ext[:,:,-2:] = fm.m_ext[:,:,n-2:]       #dEd, dEw, always the last two
+   #one negative value makes wrfxpy discard the whole array and use zeros, so a
+   #single bad cell throws away the moisture everywhere. The FMDA analysis puts
+   #1h below zero over ~3.5% of CONUS and 10h over ~0.2%.
+   moisture = m_ext[:,:,:n-2]
+   negative = int((moisture < 0).sum())
+   if negative:
+      print(f'\tclamping {negative} negative fuel moisture values to zero '
+            f'({100.0*negative/moisture.size:.2f}% of the moisture block)')
+      np.clip(moisture,0.0,None,out=moisture)
    fm.m_ext = m_ext
    #load index
    index = {'projection': 'lambert',
