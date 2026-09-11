@@ -1119,8 +1119,18 @@ def sweep_ff_params(wksp_dir,param_sets,cfg=None,overwrite=False,reuse_nc=True,t
         if stage_dir:
             for name in sorted(os.listdir(stage_dir)):
                 link = f"{run_dir}/{name}"
-                if not os.path.exists(link):
-                    os.symlink(os.path.relpath(f"{stage_dir}/{name}",run_dir),link)
+                want = os.path.relpath(f"{stage_dir}/{name}",run_dir)
+                #a wind-scaled netcdf lives in a different staging directory but
+                #keeps the same filename, so a stale link from an earlier scale
+                #would silently serve the wrong winds: replace it when it points
+                #somewhere else. only ever remove a symlink, never a real file.
+                if os.path.islink(link):
+                    if os.readlink(link) == want:
+                        continue
+                    os.unlink(link)
+                elif os.path.exists(link):
+                    continue
+                os.symlink(want,link)
 
         print(f"\n=== ForeFire parameter set {tag} in {run_dir}")
         set_params = dict(base_params); set_params.update(params or {})
