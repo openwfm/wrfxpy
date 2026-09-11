@@ -585,7 +585,91 @@ Kept with the workspace: `…TELEPHONE…/forefire/psaf_telephone.csv`,
 
 ---
 
-## 8. Open items
+## 8. Ranger Road: the exponent does NOT transfer, and reach is why
+
+The discriminating case for §7. Ranger Road is the plains fire — single dominant
+wind direction, the regime where `wRF` elasticity measured 1.22 against
+SINLAHEKIN's 0.40. James, before the runs: *"I think we'll find the plains fire
+is substantially different."* He was right.
+
+Deliberately identical design to §7 — same `pSAF` values, same `Md` 0.10, same
+derived table — so the fire is the only variable. 121 × 121 km domain, 50 m fire
+grid, ignition 36.820046 −100.498414 at 17:21:50, `behave_13` namelist.
+
+| pSAF | ha +6h | reach +6h | ha +8h | reach +8h |
+|---|---|---|---|---|
+| 0.05 | 11 | 0.43 | 16 | 0.53 |
+| 0.10 | 28 | 0.83 | 42 | 1.02 |
+| 0.15 | 53 | 1.20 | 84 | 1.49 |
+| 0.20 | 92 | 1.59 | 146 | 1.97 |
+| 0.25 | 136 | 1.97 | 222 | 2.44 |
+| 0.30 | 198 | 2.33 | 323 | 2.91 |
+| 0.45 | 434 | 3.48 | 712 | 4.36 |
+| 0.60 | 755 | 4.59 | 1,233 | 5.67 |
+
+Largest span 7.0 km on a 121 km domain, so this is **not** edge-suppressed.
+
+```
++6 h   area ~ pSAF^1.71   reach ~ pSAF^0.95
++8 h   area ~ pSAF^1.79   reach ~ pSAF^0.96
+       SINLAHEKIN ^2.00   TELEPHONE ^2.09 (reach ^1.08)
+```
+
+### The mechanism, from the reach column
+
+| | area | reach | ⇒ width | self-similar |
+|---|---|---|---|---|
+| TELEPHONE | ^2.09 | ^1.08 | **^1.01** | ^1.08 |
+| Ranger Road +6h | ^1.71 | ^0.95 | **^0.76** | ^0.95 |
+| Ranger Road +8h | ^1.79 | ^0.96 | **^0.83** | ^0.96 |
+
+**Reach is linear on every fire** (0.95–1.08). That is the physics holding:
+`pSAF` multiplies node speed, so distance follows ROS whatever else is going on.
+
+**Area is not**, because the fires do not grow self-similarly. On TELEPHONE width
+tracks length (1.01 against 1.08) so area ≈ reach². On Ranger Road width grows
+markedly slower than length (0.76–0.83 against 0.95): raising `pSAF` makes the
+plains fire **longer faster than it makes it wider**, and the area exponent falls
+below 2. That is the wind regime rather than terrain as such — one dominant
+direction drives the head at full ROS while the flanks spread at the much weaker
+cross-wind rate.
+
+### Correction to §7
+
+§7 claimed the `^2` exponent was structural and that
+`pSAF_new = pSAF_old / ratio^0.48` was fire-independent. **It is not.** The
+exponent is 1.71 here, so the same ratio needs `^0.57`.
+
+What transfers is **`reach ~ pSAF^1`**, on all three fires. **Calibrate on
+distance, not area.** Area calibration needs the fire's own anisotropy, which is
+a per-fire quantity; reach calibration does not.
+
+### And it compounds the spotting ceiling
+
+James, during the runs: *"These big plains fires often have spotting that our
+modeling is not accounting for. I don't think we'll ever find a set of parameters
+to match the explosive growth."* ForeFire standalone cannot produce spotting —
+`SpottingFluxBasicModel` emits flux, transport is absent, re-ignition is
+coupled-only (09-09 §5b).
+
+So on a plains fire, matching **area** is unsafe twice over: a missing process,
+plus an anisotropy a uniform speed multiplier cannot reproduce. No `pSAF` value
+is reported for Ranger Road, deliberately. The sweep was run for the exponent,
+which is measurable whether or not any value is usable.
+
+### An unresolved discrepancy
+
+09-08 measured `area ~ ROS^2.00` via `pSAF` on this same fire; this gives
+1.71–1.79. Two candidate causes, not separated: the derived fuel table, and the
+`d6b03a8` timing fix — the old runs carried a ~3 h head start and so sampled a
+later, more elongated phase. Worth resolving before either number is quoted.
+
+Kept with the workspace: `…Ranger_Road…/forefire/psaf_ranger.csv`,
+`ranger_psaf.py`.
+
+---
+
+## 9. Open items
 
 Carried from 09-10 §26, minus what closed today. Items 3-5 below are covered in
 full by §4.
@@ -654,7 +738,20 @@ full by §4.
 13. **The FMDA assimilation itself produces negative 1h moisture** (§6). The
     clamp is interim; James's plan is a fresh wrfxpy pull and a new assimilation.
 14. **Where the ForeFire gap actually lives.** §5 rules out the two input
-    corrections: at best 7.6× WRF-SFIRE and ~4.7× the observational bound. Next
-    candidates are `pSAF` and the wind/slope balance, tested on a fire whose
-    `phiV`/`phiP` regime is known — and TELEPHONE now provides one with an
-    observation attached.
+    corrections: at best 7.6× WRF-SFIRE and ~4.7× the observational bound.
+    §7 and §8 then test `pSAF` on three fires. **Partly answered:** the
+    wind/slope balance remains untested as a lever.
+15. **Calibrate on reach, not area.** §8: `reach ~ pSAF^1` held on all three
+    fires (0.95–1.08) but the area exponent ranged 1.71–2.09 with the fire's
+    anisotropy. Any automated tuning loop should target distance.
+16. **Separate the two causes of the Ranger Road exponent change** (§8): derived
+    fuel table versus the `d6b03a8` timing fix. Re-running the old `pSAF` values
+    on the old table under the corrected clock would isolate it.
+17. **A spotting-aware ceiling belongs in the framework** (§8). Before reporting
+    any parameter as closing a gap on a wind-driven plains fire, say what share
+    of the growth a spread model can legitimately claim. A value that closes the
+    whole gap is compensating for a missing process.
+18. **`pSAF` 0.25–0.32 on two complex-terrain fires** (§7) is the only parameter
+    value that has transferred so far, and it is NOT recommended — the two
+    observations are of unequal quality and both fires are the same class. A
+    third complex-terrain fire with a real perimeter would settle it.
