@@ -107,7 +107,6 @@ def sum_to_level(var,height,level):
                 r[i,j] = np.sum(var[0:k-1,i,j],axis=0)+var[k,i,j]*t 
     return r
 
-# TODO: check this function
 def index8height(height,level):
     """
     Find index and fraction at given height
