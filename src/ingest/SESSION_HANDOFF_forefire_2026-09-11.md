@@ -661,8 +661,19 @@ which is measurable whether or not any value is usable.
 
 09-08 measured `area ~ ROS^2.00` via `pSAF` on this same fire; this gives
 1.71–1.79. Two candidate causes, not separated: the derived fuel table, and the
-`d6b03a8` timing fix — the old runs carried a ~3 h head start and so sampled a
-later, more elongated phase. Worth resolving before either number is quoted.
+`d6b03a8` timing fix.
+
+The timing cause is real and its mechanism is now pinned down, which the `.ff`
+scripts alone do not reveal. Those scripts carry the *correct* reference and
+ignition offset — `loadData[…2026-02-17T17:00:00Z]`, `startFire[…;t=1310]` — so
+they look right. But the step seconds run 9000 / 10800 / 12600 / 14400 against
+today's 1800 / 3600 / 5400 / 7200, a constant **7200 s = 2 h**: the `goTo`
+targets were computed on the 15:00 first-wrfout reference while ForeFire's clock
+ran from 17:00, so **every step overshot by 2 h**. That is a per-step overshoot,
+not a head start at ignition, and it will move the exponent.
+
+Resolve before either number is quoted — §9 item 16 has the three-cell design and
+the recipe.
 
 Kept with the workspace: `…Ranger_Road…/forefire/psaf_ranger.csv`,
 `ranger_psaf.py`.
@@ -744,9 +755,37 @@ full by §4.
 15. **Calibrate on reach, not area.** §8: `reach ~ pSAF^1` held on all three
     fires (0.95–1.08) but the area exponent ranged 1.71–2.09 with the fire's
     anisotropy. Any automated tuning loop should target distance.
-16. **Separate the two causes of the Ranger Road exponent change** (§8): derived
-    fuel table versus the `d6b03a8` timing fix. Re-running the old `pSAF` values
-    on the old table under the corrected clock would isolate it.
+16. **NEXT SESSION — separate the two causes of the Ranger Road exponent
+    change** (§8): the derived fuel table versus the `d6b03a8` timing fix.
+    Deferred deliberately; James: *"rerun the old pSAF values on the old table to
+    separate them, but let's do that in the next session."*
+
+    Confirmed this session that the timing really is a live cause, which the
+    `.ff` scripts alone do not show. The 09-08 scripts carry
+    `loadData[…2026-02-17T17:00:00Z]` and `startFire[…;t=1310]` — the correct
+    reference and ignition offset — but their step seconds run
+    9000 / 10800 / 12600 / 14400 against today's 1800 / 3600 / 5400 / 7200, a
+    constant **7200 s = 2 h**. The `goTo` targets were computed on the 15:00
+    first-wrfout reference while ForeFire's clock ran from 17:00, so every step
+    **overshot by 2 h**. That is not a head start at ignition; it is a per-step
+    overshoot, and it will move the exponent.
+
+    The three-cell design, of which two cells already exist:
+
+    | table | clock | area exponent |
+    |---|---|---|
+    | `fuelstrans` | pre-fix | **2.00** (09-08) |
+    | `fuelstrans` | corrected | **to measure** |
+    | derived | corrected | **1.71–1.79** (§8) |
+
+    Recipe: copy `…Ranger_Road…/forefire/ranger_psaf.py`, set
+    `PSAF_VALUES = [0.3, 0.45, 0.6, 0.8, 1.0, 1.2]` (the 09-08 values, which have
+    surviving directories), point the base at
+    `/home/jhaley/forefire/tests/fuelstrans.csv` at `Md` 0.10 — its shipped value,
+    so the old runs used it unchanged — and tag `rr_old_pSAF*`. Give it **its own
+    `run_dir`** (§5 collision trap). Score at the same +6 h and +8 h. If the
+    middle cell lands near 2.00 the fuel table is the cause; near 1.75, the clock
+    is.
 17. **A spotting-aware ceiling belongs in the framework** (§8). Before reporting
     any parameter as closing a gap on a wind-driven plains fire, say what share
     of the growth a spread model can legitimately claim. A value that closes the
