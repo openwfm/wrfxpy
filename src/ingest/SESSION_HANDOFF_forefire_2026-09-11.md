@@ -1,7 +1,9 @@
 # ForeFire session handoff — 2026-09-11
 
-Branch `james_ngfs`, HEAD `f596b33`. Read `SESSION_HANDOFF_forefire_2026-09-10.md`
-§23 first — this session installs the fuel table that section prototyped.
+Branch `james_ngfs`, commits `f596b33` `191a787` `a440295` `1bbe877` `0389e28`.
+Read `SESSION_HANDOFF_forefire_2026-09-10.md` §23 first — this session installs
+the fuel table that section prototyped, then tests it on an active fire (§5) and
+follows the moisture into the FMDA chain (§6).
 
 Today is about **provenance of the inputs**, not skill. James set the standard
 explicitly when the re-baseline was launched:
@@ -324,11 +326,207 @@ all, or whether it is a formulation limit. That decision was made once on §15's
 numbers and has to be made again.
 
 **TELEPHONE (active, VIIRS available) is the natural first case** — single
-origin, 375 m detections, and a live forecast to compare against.
+origin, 375 m detections, and a live forecast to compare against. Done: §5.
 
 ---
 
-## 5. Open items
+## 5. TELEPHONE: an active fire, and what the input corrections buy
+
+`wksp/wfc-TELEPHONE_2026-09-10_19_00_00_225AA437-…-2026-09-10_18:00:00-30`
+(under `/data/jhaley/wrfxpy`, **not** `new_wrfxpy`; a 2024 TELEPHONE with a
+different incident id also exists). Wyoming, 43.6953 −109.54831, ignition
+2026-09-10 20:40Z, 1 km grid with 40× subgrid = **25 m fire grid**, WRF-SFIRE
+**Completed**, 61 wrfouts. Its `namelist.fire` carries `cmbcnst = 18605000.0`,
+`nfuelcats = 13`, `ibeh = 4` — exactly `default.fire_behave_13`, so §2's derived
+table is the right one for this fire.
+
+This is the fire class §4 asks for: single origin, 375 m VIIRS, a completed
+WRF-SFIRE run and an operational ForeFire run already in the workspace.
+
+### The observation
+
+VIIRS detections for the incident, from `ingest/NGFS/VIIRS` (39 files cover
+09-10 to 09-12; `known_incident_id` selects 14 of the 16 within 30 km):
+
+| scan | +h | px | ΣFRP MW | reach from ignition |
+|---|---|---|---|---|
+| 09-11 08:31Z | 11.86 | 1 | 0.7 | 0.41 km |
+| 09-11 08:51Z | 12.19 | 2 | 5.2 | 0.52 km |
+| 09-11 09:35Z | 12.92 | 2 | 4.9 | 0.43 km |
+| 09-11 10:13Z | 13.56 | 4 | 7.3 | 0.50 km |
+| 09-11 10:33Z | 13.89 | 5 | 3.3 | 0.69 km |
+
+A creeping fire: **0.60 km of leading-edge advance over 2.04 h → 0.082 m/s**, and
+only ~600 m from the origin after 14 h. Two things to note. The **first detection
+is +11.9 h after the stated ignition** — VIIRS saw nothing before it — and the
+first-scan centroid is **0.41 km** from `input.json`'s ignition, unusually good
+for these.
+
+Union of the detected pixel quadrilaterals (`latitude_c1..c4`) is **168.6 ha**.
+That is an **upper bound on actively burning area, not a perimeter** — a fire can
+burn between scans without lighting a new pixel — so it brackets, and no IoU is
+scored against it.
+
+### WRF-SFIRE is doing well; ForeFire is not
+
+**WRF-SFIRE 105.6 ha at +13.89 h**, just under the footprint bound. James:
+*"Comparison with satellite data shows WRF-SFIRE is doing a reasonable job with
+this fire but ForeFire is not."*
+
+The operational ForeFire run used the template defaults, and its script confirms
+§2's finding directly:
+
+```
+setParameter[fuelsTableFile=/forefire/tests/fuelstrans.csv]
+setParameter[perimeterResolution=25]
+setParameter[propagationSpeedAdjustmentFactor=0.6]
+setParameter[windReductionFactor=0.4]
+```
+
+It reaches **1,002 ha at +13.89 h — 9.5× WRF-SFIRE** and 4,033 ha by +27.3 h. The
+ratio climbs monotonically (0.71× at +0.33 h, 2.9× at +2.3 h, 7.5× at +8.3 h,
+12.2× at the end): divergent growth, not an offset.
+
+### The 2×2 on the two input corrections
+
+Horizon truncated to +15 h, which brackets the last scan. The operational run
+supplies the fourth cell; step perimeters are unaffected by truncation.
+
+| ha at +13.89 h | `Md` 0.10 | `Md` 0.0226 (FMDA) |
+|---|---|---|
+| **fuelstrans** | 1,002 (9.5×) | 3,629 (34.4×) |
+| **derived** | **799 (7.6×)** | 4,129 (39.1×) |
+
+- **The derived fuel table helps: 0.80×**, a 20% cut with nothing tuned. Unlike
+  SINLAHEKIN, whose fuel mix cancelled the changes, this fire responds.
+- **The FMDA moisture makes it 3.6–4.1× worse.** See §6: FMDA says this site is
+  *drier* than the table's 0.10, not wetter. My prior guess that 10% looked too
+  dry for September in Wyoming was wrong.
+- **They are not separable multipliers.** The derived table *reduces* area at
+  `Md` 0.10 and *increases* it at `Md` 0.0226 (1.14×). Changing SAV and load
+  changes reaction intensity, which changes the leverage moisture damping has.
+
+Even the best arm is 7.6× WRF-SFIRE and ~4.7× the footprint bound. **The inputs
+do not close this gap.** The candidates that remain are `pSAF` — a flat
+multiplier, the natural home for a size correction — and the wind/slope balance:
+TELEPHONE is steep complex terrain, the regime where SINLAHEKIN measured
+`ROS ~ wRF^0.40` against the plains fire's `^1.22`.
+
+### A trap in `write_fuel_table`, found the hard way
+
+The first attempt returned **byte-identical results for two arms that differed
+only in base table**. `write_fuel_table` names its output by `Md` alone —
+`run_dir/fueltables/fuels_Md_<md>.csv` — so two arms at the same `Md` from
+different base tables write the same path and the second silently wins. Both
+moisture arms had run the derived table; the `fuelstrans`/0.0226 cell never ran.
+
+Re-run with a per-arm `run_dir`, and asserted on `sd` before spending the runs.
+**Any sweep varying the base table must give each arm its own `run_dir`**, or
+`write_fuel_table` needs the base in its filename.
+
+Results and scripts are kept with the workspace, not a scratchpad:
+`…-30/forefire/grid_nml.csv`, `nml_rebaseline.py`.
+
+---
+
+## 6. The FMDA moisture chain, and the geogrid conversion
+
+Chasing why moisture made TELEPHONE worse led into the FMDA path. Three findings,
+two commits.
+
+### The negatives are upstream, not from the conversion
+
+`resolve_md` returned a **negative** SAV-weighted moisture and its fail-closed
+gate correctly rejected it. Reading the source netcdf
+`/data/WRFXPY/wksp_fmda/CONUS/202609/fmda-CONUS-20260910-19.nc`, `FMC_GC` is
+(1258, 2145, **5**) = `[m1, m10, m100, dEd, dEw]`:
+
+| layer | min | max | mean | % < 0 | |
+|---|---|---|---|---|---|
+| 0 | −0.0912 | 0.7876 | 0.0839 | **3.48** | 1h |
+| 1 | −0.0382 | 0.6645 | 0.1197 | 0.24 | 10h |
+| 2 | 0.0189 | 1.2054 | 0.2217 | 0.00 | 100h |
+| 3 | −0.2573 | 0.1099 | −0.0647 | 93.68 | `dEd` |
+| 4 | −2.4603 | 0.1283 | −0.1763 | 78.63 | `dEw` |
+
+The same **3.48%** appears in the written tile, so the conversion copies them
+through faithfully. **The assimilation itself drives 1h below zero** in the driest
+cells; layers 3–4 are signed equilibrium adjustments and are fine. The ordering
+1h < 10h < 100h is correct for drying, and 96.5% of the field is physical.
+
+At TELEPHONE: 1h −0.0135, 10h 0.0226, 100h 0.1128. **FMDA says this site is
+drier than the fuel table's `Md` = 0.10**, which is why §5's moisture arms
+overshoot. The 10h value was used as the driest physically valid reading.
+
+James's plan is a fresh pull of the latest wrfxpy and a new assimilation; the
+below is the interim.
+
+### `make_geo_folder` put a non-moisture into a moisture slot
+
+`from_netcdf` builds `m_ext = [m1, m10, m100, dEd, dEw]` (width 5). The old
+`make_geo_folder` widened to 6 leaving `[…, dEd, dEw, 0]`, and `to_geogrid`
+writes `FMC_GC[:,:,:-2]` — four slices at n=6 — so **`dEd` landed where geogrid
+reads a moisture class.** Both shapes exist on disk:
+
+```
+fmda-CONUS-20260910-20.geo   FMC_GC z=6, FMEP z=2   <- make_geo_folder's output
+everything else sampled      FMC_GC z=5, FMEP z=3   <- another producer
+```
+
+Measured on the z=6 tile: layer 3 mean **−0.0653, negative over 93.8%**, against
+0.0000 on the z=5 tiles. TELEPHONE's tile (`-19`) is a z=5 one, so it never went
+through the conversion. What writes the z=5/z=3 folders is **not established** —
+FMEP z=3 matches no branch of the current `to_geogrid`.
+
+### The fix (`1bbe877`, `0389e28`)
+
+`namelist.fire` declares `moisture_classes = 6`, so three classes must be added,
+**after `m100` and before the parameters**. `to_geogrid` keeps the last two
+slices for its lon/lat test, so six filled classes need `m_ext` **eight** wide:
+
+```
+m_ext = [m1, m10, m100, 0.1, 0.3, 0.3, dEd, dEw]
+FMC_GC -> 8 layers, first six the classes, last two zero
+FMEP   -> [dEd, dEw], matching source exactly
+```
+
+`0.1, 0.3, 0.3` (1000h, live herbaceous, live woody) are **standing values, not
+analysis**, commented as such: zero is not a neutral default for fuel moisture,
+it is the most flammable one. Negative moisture is clamped to zero with a printed
+count — 100,416 values, 1.24% of the dead classes on the 19Z tile. Per James,
+**one negative makes wrfxpy discard the whole array and use zeros**, so the clamp
+protects the other 98.8% rather than repairing anything.
+
+`get_fmda_path` now calls `make_geo_folder` only on the `behave` path; `cawfe`
+points at the running FMDA instance, which writes the older files it already
+reads.
+
+**`FMC_GC` tile_z goes 6 → 8.** WRF should read the first `moisture_classes`,
+but geogrid's tolerance for the extra levels is **unverified** — check it on the
+first `behave` run after this.
+
+### Two things left alone
+
+`to_geogrid`'s `if n == 5 / else` branch (`else` took `[-3:-1]`, correct only for
+the old `[…, dEd, dEw, 0]` layout) was an **uncommitted local change**, not
+committed code — HEAD already has the unconditional `FMEP = m_ext[:,:,-2:]`,
+which is what the width-8 layout needs. `src/fmda/fuel_moisture_model.py` is
+therefore left uncommitted and the two committed copies are coherent against HEAD.
+
+The widening idiom exists in **six** places: `ngfs/ngfs_incident.py`,
+`ngfs_start.py` (both fixed), and `ngfs_start_tmp.py`, `ngfs_factor.py`,
+`copy_fmda_nc.py`, `wps_fmda_compare.py` (**not fixed** — still writing `dEd`
+into the moisture slot). `ngfs_start.py` also carries a commented-out block that
+already had the correct ordering.
+
+`0389e28` commits `ngfs_start.py` **in full**: of its 48 hunks only 2 are the
+FMDA fix, the rest being pre-existing uncommitted work that could not be
+separated (`make_geo_folder` does not exist in that file's previous commit at
+all). That work is not reviewed here.
+
+---
+
+## 7. Open items
 
 Carried from 09-10 §26, minus what closed today. Items 3-5 below are covered in
 full by §4.
@@ -364,3 +562,28 @@ full by §4.
    session and reproduces 09-10 §10's cluster table (5/18/19 px, ΣFRP
    1,116/11,363/8,142 MW) but not §15's rates. `sweep_analyze.py` is still the
    one most worth promoting into the repo.
+
+### Added this session
+
+8. **The `.ff` templates still hardcode `fuelstrans.csv`** (§2), so a default
+   `run_forecasts` does not use the derived table — confirmed on TELEPHONE's
+   operational run. Two options are recorded in §2; neither is chosen.
+9. **`write_fuel_table` names its output by `Md` alone**, so two arms at the same
+   `Md` from different base tables collide (§5). Give each arm its own `run_dir`,
+   or put the base table in the filename.
+10. **`FMC_GC` tile_z goes 6 → 8** (§6). Verify geogrid accepts the extra levels
+    on the first `behave` run after `1bbe877`.
+11. **`get_fmda_path`'s guard is existence-only**, so the z=5 folders written by
+    the other producer are never regenerated — 70 `.geo` against 254 `.nc`
+    sources. An hour must be deleted by hand to rebuild it. A shape-aware guard
+    was proposed and not adopted.
+12. **Four copies of the widening idiom are still unfixed** (§6):
+    `ngfs_start_tmp.py`, `ngfs_factor.py`, `copy_fmda_nc.py`,
+    `wps_fmda_compare.py`.
+13. **The FMDA assimilation itself produces negative 1h moisture** (§6). The
+    clamp is interim; James's plan is a fresh wrfxpy pull and a new assimilation.
+14. **Where the ForeFire gap actually lives.** §5 rules out the two input
+    corrections: at best 7.6× WRF-SFIRE and ~4.7× the observational bound. Next
+    candidates are `pSAF` and the wind/slope balance, tested on a fire whose
+    `phiV`/`phiP` regime is known — and TELEPHONE now provides one with an
+    observation attached.
