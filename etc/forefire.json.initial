@@ -16,8 +16,8 @@
     "wksp_root": "/data/jhaley/wrfxpy/wksp",
     "min_timesteps": 20,
     "perim_copy_dir": "/home/jhaley/Documents/Fall_2023/forefire_perims",
-    "fuels_table": "/home/jhaley/forefire/tests/fuelstrans.csv",
-    "_comment_fuels_table": "Host path of the base ForeFire fuel table. The .ff templates point at its container path; when moisture.enabled a per-run copy is written with Md replaced.",
+    "fuels_table": "/home/jhaley/forefire/tests/ff_fuels_behave13.csv",
+    "_comment_fuels_table": "Host path of the base ForeFire fuel table. GENERATED, not shipped: build it with fuel_table_from_namelist(etc/nlists/default.fire_behave_13, cfg), which derives the seven fields ForeFire Rothermel reads from the namelist WRF-SFIRE was handed. The older fuelstrans.csv is a 40-to-13 Scott & Burgan mapping kept only as a fallback. The .ff templates point at its container path; when moisture.enabled a per-run copy is written with Md replaced.",
     "moisture": {
         "enabled": false,
         "source": "fmda_geogrid",
