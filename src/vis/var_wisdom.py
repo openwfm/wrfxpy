@@ -83,37 +83,37 @@ def smoke_at_height(varname,d,t,level):
     print_stats(varname,s,'ug/m^3')
     return s
 
-def u8p_m(d,t,level):
+def u8p_agl_m(d,t,level):
     return interpolate2height(u8p(d,t),height8p_terrain(d,t),level)
 
-def v8p_m(d,t,level):
+def v8p_agl_m(d,t,level):
     return interpolate2height(v8p(d,t),height8p_terrain(d,t),level)
 
-def u8p_ft(d,t,level_ft):
-    return u8p_m(d,t,convert_value('ft','m',level_ft))
+def u8p_agl_ft(d,t,level_ft):
+    return u8p_agl_m(d,t,convert_value('ft','m',level_ft))
 
-def v8p_ft(d,t,level_ft):
-    return v8p_m(d,t,convert_value('ft','m',level_ft))
+def v8p_agl_ft(d,t,level_ft):
+    return v8p_agl_m(d,t,convert_value('ft','m',level_ft))
 
-def u8p_m_asl(d, t, level):
+def u8p_asl_m(d, t, level):
     return interpolate2height(u8p(d, t), height8p(d, t), level)
 
-def v8p_m_asl(d, t, level):
+def v8p_asl_m(d, t, level):
     return interpolate2height(v8p(d, t), height8p(d, t), level)
 
-def u8p_ft_asl(d, t, level_ft):
-    return u8p_m_asl(d, t, convert_value('ft', 'm', level_ft))
+def u8p_asl_ft(d, t, level_ft):
+    return u8p_asl_m(d, t, convert_value('ft', 'm', level_ft))
 
-def v8p_ft_asl(d, t, level_ft):
-    return v8p_m_asl(d, t, convert_value('ft', 'm', level_ft))
+def v8p_asl_ft(d, t, level_ft):
+    return v8p_asl_m(d, t, convert_value('ft', 'm', level_ft))
 
 def is_windvec(name):
     return name in [
-        "WINDVEC1000FT",
-        "WINDVEC4000FT",
-        "WINDVEC6000FT",
         "WINDVEC",
         "WINDVEC_mph_D",
+        "WINDVEC1000FT_AGL",
+        "WINDVEC4000FT_AGL",
+        "WINDVEC6000FT_AGL",
         "WINDVEC500FT_ASL",
         "WINDVEC1000FT_ASL",
         "WINDVEC1500FT_ASL",
@@ -471,7 +471,7 @@ _var_wisdom = {
         'colorbar' : 'm/s',
         'colormap' : 'jet',
         'scale' : 'original',
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_agl_ft(d,t,1000)**2.0 + v8p_agl_ft(d,t,1000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD1000FT_AGL_mph' : {
@@ -480,7 +480,7 @@ _var_wisdom = {
         'colorbar' : 'mph',
         'colormap' : 'jet',
         'scale' : 'original',
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,1000)**2.0 + v8p_ft(d,t,1000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_agl_ft(d,t,1000)**2.0 + v8p_agl_ft(d,t,1000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC1000FT_AGL' : {
@@ -492,11 +492,11 @@ _var_wisdom = {
     },
     'U1000FT_AGL' : {
         'name' : 'longitudinal wind component 1000ft AGL',
-        'retrieve_as' : lambda d, t: u8p_ft(d,t,1000),
+        'retrieve_as' : lambda d, t: u8p_agl_ft(d,t,1000),
     },
     'V1000FT_AGL' : {
         'name' : 'latitudinal wind component 1000ft AGL',
-        'retrieve_as' : lambda d, t: v8p_ft(d,t,1000),
+        'retrieve_as' : lambda d, t: v8p_agl_ft(d,t,1000),
     },
     'WINDSPD4000FT_AGL' : {
         'name' : 'wind speed at 4000ft AGL',
@@ -504,7 +504,7 @@ _var_wisdom = {
         'colorbar' : 'm/s',
         'colormap' : 'jet',
         'scale' : 'original',
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_agl_ft(d,t,4000)**2.0 + v8p_agl_ft(d,t,4000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD4000FT_AGL_mph' : {
@@ -513,7 +513,7 @@ _var_wisdom = {
         'colorbar' : 'mph',
         'colormap' : 'jet',
         'scale' : 'original',
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,4000)**2.0 + v8p_ft(d,t,4000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_agl_ft(d,t,4000)**2.0 + v8p_agl_ft(d,t,4000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC4000FT_AGL' : {
@@ -525,11 +525,11 @@ _var_wisdom = {
     },
     'U4000FT_AGL' : {
         'name' : 'longitudinal wind component 4000ft AGL',
-        'retrieve_as' : lambda d, t: u8p_ft(d,t,4000),
+        'retrieve_as' : lambda d, t: u8p_agl_ft(d,t,4000),
     },
     'V4000FT_AGL' : {
         'name' : 'latitudinal wind component 4000ft AGL',
-        'retrieve_as' : lambda d, t: v8p_ft(d,t,4000),
+        'retrieve_as' : lambda d, t: v8p_agl_ft(d,t,4000),
     },
     'WINDSPD6000FT_AGL' : {
         'name' : 'wind speed at 6000ft AGL',
@@ -537,7 +537,7 @@ _var_wisdom = {
         'colorbar' : 'm/s',
         'colormap' : 'jet',
         'scale' : 'original',
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_agl_ft(d,t,6000)**2.0 + v8p_agl_ft(d,t,6000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD6000FT_AGL_mph' : {
@@ -546,7 +546,7 @@ _var_wisdom = {
         'colorbar' : 'mph',
         'colormap' : 'jet',
         'scale' : 'original',
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft(d,t,6000)**2.0 + v8p_ft(d,t,6000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_agl_ft(d,t,6000)**2.0 + v8p_agl_ft(d,t,6000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC6000FT_AGL' : {
@@ -558,11 +558,11 @@ _var_wisdom = {
     },
     'U6000FT_AGL' : {
         'name' : 'longitudinal wind component 6000ft AGL',
-        'retrieve_as' : lambda d, t: u8p_ft(d,t,6000),
+        'retrieve_as' : lambda d, t: u8p_agl_ft(d,t,6000),
     },
     'V6000FT_AGL' : {
         'name' : 'latitudinal wind component 6000ft AGL',
-        'retrieve_as' : lambda d, t: v8p_ft(d,t,6000),
+        'retrieve_as' : lambda d, t: v8p_agl_ft(d,t,6000),
     },
     'WINDSPD500FT_ASL' : {
         'name' : 'wind speed at 500ft ASL',
@@ -571,17 +571,17 @@ _var_wisdom = {
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft_asl(d,t,500)**2.0 + v8p_ft_asl(d,t,500)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_asl_ft(d,t,500)**2.0 + v8p_asl_ft(d,t,500)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD500FT_ASL_mph' : {
-        'name': 'wind speed at 1000ft ASL',
+        'name': 'wind speed at 500ft ASL',
         'native_unit': 'm/s',
         'colorbar': 'mph',
         'colormap': 'jet',
         'scale': 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as': lambda d, t: np.sqrt(u8p_ft_asl(d,t,500)**2.0 + v8p_ft_asl(d,t,500)**2.0),
+        'retrieve_as': lambda d, t: np.sqrt(u8p_asl_ft(d,t,500)**2.0 + v8p_asl_ft(d,t,500)**2.0),
         'grid': lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC500FT_ASL' : {
@@ -593,11 +593,11 @@ _var_wisdom = {
     },
     'U500FT_ASL' : {
         'name' : 'longitudinal wind component 500ft ASL',
-        'retrieve_as' : lambda d, t: u8p_ft_asl(d,t,500),
+        'retrieve_as' : lambda d, t: u8p_asl_ft(d,t,500),
     },
     'V500FT_ASL' : {
         'name' : 'latitudinal wind component 500ft ASL',
-        'retrieve_as' : lambda d, t: v8p_ft_asl(d,t,500),
+        'retrieve_as' : lambda d, t: v8p_asl_ft(d,t,500),
     },
     'WINDSPD1000FT_ASL' : {
         'name' : 'wind speed at 1000ft ASL',
@@ -606,7 +606,7 @@ _var_wisdom = {
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft_asl(d,t,1000)**2.0 + v8p_ft_asl(d,t,1000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_asl_ft(d,t,1000)**2.0 + v8p_asl_ft(d,t,1000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD1000FT_ASL_mph' : {
@@ -616,7 +616,7 @@ _var_wisdom = {
         'colormap': 'jet',
         'scale': 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as': lambda d, t: np.sqrt(u8p_ft_asl(d,t,1000)**2.0 + v8p_ft_asl(d,t,1000)**2.0),
+        'retrieve_as': lambda d, t: np.sqrt(u8p_asl_ft(d,t,1000)**2.0 + v8p_asl_ft(d,t,1000)**2.0),
         'grid': lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC1000FT_ASL' : {
@@ -628,11 +628,11 @@ _var_wisdom = {
     },
     'U1000FT_ASL' : {
         'name' : 'longitudinal wind component 1000ft ASL',
-        'retrieve_as' : lambda d, t: u8p_ft_asl(d,t,1000),
+        'retrieve_as' : lambda d, t: u8p_asl_ft(d,t,1000),
     },
     'V1000FT_ASL' : {
         'name' : 'latitudinal wind component 1000ft ASL',
-        'retrieve_as' : lambda d, t: v8p_ft_asl(d,t,1000),
+        'retrieve_as' : lambda d, t: v8p_asl_ft(d,t,1000),
     },
     'WINDSPD1500FT_ASL' : {
         'name' : 'wind speed at 1500ft ASL',
@@ -641,7 +641,7 @@ _var_wisdom = {
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft_asl(d,t,1500)**2.0 + v8p_ft_asl(d,t,1500)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_asl_ft(d,t,1500)**2.0 + v8p_asl_ft(d,t,1500)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD1500FT_ASL_mph' : {
@@ -651,7 +651,7 @@ _var_wisdom = {
         'colormap': 'jet',
         'scale': 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as': lambda d, t: np.sqrt(u8p_ft_asl(d,t,1500)**2.0 + v8p_ft_asl(d,t,1500)**2.0),
+        'retrieve_as': lambda d, t: np.sqrt(u8p_asl_ft(d,t,1500)**2.0 + v8p_asl_ft(d,t,1500)**2.0),
         'grid': lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC1500FT_ASL' : {
@@ -663,11 +663,11 @@ _var_wisdom = {
     },
     'U1500FT_ASL' : {
         'name' : 'longitudinal wind component 1500ft ASL',
-        'retrieve_as' : lambda d, t: u8p_ft_asl(d,t,1500),
+        'retrieve_as' : lambda d, t: u8p_asl_ft(d,t,1500),
     },
     'V1500FT_ASL' : {
         'name' : 'latitudinal wind component 1500ft ASL',
-        'retrieve_as' : lambda d, t: v8p_ft_asl(d,t,1500),
+        'retrieve_as' : lambda d, t: v8p_asl_ft(d,t,1500),
     },
     'WINDSPD2000FT_ASL' : {
         'name' : 'wind speed at 2000ft ASL',
@@ -676,7 +676,7 @@ _var_wisdom = {
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft_asl(d,t,2000)**2.0 + v8p_ft_asl(d,t,2000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_asl_ft(d,t,2000)**2.0 + v8p_asl_ft(d,t,2000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD2000FT_ASL_mph' : {
@@ -686,7 +686,7 @@ _var_wisdom = {
         'colormap': 'jet',
         'scale': 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as': lambda d, t: np.sqrt(u8p_ft_asl(d,t,2000)**2.0 + v8p_ft_asl(d,t,2000)**2.0),
+        'retrieve_as': lambda d, t: np.sqrt(u8p_asl_ft(d,t,2000)**2.0 + v8p_asl_ft(d,t,2000)**2.0),
         'grid': lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC2000FT_ASL' : {
@@ -698,11 +698,11 @@ _var_wisdom = {
     },
     'U2000FT_ASL' : {
         'name' : 'longitudinal wind component 2000ft ASL',
-        'retrieve_as' : lambda d, t: u8p_ft_asl(d,t,2000),
+        'retrieve_as' : lambda d, t: u8p_asl_ft(d,t,2000),
     },
     'V2000FT_ASL' : {
         'name' : 'latitudinal wind component 2000ft ASL',
-        'retrieve_as' : lambda d, t: v8p_ft_asl(d,t,2000),
+        'retrieve_as' : lambda d, t: v8p_asl_ft(d,t,2000),
     },
     'WINDSPD2500FT_ASL' : {
         'name' : 'wind speed at 2500ft ASL',
@@ -711,7 +711,7 @@ _var_wisdom = {
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft_asl(d,t,2500)**2.0 + v8p_ft_asl(d,t,2500)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_asl_ft(d,t,2500)**2.0 + v8p_asl_ft(d,t,2500)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD2500FT_ASL_mph' : {
@@ -721,7 +721,7 @@ _var_wisdom = {
         'colormap': 'jet',
         'scale': 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as': lambda d, t: np.sqrt(u8p_ft_asl(d,t,2500)**2.0 + v8p_ft_asl(d,t,2500)**2.0),
+        'retrieve_as': lambda d, t: np.sqrt(u8p_asl_ft(d,t,2500)**2.0 + v8p_asl_ft(d,t,2500)**2.0),
         'grid': lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC2500FT_ASL' : {
@@ -733,11 +733,11 @@ _var_wisdom = {
     },
     'U2500FT_ASL' : {
         'name' : 'longitudinal wind component 2500ft ASL',
-        'retrieve_as' : lambda d, t: u8p_ft_asl(d,t,2500),
+        'retrieve_as' : lambda d, t: u8p_asl_ft(d,t,2500),
     },
     'V2500FT_ASL' : {
         'name' : 'latitudinal wind component 2500ft ASL',
-        'retrieve_as' : lambda d, t: v8p_ft_asl(d,t,2500),
+        'retrieve_as' : lambda d, t: v8p_asl_ft(d,t,2500),
     },
     'WINDSPD3000FT_ASL' : {
         'name' : 'wind speed at 3000ft ASL',
@@ -746,7 +746,7 @@ _var_wisdom = {
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft_asl(d,t,3000)**2.0 + v8p_ft_asl(d,t,3000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_asl_ft(d,t,3000)**2.0 + v8p_asl_ft(d,t,3000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD3000FT_ASL_mph' : {
@@ -756,7 +756,7 @@ _var_wisdom = {
         'colormap': 'jet',
         'scale': 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as': lambda d, t: np.sqrt(u8p_ft_asl(d,t,3000)**2.0 + v8p_ft_asl(d,t,3000)**2.0),
+        'retrieve_as': lambda d, t: np.sqrt(u8p_asl_ft(d,t,3000)**2.0 + v8p_asl_ft(d,t,3000)**2.0),
         'grid': lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC3000FT_ASL' : {
@@ -768,11 +768,11 @@ _var_wisdom = {
     },
     'U3000FT_ASL' : {
         'name' : 'longitudinal wind component 3000ft ASL',
-        'retrieve_as' : lambda d, t: u8p_ft_asl(d,t,3000),
+        'retrieve_as' : lambda d, t: u8p_asl_ft(d,t,3000),
     },
     'V3000FT_ASL' : {
         'name' : 'latitudinal wind component 3000ft ASL',
-        'retrieve_as' : lambda d, t: v8p_ft_asl(d,t,3000),
+        'retrieve_as' : lambda d, t: v8p_asl_ft(d,t,3000),
     },
     'WINDSPD3500FT_ASL' : {
         'name' : 'wind speed at 3500ft ASL',
@@ -781,7 +781,7 @@ _var_wisdom = {
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft_asl(d,t,3500)**2.0 + v8p_ft_asl(d,t,3500)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_asl_ft(d,t,3500)**2.0 + v8p_asl_ft(d,t,3500)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD3500FT_ASL_mph' : {
@@ -791,7 +791,7 @@ _var_wisdom = {
         'colormap': 'jet',
         'scale': 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as': lambda d, t: np.sqrt(u8p_ft_asl(d,t,3500)**2.0 + v8p_ft_asl(d,t,3500)**2.0),
+        'retrieve_as': lambda d, t: np.sqrt(u8p_asl_ft(d,t,3500)**2.0 + v8p_asl_ft(d,t,3500)**2.0),
         'grid': lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC3500FT_ASL' : {
@@ -803,11 +803,11 @@ _var_wisdom = {
     },
     'U3500FT_ASL' : {
         'name' : 'longitudinal wind component 3500ft ASL',
-        'retrieve_as' : lambda d, t: u8p_ft_asl(d,t,3500),
+        'retrieve_as' : lambda d, t: u8p_asl_ft(d,t,3500),
     },
     'V3500FT_ASL' : {
         'name' : 'latitudinal wind component 3500ft ASL',
-        'retrieve_as' : lambda d, t: v8p_ft_asl(d,t,3500),
+        'retrieve_as' : lambda d, t: v8p_asl_ft(d,t,3500),
     },
     'WINDSPD4000FT_ASL' : {
         'name' : 'wind speed at 4000ft ASL',
@@ -816,7 +816,7 @@ _var_wisdom = {
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft_asl(d,t,4000)**2.0 + v8p_ft_asl(d,t,4000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_asl_ft(d,t,4000)**2.0 + v8p_asl_ft(d,t,4000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD4000FT_ASL_mph' : {
@@ -826,7 +826,7 @@ _var_wisdom = {
         'colormap': 'jet',
         'scale': 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as': lambda d, t: np.sqrt(u8p_ft_asl(d,t,4000)**2.0 + v8p_ft_asl(d,t,4000)**2.0),
+        'retrieve_as': lambda d, t: np.sqrt(u8p_asl_ft(d,t,4000)**2.0 + v8p_asl_ft(d,t,4000)**2.0),
         'grid': lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC4000FT_ASL' : {
@@ -838,11 +838,11 @@ _var_wisdom = {
     },
     'U4000FT_ASL' : {
         'name' : 'longitudinal wind component 4000ft ASL',
-        'retrieve_as' : lambda d, t: u8p_ft_asl(d,t,4000),
+        'retrieve_as' : lambda d, t: u8p_asl_ft(d,t,4000),
     },
     'V4000FT_ASL' : {
         'name' : 'latitudinal wind component 4000ft ASL',
-        'retrieve_as' : lambda d, t: v8p_ft_asl(d,t,4000),
+        'retrieve_as' : lambda d, t: v8p_asl_ft(d,t,4000),
     },
     'WINDSPD5000FT_ASL' : {
         'name' : 'wind speed at 5000ft ASL',
@@ -851,7 +851,7 @@ _var_wisdom = {
         'colormap' : 'jet',
         'scale' : 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as' : lambda d, t: np.sqrt(u8p_ft_asl(d,t,5000)**2.0 + v8p_ft_asl(d,t,5000)**2.0),
+        'retrieve_as' : lambda d, t: np.sqrt(u8p_asl_ft(d,t,5000)**2.0 + v8p_asl_ft(d,t,5000)**2.0),
         'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDSPD5000FT_ASL_mph' : {
@@ -861,7 +861,7 @@ _var_wisdom = {
         'colormap': 'jet',
         'scale': 'original',
         'transparent_values' : [-np.inf,0],
-        'retrieve_as': lambda d, t: np.sqrt(u8p_ft_asl(d,t,5000)**2.0 + v8p_ft_asl(d,t,5000)**2.0),
+        'retrieve_as': lambda d, t: np.sqrt(u8p_asl_ft(d,t,5000)**2.0 + v8p_asl_ft(d,t,5000)**2.0),
         'grid': lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
     },
     'WINDVEC5000FT_ASL' : {
@@ -873,11 +873,11 @@ _var_wisdom = {
     },
     'U5000FT_ASL' : {
         'name' : 'longitudinal wind component 5000ft ASL',
-        'retrieve_as' : lambda d, t: u8p_ft_asl(d,t,5000),
+        'retrieve_as' : lambda d, t: u8p_asl_ft(d,t,5000),
     },
     'V5000FT_ASL' : {
         'name' : 'latitudinal wind component 5000ft ASL',
-        'retrieve_as' : lambda d, t: v8p_ft_asl(d,t,5000),
+        'retrieve_as' : lambda d, t: v8p_asl_ft(d,t,5000),
     },
     'PLUME_HEIGHT' : {
         'name' : 'plume height',
