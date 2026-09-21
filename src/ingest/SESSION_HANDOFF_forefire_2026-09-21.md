@@ -182,31 +182,68 @@ comparable to each other on area or spread; only the 06:00Z figures above are.
 gave "21 members, 190-215 ha, spread 1.13". That was the §4-truncated run, only
 10.5 h in. It is wrong.
 
-## 6. Red Bank — IN FLIGHT AT HANDOFF
+## 6. Red Bank — ensemble against ensemble
 
 `Red_Bank_2026-09-15_17_00_00_57A034B6-C5DA-4780-BA17-014940D059CC`, north Texas,
 ignition 2026-09-15 18:27:21Z at 32.56616, -97.90548. Same geometry as Union
 (30 km, 25 m, 1200x1200), 61 wrfouts spanning 15:00 09-15 to 21:00 09-16.
 
 Chosen because it is **entirely historical**: 30 GRIBs, no gaps, covering the whole
-WRF window, so unlike Union the HRRR ensemble can run to the **same end time** and
-give a true like-for-like comparison of both areas and spreads.
+WRF window, so unlike Union the HRRR ensemble could run to the **same end time**.
+This is the like-for-like test §5 could not give. `--wn-mesh 50` is justified here:
+DEM std **31.5 m**, next to Dry River's 26.7 m which 09-18 §4 measured as converged
+at 50 m.
 
-Two jobs were running when this was written:
+**Both ensembles at a common valid time of 2026-09-16T21:00Z:**
 
-- HRRR netcdf build, 28 steps into `/home/jhaley/forefire/tests/ffwksp_redbank_hrrr`
-  (`--wn-mesh 50`, justified: DEM std **31.5 m**, next to Dry River's 26.7 m which
-  09-18 §4 measured as converged at 50 m).
-- WRF ensemble re-run with `overwrite=True` under the cron lock, to relabel it
-  with §3. It is **far slower per step than Union** — 33 of ~56 steps in about 6
-  minutes, against Union's whole 47-step run in 1.9 minutes — but it is progressing,
-  not stuck. Red Bank's fire is much larger, and each step's `goTo[t=END_TIME]` runs
-  to 97200 s here against Union's 84600. Watch for the 240 s `apptainer.timeout_s`
-  on the early steps, whose second `goTo` is the longest single run in the ensemble;
-  a step killed there would write no final geojson.
+    source                    members   mean      median    sd     CV     spread
+    WRF-SFIRE (30-min steps)     54     4227.3    4128.2   302.4   7.2%    1.25
+    HRRR+WindNinja (hourly)      27     4376.9    4228.3   406.7   9.3%    1.41
 
-**A background job does not survive the session ending** — the same warning as
-09-15 §F. Check both before assuming results exist.
+    HRRR/WRF  mean 1.035   median 1.024
+
+**The two agree to 3.5% on the mean and 2.4% on the median**, and their ranges
+overlap almost exactly at the bottom (3892 against 3889 ha). This holds in a very
+different regime from Union: Red Bank is ~23x larger (4200 ha against 180) over a
+27-hour window rather than 10.
+
+**But the HRRR ensemble is measurably more dispersed** — CV 9.3% against 7.2%,
+spread 1.41 against 1.25 — and it is not spread evenly. It comes from a few early
+members:
+
+    HRRR  1:3977  2:4129  3:4804  4:5177  5:4600  6:4277  7:4155  8:4004
+    WRF   6:4108  7:4148  8:4260  9:4317 10:4204 11:4247 12:4361 13:4304
+
+Members 3-5, the 20:00-22:00Z lags on the ignition evening, run 4800-5200 ha while
+everything else sits near 4100; the WRF ensemble has no equivalent excursion. Two
+causes not separated here: the hourly cadence resolving the evening wind differently
+from WRF's 30 minutes, or WindNinja's spatial structure, which 09-18 §6 measured as
+uncorrelated with WRF's (anomaly correlation 0.13) at comparable variance amplitude.
+A member seeded during a windier hour inherits a larger fire and never gives it back.
+
+**So the GRIB-driven path matches central tendency but adds roughly 2 points of CV**,
+concentrated in the lags near ignition. That is the honest summary across both fires.
+
+Two caveats on these numbers:
+
+- **Member counts differ (54 against 27) because the cadences do** — 30-minute
+  against hourly steps over the same window. Equal counts would need half-hourly
+  GRIBs, which the f03 cache cannot supply (§8).
+- Areas are a local-scaling shoelace on lon/lat, consistent between the two so the
+  **ratios** are sound, but they are not projected areas and should not be quoted as
+  absolutes against an IR perimeter.
+
+**A trap that cost a run here.** The first HRRR pass ended at 23:00Z against WRF's
+21:00Z, because `build_step_ncs` searches to `ign + (steps + 1)` hours and that
+reached two hours past the last wrfout. The untrimmed figures (mean 4913 ha, spread
+1.43) are **not** comparable with WRF's and should be ignored if found elsewhere; on
+a fire growing ~200 ha/h two extra hours account for most of the difference. The fix
+was trimming the timing table to the WRF end time and re-running with
+`overwrite=True` — cheap, since the netcdfs already existed.
+
+**Timing, for planning:** the WRF re-run was 54 steps in 5.5 minutes, much slower per
+step than Union's 47 in 1.9, simply because the fire is larger. It was never stuck.
+The netcdf build was 29 steps at roughly 2 minutes each.
 
 ## 7. WindNinja usage — two traps to add to 09-18 §2
 
@@ -239,11 +276,14 @@ correct selector for those, since only the 00/06/12/18Z cycles reach f48.
 ## 9. Open items
 
 1. **Nothing is pushed.** Four commits this session; `james_ngfs` is local only.
-2. **Red Bank is unfinished** (§6), and the WRF side of it may be wedged.
+2. **Why the HRRR ensemble is more dispersed near the ignition** (§6). Two
+   candidate causes are on record and not separated: hourly cadence against
+   WRF's 30 minutes, and WindNinja's uncorrelated spatial structure. Separating
+   them needs a third fire, or the same fire at two cadences.
 3. **Every archived ForeFire run has wrong `valid_at` stamps** (§3) and most have
    mostly-empty ensembles (§4). Geometry is fine; labels and completeness are not.
    Re-running needs `overwrite=True` and the lock. **How far back to go is
-   undecided** — only Union has been redone.
+   undecided** — only Union and Red Bank have been redone.
 4. **Workspaces touched by cron between the §3 fix and their re-run are mixed** —
    `.ff` scripts carry the new anchor while geojsons are stale. The 09:47 cron
    regenerated 192 files in the Union workspace this way before it was re-run.
@@ -261,12 +301,14 @@ correct selector for those, since only the 00/06/12/18Z cycles reach f48.
 
 ## 10. NEXT SESSION
 
-1. **Finish Red Bank** (§6) and get the first like-for-like ensemble-vs-ensemble
-   comparison at one valid time. That is the test Union could not provide.
-2. **Decide the re-run scope** for §9 item 3. Every archived ensemble is affected.
+1. **Decide the re-run scope** for §9 item 3. Every archived ensemble is affected;
+   two are done.
+2. **Chase the near-ignition dispersion** (§9 item 2). It is the only place the two
+   wind sources visibly disagree, so it is where a third fire would pay.
 3. **Wire NGFS ignitions in.** `forefire_grib.py` takes lat/lon and time as
    arguments by design; per JH the ignition should come from the same logic that
    drives the NGFS forecasts, whose points he considers better than NIFC's.
-4. **Set expectations from §5**: on this evidence a GRIB-driven forecast lands on
-   top of the coupled one, so the limit is still ForeFire's shape deficit
+4. **Set expectations from §5 and §6**: across two fires three orders of magnitude
+   apart in size, a GRIB-driven forecast lands within a few percent of the coupled
+   one on central tendency. The limit is still ForeFire's shape deficit
    (09-18 §7), not the winds.
