@@ -8,9 +8,12 @@
 
 # Set up environment
 eval "$(conda shell.bash hook)"
-conda activate fmda_ml
+#conda activate fmda_ml
+echo "Activating conda env: fmda_ml_test"
+conda activate fmda_ml_test
 
 pwd
 export PYTHONPATH=src
+echo "Executing: python src/hrrr_cycler.py $*"
 python src/hrrr_cycler.py $*
 
