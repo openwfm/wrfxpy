@@ -301,6 +301,35 @@ correct selector for those, since only the 00/06/12/18Z cycles reach f48.
 
 ## 10. NEXT SESSION
 
+**The goal JH set: test this in more complicated terrain.** Both fires done today
+were flat — Red Bank DEM std **31.5 m**, Union 21-93 m total relief — which is
+exactly the regime 09-18 §4 measured as *converged*, and it is why `--wn-mesh 50`
+was defensible on both. Complex terrain is the opposite case and is where this path
+is most likely to break:
+
+- **WindNinja is not converged there.** Against a 75 m solve on Wind River (std
+  472 m), RMS speed error falls 0.526 -> 0.217 m/s from 300 m to 100 m with **no
+  plateau**, and peak speed keeps climbing 11.3 -> 20.0 m/s as the mesh refines.
+  The ridge-top accelerations that drive fast spread are the least converged part.
+  So **do not carry `--wn-mesh 50` over** — set the solve mesh from terrain
+  roughness, per 09-18 §4, and expect to justify it per fire.
+- **A finer mesh runs into the cell ceiling.** 30 km at 25 m is 1.44 M cells; at
+  15 m it is 4.0 M, right on the measured budget, and 5.76 M fails outright on an
+  int index overflow that more RAM will not fix (09-18 §3). Trading domain extent
+  against resolution may become necessary, and `forefire_grib.py` refuses the
+  combination rather than letting WindNinja fail obscurely.
+- **Expect the §6 dispersion to grow, not shrink.** WindNinja's spatial structure
+  is uncorrelated with WRF's even on flat ground (anomaly correlation 0.13); in
+  terrain its texture comes from mass conservation over topography while WRF's comes
+  from boundary-layer structures, and it has no representation of separation, lee
+  rotors or hydraulic jumps. The honest description there is terrain-aware
+  interpolation, not prediction.
+
+A fire with real relief also finally tests the `altitude` field, which on both of
+today's fires was nearly flat and could not have revealed an error.
+
+Then:
+
 1. **Decide the re-run scope** for §9 item 3. Every archived ensemble is affected;
    two are done.
 2. **Chase the near-ignition dispersion** (§9 item 2). It is the only place the two
