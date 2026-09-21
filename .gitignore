@@ -1,3 +1,5 @@
+src/ingest/SynopticDB/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
