@@ -46,10 +46,15 @@ class GribForecast(GribSource):
         # it is possible that a cycle output is delayed and unavailable when we expect it (3 hours after cycle time)
         # in this case, the grib source supports using previous cycles (up to 2)
         cycle_shift = 0
+        given_cycle_start = cycle_start
         while cycle_shift < 3:
     
-            if cycle_start is not None:
-                cycle_start = cycle_start.replace(minute=0,second=0,microsecond=0)
+            if given_cycle_start is not None:
+                # shift back from the cycle we were given, so a retry actually
+                # moves; previously cycle_start was non-None after the first
+                # pass and the same cycle was retried until the loop gave up
+                cycle_start = given_cycle_start.replace(minute=0,second=0,microsecond=0)
+                cycle_start -= timedelta(hours=self.cycle_hours*cycle_shift)
                 logging.info('forecast cycle start given as %s' % cycle_start)
             else:
                 # select cycle (at least hours_behind_real_time behind)

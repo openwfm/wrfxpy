@@ -49,10 +49,12 @@ class HRRR(GribForecast):
     info = "The High-Resolution Rapid Refresh (HRRR)"
     remote_url = ["s3://noaa-hrrr-bdp-pds/", "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"]
     browse_aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/index.html"
-    cycle_hours = 1
+    cycle_hours = 6                # only the 00/06/12/18Z cycles reach f48
     period_hours = 1
     hours_behind_real_time = 1     # choose forecast cycle at least one hour behind
-    # HRRR provides hourly GRIB2 files up to hour 48.
+    # HRRR runs hourly, but only the 6-hourly cycles carry hourly GRIB2 files out
+    # to hour 48; every other cycle stops at f18.  cycle_hours = 6 keeps cycle
+    # selection on the cycles this 48 actually describes.
     grib_forecast_hours_periods = [{'hours':48, 'period':1}]
     # more general info: https://rapidrefresh.noaa.gov/internal/pdfs/RAPX_HRRRX_NWS-13sep2016-pub.pdf
     # file content: http://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfprsf00.grib2.shtml
