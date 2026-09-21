@@ -665,6 +665,21 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
               f"{len(schedule)} steps")
     #time of the last wrfout, ign_seconds
     end_time = timing_table['ign_seconds'].max()
+
+    #Every step's loadData gets the *ignition step's* timestamp, not its own.
+    #ForeFire runs one continuous clock across the chain, anchored at the ignition:
+    #a restart state file carries absolute times in it, e.g.
+    #FireDomain[...;t=10806] with FireFront[...;t=1640] where 1640 is the ignition
+    #offset.  START_STEP, END_STEP and END_TIME are all ign_seconds, measured from
+    #that same anchor, so they are correct as they stand.  But loadData's date is
+    #what ForeFire stamps outputs with -- valid_at comes out as (that date + t).
+    #Handing it each step's own timestamp therefore mislabelled every step after the
+    #ignition by (its nc time - the ignition step's), growing by one step each time:
+    #on the Union fire step 05 printed t=18000, truly 01:00Z, stamped 05:00Z.  The
+    #simulation was always right; only the labels were wrong, which also made the
+    #members look like they ended at different times when they did not.
+    runnable = timing_table[timing_table['ign_seconds'] > 0]
+    anchor_utc = str((runnable if len(runnable) else timing_table).iloc[0]['UTC_str'])
     #number of time steps
     steps = len(timing_table)
     ignition_step = True
@@ -701,7 +716,7 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
                 
                 change_dict = {
                     "FF_NC" : os.path.basename(out_file),
-                    "UTC_STRING" : str(row['UTC_str']),
+                    "UTC_STRING" : anchor_utc,
                     "START_STEP" : start_step_string,
                     "END_STEP" : end_step_string,
                     "END_TIME" : str(end_time),
@@ -1746,7 +1761,7 @@ def run_days(days2run=1,overwrite=False,cfg=None):
 
 
 if __name__ == "__main__":
-    run_days(days2run=7)
+    run_days(days2run=4)
     '''
     l = [
         '/data/jhaley/wrfxpy/wksp/wfc-LITTLE_GIANT_2026-07-16_09_00_00_091081ED-BD23-4610-AE4A-270F95D1711E-2026-07-16_09:00:00-27',
