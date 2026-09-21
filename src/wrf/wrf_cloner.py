@@ -109,7 +109,9 @@ class WRFCloner(object):
                  "gribmap.txt", "grib2map.tbl", "LANDUSE.TBL", "MPTABLE.TBL",
                  "ozone.formatted", "ozone_lat.formatted", "ozone_plev.formatted",
                  "RRTM_DATA", "RRTM_DATA_DBL", "RRTMG_LW_DATA", "RRTMG_LW_DATA_DBL",
-                 "RRTMG_SW_DATA", "RRTMG_SW_DATA_DBL", "SOILPARM.TBL", "tc.exe", "tr49t67", "tr49t85",
+                 "RRTMG_SW_DATA", "RRTMG_SW_DATA_DBL", "SFIRE_FOFEM_FCCS.TBL",
+                 "SFIRE_MLHF_BioSmoke.TBL", "SFIRE_URBAN_FUELS.TBL", 
+                 "SOILPARM.TBL", "tc.exe", "tr49t67", "tr49t85",
                  "tr67t85", "URBPARM.TBL", "URBPARM_UZE.TBL", "VEGPARM.TBL", "wrf.exe"]
 
     # list of files that must(?) be symlinked from the WRFV3 serial directory

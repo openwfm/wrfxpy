@@ -1,5 +1,5 @@
 from utils import ensure_dir, symlink_unless_exists, readhead
-from .downloader import download_url, DownloadError
+from .downloader import download_url, download_many, DownloadError
 import os.path as osp
 import logging
 
@@ -119,7 +119,28 @@ class GribSource(object):
             logging.error('%s cannot download grib file %s' % (self.id, url))
             logging.warning('Please check %s for %s' % (self.info_url, self.info))
             raise GribError('GribSource: failed to download file %s' % url)
+        
+    def download_grib_many(self, url_base, rel_paths, workers=32, **download_kwargs):
+        """
+        Download all GRIB files from a GRIB service and stream to relative paths in ingest_dir in parallel.
 
+        :param url_base: the base URL part of the GRIB service
+        :param rel_paths: the relative path of the files (w.r.t GRIB base url and w.r.t self.ingest_dir)
+        :param workers: number of workers for parallel execution
+        """
+        pairs = []
+        for rel_path in rel_paths:
+            url = osp.join(url_base, rel_path)
+            grib_path = osp.join(self.ingest_dir, rel_path)
+            pairs.append((url, grib_path))
+
+        # Parallelize downloads. Option aws_only=True makes sure to only parallelize s3://
+        download_many(
+            pairs,
+            workers=workers,
+            aws_only=True,
+            **download_kwargs
+        )
     
     def grib_available_locally(self, path):
         """

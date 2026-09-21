@@ -9,11 +9,11 @@ _var_wisdom = {
         'units': 'fuel category',
         'description': 'Anderson 13 fire behavior categories',
         'type': 'categorical', 
-        'category_range': [0,14],
-        'fill_missing': 14,       
+        'category_range': [0,13],
+        'fill_missing': 0,       
         'fill' : Dict({
-            range(15,91): 14, 92: 14, range(94,100): 14,
-            -9999: 14, (0,91,93): 'nearest'
+            range(15,91): 0, 92: 0, range(94,100): 0,
+            -9999: 0, (91,93): 'nearest'
         }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
@@ -29,16 +29,16 @@ _var_wisdom = {
         'units': 'fuel category',
         'description': '40 Scott and Burgan fire behavior categories',
         'type': 'categorical', 
-        'category_range': [0,41],
-        'fill_missing': 41,
+        'category_range': [0,40],
+        'fill_missing': 0,
         'fill' : Dict({
             101: 1, 102: 2, 103: 3, 104: 4, 105: 5, 106: 6, 107: 7, 108: 8,
             109: 9, 121: 10, 122: 11, 123: 12, 124: 13, 141: 14, 142: 15,
             143: 16, 144: 17, 145: 18, 146: 19, 147: 20, 148: 21, 149: 22,
             161: 23, 162: 24, 163: 25, 164: 26, 165: 27, 181: 28, 182: 29,
             183: 30, 184: 31, 185: 32, 186: 33, 187: 34, 188: 35, 189: 36,
-            201: 37, 202: 38, 203: 39, 204: 40, range(42,91): 41, 92: 41,
-            range(94,100): 41, -9999: 41, (0,91,93): 'nearest'
+            201: 37, 202: 38, 203: 39, 204: 40, range(42,91): 0, 92: 0,
+            range(94,100): 0, -9999: 0, (91,93): 'nearest'
         }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
@@ -54,21 +54,42 @@ _var_wisdom = {
         'units': 'fuel category',
         'description': 'Anderson 13 fire behavior categories from MODIS landuse 20 class',
         'type': 'categorical', 
-        'category_range': [0,14],
-        'fill_missing': 14,
+        'category_range': [0,13],
+        'fill_missing': 0,
         'fill' : Dict({
-            0: 14, 1: 2, 2: 8, 3: 2, 4: 8, 5: 10, 7: 5, 8: 7, 9: 3, 10: 1, 
-            11: 14, 12: 5, 13: 14, 14: 1, range(15,18): 14, 18: 11, range(19,22): 14
+            1: 8, 2: 9, 3: 8, 4: 9, 5: 10, 6: 4, 7: 5, 8: 2, 9: 2, 10: 3, 
+            11: 0, 12: 1, 13: 0, 14: 2, range(15,18): 0, 18: 8, 19: 5, range(20,22): 0
         }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
         'bits': 16,
         'interp_option': 'default:nearest_neighbor+average_16pt+search',
-        'rel_path': 'default:modis_landuse_20class_30s_with_lakes/',
+        'abs_path': '/home/afarguell/modis_landuse_20class_15s_with_lakes_fbfm13',
         'subgrid': 'yes',
         'add_opts': {'dominant_only': 'NFUEL_CAT',
                     'z_dim_name': 'fuel_cat',
                     'halt_on_missing': 'no'} 
+    },
+    'NFUEL_CAT_40_MODIS_20': {
+        'name': 'NFUEL_CAT',
+        'units': 'fuel category',
+        'description': '40 Scott & Burgan fire behavior categories from MODIS landuse 20 class',
+        'type': 'categorical', 
+        'category_range': [0,40],
+        'fill_missing': 0,
+        'fill' : Dict({
+            1: 35, 2: 36, 3: 30, 4: 33, 5: 31, 6: 18, 7: 16, 8: 25, 9: 12, 10: 3, 
+            11: 0, 12: 2, 13: 0, 14: 11, range(15,18): 0, 18: 24, 19: 11, range(20,22): 0
+        }),
+        'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
+        'signed': 'yes',
+        'bits': 16,
+        'interp_option': 'default:nearest_neighbor+average_16pt+search',
+        'abs_path': '/home/afarguell/modis_landuse_20class_15s_with_lakes_fbfm40',
+        'subgrid': 'yes',
+        'add_opts': {'dominant_only': 'NFUEL_CAT',
+                    'z_dim_name': 'fuel_cat',
+                    'halt_on_missing': 'no'}  
     },
     'NTREE_CAT' : {
         'name': 'NTREE_CAT',
@@ -126,42 +147,85 @@ _var_wisdom = {
         'description': 'Forest Canopy Height from LANDFIRE',
         'type': 'continuous',
         'signed': 'yes',
+        'scale': 1.,
         'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
     },
-    'CAN_BOT' : {
+    'CAN_BOTTOM' : {
         'name': 'CAN_BOTTOM',
         'units': 'meters',
         'description': 'Forest Canopy Base Height from LANDFIRE',
         'type': 'continuous',
         'signed': 'yes',
+        'scale': 1.,
         'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
     },
-    'CAN_BD' : {
+    'CAN_BULK_DENSITY' : {
         'name': 'CAN_BULK_DENSITY',
         'units': 'kg m-3',
         'description': 'Forest Canopy Bulk Density from LANDFIRE',
         'type': 'continuous',
         'signed': 'yes',
+        'scale': 1.,
         'unit_scale': 0.01, # scale the array to be in kg/m3 (original data is multiplied by 100)
-        'bits': 16,
+        'bits': 32,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
     },
-    'CAN_COV' : {
+    'CAN_COVER' : {
         'name': 'CAN_COVER',
         'units': '%',
         'description': 'Forest Canopy Cover from LANDFIRE (%)',
         'type': 'continuous',
         'signed': 'yes',
+        'scale': 1.,
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
+    },
+    'URB_SEPARATION' : {
+        'name': 'URB_SEPARATION',
+        'units': 'm',
+        'description': 'Building Separation (m)',
+        'type': 'continuous',
+        'signed': 'yes',
+        'scale': 1.,
+        'bits': 16,
+        'fill_missing': 0,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+        'fill_missing': 0.0
+    },
+    'URB_SIDE_LENGTH' : {
+        'name': 'URB_SIDE_LENGTH',
+        'units': 'm',
+        'description': 'Building Side Length (m)',
+        'type': 'continuous',
+        'signed': 'yes',
+        'scale': 1.,
+        'bits': 16,
+        'fill_missing': 0,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+        'fill_missing': 0.0
+    },
+    'URB_HEIGHT' : {
+        'name': 'URB_HEIGHT',
+        'units': 'm',
+        'description': 'Building Height (m)',
+        'type': 'continuous',
+        'signed': 'yes',
+        'scale': 1.,
+        'bits': 16,
+        'fill_missing': 0,
+        'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
+        'subgrid': 'yes',
+        'fill_missing': 0.0
     },
     'FMC_GC' : {
         'name': 'FMC_GC',

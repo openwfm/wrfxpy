@@ -50,8 +50,8 @@ from ingest.GFSA import GFSA
 from ingest.GFSF import GFSF_P, GFSF_S
 
 from ingest.MODIS import Terra, Aqua
-from ingest.VIIRS import SNPP
-from ingest.GOES import GOES16, GOES17
+from ingest.VIIRS import SNPP, SNPPHR, NOAA20, NOAA20HR
+from ingest.GOES import GOES16, GOES17, GOES18
 
 from fmda.fuel_moisture_da import assimilate_fm10_observations
 
@@ -122,6 +122,7 @@ class JobState(Dict):
         self.clean_dir = args.get('clean_dir', True)
         self.run_wrf = args.get('run_wrf', True)
         self.iofields = args.get('iofields', False)
+        self.nproc = args.get('nproc', None)
         self.args = args
         logging.debug('JobState initialized: ' + str(self))
 
@@ -173,12 +174,24 @@ class JobState(Dict):
         if 'SNPP' in sat_list:
             snpp=SNPP(js)
             sat.append(snpp)
+        if 'SNPPHR' in sat_list:
+            snpphr=SNPPHR(js)
+            sat.append(snpphr)
+        if 'NOAA20' in sat_list:
+            noaa20=NOAA20(js)
+            sat.append(noaa20)
+        if 'NOAA20HR' in sat_list:
+            noaa20hr=NOAA20HR(js)
+            sat.append(noaa20hr)
         if 'G16' in sat_list:
             g16=GOES16(js)
             sat.append(g16)
         if 'G17' in sat_list:
             g17=GOES17(js)
             sat.append(g17)
+        if 'G18' in sat_list:
+            g18=GOES18(js)
+            sat.append(g18) 
         return sat
 
     def parse_satellite_source(self, args):
@@ -332,12 +345,14 @@ def run_fire_init(js, q):
             'scars_mask_path': osp.join(js.fire_init_dir, 'scars_mask.pkl')
         })
         if 'prev_forecast' in js.keys():
-            prev_scars_mask_path = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/scars_mask.pkl')
-            if osp.exists(prev_scars_mask_path):
-                force_copy(prev_scars_mask_path, params['scars_mask_path'])
-            prev_fire_init_results = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/results.pkl')
-            if osp.exists(prev_fire_init_results):
-                params.update({'prev_perims': prev_fire_init_results})
+            prev_forecast_path = osp.join(js.workspace_path, js.prev_forecast) 
+            if osp.exists(prev_forecast_path):
+                prev_scars_mask_path = osp.join(prev_forecast_path, 'fire_init/scars_mask.pkl')
+                if osp.exists(prev_scars_mask_path):
+                    force_copy(prev_scars_mask_path, params['scars_mask_path'])
+                prev_fire_init_results = osp.join(js.workspace_path, js.prev_forecast, 'fire_init/results.pkl')
+                if osp.exists(prev_fire_init_results):
+                    params.update({'prev_perims': prev_fire_init_results})
 
         perims, params = fire_init.init_fire_info(**params)
         if len(perims):
@@ -438,12 +453,12 @@ def retrieve_gribs_and_run_ungrib(js, grib_source, q):
                 # move output to cache directory
                 make_dir(colmet_dir)
                 for f in manifest.colmet_files:
-                    move(osp.join(grib_dir,f),osp.join(colmet_dir,f))
+                    move(osp.join(grib_dir, osp.basename(f)), osp.join(colmet_dir, osp.basename(f)))
                 # now all colmet files should be in the cache
 
         if cache_colmet:
             for f in manifest.colmet_files:
-                symlink_unless_exists(osp.join(colmet_dir,f),osp.join(wps_dir,f))
+                symlink_unless_exists(osp.join(colmet_dir,osp.basename(f)),osp.join(wps_dir,osp.basename(f)))
         else:
             # move output
             for f in glob.glob(osp.join(grib_dir,grib_source.prefix + '*')):
@@ -610,7 +625,7 @@ def vars_add_to_geogrid(js):
             if (
                 wisdom['name'] == 'NFUEL_CAT'
                 and 'category_range' in wisdom
-                and nfuelcats != wisdom['category_range'][1] - 1
+                and nfuelcats != wisdom['category_range'][1]
             ):
                 logging.warning('unmatch number of categories, skipping processing of {}'.format(var))
                 continue
@@ -674,7 +689,10 @@ def fmda_add_to_geogrid(js):
     except:
         logging.error('fmda_add_to_geogrid - cannot open %s' % index_path)
         raise Exception('fmda_add_to_geogrid - failed opening index file {}'.format(index_path))
+    #TODO: improve how it finds the geolocation file
     geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
+    if not osp.exists(geo_path):
+        geo_path = osp.dirname(osp.dirname(osp.dirname(fmda_geogrid_path)))+'-geo.nc'
     logging.info('fmda_add_to_geogrid - reading longitudes and latitudes from NetCDF file %s' % geo_path )
     with nc4.Dataset(geo_path,'r') as d:
         lats = d.variables['XLAT'][:,:]
@@ -757,10 +775,14 @@ def execute(args,job_args):
 
     js.bounds = Dict({})
     for k,domain in enumerate(js.domain_conf.domains):
+        buffer = 0.1 # buffer in degrees
         bbox = domain.bounding_box()
         lons = [b[1] for b in bbox]
         lats = [b[0] for b in bbox]
-        bounds = (min(lons),max(lons),min(lats),max(lats))
+        bounds = (
+            min(lons) - buffer, max(lons) + buffer,
+            min(lats) - buffer, max(lats) + buffer
+        )
         js.bounds[str(k+1)] = bounds
 
     logging.info('satellite sources %s' % [s.id for s in js.satellite_source])
@@ -899,11 +921,17 @@ def execute(args,job_args):
     proc_q = Queue()
 
     metgrid_proc = Process(target=run_metgrid, args=(js, proc_q))
-
-    if js.use_realtime:
-        fire_init_proc = Process(target=run_fire_init, args=(js, proc_q))
-    else:
-        logging.info("step 5b: fire init processing [skipping]")
+    # check if data is available to run fire initialization
+    if "fire_init_dir" in js.keys():
+        perim1_path = osp.join(js.fire_init_dir, "perim1.pkl")
+        perim2_path = osp.join(js.fire_init_dir, "perim2.pkl")
+        if not (osp.exists(perim1_path) and osp.exists(perim2_path)):
+            logging.warning("Real-time data missing, so skipping running fire initialization")
+            js.use_realtime = False
+        if js.use_realtime:
+            fire_init_proc = Process(target=run_fire_init, args=(js, proc_q))
+        else:
+            logging.info("step 5b: fire init processing [skipping]")
 
     logging.info('execute: starting parallel METGRID, and fire init processing')
     metgrid_proc.start()
@@ -993,31 +1021,40 @@ def execute(args,job_args):
             wrf_path = osp.join(js.wrf_dir, 'wrfinput_d{:02d}'.format(js.max_dom))
             force_copy(wrf_path, wrf_path + '_orig')
             outside_time = fire_data.get('outside_time', 360000.)
-            no_fuel_cat = js.fire_nml['fuel_scalars']['no_fuel_cat']
+            no_fuel_cat = 0
             fire_init.integrate_init(
                 wrf_path, fire_data['TIGN_G'], fire_data['FUEL_MASK'], 
                 outside_time=outside_time, no_fuel_cat=no_fuel_cat
             )
-            if 'prev_forecast' in js.keys():
-                # implementation of adding smoke from previous forecast
-                wrfinput_paths = sorted(glob.glob(osp.join(js.wrf_path, 'wrfinput*')))
-                wrfout_paths = []
-                for wrfinput_path in wrfinput_paths:
-                    dom_str, = re.match(r'wrfinput_d(0[0-9])', osp.basename(wrfinput_path)).groups()
-                    wrfout_wildcard = js.start_utc.strftime('wrfout_d{:02d}_%Y-%m-%d_%H:%M:*'.format(dom_str))
-                    wrfout_wildcard_paths = osp.join(js.workspace_path, js.prev_forecast, 'wrf', wrfout_wildcard)
-                    prev_wrfout_paths = sorted(glob.glob(wrfout_wildcard_paths))
-                    if len(prev_wrfout_paths):
-                        wrfout_paths.append(prev_wrfout_paths[0])
-                if len(wrfinput_paths) == len(wrfout_paths):
-                    logging.info('integrating smoke from previous forecast')
-                    fire_init.add_smoke(wrfout_paths, wrfinput_paths)
+            if 'prev_forecast' in js.keys() and js.get('transfer_smoke', False):
+                prev_forecast_path = osp.join(js.workspace_path, js.prev_forecast)
+                if osp.exists(prev_forecast_path):
+                    # implementation of adding smoke from previous forecast
+                    wrfinput_paths = sorted(glob.glob(osp.join(js.wrf_path, 'wrfinput*')))
+                    wrfout_paths = []
+                    for wrfinput_path in wrfinput_paths:
+                        dom_str, = re.match(r'wrfinput_d(0[0-9])', osp.basename(wrfinput_path)).groups()
+                        wrfout_wildcard = js.start_utc.strftime('wrfout_d{:02d}_%Y-%m-%d_%H:%M:*'.format(dom_str))
+                        wrfout_wildcard_paths = osp.join(prev_forecast_path, 'wrf', wrfout_wildcard)
+                        prev_wrfout_paths = sorted(glob.glob(wrfout_wildcard_paths))
+                        if len(prev_wrfout_paths):
+                            wrfout_paths.append(prev_wrfout_paths[0])
+                    if len(wrfinput_paths) == len(wrfout_paths):
+                        logging.info('integrating smoke from previous forecast')
+                        fire_init.add_smoke(wrfout_paths, wrfinput_paths)
         else:
             logging.error('use_realtime is selected, but no fire information to start a fire simulation')
             sys.exit(1)
     else:
         if len(js.ignitions) and js.use_tign_ignition:
             process_ignitions(js)
+            
+    # set the parallel processes from nproc for wrf.exe
+    if js.nproc != None and np.prod(js.nproc) == js.num_nodes * js.ppn:
+        js.wrf_nml['domains']['nproc_x'] = js.nproc[0]
+        js.wrf_nml['domains']['nproc_y'] = js.nproc[1]
+        # update namelist input
+        f90nml.write(js.wrf_nml, osp.join(js.wrf_dir, 'namelist.input'), force=True)
     
     logging.info('run_wrf = %s' % js.run_wrf)
     if js.run_wrf:
@@ -1461,7 +1498,7 @@ def verify_inputs(args,sys_cfg):
     # check for valid satellite source
     if 'satellite_source' in args:
         for sat in args['satellite_source']:
-            if sat not in ['Terra','Aqua','SNPP','G16','G17']:
+            if sat not in ['Terra','Aqua','SNPP','SNPPHR','NOAA20','NOAA20HR','G16','G17','G18']:
                 raise ValueError('Invalid satellite source %s, must be one of Terra, Aqua, SNPP, G16, G17' % sat)
 
     # if precomputed key is present, check files linked in
@@ -1516,7 +1553,8 @@ def process_arguments(job_args,sys_cfg):
     args['cycle_start_utc'] = timespec_to_utc(args.get('cycle_start_utc', None))
     args['max_dom'] = max([int(x) for x in [x for x in args['domains'] if len(x) == 1]])
     args['min_sub_dom'] = min([int(x) for x in [x for x in args['domains'] if len(x) == 1] if (np.array(args['domains'][x].get('subgrid_ratio',[0,0])) > 0).all()])
-    args['max_dom_pp'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
+    if 'postproc' in args.keys() and len(args['postproc']) > 0:
+        args['max_dom_pp'] = max([int(x) for x in [x for x in args['postproc'] if len(x) == 1]])
     args['satprod_satsource'] = Dict({})
 
     # add postprocess satellite data
