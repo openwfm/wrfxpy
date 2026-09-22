@@ -297,21 +297,47 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
 8. **Ensemble spread does not generalise** (§5). Three fires give three orderings:
    HRRR more dispersed on Red Bank and Dome, tighter on Silver. Do not read a
    spread difference as meaningful without more cases.
-9. **Cotton 2 is in flight** — Napa County, `ZSF` std 184 m, which fills the gap
-   between Red Bank and Silver. Its interest is a ~164 deg wind reversal, but that
-   begins on the *last* hour the f03 cache reaches and everything after is out of
-   range (§9 of the 09-21 handoff). The reachable window is the pre-shift steady
-   SW flow. Re-running once later cycles are cached would capture the shift;
-   `forefire_grib` skips existing netcdfs, so extending costs only the new hours.
+9. **Cotton 2 is deferred, deliberately, until the cache covers its wind shift.**
+   `COTTON_2_2026-09-21_20_00_00_283A99DF-AFD8-4F6A-8CA4-F827DA0AFBCD`, Napa County,
+   ignition 2026-09-21 21:26:54Z at 38.63331, -122.06932. `ZSF` std **184.4 m**,
+   which fills the gap between Red Bank (31.5) and Silver (365) — the mid-range
+   regime §5 implicates as the awkward one. Second California case.
+
+   Its interest is a **~164 deg wind reversal**: steady SW 194-227 deg from 19:00
+   09-21 through 11:00 09-22, swinging to 360 deg at 12:00 and then round through
+   N, NE, E to SE by 00:00 09-23. **That reversal begins on the last hour the f03
+   cache reaches**, so the whole post-shift regime is out of range today. Per JH,
+   held until the cache is complete rather than run on the pre-shift window.
+
+   Two details for whoever picks it up. The WRF field goes **incoherent through the
+   transition** — R falls to 0.161 at 11:00 and 0.118 at 12:00, below the 0.3 floor
+   — so direction statistics *across* the shift are meaningless regardless of data;
+   compare the steady regimes either side instead. And the f03 cache advances about
+   an hour per hour, so the full window to 2026-09-23 00:00Z became reachable around
+   00:00Z on 09-23. Nothing prunes `ingest/HRRRA`, so the early hours will still be
+   there.
+
+   **14 netcdfs of the pre-shift window are already built** in
+   `/home/jhaley/forefire/tests/ffwksp_cotton2_hrrr`. `forefire_grib` skips existing
+   netcdfs, so resuming costs only the new hours — raise `--steps` and re-run the
+   same command.
 
 ## 10. NEXT SESSION
 
-1. **Fill in §1.** Run `wn_vs_wrf.py` on several more fires spanning roughness —
-   it needs one netcdf and one wrfout per fire, so it is hours cheaper than
-   ensembles. Add Union and Red Bank first since their runs already exist.
-2. **Then run ensembles only where the winds say it is interesting**, i.e. where
-   `B/A` departs from 1.
-3. **Test whether the area ratio tracks `B/A`.** That is the difference between a
-   bounded, correctable error and an unreliable one.
-4. Pick at least one complex-terrain fire where `fire_init` *did* run, so absolute
-   areas mean something and a perimeter score is possible.
+1. **Finish Cotton 2** (§9 item 9). The cache should now cover its wind reversal,
+   14 netcdfs of the pre-shift window are already built, and it is both a
+   mid-roughness point for §1 and the only case so far with a large wind shift in it.
+2. **Fill in §1 cheaply.** Run `wn_vs_wrf.py` on more fires spanning roughness — one
+   netcdf and one wrfout per fire, minutes rather than the hours an ensemble costs.
+   **Union and Red Bank first**, since their runs already exist and two flat points
+   with wind statistics would test the weakest part of the `B/A` claim: whether
+   area/wind stays near 1 when `B/A` is near 1.
+3. **Then run ensembles only where the winds say it is interesting**, i.e. where
+   `B/A` departs from 1. Both complex cases so far were worth it; a case with
+   `B/A` ~ 1 would mostly confirm what the winds already said.
+4. **Get a third point off the fitted line.** The `B/A` coefficient is currently
+   fitted to Silver and checked on Dome. A case whose area ratio is predicted from
+   *both* of them, in advance, is what turns this from consistent into established.
+5. **Pick at least one complex-terrain fire where `fire_init` did run**, so absolute
+   areas mean something and a perimeter score is possible — and check
+   `poly_PolygonDateTime` against the forecast window first (§7).
