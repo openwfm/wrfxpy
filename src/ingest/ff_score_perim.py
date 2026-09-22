@@ -25,6 +25,13 @@ recorded 2078.5 ha and 2.90, and the area is 100.0% of the stated acreage. So
 elongation here is comparable to the 09-18 and 09-11 figures, not merely
 self-consistent.
 
+**Suppression.** An estimated 98% of fires are fought, and neither model represents
+that, so `obs_x > 1` on a suppressed fire is expected rather than a model error. Where
+`attr_ContainmentDateTime` falls inside the run, pass it to `--at`: scoring at the
+perimeter's own timestamp otherwise measures however many hours the model kept
+growing after the real fire was held. Even the containment-time score stays biased,
+because suppression acts throughout rather than only at the end.
+
 Observed perimeters are NIFC/IRWIN geojson; the observation time is
 `poly_PolygonDateTime`. ForeFire geojsons carry `valid_at`. Modelled perimeters are
 grouped by `valid_at` and the group nearest the observation time is scored, each
@@ -122,12 +129,17 @@ def _valid_at(fc):
     return None
 
 
-def score(obs_path, model_dir, pattern='*final*.geojson'):
+def score(obs_path, model_dir, pattern='*final*.geojson', at=None):
     obs, obs_fc = _load(obs_path)
     if obs is None:
         raise SystemExit('observed perimeter has no geometry: %s' % obs_path)
     props = obs_fc['features'][0].get('properties', {})
     t_obs = _obs_time(props)
+    #Scoring target, which is not always the observation time.  On a suppressed fire
+    #the model keeps growing after the real fire was held, so scoring at the
+    #perimeter's own timestamp measures that overrun rather than the forecast.  Pass
+    #--at with attr_ContainmentDateTime to score where the comparison is fairest.
+    t_target = at or t_obs
     c = obs.centroid
     proj, epsg = _utm_proj(c.x, c.y)
     obs_u = _to_utm(obs, proj)
@@ -153,15 +165,15 @@ def score(obs_path, model_dir, pattern='*final*.geojson'):
         raise SystemExit('no non-empty perimeters matching %s in %s'
                          % (pattern, model_dir))
     times = [t for t in cand if t is not None]
-    if times and t_obs is not None:
-        t_pick = min(times, key=lambda t: abs((t - t_obs).total_seconds()))
-        dt_min = (t_pick - t_obs).total_seconds() / 60.0
+    if times and t_target is not None:
+        t_pick = min(times, key=lambda t: abs((t - t_target).total_seconds()))
+        dt_min = (t_pick - t_target).total_seconds() / 60.0
     else:
         t_pick = list(cand)[0]
         dt_min = float('nan')
     members = cand[t_pick]
-    print('\nmodelled  %d perimeters at %s  (%+.0f min from observation)'
-          % (len(members), t_pick, dt_min))
+    print('\nmodelled  %d perimeters at %s  (%+.0f min from target %s)'
+          % (len(members), t_pick, dt_min, t_target))
 
     rows = []
     print('  %-40s %9s %7s %7s %7s' % ('member', 'area_ha', 'obs_x', 'IoU', 'elong'))
@@ -196,8 +208,13 @@ def main():
     p.add_argument('--pattern', default='*final*.geojson',
                    help="glob for modelled perimeters (default '*final*.geojson'; "
                         "use '*.geojson' to include the chained step track)")
+    p.add_argument('--at', default=None,
+                   help='score the modelled perimeters nearest this UTC time instead '
+                        'of the observation time, e.g. the fire\'s '
+                        'attr_ContainmentDateTime. Format YYYY-MM-DDTHH:MM:SS')
     a = p.parse_args()
-    score(a.observed, a.model_dir, a.pattern)
+    at = datetime.strptime(a.at, '%Y-%m-%dT%H:%M:%S') if a.at else None
+    score(a.observed, a.model_dir, a.pattern, at=at)
 
 
 if __name__ == '__main__':
