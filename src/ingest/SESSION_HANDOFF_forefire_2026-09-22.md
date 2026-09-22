@@ -1,16 +1,17 @@
 # ForeFire session handoff — 2026-09-22
 
-Branch `james_ngfs`. One commit this session so far (`af212f4`, the wind comparison
-tool); everything else is measurement. Follows
+Branch `james_ngfs`. Commits this session: `af212f4` (the wind comparison tool),
+`1539a22` (the two-ensemble driver), `e5e5cb3` and this update. Follows
 `SESSION_HANDOFF_forefire_2026-09-21.md`, whose §10 set the goal: **test the
-GRIB-driven path in more complicated terrain.** Done, on one fire.
+GRIB-driven path in more complicated terrain.** Done, on two fires.
 
-**Headline:** in complex terrain the GRIB-driven path produces a fire **28% smaller**
-than the coupled run, where on flat ground it matched to 1-3.5%. The cause separates
-cleanly and usefully: **ForeFire tolerates WindNinja's direction error and is
-sensitive to its speed bias.** Direction RMS of 49 deg moved the fire's centroid by
-514 m — nothing — while a 24% wind-speed deficit propagated almost one-for-one into
-a 28% area deficit.
+**Headline:** **ForeFire tolerates WindNinja's direction error and is sensitive to
+its speed bias**, and the speed bias does not go one way in complex terrain. Silver
+(Selkirk Mtns) ran 24% slow and produced a fire 28% *smaller* than the coupled run;
+Dome (Yosemite), rougher still, ran 18% fast and produced one 16% *larger*. Both
+times the area ratio tracked the speed ratio, and both times a 36-49 deg direction
+RMS moved the ensemble centroid under 520 m on a multi-kilometre fire. **Terrain
+roughness predicts none of it** (§1).
 
 ---
 
@@ -20,27 +21,47 @@ a 28% area deficit.
 hypothesis. Terrain roughness is `ZSF` std over the fire grid, which is the number
 09-18 §4 used to separate the converged from the unconverged regime.
 
-    fire        ZSF std   wind B/A  dir RMS   anomR    area HRRR/WRF   centroid off
-    Dry River     26.7 m    1.04      3.7      0.129   (not run)          -
-    Union         ~20 m*    -         -        -        0.99 +            -
-    Red Bank      31.5 m    -         -        -        1.035             -
-    Silver       364.7 m    0.765    49.1      0.109    0.717           514 m
+    fire        ZSF std   wind B/A  dir RMS   anomR   area HRRR/WRF  area/wind  centroid
+    Dry River     26.7 m    1.04       3.7     0.129   (not run)         -          -
+    Union         ~20 m*    -          -       -        0.99 +           -          -
+    Red Bank      31.5 m    -          -       -        1.035            -          -
+    Silver       364.7 m    0.765     49.1     0.109    0.717          0.937      514 m
+    Dome         504.1 m    1.175     35.9     0.396    1.164          0.991      455 m
 
     * Union: relief 21-93 m; std not computed.
     + Union is an ensemble mean against a single WRF chained-track perimeter, not
-      ensemble against ensemble.  Red Bank and Silver are ensemble against ensemble.
+      ensemble against ensemble.  Red Bank, Silver and Dome are ensemble against
+      ensemble, each at a single common valid time.
 
-**What the table is for.** The flat rows cluster tightly at 1.0 and the one complex
-row sits at 0.72. If that is a real terrain dependence rather than a Silver quirk,
-more complex cases should land low and the relationship should track `B/A` rather
-than `ZSF` std directly — because the mechanism (§3) is the speed deficit, and
-roughness is only a proxy for it. **The cheap discriminator is `wn_vs_wrf.py`
-(§2): it needs one netcdf and one wrfout, not a whole ensemble.** Run it on several
-fires before spending hours on ensembles.
+**Roughness is falsified as the predictor; `B/A` is not.** The first version of this
+table guessed that rougher terrain would mean a lower area ratio. **Dome breaks
+that** — it is the roughest case and errs the *other* way, 1.16 against Silver's
+0.72, with *better* direction agreement and by far the best anomaly correlation of
+any case including flat ground. Nothing in the wind columns is monotonic in `ZSF`
+std.
 
-Gaps to fill: `B/A` and direction statistics for Union and Red Bank, which were
-never measured — their comparisons predate the tool. Doing that would turn three
-of the four rows into complete records at almost no cost.
+What does hold, on two complex cases sitting either side of 1.0:
+
+- **the area ratio tracks the speed ratio**, area/wind 0.937 and 0.991;
+- **the direction error does not matter** — 49 deg and 36 deg RMS both moved the
+  ensemble centroid only 455-514 m on multi-kilometre fires.
+
+**How strong that is: n=2.** Dome's area ratio was predicted at ~1.10 before the
+ensembles ran, from Silver's own area/wind ratio, and came out 1.164 — right sign,
+right magnitude. But two points always fit a line, and the prediction borrowed its
+constant from one of them. The *sign* following `B/A` is established; the
+*coefficient* is not.
+
+**Why it would matter if it survives.** `B/A` is measurable from **one netcdf and
+one wrfout** with `wn_vs_wrf.py` (§2) — minutes, against hours for an ensemble. If
+it predicts the area ratio, a GRIB-driven forecast has a knowable, bounded error
+that can be estimated before it is run, and possibly corrected. That is the single
+most valuable thing left to test.
+
+Gaps to fill, cheapest first: `B/A` and direction statistics for **Union and Red
+Bank**, whose runs already exist and whose comparisons predate the tool. Two flat
+points with wind statistics would show whether area/wind stays near 1 at `B/A`
+near 1, which is the weakest part of the claim.
 
 ## 2. The measurement tool
 
@@ -142,7 +163,59 @@ Also note the HRRR ensemble is **tighter** than WRF's here (CV 7.7% against 9.9%
 the opposite of Red Bank, where 09-21 §6 found it more dispersed near the ignition.
 That near-ignition dispersion therefore does **not** generalise.
 
-## 5. Silver-specific caveats that do not affect the ratio
+## 5. Dome — the second complex case, erring the other way
+
+`DOME_2026-09-15_17_00_00_AACFD673-4C1B-4CDF-B9DD-128E34BD7272`, Yosemite. Ignition
+2026-09-15 18:11:53Z at 37.568215, -119.615585. 30 km at 25 m, solved at 25 m.
+**`ZSF` std 504.1 m, relief 571-3006 m** — the roughest case measured, above the
+Wind River reference (472 m) that 09-18 §4 found unconverged at any mesh.
+
+California, which per JH matters operationally: other WRF-SFIRE developers have
+CalFire relationships and performance across California is always of interest. So
+the hardest terrain and the highest operational scrutiny coincide.
+
+Winds, all 28 hours, every one with R >= 0.76:
+
+    B/A            mean 1.175   range 0.795 to 1.494
+    dir RMS        mean 35.9    range 21.2 to 76.1 deg
+    anomaly corr   mean 0.396   range 0.250 to 0.562
+    peak B/A       mean 2.01    range 1.15 to 3.21
+
+**Opposite to Silver on speed, better on everything else.** WindNinja runs *fast*
+here (1.175 against Silver's 0.765), its direction RMS is lower (35.9 against 49.1),
+and its anomaly correlation of 0.396 is by a wide margin the best of any case
+measured — better than flat ground's 0.129. The plausible reading is that where
+terrain forcing genuinely dominates, both models respond to the same topography, and
+Silver's mid-range relief is the awkward regime where WRF's boundary-layer structures
+matter but WindNinja's terrain response does not yet dominate. **That is a hypothesis
+and needs the cases in between.**
+
+The diurnal signature repeats from Silver, offset: daytime hours run 1.32-1.49,
+overnight hours fall to 0.795-1.012. Including the night is what pulls the full-window
+`B/A` down from a daytime 1.438 to 1.175 — **so always use the full window against
+the area ratio, never the daytime figure.**
+
+Ensembles, both at a common valid time of 2026-09-16T21:00Z (HRRR data ran an hour
+longer and was trimmed):
+
+    source                    members   mean      median     sd     CV    spread
+    WRF-SFIRE (30-min)           54     3370.9    3366.9   202.5   6.0%   1.31
+    HRRR+WindNinja (hourly)      27     3922.8    4020.1   387.2   9.9%   1.50
+
+    HRRR/WRF  mean 1.164   median 1.194
+    mean centroid offset  455 m
+
+**The area ratio was predicted at ~1.10 before the run** — Silver's area/wind of
+0.937 applied to Dome's 1.175 — and came out **1.164**. Right sign, right magnitude.
+See §1 for how much weight that carries: the prediction borrowed its constant from
+the only other point.
+
+Note the ensemble spread inverts again: the HRRR ensemble is *more* dispersed here
+(CV 9.9% against 6.0%) where on Silver it was *tighter* (7.7% against 9.9%), and on
+Red Bank more dispersed. **Ensemble spread behaviour does not generalise across
+cases** — three fires, three different orderings.
+
+## 6. Silver-specific caveats that do not affect the ratio
 
 - **`fire_init` was not invoked for this fire**, confirmed by measurement: cells
   inside the 2026-08-27 perimeter are 9.6% `NFUEL_CAT == 14` against 13.3% outside.
@@ -155,7 +228,7 @@ That near-ignition dispersion therefore does **not** generalise.
 - **The only perimeter available predates the forecast by 24 days** (§6), so nothing
   here is scored against observation.
 
-## 6. A perimeter can be much older than the forecast
+## 7. A perimeter can be much older than the forecast
 
 `ngfs/perims/Silver_{68A6E77D-...}.geojson` has `poly_PolygonDateTime`
 **2026/08/27 18:56** against a forecast window of 2026-09-20 18:00Z to
@@ -177,7 +250,7 @@ What the perimeter does establish is location, and it checks out: geometry is
 self-consistent (709.1 ha computed against 714.7 ha stated, 99.2%) and the forecast
 ignition sits inside it, 108 m from the nearest vertex.
 
-## 7. The two fuel paths differ cell by cell
+## 8. The two fuel paths differ cell by cell
 
 Measured on Silver, and it applies to **every** comparison including Union and Red
 Bank, where it was never checked:
@@ -200,25 +273,38 @@ Terrain, by contrast, agrees closely: the LANDFIRE DEM cut reproduced WRF's `ZSF
 range to 637-2299 m against 637-2300 m. That is the first check of the `altitude`
 field in real relief, which 09-21 §10 flagged as untested on flat fires.
 
-## 8. Open items
+## 9. Open items
 
 1. **Nothing is pushed**, on either branch, now across two sessions.
-2. **§1 is one complex case.** Everything in §3 and §4 is n=1 for complex terrain.
+2. **§1 is two complex cases**, sitting either side of 1.0. The *sign* of the area
+   error follows `B/A`; the coefficient is fitted to one point. Roughness is
+   falsified as a predictor.
 3. **`B/A` and direction statistics are missing for Union and Red Bank** — cheap to
    add now that the tool exists, and they would make the table meaningful.
-4. **The overnight divergence is unexplained** (§3) and `--diurnal_winds` is ruled
-   out as the cause.
-5. **Whether `B/A` predicts the area ratio** is the question §1 exists to answer. If
-   it does, a speed correction becomes possible; note 09-18's warning that a `wRF`
-   calibrated against WindNinja means something different from one calibrated
-   against coupled winds, so do not mix them.
+4. **The overnight divergence is unexplained** (§3, §5) and `--diurnal_winds` is
+   ruled out as the cause. It now appears on both complex fires, offset but the
+   same shape, so it is a property of the method rather than of one case.
+5. **Whether `B/A` predicts the area ratio quantitatively** — the sign is
+   established on two cases, the coefficient is not. If it holds, a speed
+   correction becomes possible; note 09-18's warning that a `wRF` calibrated
+   against WindNinja means something different from one calibrated against coupled
+   winds, so do not mix them.
 6. Archived runs still carry wrong `valid_at` and mostly-empty ensembles from the
-   09-21 §3 and §4 bugs. Union, Red Bank and now Silver are redone; the rest are not,
-   and how far back to go is still undecided.
+   09-21 §3 and §4 bugs. Union, Red Bank, Silver and Dome are redone; the rest are
+   not, and how far back to go is still undecided.
 7. `dry_ff_compare.py`, the perimeter-scoring half of 09-18 §10 item 6, is still
    unwritten.
+8. **Ensemble spread does not generalise** (§5). Three fires give three orderings:
+   HRRR more dispersed on Red Bank and Dome, tighter on Silver. Do not read a
+   spread difference as meaningful without more cases.
+9. **Cotton 2 is in flight** — Napa County, `ZSF` std 184 m, which fills the gap
+   between Red Bank and Silver. Its interest is a ~164 deg wind reversal, but that
+   begins on the *last* hour the f03 cache reaches and everything after is out of
+   range (§9 of the 09-21 handoff). The reachable window is the pre-shift steady
+   SW flow. Re-running once later cycles are cached would capture the shift;
+   `forefire_grib` skips existing netcdfs, so extending costs only the new hours.
 
-## 9. NEXT SESSION
+## 10. NEXT SESSION
 
 1. **Fill in §1.** Run `wn_vs_wrf.py` on several more fires spanning roughness —
    it needs one netcdf and one wrfout per fire, so it is hours cheaper than
