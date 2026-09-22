@@ -1,17 +1,34 @@
 # ForeFire session handoff — 2026-09-22
 
-Branch `james_ngfs`. Commits this session: `af212f4` (the wind comparison tool),
-`1539a22` (the two-ensemble driver), `e5e5cb3` and this update. Follows
-`SESSION_HANDOFF_forefire_2026-09-21.md`, whose §10 set the goal: **test the
-GRIB-driven path in more complicated terrain.** Done, on two fires.
+Branch `james_ngfs`, **nine commits this session, none pushed**:
 
-**Headline:** **ForeFire tolerates WindNinja's direction error and is sensitive to
-its speed bias**, and the speed bias does not go one way in complex terrain. Silver
+```
+af212f4  Add the WindNinja against WRF-SFIRE wind comparison
+1539a22  Add a driver to run both ensembles to a common end time
+e5e5cb3  Record the 2026-09-22 session: the first complex-terrain case
+1172295  Add Dome to the case table; roughness falsified, B/A is not
+531de4a  Defer Cotton 2 until the cache covers its wind reversal
+9302b05  Add perimeter scoring against an observed IR perimeter
+77171c4  Score at a target time, not only the observation timestamp
+eb5b8ff  Record Tabor: the first run with no WRF-SFIRE in the chain
+```
+
+Follows `SESSION_HANDOFF_forefire_2026-09-21.md`, whose §10 set the goal: **test the
+GRIB-driven path in more complicated terrain.** Done, on two fires — and a third that
+went further, running with no WRF at all.
+
+**Headline 1, complex terrain:** **ForeFire tolerates WindNinja's direction error and
+is sensitive to its speed bias**, and the speed bias does not go one way. Silver
 (Selkirk Mtns) ran 24% slow and produced a fire 28% *smaller* than the coupled run;
-Dome (Yosemite), rougher still, ran 18% fast and produced one 16% *larger*. Both
-times the area ratio tracked the speed ratio, and both times a 36-49 deg direction
-RMS moved the ensemble centroid under 520 m on a multi-kilometre fire. **Terrain
-roughness predicts none of it** (§1).
+Dome (Yosemite), rougher still, ran 18% fast and produced one 16% *larger*. Both times
+the area ratio tracked the speed ratio, and both times a 36-49 deg direction RMS moved
+the ensemble centroid under 520 m on a multi-kilometre fire. **Terrain roughness
+predicts none of it** (§1).
+
+**Headline 2, the goal itself:** Tabor ran **end to end from an ignition point, a time
+and GRIB files, with no WRF-SFIRE anywhere**, and was scored against a real IR
+perimeter (§6). That is 09-18 §11 delivered. Both measurement tools 09-18 asked for now
+exist (§2), so its open item 6 is fully closed.
 
 ---
 
