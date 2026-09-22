@@ -80,8 +80,11 @@ below about 0.3 the direction columns mean nothing. That is the trap 09-18 §2
 recorded, and the number that detects it is now printed beside the numbers it
 invalidates instead of being left to memory.
 
-This closes 09-18 §10 item 6 for the wind half. The perimeter-scoring half
-(`dry_ff_compare.py`) is still missing.
+This closes 09-18 §10 item 6 for the wind half. `src/ingest/ff_score_perim.py`
+(`9302b05`, `77171c4`) closes the perimeter-scoring half, so that item is now fully
+retired. It reports area, obs ratio, IoU and elongation, and validates against 09-18's
+own figures: on the Dry River perimeter it returns 2078.5 ha and elongation 2.90
+against that handoff's recorded 2078.5 and 2.90.
 
 ## 3. Silver — what complex terrain did to the winds
 
@@ -215,7 +218,77 @@ Note the ensemble spread inverts again: the HRRR ensemble is *more* dispersed he
 Red Bank more dispersed. **Ensemble spread behaviour does not generalise across
 cases** — three fires, three different orderings.
 
-## 6. Silver-specific caveats that do not affect the ratio
+## 6. Tabor — the first run with no WRF-SFIRE at all
+
+**This is the 09-18 §11 goal reached end to end:** a fire forecast from an ignition
+point, an ignition time and GRIB files, with no WRF run anywhere in the chain, scored
+against a real IR perimeter.
+
+`Tabor_2026-09-20_06_00_00_F1623A08-608E-4150-816C-C14A302C5867`, Ozarks, Missouri.
+Ignition 2026-09-20 07:40:30Z at 36.780685, -92.112183. **DEM std 36.6 m** — a
+Red Bank-class flat case. Not seen by GOES; VIIRS only.
+
+**The workspace was created by hand**, in
+`/data/jhaley/new_wrfxpy/wrfxpy/wksp/wfc-Tabor_..._-33/`. The job file in
+`new_wrfxpy/wrfxpy/jobs/` already carried everything `read_input` needs — `start_utc`,
+`ignitions.1[0].time_utc` and `.latlon`, `grid_code` — so it was copied to
+`input.json` with `end_utc` extended from the job's 2026-09-20 17:00 to 2026-09-21
+17:00, to reach the perimeter. **Stopping at the job's own window would have made the
+fire unscoreable.** Domain 31 km at 25 m, from the job's `domain_size` 31 and
+`subgrid_ratio` 40. 37 gap-free GRIBs, 35 netcdfs, 35 members.
+
+### Scoring a suppressed fire
+
+Tabor was fought: `attr_FireStrategyFullSuppPrcnt` 100, `attr_PercentContained` 99,
+behaviour "Minimal / Flanking / Smoldering", **contained 2026-09-20 23:59** — 17 hours
+*before* the perimeter's own timestamp. Per JH an estimated **98% of fires have
+suppression applied**, which no model here represents.
+
+    observed                      158.9 ha   elongation 1.93   (99.9% of stated acreage)
+    at containment  09-21 00:00    70.1 ha   obs_x 0.44   IoU 0.225   elong 1.16
+    at observation  09-21 18:00   255-302    obs_x 1.60-1.90  IoU 0.29-0.36  elong 1.01-1.26
+    crosses 158.9 ha at 09-21 09:00, about 9 h after containment
+
+**Neither endpoint is a clean skill measure and both are biased in known directions.**
+The containment score is low largely because the model ignites from a *point* at
+07:40 while the real fire was already **50 acres at discovery 12.6 h earlier** — that
+is a missing head start, not slow spread. The observation-time score is high because
+the model grew for 17 h after the real fire was held.
+
+**Per JH, IoU around 0.25 or better counts as a success.** That is the calibration
+anchor this work did not previously have, and it reframes earlier numbers: Tabor's
+0.29-0.36 and Dry River's 0.330/0.341 (09-18 §7) are successes, not the mediocre
+results they were written up as.
+
+### The result that is not confounded
+
+    fire                observed    modelled
+    SINLAHEKIN (09-11)    2.54      1.38-1.57
+    Dry River  (09-18)    2.90      1.73
+    Tabor      (here)     1.93      1.01-1.26
+
+**The shape deficit holds, and this is the first time it has been shown in the
+standalone GRIB-driven path.** ForeFire produces a fire that is too round whether the
+winds come from coupled WRF or from HRRR through WindNinja.
+
+Elongation is also the metric least corrupted by suppression here. Suppression caps
+how far a fire gets; there is no obvious reason it should make the real fire
+*rounder* than the model, and flank-first attack — which the behaviour fields record
+— would tend to make it narrower, widening the gap rather than explaining it.
+
+### Why the ignition time was so far off, and what to do about it
+
+Per JH, **VIIRS spatial resolution is decent but its temporal resolution is not**, so
+a fire seen only by VIIRS gets an ignition time pinned to an overpass rather than to
+ignition. Tabor's 12.6 h offset is that, not an error in the job.
+
+His suggested direction: for VIIRS-only fires, **estimate the state of the fire at
+the time of overpass and run the model forward from that estimate**, rather than
+igniting a point at the overpass time. That would remove the largest confound in the
+containment-time score above, and it is a different initialisation problem from
+anything `forefire_grib.py` currently does.
+
+## 7. Silver-specific caveats that do not affect the ratio
 
 - **`fire_init` was not invoked for this fire**, confirmed by measurement: cells
   inside the 2026-08-27 perimeter are 9.6% `NFUEL_CAT == 14` against 13.3% outside.
@@ -225,10 +298,10 @@ cases** — three fires, three different orderings.
   talus near treeline, which is why there is a natural cat-14 background at all.
 - **Absolute areas are therefore not realistic for this fire.** The ratio is,
   because both models use the identical fuel map.
-- **The only perimeter available predates the forecast by 24 days** (§6), so nothing
+- **The only perimeter available predates the forecast by 24 days** (§8), so nothing
   here is scored against observation.
 
-## 7. A perimeter can be much older than the forecast
+## 8. A perimeter can be much older than the forecast
 
 `ngfs/perims/Silver_{68A6E77D-...}.geojson` has `poly_PolygonDateTime`
 **2026/08/27 18:56** against a forecast window of 2026-09-20 18:00Z to
@@ -250,7 +323,7 @@ What the perimeter does establish is location, and it checks out: geometry is
 self-consistent (709.1 ha computed against 714.7 ha stated, 99.2%) and the forecast
 ignition sits inside it, 108 m from the nearest vertex.
 
-## 8. The two fuel paths differ cell by cell
+## 9. The two fuel paths differ cell by cell
 
 Measured on Silver, and it applies to **every** comparison including Union and Red
 Bank, where it was never checked:
@@ -273,7 +346,7 @@ Terrain, by contrast, agrees closely: the LANDFIRE DEM cut reproduced WRF's `ZSF
 range to 637-2299 m against 637-2300 m. That is the first check of the `altitude`
 field in real relief, which 09-21 §10 flagged as untested on flat fires.
 
-## 9. Open items
+## 10. Open items
 
 1. **Nothing is pushed**, on either branch, now across two sessions.
 2. **§1 is two complex cases**, sitting either side of 1.0. The *sign* of the area
@@ -292,8 +365,8 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
 6. Archived runs still carry wrong `valid_at` and mostly-empty ensembles from the
    09-21 §3 and §4 bugs. Union, Red Bank, Silver and Dome are redone; the rest are
    not, and how far back to go is still undecided.
-7. `dry_ff_compare.py`, the perimeter-scoring half of 09-18 §10 item 6, is still
-   unwritten.
+7. ~~`dry_ff_compare.py`~~ — **done**, as `src/ingest/ff_score_perim.py` (§2, §6).
+   09-18 §10 item 6 is fully closed.
 8. **Ensemble spread does not generalise** (§5). Three fires give three orderings:
    HRRR more dispersed on Red Bank and Dome, tighter on Silver. Do not read a
    spread difference as meaningful without more cases.
@@ -322,9 +395,9 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
    netcdfs, so resuming costs only the new hours — raise `--steps` and re-run the
    same command.
 
-## 10. NEXT SESSION
+## 11. NEXT SESSION
 
-1. **Finish Cotton 2** (§9 item 9). The cache should now cover its wind reversal,
+1. **Finish Cotton 2** (§10 item 9). The cache should now cover its wind reversal,
    14 netcdfs of the pre-shift window are already built, and it is both a
    mid-roughness point for §1 and the only case so far with a large wind shift in it.
 2. **Fill in §1 cheaply.** Run `wn_vs_wrf.py` on more fires spanning roughness — one
@@ -340,4 +413,4 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
    *both* of them, in advance, is what turns this from consistent into established.
 5. **Pick at least one complex-terrain fire where `fire_init` did run**, so absolute
    areas mean something and a perimeter score is possible — and check
-   `poly_PolygonDateTime` against the forecast window first (§7).
+   `poly_PolygonDateTime` against the forecast window first (§8).
