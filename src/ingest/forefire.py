@@ -1836,27 +1836,35 @@ def expected_wrfouts(wksp_dir):
 def wrfout_status(wksp_dir):
     """(ok, message).  ok is False when ForeFire should not be run on this fire.
 
-    Two different situations give too few wrfouts and they need different
-    responses, so the message distinguishes them:
+    Counts whichever source make_timing_table would actually use: wrfouts when
+    there are at least five, otherwise **saveouts**.  A cleaned workspace has its
+    wrfouts replaced by saveout_d01_* holding the variables that drive the
+    forecast -- UF, VF, FMC_GC_F and the projection attributes -- which with
+    NFUEL_CAT and ZSF from wrfinput_d01 is everything make_FF_nc needs.  So a
+    cleaned fire is still runnable and must not be skipped.
 
-      - **WRF is still running.**  The cron fires at 00:10 while wrfouts are still
-        appearing, make_timing_table globs a partial set, and the forecast is
-        silently truncated -- 21 of 36 recent runs were truncated this way.
-        Re-running later fixes it.
-      - **The wrfouts have been cleaned up.**  Older workspaces are reduced to a
-        single wrfout, so the forecast can never be rebuilt from them.  Re-running
-        will not help; leave the fire alone.
+    What a cleaned workspace *does* lose is FXLONG/FXLAT and FIRE_AREA, so
+    wn_vs_wrf.py must take coordinates from wrfinput_d01 instead, and **WRF-SFIRE's
+    own growth curve cannot be recovered** -- model-against-model comparison is no
+    longer possible for that fire.
+
+    A short count means WRF is still writing: the cron fires at 00:10 while wrfouts
+    are still appearing, make_timing_table globs a partial set, and the forecast is
+    silently truncated -- 21 of 36 recent runs were truncated this way.  Re-running
+    once WRF has finished fixes it.
     """
     exp = expected_wrfouts(wksp_dir)
-    act = len(glob.glob(f"{wksp_dir}/wrf/wrfout_d01_*"))
+    n_wrf = len(glob.glob(f"{wksp_dir}/wrf/wrfout_d01_*"))
+    n_sav = len(glob.glob(f"{wksp_dir}/wrf/saveout_d01_*"))
+    #mirror make_timing_table: wrfouts win only when there are at least five
+    act, src = (n_wrf, 'wrfouts') if n_wrf >= 5 else (n_sav, 'saveouts')
     if exp is None:
-        return True, f"expected wrfout count unknown, proceeding with {act}"
+        return True, f"expected count unknown, proceeding with {act} {src}"
     if act >= exp:
-        return True, f"{act} of {exp} wrfouts, complete"
-    if act <= max(2, exp // 10):
-        return False, (f"only {act} of {exp} wrfouts -- these look cleaned up rather "
-                       f"than pending, so re-running will not help")
-    return False, (f"{act} of {exp} wrfouts -- WRF still running, skipping so the "
+        return True, f"{act} of {exp} {src}, complete"
+    if act == 0:
+        return False, f"no wrfouts or saveouts at all, nothing to run from"
+    return False, (f"{act} of {exp} {src} -- WRF still running, skipping so the "
                    f"forecast is not truncated")
 
 
