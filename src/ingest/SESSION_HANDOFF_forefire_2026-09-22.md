@@ -305,7 +305,90 @@ igniting a point at the overpass time. That would remove the largest confound in
 containment-time score above, and it is a different initialisation problem from
 anything `forefire_grib.py` currently does.
 
-## 7. Silver-specific caveats that do not affect the ratio
+## 7. Cotton 2 and the mesh-sensitivity experiment — RESULTS PENDING
+
+**Written 2026-09-23 while the runs were still going. Everything below is measured;
+the ensemble and mesh results are the parts still missing and are marked as such.**
+
+`COTTON_2_2026-09-21_20_00_00_283A99DF-AFD8-4F6A-8CA4-F827DA0AFBCD`, Napa County,
+California. Ignition 2026-09-21 21:26:54Z at 38.63331, -122.06932. 30 km at 25 m.
+**`ZSF` std 184.4 m**, relief 23-927 m — the mid-roughness point between Red Bank
+(31.5) and Silver (365) that §1 is missing, and a second California case.
+
+### Why it was deferred a day, and what that bought
+
+Its interest is a **~164 deg wind reversal**. Measured off the WRF run, domain-mean
+direction the wind blows *from*:
+
+    19:00 09-21 -> 11:00 09-22   steady SW, 194-227 deg   R 0.79-0.96
+    12:00 09-22                  360 deg   <== the reversal   R 0.118
+    13:00 -> 00:00 09-23         339 -> 179, round through N, NE, E to SE
+
+On 09-22 the f03 cache reached only 12:00Z, so the reversal began on the last
+available hour and everything after was out of range. Held overnight rather than run
+on the pre-shift window. By 09-23 10:00Z the cache covered to 09-23 02:00Z — **31
+GRIBs, no gaps** — past the WRF end of 09-23 00:00Z. The 15 netcdfs built on 09-22
+were reused untouched; `forefire_grib` skipped them and built only the new hours.
+
+**Compare the steady regimes either side, not across the shift.** R falls to 0.161 at
+11:00 and 0.118 at 12:00, below the 0.3 floor, so direction statistics through the
+transition are meaningless regardless of data.
+
+### Cost, measured — and a correction to 09-21 §1
+
+09-21 §1 says a step is "dominated by the warps and the netcdf write, not the solve."
+**That is wrong.** Timed on this fire, 1200x1200 at a 25 m solve, from netcdf mtimes
+over 12 consecutive steps:
+
+    total per step                    ~145 s
+      WindNinja solve                 ~140 s   ~97%
+      gdalwarp x2 (vel, ang)             2.2 s
+      read_asc x2 (np.loadtxt)           1.2 s
+      conda activate x3                  1.1 s
+      apply_windrf + write_ff_nc        <0.1 s
+
+Everything on the Python side totals under 5 s. Two plausible culprits were checked
+and cleared: `np.loadtxt` on a 1.44 M-value ASCII grid is 0.6 s (`np.fromstring` is
+4.3x faster and irrelevant at this scale), and `remap_fuel`'s scipy distance
+transform is 0.6 s and runs once per fire, not per step.
+
+**So the only cost lever is the WindNinja mesh**, which scales as `cells^0.93`:
+
+    solve mesh   cells (30 km)   est. per step   27 steps
+      25 m          1.44 M          ~145 s        ~65 min
+      50 m          0.36 M           ~40 s        ~18 min
+     100 m          0.09 M           ~11 s         ~5 min
+
+Also worth knowing for any future low-latency path: netcdf assembly is effectively
+free, so cached or shared WindNinja fields would make a run cost seconds.
+
+### The mesh experiment
+
+Same domain, fire grid, GRIBs, ignition and `windrf`; **the only variable is
+`--wn-mesh`**, at 25, 50 and 100 m. Results land in `forefire_hrrr_m50` and
+`forefire_hrrr_m100` beside the 25 m run. The WRF ensemble is the shared reference
+and is run once (`--skip-wrf` on the variants).
+
+**The question it answers has not been asked before.** 09-18 §4 measured mesh
+convergence **in the wind field** — RMS speed error 0.526 -> 0.217 m/s from 300 m to
+100 m with no plateau, peak speed climbing 11.3 -> 20.0 m/s — but never whether any
+of that reaches the fire.
+
+**The prediction, stated before the answer is known.** Silver and Dome showed the
+fire tracks the speed bias and ignores direction scatter (§1). So fire area should
+follow `B/A` across meshes and be largely indifferent to the rest of the field's
+detail. If the three meshes give similar `B/A` and similar areas, the 65-minute 25 m
+solve buys nothing over the 5-minute 100 m one **for this purpose**, which would
+matter operationally. If area varies strongly with mesh while `B/A` does not, the
+speed-bias mechanism is falsified — the more interesting outcome.
+
+### Still missing
+
+Ensemble comparison at 25 m; `B/A` and direction statistics per mesh; fire areas per
+mesh; and whether the reversal is captured. Fill these in and drop the PENDING from
+the heading.
+
+## 8. Silver-specific caveats that do not affect the ratio
 
 - **`fire_init` was not invoked for this fire**, confirmed by measurement: cells
   inside the 2026-08-27 perimeter are 9.6% `NFUEL_CAT == 14` against 13.3% outside.
@@ -315,10 +398,10 @@ anything `forefire_grib.py` currently does.
   talus near treeline, which is why there is a natural cat-14 background at all.
 - **Absolute areas are therefore not realistic for this fire.** The ratio is,
   because both models use the identical fuel map.
-- **The only perimeter available predates the forecast by 24 days** (§8), so nothing
+- **The only perimeter available predates the forecast by 24 days** (§9), so nothing
   here is scored against observation.
 
-## 8. A perimeter can be much older than the forecast
+## 9. A perimeter can be much older than the forecast
 
 `ngfs/perims/Silver_{68A6E77D-...}.geojson` has `poly_PolygonDateTime`
 **2026/08/27 18:56** against a forecast window of 2026-09-20 18:00Z to
@@ -340,7 +423,7 @@ What the perimeter does establish is location, and it checks out: geometry is
 self-consistent (709.1 ha computed against 714.7 ha stated, 99.2%) and the forecast
 ignition sits inside it, 108 m from the nearest vertex.
 
-## 9. The two fuel paths differ cell by cell
+## 10. The two fuel paths differ cell by cell
 
 Measured on Silver, and it applies to **every** comparison including Union and Red
 Bank, where it was never checked:
@@ -363,7 +446,7 @@ Terrain, by contrast, agrees closely: the LANDFIRE DEM cut reproduced WRF's `ZSF
 range to 637-2299 m against 637-2300 m. That is the first check of the `altitude`
 field in real relief, which 09-21 §10 flagged as untested on flat fires.
 
-## 10. Open items
+## 11. Open items
 
 1. **Nothing is pushed**, on either branch, now across two sessions.
 2. **§1 is two complex cases**, sitting either side of 1.0. The *sign* of the area
@@ -387,34 +470,12 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
 8. **Ensemble spread does not generalise** (§5). Three fires give three orderings:
    HRRR more dispersed on Red Bank and Dome, tighter on Silver. Do not read a
    spread difference as meaningful without more cases.
-9. **Cotton 2 is deferred, deliberately, until the cache covers its wind shift.**
-   `COTTON_2_2026-09-21_20_00_00_283A99DF-AFD8-4F6A-8CA4-F827DA0AFBCD`, Napa County,
-   ignition 2026-09-21 21:26:54Z at 38.63331, -122.06932. `ZSF` std **184.4 m**,
-   which fills the gap between Red Bank (31.5) and Silver (365) — the mid-range
-   regime §5 implicates as the awkward one. Second California case.
+9. **Cotton 2 is running as of 2026-09-23, results pending — see §7.** Deferred on
+   09-22 until the cache covered its wind shift; it now does.
 
-   Its interest is a **~164 deg wind reversal**: steady SW 194-227 deg from 19:00
-   09-21 through 11:00 09-22, swinging to 360 deg at 12:00 and then round through
-   N, NE, E to SE by 00:00 09-23. **That reversal begins on the last hour the f03
-   cache reaches**, so the whole post-shift regime is out of range today. Per JH,
-   held until the cache is complete rather than run on the pre-shift window.
+## 12. NEXT SESSION
 
-   Two details for whoever picks it up. The WRF field goes **incoherent through the
-   transition** — R falls to 0.161 at 11:00 and 0.118 at 12:00, below the 0.3 floor
-   — so direction statistics *across* the shift are meaningless regardless of data;
-   compare the steady regimes either side instead. And the f03 cache advances about
-   an hour per hour, so the full window to 2026-09-23 00:00Z became reachable around
-   00:00Z on 09-23. Nothing prunes `ingest/HRRRA`, so the early hours will still be
-   there.
-
-   **14 netcdfs of the pre-shift window are already built** in
-   `/home/jhaley/forefire/tests/ffwksp_cotton2_hrrr`. `forefire_grib` skips existing
-   netcdfs, so resuming costs only the new hours — raise `--steps` and re-run the
-   same command.
-
-## 11. NEXT SESSION
-
-1. **Finish Cotton 2** (§10 item 9). The cache should now cover its wind reversal,
+1. **Finish Cotton 2** (§11 item 9). The cache should now cover its wind reversal,
    14 netcdfs of the pre-shift window are already built, and it is both a
    mid-roughness point for §1 and the only case so far with a large wind shift in it.
 2. **Fill in §1 cheaply.** Run `wn_vs_wrf.py` on more fires spanning roughness — one
@@ -430,4 +491,4 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
    *both* of them, in advance, is what turns this from consistent into established.
 5. **Pick at least one complex-terrain fire where `fire_init` did run**, so absolute
    areas mean something and a perimeter score is possible — and check
-   `poly_PolygonDateTime` against the forecast window first (§8).
+   `poly_PolygonDateTime` against the forecast window first (§9).
