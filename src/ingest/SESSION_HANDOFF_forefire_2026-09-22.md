@@ -751,7 +751,80 @@ possible.** `ff.run_days(days2run=8, overwrite=True)` does this and was launched
 WRF reliably finishes, or made to skip fires whose WRF is still going. Nothing does
 either yet.
 
-## 13. Silver-specific caveats that do not affect the ratio
+## 13. Recovering WRF-SFIRE's fire from TIGN_G, and the Dome triangulation
+
+### Cleaned workspaces are not lost
+
+Per JH, a cleaned workspace has its wrfouts replaced by `saveout_d01_*`, and **fire
+progression survives in `TIGN_G` in the retained final wrfout**. TIGN_G is each
+fire-grid cell's ignition time in seconds since the simulation start, with a large
+sentinel for cells that never burned, so **area at time t is the count of cells at or
+below t** — the whole progression from one file.
+
+`ff_growth.wrf_track` does this, and the CLI takes `wrf:<label>=<workspace>` so
+WRF-SFIRE's own fire appears as a column beside the ForeFire forecasts.
+
+**Validated where both variables survive.** On Hot Spring 226, TIGN_G gives 442.8 ha
+against `FIRE_AREA`'s 440.9 at the final time and tracks at every hour. It runs
+**0.5-1% high** because TIGN_G marks a cell burned at its ignition instant while
+FIRE_AREA ramps fractionally — a consistent bias, not noise.
+
+**It is better than FIRE_AREA for this purpose:** one file instead of 61, it works on
+cleaned and uncleaned workspaces alike, and it evaluates at any instant rather than
+only at output times.
+
+**An earlier note in `wrfout_status` claimed cleaning made WRF-SFIRE's growth curve
+unrecoverable and model-against-model comparison impossible. That was wrong** and is
+corrected. The WRF-SFIRE reference does **not** have a shelf life; the archive stays
+usable.
+
+### Dome: observation, WRF-SFIRE and ForeFire together
+
+Dome's `FIRE_AREA` was already gone, so this comparison existed only because TIGN_G
+recovered it. At the observation time **2026-09-16 13:31Z**:
+
+    observed (NIFC IR, ytd)     476.6 ha    1.00x
+    WRF-SFIRE (from TIGN_G)     322.3 ha    0.68x
+    ForeFire (HRRR, 25 m)      2861.6 ha    6.00x
+
+    ForeFire / WRF-SFIRE = 8.88x
+    final areas: WRF-SFIRE 613.6 ha, ForeFire ensemble mean 5139.5 -> 8.4x
+
+**The two models bracket the observation.** WRF-SFIRE underpredicts by a third;
+ForeFire overpredicts by six. That rules out the possibility that ForeFire only looks
+bad because WRF-SFIRE is a soft target — **WRF-SFIRE is under the truth and ForeFire
+is far over it**, so ForeFire's error against reality (6.0x) is real and its error
+against WRF-SFIRE (8.9x) overstates it only slightly.
+
+Hour by hour the divergence is stark: at 14:00Z ForeFire grows at **247 ha/h against
+WRF-SFIRE's 29**, widening to 347 against 42 by 20:00Z.
+
+This is the strongest evidence yet for the overprediction being ForeFire's, and it
+sharpens §7 — winds, mesh and moisture together account for tens of percent
+against a discrepancy approaching an order of magnitude.
+
+## 14. IN FLIGHT AT HANDOFF — the batch re-run
+
+`ff.run_days(days2run=8, overwrite=True)` was launched to re-run every recent
+workspace with per-step moisture, fixing the truncation of §12.
+
+    process   detached (PPID 1), so it should survive the session ending
+    log       <session scratchpad>/rerun_all.log
+    progress  6 fires when this was written
+
+**The log lives in the session scratchpad and may not persist.** The durable way to
+check is the workspaces themselves — re-run the survey in §12: a completed
+re-run has its last ForeFire perimeter at or after its last wrfout, and many distinct
+`fuelsTableFile` entries rather than one.
+
+**Two caveats for reading the results.** The batch started *before* the
+completeness guard was committed, so the already-running process is using the old
+code and may still produce truncated output for fires whose WRF was unfinished; the
+guard takes effect on the next invocation, including the nightly cron. And it started
+before the saveout fix, so it may have skipped nothing but will have wasted time on
+cleaned fires it could not previously recognise.
+
+## 15. Silver-specific caveats that do not affect the ratio
 
 - **`fire_init` was not invoked for this fire**, confirmed by measurement: cells
   inside the 2026-08-27 perimeter are 9.6% `NFUEL_CAT == 14` against 13.3% outside.
@@ -764,7 +837,7 @@ either yet.
 - **The only perimeter available predates the forecast by 24 days** (§9), so nothing
   here is scored against observation.
 
-## 14. A perimeter can be much older than the forecast
+## 16. A perimeter can be much older than the forecast
 
 `ngfs/perims/Silver_{68A6E77D-...}.geojson` has `poly_PolygonDateTime`
 **2026/08/27 18:56** against a forecast window of 2026-09-20 18:00Z to
@@ -786,7 +859,7 @@ What the perimeter does establish is location, and it checks out: geometry is
 self-consistent (709.1 ha computed against 714.7 ha stated, 99.2%) and the forecast
 ignition sits inside it, 108 m from the nearest vertex.
 
-## 15. The two fuel paths differ cell by cell
+## 17. The two fuel paths differ cell by cell
 
 Measured on Silver, and it applies to **every** comparison including Union and Red
 Bank, where it was never checked:
@@ -809,7 +882,7 @@ Terrain, by contrast, agrees closely: the LANDFIRE DEM cut reproduced WRF's `ZSF
 range to 637-2299 m against 637-2300 m. That is the first check of the `altitude`
 field in real relief, which 09-21 §10 flagged as untested on flat fires.
 
-## 16. Open items
+## 18. Open items
 
 1. **Nothing is pushed**, on either branch, now across two sessions.
 2. **§1 is two complex cases**, sitting either side of 1.0. The *sign* of the area
@@ -877,7 +950,12 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
     registration commented out, and that rebuilding the container to change it is not
     currently achievable.
 
-## 17. NEXT SESSION
+## 19. NEXT SESSION
+
+0. **Check the batch re-run first** (§14). It was still going at handoff and is
+   detached, so it should have continued. Re-run the survey in §12 to see how many
+   workspaces are now complete, and note that the batch predates both the
+   completeness guard and the saveout fix.
 
 1. (see §12 item 9). The cache should now cover its wind reversal,
    14 netcdfs of the pre-shift window are already built, and it is both a
