@@ -39,6 +39,11 @@ hypothesis. Terrain roughness is `ZSF` std over the fire grid, which is the numb
 09-18 §4 used to separate the converged from the unconverged regime.
 
     fire        ZSF std*  wind B/A  dir RMS   anomR   area HRRR/WRF  area/wind  centroid
+    -- scored against observation (§9) --
+    Dome        obs_x 6.00  IoU 0.165   elong 1.16 vs observed 2.77
+    Red Bank    obs_x 4.89  IoU 0.204   elong 1.76 vs observed 1.83   (timestamp +33 h, wide bar)
+    Tabor       obs_x 1.6-1.9 IoU 0.29-0.36 elong 1.01-1.26 vs 1.93   (suppressed, ignited 12.6 h late)
+    Silver / Cotton 2 / Union: no usable observation
     Dry River     26.7 m    1.04       3.7     0.129   (not run)         -          -
     Union         ~20 m*    -          -       -        0.99 +           -          -
     Red Bank      31.5 m    -          -       -        1.035            -          -
@@ -532,7 +537,78 @@ SINLAHEKIN, Dry River and Tabor — and IoU 0.306 is a success by the 0.25 stand
 **Matching on size rather than time is worth reusing** wherever detection lag makes
 the clocks incomparable.
 
-## 9. Fuel moisture as a field — what is reachable and what is not
+## 9. Scoring against observations — the ytd collections, and why timestamps are suspect
+
+### The per-fire files are often the worse observation
+
+`ngfs/perims` holds per-fire files **and** `perims_ytd_<date>.geojson`, each carrying
+every fire's latest perimeter. The per-fire file is frequently unusable while the ytd
+series has something better for the same fire:
+
+    Dome, per-fire file   40.5 ha stamped 2 h BEFORE the job's ignition -> unscoreable
+    Dome, ytd series      476.6 ha at 2026-09-16 13:31, INSIDE the forecast window
+
+Working from the per-fire file cost a real validation. **Run
+`ff_score_perim.py --irwin <id> --list` before concluding a fire cannot be scored.**
+
+`extract_from_ytd`/`ytd_series` and a `--irwin`/`--ytd-dir` CLI were added
+(`41ab9dc`). Two traps, both of which broke a first attempt: the files are a single
+**~170 MB line** and `poly_IRWINID` is `"{AACFD673-...}"` — **literal braces inside a
+string** — so naive brace matching starts in the wrong place and never closes; and
+these files date in **RFC-822** (`"Wed, 16 Sep 2026 13:31:00 GMT"`) where the per-fire
+files use `%Y/%m/%d`.
+
+### The rescore
+
+    fire       observed            modelled    obs_x    IoU    obs elong  mod elong
+    Dome        476.6 ha @13:31Z    2861.6      6.00    0.165     2.77       1.16
+    Red Bank     83.9 ha @00:58Z     410.3      4.89    0.204     1.83       1.76
+    Tabor       158.9 ha            255-302   1.60-1.90 0.29-0.36 1.93    1.01-1.26
+
+Not scoreable: **Silver** (only perimeter is 2026-09-05, fifteen days pre-forecast —
+the weeks-old-fire pattern), **Cotton 2** and **Union** (no perimeter in the
+collections at all).
+
+**The overprediction is now confirmed against ground truth, not only against
+WRF-SFIRE.** Dome 6.0x and Red Bank 4.9x, both **below the 0.25 IoU standard** — the
+first genuine failures in this work. Only Tabor is near 1, and that is the suppressed
+fire where the model also ignited 12.6 h late, so the two errors partly cancel.
+
+### The shape deficit looks regime-dependent
+
+**Red Bank: observed elongation 1.83, modelled 1.76 — essentially right.** Every other
+case had observed 1.93-2.90 against modelled 1.01-1.76. So ForeFire is not producing a
+fixed roundness; it tracks when the real fire *is* round and fails when the fire is
+elongated. Red Bank is the flat plains case with the roundest observation.
+
+That reframes the deficit from "ForeFire makes round fires" to **"ForeFire cannot
+produce strong elongation"** — a different and more diagnosable problem, and
+consistent with 09-18's finding that the wind source does not fix it.
+
+### IR observation timestamps are often untrustworthy
+
+**Per JH, fire progress datasets are problematic and the timestamps on IR observations
+are frequently not to be trusted.** `src/ngfs/perim_cache.py` runs on cron and its
+`load_geojson_with_processed_time` attaches a **`processed_utc` taken from the file's
+mtime** — when the change was *noticed*. That is not stored in the ytd files
+themselves (they carry none), so in practice the bound is **the ytd file's own
+mtime**.
+
+Using it as a sanity check:
+
+    perims_ytd_2026-09-16.geojson  mtime 09-16 16:00  carries Dome's 13:31   (+2.5 h)
+    perims_ytd_2026-09-17.geojson  mtime 09-17 10:00  carries Red Bank 00:58 (+33 h)
+
+**Dome's claimed time is corroborated; Red Bank's is not.** A 33-hour gap means the
+flight could be anywhere in that window, and since the modelled fire grows
+monotonically, `obs_x` moves a long way with it. **Treat Red Bank's 4.89x as having a
+wide error bar**, and check this bound before trusting any score.
+
+Note also that the ytd **filename date is UTC while the mtime is local**, so a file
+named `2026-09-20` can have an mtime of `2026-09-19 19:00`. Do not infer the notice
+time from the filename.
+
+## 10. Fuel moisture as a field — what is reachable and what is not
 
 §7 item 12 (now §12 item 12) records that Md is a scalar. **Per JH, moisture as a field could be a
 ForeFire input if a different spread model is used** — several Balbi variants exist —
@@ -596,7 +672,7 @@ afternoon's work.
 not a field.** A field is the better answer and it is blocked on a build problem, not
 on a design one.
 
-## 10. Silver-specific caveats that do not affect the ratio
+## 11. Silver-specific caveats that do not affect the ratio
 
 - **`fire_init` was not invoked for this fire**, confirmed by measurement: cells
   inside the 2026-08-27 perimeter are 9.6% `NFUEL_CAT == 14` against 13.3% outside.
@@ -609,7 +685,7 @@ on a design one.
 - **The only perimeter available predates the forecast by 24 days** (§9), so nothing
   here is scored against observation.
 
-## 11. A perimeter can be much older than the forecast
+## 12. A perimeter can be much older than the forecast
 
 `ngfs/perims/Silver_{68A6E77D-...}.geojson` has `poly_PolygonDateTime`
 **2026/08/27 18:56** against a forecast window of 2026-09-20 18:00Z to
@@ -631,7 +707,7 @@ What the perimeter does establish is location, and it checks out: geometry is
 self-consistent (709.1 ha computed against 714.7 ha stated, 99.2%) and the forecast
 ignition sits inside it, 108 m from the nearest vertex.
 
-## 12. The two fuel paths differ cell by cell
+## 13. The two fuel paths differ cell by cell
 
 Measured on Silver, and it applies to **every** comparison including Union and Red
 Bank, where it was never checked:
@@ -654,7 +730,7 @@ Terrain, by contrast, agrees closely: the LANDFIRE DEM cut reproduced WRF's `ZSF
 range to 637-2299 m against 637-2300 m. That is the first check of the `altitude`
 field in real relief, which 09-21 §10 flagged as untested on flat fires.
 
-## 13. Open items
+## 14. Open items
 
 1. **Nothing is pushed**, on either branch, now across two sessions.
 2. **§1 is two complex cases**, sitting either side of 1.0. The *sign* of the area
@@ -722,7 +798,7 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
     registration commented out, and that rebuilding the container to change it is not
     currently achievable.
 
-## 14. NEXT SESSION
+## 15. NEXT SESSION
 
 1. (see §12 item 9). The cache should now cover its wind reversal,
    14 netcdfs of the pre-shift window are already built, and it is both a
