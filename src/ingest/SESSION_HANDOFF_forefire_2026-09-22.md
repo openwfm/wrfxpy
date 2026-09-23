@@ -38,7 +38,7 @@ exist (§2), so its open item 6 is fully closed.
 hypothesis. Terrain roughness is `ZSF` std over the fire grid, which is the number
 09-18 §4 used to separate the converged from the unconverged regime.
 
-    fire        ZSF std   wind B/A  dir RMS   anomR   area HRRR/WRF  area/wind  centroid
+    fire        ZSF std*  wind B/A  dir RMS   anomR   area HRRR/WRF  area/wind  centroid
     Dry River     26.7 m    1.04       3.7     0.129   (not run)         -          -
     Union         ~20 m*    -          -       -        0.99 +           -          -
     Red Bank      31.5 m    -          -       -        1.035            -          -
@@ -46,8 +46,14 @@ hypothesis. Terrain roughness is `ZSF` std over the fire grid, which is the numb
     Dome         504.1 m    1.175     35.9     0.396    1.164          0.991      455 m
     Cotton 2     184.4 m    1.119     54.3     0.20*    1.082          0.967        -
 
-    * Union: relief 21-93 m; std not computed.  Cotton 2 anomR is a rough mean over
+    * DOMAIN-WIDE std, which overstates what the fire experiences by 14-51% and not
+      uniformly -- see §8.  Near-fire (<=5 km) values: Red Bank 21.5, Cotton 2 162.3,
+      Silver 241.0, Dome 377.9.  Ordering is preserved; use near-fire in new rows.
+      Union: relief 21-93 m; std not computed.  Cotton 2 anomR is a rough mean over
       hours with R >= 0.3; its wind reversal makes several hours unusable.
+      Silver, Dome and Red Bank area ratios were measured PRE-MOISTURE.  Dome's
+      moisture-on 25 m ensemble is 5139.5 ha against 3922.8 pre-moisture (§8), so its
+      area ratio would move; it has not been recomputed against a moisture-on WRF arm.
     + Union is an ensemble mean against a single WRF chained-track perimeter, not
       ensemble against ensemble.  Red Bank, Silver and Dome are ensemble against
       ensemble, each at a single common valid time.
@@ -429,7 +435,104 @@ while 50 m and 100 m were not. The 25 m was rebuilt with moisture on rather than
 comparing across a changed configuration. Do not change configuration inside an
 experiment.
 
-## 8. Fuel moisture as a field — what is reachable and what is not
+## 8. Dome revisited — mesh and moisture, and a correction to the roughness metric
+
+Dome re-run 2026-09-23 with **per-step moisture** at three WindNinja solve meshes
+(25/50/100 m, fire grid fixed at 25 m). The existing 25 m netcdfs were reused —
+**moisture lives in the fuel table, not the netcdf** — so only 50 m and 100 m needed
+building. The pre-moisture 25 m run is preserved as `forefire_hrrr_premoisture`.
+
+### Mesh: insensitivity holds, and tightens
+
+    25 m  5139.5 ha     50 m  5175.6 ha     100 m  5177.3 ha
+    50/25 = 1.007       100/25 = 1.007      (Cotton 2: 0.986, 0.982)
+
+**Under 1% across a 4x mesh range**, tighter than Cotton 2's 2%. Two fires now agree
+that the fire ignores the solve mesh. A 100 m solve at ~5 minutes remains the right
+operational choice against ~65 minutes at 25 m.
+
+### Moisture *increased* area by 31%, and the reason matters
+
+    25 m, constant Md   3922.8 ha
+    25 m, per-step Md   5139.5 ha     ratio 1.310
+    (Cotton 2: 0.781, with a 13-hour stall)
+
+**Opposite in sign to Cotton 2, and a prediction of mine was wrong.** I expected
+moisture to damp Dome modestly. It did the reverse, because:
+
+    Dome      Md 0.055-0.106  mean 0.079   80% of steps BELOW the table default 0.1
+    Cotton 2  Md 0.064-0.202  mean 0.118   57% of steps ABOVE it
+
+**The constant `Md = 0.1` was never neutral.** It was wetter than reality at Dome and
+drier than reality at Cotton 2's peak, so switching to real moisture speeds one fire
+up and slows the other down. **Per-step moisture does not systematically shrink
+fires; it removes an arbitrary constant.** That is a better argument for the feature
+than "it makes fires smaller", and it means ForeFire's overprediction (§7) cannot be
+blamed on moisture in either direction.
+
+The no-stall prediction *did* hold: Dome is 65% timber litter (cats 8-10, `me`
+0.25-0.30) and Md peaks at 0.106, nowhere near extinction.
+
+**Per JH: below about 5-6% dead fuel moisture a fire is a good bet for big growth,
+and there is a tipping point below which fires become largely unpredictable.** Dome's
+minimum is **5.53%**, right at that threshold — so the 31% increase is not a modelling
+curiosity, it is the model being handed conditions that really do drive large growth.
+
+**Caveat carried from before the run:** the SAV weighting makes Md 93.5% a 1-hour
+quantity, which suits Cotton 2's grass and fits Dome's timber litter poorly, where 10h
+and 100h classes carry more of the behaviour. Part of the 31% is that configuration
+choice and this run cannot separate it from physics.
+
+### Correction: the case table's roughness column is misleading
+
+**Per JH the Dome fire sits southwest of Yosemite Valley and west of the main Sierra
+ridges** — the domain contains some of the steepest terrain on the planet, but the
+fire does not burn in it. Measured:
+
+    Dome ZSF std:  whole domain 504.1 m
+                   within 2 km of ignition  209.7 m
+                   within 5 km              377.9 m
+                   5-10 km                  452.3 m
+                   >15 km                   633.5 m   <- the Valley and main ridges
+
+**So §1's roughness column, which is domain-wide, overstates what the fire
+experiences.** Across the cases:
+
+    fire        domain std   <=5 km std   ratio
+    Red Bank        31.5        21.5       1.47
+    Cotton 2       184.4       162.3       1.14
+    Silver         364.7       241.0       1.51
+    Dome           504.1       377.9       1.33
+
+The **ordering is preserved** and Dome is still roughest near the fire, so the
+conclusions stand — but the overstatement is 14-51% and **not uniform**, so the
+domain figure should not be used to compare cases. An earlier claim that Dome tested
+mesh insensitivity at "nearly 3x Cotton 2's terrain forcing" is really 2.3x
+(378 against 162). **Use near-fire roughness in future rows.**
+
+### The perimeter is an early-state observation
+
+`ngfs/perims/DOME_{AACFD673-...}.geojson`: `poly_PolygonDateTime` **2026-09-15
+16:09**, 41 minutes after discovery and **two hours *before* the job's 18:11:53
+ignition**. 100.07 acres = 40.5 ha; geometry exact (computed 40.5, 100.1% of stated).
+
+It cannot score the forecast's end, but it pins the head-start deficit precisely:
+
+    real fire     40.5 ha at 16:09
+    model         ignites a point at 18:11, reaches 40.5 ha at 20:00
+    -> the model is about 3.8 h behind the real fire at equal size
+
+Centroid 608 m from the modelled ignition, so location is good.
+
+**Shape compared at matched size rather than matched time**, which sidesteps the lag:
+at 20:00 the modelled fire is 60.3 ha with **elongation 1.14 against the observed
+2.23**, IoU 0.306. The shape deficit again, in the same direction and magnitude as
+SINLAHEKIN, Dry River and Tabor — and IoU 0.306 is a success by the 0.25 standard.
+
+**Matching on size rather than time is worth reusing** wherever detection lag makes
+the clocks incomparable.
+
+## 9. Fuel moisture as a field — what is reachable and what is not
 
 §7 item 12 (now §12 item 12) records that Md is a scalar. **Per JH, moisture as a field could be a
 ForeFire input if a different spread model is used** — several Balbi variants exist —
@@ -493,7 +596,7 @@ afternoon's work.
 not a field.** A field is the better answer and it is blocked on a build problem, not
 on a design one.
 
-## 9. Silver-specific caveats that do not affect the ratio
+## 10. Silver-specific caveats that do not affect the ratio
 
 - **`fire_init` was not invoked for this fire**, confirmed by measurement: cells
   inside the 2026-08-27 perimeter are 9.6% `NFUEL_CAT == 14` against 13.3% outside.
@@ -506,7 +609,7 @@ on a design one.
 - **The only perimeter available predates the forecast by 24 days** (§9), so nothing
   here is scored against observation.
 
-## 10. A perimeter can be much older than the forecast
+## 11. A perimeter can be much older than the forecast
 
 `ngfs/perims/Silver_{68A6E77D-...}.geojson` has `poly_PolygonDateTime`
 **2026/08/27 18:56** against a forecast window of 2026-09-20 18:00Z to
@@ -528,7 +631,7 @@ What the perimeter does establish is location, and it checks out: geometry is
 self-consistent (709.1 ha computed against 714.7 ha stated, 99.2%) and the forecast
 ignition sits inside it, 108 m from the nearest vertex.
 
-## 11. The two fuel paths differ cell by cell
+## 12. The two fuel paths differ cell by cell
 
 Measured on Silver, and it applies to **every** comparison including Union and Red
 Bank, where it was never checked:
@@ -551,7 +654,7 @@ Terrain, by contrast, agrees closely: the LANDFIRE DEM cut reproduced WRF's `ZSF
 range to 637-2299 m against 637-2300 m. That is the first check of the `altitude`
 field in real relief, which 09-21 §10 flagged as untested on flat fires.
 
-## 12. Open items
+## 13. Open items
 
 1. **Nothing is pushed**, on either branch, now across two sessions.
 2. **§1 is two complex cases**, sitting either side of 1.0. The *sign* of the area
@@ -619,7 +722,7 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
     registration commented out, and that rebuilding the container to change it is not
     currently achievable.
 
-## 13. NEXT SESSION
+## 14. NEXT SESSION
 
 1. (see §12 item 9). The cache should now cover its wind reversal,
    14 netcdfs of the pre-shift window are already built, and it is both a
