@@ -1811,6 +1811,55 @@ def remove_z_coordinate(geojson_data):
   return geojson_data
 
 
+def expected_wrfouts(wksp_dir):
+    """How many wrfouts a finished WRF run should have left, or None if unknown.
+
+    The workspace name ends '-<start_utc>-<hours>' and input.json carries the
+    domain's history_interval in minutes, so the count is
+    hours*60/history_interval + 1 (both endpoints written).  Verified exactly
+    against twelve finished runs.
+    """
+    m = re.search(r'-(\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2})-(\d+)$',
+                  os.path.basename(wksp_dir.rstrip('/')))
+    if not m:
+        return None
+    try:
+        cfg = json.load(open(f"{wksp_dir}/input.json"))
+        hist = int(cfg['domains']['1']['history_interval'])
+    except Exception:
+        return None
+    if hist <= 0:
+        return None
+    return int(m.group(2)) * 60 // hist + 1
+
+
+def wrfout_status(wksp_dir):
+    """(ok, message).  ok is False when ForeFire should not be run on this fire.
+
+    Two different situations give too few wrfouts and they need different
+    responses, so the message distinguishes them:
+
+      - **WRF is still running.**  The cron fires at 00:10 while wrfouts are still
+        appearing, make_timing_table globs a partial set, and the forecast is
+        silently truncated -- 21 of 36 recent runs were truncated this way.
+        Re-running later fixes it.
+      - **The wrfouts have been cleaned up.**  Older workspaces are reduced to a
+        single wrfout, so the forecast can never be rebuilt from them.  Re-running
+        will not help; leave the fire alone.
+    """
+    exp = expected_wrfouts(wksp_dir)
+    act = len(glob.glob(f"{wksp_dir}/wrf/wrfout_d01_*"))
+    if exp is None:
+        return True, f"expected wrfout count unknown, proceeding with {act}"
+    if act >= exp:
+        return True, f"{act} of {exp} wrfouts, complete"
+    if act <= max(2, exp // 10):
+        return False, (f"only {act} of {exp} wrfouts -- these look cleaned up rather "
+                       f"than pending, so re-running will not help")
+    return False, (f"{act} of {exp} wrfouts -- WRF still running, skipping so the "
+                   f"forecast is not truncated")
+
+
 def run_forecasts(wksp_dir,forefire_dir = None, overwrite = False, cfg = None, params = None,
                   ignitions = None):
     #forefire_dir defaults to run_dir in etc/forefire.json
@@ -1824,6 +1873,13 @@ def run_forecasts(wksp_dir,forefire_dir = None, overwrite = False, cfg = None, p
     #read information about the fire
     t0 = pd.Timestamp.now()
     start_utc,ign_utc,ign_latlon,grid_code = read_input(wksp_dir)
+
+    #do not build a forecast on a WRF run that is still writing: the cron fires while
+    #wrfouts are still appearing and the result is silently truncated
+    ok,why = wrfout_status(wksp_dir)
+    print(f"wrfouts: {why}")
+    if not ok and not cfg.get('allow_partial_wrfouts'):
+        return
 
     #find list of wrfouts and pair with times
     timing_table = make_timing_table(wksp_dir,ign_utc)     #<<<<-------------------------- add ability to make forecasts from the weather files
