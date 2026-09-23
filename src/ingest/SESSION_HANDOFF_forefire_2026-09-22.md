@@ -522,8 +522,37 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
 11. **Per-step moisture is on by default now** (`etc/forefire.json`, untracked).
     CONUS only, deliberately; off-grid fires keep the default table. The cron moved
     from every 20 minutes to `10 0 * * *` after interfering twice.
-12. **Md is a domain-mean scalar per step**, not a field. The real moisture varies
-    across a 30 km domain and ForeFire is being handed one number for all of it.
+12. **Md is a scalar per step, not a field, and the averaging radius is a real
+    choice.** An earlier draft of this item called it a "domain-mean" — it is not.
+    `read_fmda_hourly` averages within `moisture.radius_km`, default **10 km**, around
+    the ignition on a 30 km domain. Measured on Cotton 2:
+
+        FMDA grid spacing near the fire: 1.66 km  (so r=1 km catches no cells at all)
+
+        06Z   r<= 5 km  mean 0.0960  sd 0.0107  range 0.076-0.113
+              r<=10 km  mean 0.1133  sd 0.0179  range 0.076-0.148
+              r<=21 km  mean 0.1226  sd 0.0173  range 0.076-0.191   straddles me
+        12Z   r<= 5 km  mean 0.1762  sd 0.0421  range 0.132-0.256   straddles me
+              r<=21 km  mean 0.1963  sd 0.0443  range 0.104-0.266   straddles me
+
+    **The radius shifts Md by ~20%** (0.096 at 5 km against 0.123 at 21 km, 06Z).
+    **The domain straddles cat 2's `me` of 0.15** — at 12Z even cells within 5 km span
+    0.132-0.256, so part of the domain is arrested and part is burning freely while
+    the model applies one number everywhere. And **the variance is itself
+    time-varying**: sd 0.011 at 06Z against 0.042 at 12Z, a 4x change, so no fixed
+    radius is right for both.
+
+    **Per JH:** derive the mean from locations nearer the ignition, *depending on the
+    variance across the domain* — fuel conditions away from the fire may differ from
+    those where it is likely to spread. That argues for a variance-dependent radius
+    rather than a tuned constant: widen while sd stays low, tighten toward the
+    ignition when it does not. **The floor is the grid** — at 1.66 km spacing, ~5 km
+    is the tightest radius averaging more than a handful of cells, and below that it
+    reads one or two RTMA cells with whatever noise they carry.
+
+    The deeper fix is Md as a **field**. ForeFire's fuel table is per-category, so a
+    spatially varying Md needs the table mechanism rethought, not just a different
+    average.
 
 ## 12. NEXT SESSION
 
