@@ -128,6 +128,77 @@ def read_fmda_fmc(geo_dir,lat,lon,radius_km=10,classes=(0,),weights=None):
         return None
 
 
+#grid lat/lon for an FMDA region, read once; the tile is 1258x2145 so finding the
+#nearest cell per step would otherwise re-scan 2.7 M points every time
+_FMDA_GRID = {}
+
+
+def _fmda_grid(geo_file):
+    if geo_file not in _FMDA_GRID:
+        g = nc.Dataset(geo_file)
+        _FMDA_GRID[geo_file] = (np.array(g['XLAT'][:]), np.array(g['XLONG'][:]))
+    return _FMDA_GRID[geo_file]
+
+
+def read_fmda_hourly(fmda_dir, geo_file, lat, lon, when, radius_km=10,
+                     classes=(0, 1, 2), weights=(2000.0, 109.0, 30.0)):
+    """Weighted mean dead fuel moisture at a point and a *time*, from the hourly
+    FMDA cycler output.
+
+    read_fmda_fmc reads the geogrid tile, which is one snapshot written before
+    wrf.exe runs, so a whole ForeFire run gets a single Md.  The cycler instead
+    writes hourly files -- <fmda_dir>/<YYYYMM>/fmda-<CODE>-<YYYYMMDD>-<HH>.nc, each
+    carrying FMC_GC(south_north, west_east, class) -- which is what lets Md follow
+    the diurnal cycle across a run's steps.
+
+    Grid coordinates live in the region's <CODE>-geo.nc, not in the hourly files.
+    That file is the one the FMDA handoff warns must never be pruned: it is written
+    once and read forever.
+
+    Returns the mean as a fraction, or None if nothing usable is within radius_km of
+    the point at that time.  None means "leave the fuel table alone", so a missing
+    hour degrades to the run's default rather than to a silently wrong moisture.
+    """
+    when = pd.Timestamp(when)
+    if when.tzinfo is not None:
+        when = when.tz_convert('UTC').tz_localize(None)
+    #nearest hour on disk; the cycler names by valid time
+    cand = glob.glob(f"{fmda_dir}/*/fmda-*-????????-??.nc")
+    if not cand:
+        return None
+    def _t(path):
+        stem = os.path.basename(path)[:-3]
+        return pd.Timestamp(stem[-11:-3] + 'T' + stem[-2:] + ':00:00')
+    best = min(cand, key=lambda f: abs((_t(f) - when).total_seconds()))
+    if abs((_t(best) - when).total_seconds()) > 3600 * 2:
+        return None
+
+    lat2d, lon2d = _fmda_grid(geo_file)
+    #local-plane distance is fine at these radii and far cheaper than great-circle
+    dy = (lat2d - lat) * 110540.0
+    dx = (lon2d - lon) * 111320.0 * np.cos(np.deg2rad(lat))
+    within = (dx * dx + dy * dy) <= (radius_km * 1000.0) ** 2
+    if not within.any():
+        return None
+
+    d = nc.Dataset(best)
+    fmc = d.variables['FMC_GC']
+    tot = 0.0
+    wsum = 0.0
+    for c, w in zip(classes, weights):
+        if c >= fmc.shape[2]:
+            continue
+        v = np.array(fmc[:, :, c])[within]
+        v = v[np.isfinite(v) & (v > 0)]
+        if v.size == 0:
+            continue
+        tot += w * float(v.mean())
+        wsum += w
+    if wsum == 0:
+        return None
+    return tot / wsum
+
+
 def resolve_md(wksp_dir,ign_latlon,cfg):
     """Dead fuel moisture for a run, with where it came from.
 
@@ -375,6 +446,57 @@ def moisture_params(wksp_dir,ign_latlon,cfg):
     if md is None:
         return {}
     return {'fuelsTableFile': container_path(write_fuel_table(md,cfg),cfg)}
+
+
+def md_series(timing_table, ign_latlon, cfg):
+    """Per-step dead fuel moisture, or None to leave the fuel table alone.
+
+    Returns a list aligned with timing_table rows.  A run used to get one Md for its
+    whole length, written once into the fuel table by write_fuel_table, so a fire
+    could not respond to moisture at all -- and the base table's 0.1 sits below the
+    0.12 moisture of extinction, so it could never stall.  Measured on Cotton 2 the
+    real signal swings 0.064 to 0.197 over a day, crossing `me` for much of the
+    night, which is the mechanism behind the growth stall seen in WRF-SFIRE.
+
+    Only active when moisture.source is 'fmda_hourly'.  Any step whose hour is
+    missing gets None and keeps the default table, so a gap degrades that step
+    rather than the run.
+    """
+    mc = cfg.get('moisture', {})
+    if not mc.get('enabled') or mc.get('source') != 'fmda_hourly':
+        return None
+    fmda_dir = mc.get('fmda_dir')
+    geo_file = mc.get('fmda_geo_file')
+    if not fmda_dir or not geo_file:
+        print('moisture source fmda_hourly needs fmda_dir and fmda_geo_file')
+        return None
+    if mc.get('weighting', 'single') == 'sav':
+        classes = tuple(mc.get('dead_classes', [0, 1, 2]))
+        weights = tuple(mc.get('sav_weights', [2000.0, 109.0, 30.0]))
+    else:
+        classes, weights = (mc.get('class_index', 0),), (1.0,)
+    lo, hi = mc.get('valid_range', [0.02, 0.50])
+
+    out = []
+    for _, row in timing_table.iterrows():
+        md = None
+        try:
+            md = read_fmda_hourly(fmda_dir, geo_file, ign_latlon[0], ign_latlon[1],
+                                  row['UTC_str'], mc.get('radius_km', 10),
+                                  classes, weights)
+        except Exception as e:
+            print(f"hourly FMDA failed at {row['UTC_str']}: {e}")
+        if md is not None and not (lo <= md <= hi):
+            print(f"hourly FMDA Md={md:.4f} outside {lo}-{hi} at {row['UTC_str']}, ignored")
+            md = None
+        out.append(md)
+    got = [m for m in out if m is not None]
+    if not got:
+        print('hourly FMDA gave nothing usable; fuel tables unchanged')
+        return None
+    print(f"hourly FMDA Md over {len(got)} of {len(out)} steps: "
+          f"{min(got):.4f} to {max(got):.4f}")
+    return out
 
 
 def read_ignitions(wksp_dir):
@@ -663,6 +785,10 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
         print(f"multi-point ignition: {len(ignitions)} points -> {len(thinned)} after "
               f"thinning -> {sum(len(v) for v in schedule.values())} placed across "
               f"{len(schedule)} steps")
+    #per-step dead fuel moisture, when configured; None keeps one table for the run
+    md_per_step = md_series(timing_table, ign_latlon, cfg)
+    md_tables = {}
+
     #time of the last wrfout, ign_seconds
     end_time = timing_table['ign_seconds'].max()
 
@@ -745,8 +871,18 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
                     file_content = file_content.replace(placeholder, value)
 
                 #override tuning parameters for a parameter-variation run
-                if params:
-                    file_content = apply_ff_params(file_content,params)
+                step_params = dict(params or {})
+                if md_per_step is not None and md_per_step[i] is not None:
+                    #one table per distinct Md.  Rounding to 4 decimals would let
+                    #equal-moisture steps share a table, though in practice they
+                    #rarely do -- Cotton 2 gave 30 distinct values over 30 steps.
+                    #The tables are small text files, so this is cheap either way.
+                    key = round(md_per_step[i], 4)
+                    if key not in md_tables:
+                        md_tables[key] = container_path(write_fuel_table(key, cfg), cfg)
+                    step_params['fuelsTableFile'] = md_tables[key]
+                if step_params:
+                    file_content = apply_ff_params(file_content,step_params)
 
                 #detections belonging to this step's window
                 if i in schedule:
