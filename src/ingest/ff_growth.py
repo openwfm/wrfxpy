@@ -30,8 +30,10 @@ import glob
 import json
 import os.path as osp
 from datetime import datetime, timedelta
+import re
 
 import numpy as np
+import netCDF4 as nc
 from shapely.geometry import shape
 from shapely.ops import unary_union
 
@@ -73,8 +75,67 @@ def track(model_dir, pattern='*.geojson'):
     return rows, proj
 
 
-def compare(runs, pattern='*.geojson', stall_ha_per_h=1.0):
-    """runs is [(label, dir), ...].  Prints area and growth rate per hour."""
+def wrf_track(wksp_dir, step_minutes=60, cell_m=None):
+    """WRF-SFIRE's own burned area through time, from TIGN_G.
+
+    `TIGN_G` in the **retained final wrfout** is each fire-grid cell's ignition time
+    in seconds since the simulation start, with a large sentinel for cells that never
+    burned.  Area at time t is therefore just the count of cells whose TIGN_G is at
+    or below t, which recovers the whole progression from **one file**.
+
+    That matters because cleaned workspaces lose `FIRE_AREA` -- their wrfouts are
+    replaced by saveouts, which do not carry it -- so summing FIRE_AREA per output
+    time only works on fires that have not been cleaned yet.  TIGN_G works on both,
+    and evaluates at any instant rather than only at output times.
+
+    Validated on Hot Spring 226, where both survive: 442.8 ha against FIRE_AREA's
+    440.9 at the final time, tracking at every hour.  It runs **0.5-1% high** because
+    TIGN_G marks a cell burned at its ignition instant while FIRE_AREA ramps
+    fractionally -- a consistent bias, not noise.
+
+    Returns [(datetime, area_ha)].
+    """
+    outs = sorted(glob.glob(osp.join(wksp_dir, 'wrf', 'wrfout_d01_*')))
+    if not outs:
+        return []
+    d = nc.Dataset(outs[-1])
+    if 'TIGN_G' not in d.variables:
+        return []
+    #drop the edge strip make_FF_nc drops, so areas match the ForeFire domain
+    sr = int(d.dimensions['west_east_subgrid'].size /
+             (d.dimensions['west_east'].size + 1))
+    t = np.array(d['TIGN_G'][0, :-sr, :-sr])
+    if cell_m is None:
+        cell_m = float(d.DX) / sr
+    cell_ha = cell_m * cell_m / 1e4
+    burned = t < t.max() * 0.999          # the rest carry the never-burned sentinel
+    if not burned.any():
+        return []
+
+    m = re.search(r'-(\d{4}-\d{2}-\d{2})_(\d{2}):(\d{2}):(\d{2})-\d+$',
+                  osp.basename(wksp_dir.rstrip('/')))
+    if m:
+        start = datetime.strptime('%s %s:%s:%s' % m.groups(), '%Y-%m-%d %H:%M:%S')
+    else:
+        start = datetime.strptime(osp.basename(outs[0])[11:], '%Y-%m-%d_%H:%M:%S')
+
+    end = float(t[burned].max())
+    rows = []
+    step = step_minutes * 60
+    k = step
+    while k <= end + step:
+        rows.append((start + timedelta(seconds=k),
+                     float(((t <= k) & burned).sum()) * cell_ha))
+        k += step
+    return rows
+
+
+def compare(runs, pattern='*.geojson', stall_ha_per_h=1.0, wrf=None):
+    """runs is [(label, dir), ...].  Prints area and growth rate per hour.
+
+    wrf is [(label, workspace), ...] read from TIGN_G via wrf_track, so WRF-SFIRE's
+    own fire appears as a column beside the ForeFire forecasts.
+    """
     tracks = {}
     proj = None
     for label, d in runs:
@@ -84,6 +145,12 @@ def compare(runs, pattern='*.geojson', stall_ha_per_h=1.0):
         tracks[label] = dict(r)
         print('%-14s %3d perimeters  %s -> %s' % (
             label, len(r), r[0][0] if r else '-', r[-1][0] if r else '-'))
+    for label, w in (wrf or []):
+        r = wrf_track(w)
+        tracks[label] = dict(r)
+        print('%-14s %3d steps from TIGN_G  %s -> %s' % (
+            label, len(r), r[0][0] if r else '-', r[-1][0] if r else '-'))
+        runs = list(runs) + [(label, w)]
     times = sorted({t for v in tracks.values() for t in v})
     if not times:
         raise SystemExit('no step perimeters found; try --pattern')
@@ -137,12 +204,18 @@ def main():
                    help='growth below this many ha/h counts as stalled (default 1)')
     a = p.parse_args()
     runs = []
+    wrf = []
     for spec in a.runs:
         if '=' not in spec:
             raise SystemExit('expected label=dir, got %r' % spec)
         label, d = spec.split('=', 1)
-        runs.append((label, d))
-    compare(runs, a.pattern, a.stall)
+        #a 'wrf:' prefix reads WRF-SFIRE's own fire from TIGN_G instead of ForeFire
+        #geojsons, so the reference curve sits in the same table as the forecasts
+        if label.startswith('wrf:'):
+            wrf.append((label[4:] or 'WRF-SFIRE', d))
+        else:
+            runs.append((label, d))
+    compare(runs, a.pattern, a.stall, wrf=wrf)
 
 
 if __name__ == '__main__':

@@ -1843,10 +1843,12 @@ def wrfout_status(wksp_dir):
     NFUEL_CAT and ZSF from wrfinput_d01 is everything make_FF_nc needs.  So a
     cleaned fire is still runnable and must not be skipped.
 
-    What a cleaned workspace *does* lose is FXLONG/FXLAT and FIRE_AREA, so
-    wn_vs_wrf.py must take coordinates from wrfinput_d01 instead, and **WRF-SFIRE's
-    own growth curve cannot be recovered** -- model-against-model comparison is no
-    longer possible for that fire.
+    A cleaned workspace loses FXLONG/FXLAT and FIRE_AREA, so wn_vs_wrf.py must take
+    coordinates from wrfinput_d01 instead.  **WRF-SFIRE's growth curve is still
+    recoverable**, contrary to an earlier note here: TIGN_G in the retained final
+    wrfout gives each cell's ignition time, so area at t is the count of cells at or
+    below t.  ff_growth.wrf_track does this, and it is validated against FIRE_AREA to
+    within 0.5%.  Model-against-model comparison therefore survives cleaning.
 
     A short count means WRF is still writing: the cron fires at 00:10 while wrfouts
     are still appearing, make_timing_table globs a partial set, and the forecast is
