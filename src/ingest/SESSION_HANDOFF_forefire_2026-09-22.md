@@ -429,7 +429,71 @@ while 50 m and 100 m were not. The 25 m was rebuilt with moisture on rather than
 comparing across a changed configuration. Do not change configuration inside an
 experiment.
 
-## 8. Silver-specific caveats that do not affect the ratio
+## 8. Fuel moisture as a field — what is reachable and what is not
+
+§7 item 12 (now §12 item 12) records that Md is a scalar. **Per JH, moisture as a field could be a
+ForeFire input if a different spread model is used** — several Balbi variants exist —
+though that would need a new fuels csv and possibly different fuel maps. Checked, and
+the position is better than expected in one way and blocked in another.
+
+### The models are all there
+
+`libforefireL.so` inside the container carries **all eleven** propagation models:
+`Rothermel`, `RothermelAndrews2018`, `Balbi2015`, `Balbi2020`, `BalbiNov2011`,
+`BalbiNov2011Curv`, `BalbiNov2011TMdMl`, `BalbiUnsteady`, `Farsite`, `IsotropicFuel`,
+`WindDriven`. The `forefire` executable is only 68 KB — a thin driver — so look in the
+library, not the binary. Selecting one is a `setParameter[propagationModel=...]`
+change in the templates, no rebuild.
+
+### Moisture layers are already plumbed
+
+`DataBroker.cpp` reads **`moisture` and `temperature` as XYZT layers straight out of
+the netcdf**, by the same machinery as `windU`/`windV` (lines ~343, ~1285). So a
+spatially *and* temporally varying field needs no new mechanism — `forefire_grib.py`
+would just write another variable.
+
+### But dead moisture is deliberately wired to the table
+
+In `BalbiNov2011TMdMl.cpp`:
+
+    deadMoisture = Md; //registerProperty("deadMoisture");
+
+**Live moisture and temperature come from layers; dead moisture does not.** Someone
+tied it back to the fuel table and commented out the layer registration. So today:
+
+    live moisture, temperature   can be fields, no source change
+    dead moisture                per-category table constant
+
+### And the source change is effectively out of reach
+
+**Per JH: the Singularity container was built on a separate machine from a Docker
+image published by the ForeFire developers. Compiling ForeFire from source needs
+specific compilers and a C++ netcdf library he could not get working in any
+environment here.**
+
+So uncommenting that one line is *not* a one-line change in practice — it requires a
+rebuild that has not been achievable. Treat the container as fixed. The routes that
+remain are to ask upstream, or to solve the build environment, and neither is a
+afternoon's work.
+
+### What a model switch would cost anyway
+
+- **The fuel table.** `ff_fuels_behave13.csv` already carries Balbi parameters
+  (`Rhod`, `Tau0`, `Deltah`, `r00`, `X0`, `Blai`), which is why one file serves a
+  Rothermel run — but whether those values are *calibrated* for Balbi or merely
+  inherited is unverified and must not be assumed.
+- **The fuel maps.** Balbi variants separate dead and live loads (`Sigmad`/`Sigmal`)
+  and depth, which Anderson 13 supplies only coarsely.
+- **Every calibration measured here.** `windrf` and `windReductionFactor` were tuned
+  against Rothermel behaviour, and 09-18 §7 warns such calibrations do not transfer.
+  **A model switch would invalidate the `B/A` relationship measured across five fires
+  rather than extending it.**
+
+**So the practical near-term option is the variance-dependent radius of §7 item 12,
+not a field.** A field is the better answer and it is blocked on a build problem, not
+on a design one.
+
+## 9. Silver-specific caveats that do not affect the ratio
 
 - **`fire_init` was not invoked for this fire**, confirmed by measurement: cells
   inside the 2026-08-27 perimeter are 9.6% `NFUEL_CAT == 14` against 13.3% outside.
@@ -442,7 +506,7 @@ experiment.
 - **The only perimeter available predates the forecast by 24 days** (§9), so nothing
   here is scored against observation.
 
-## 9. A perimeter can be much older than the forecast
+## 10. A perimeter can be much older than the forecast
 
 `ngfs/perims/Silver_{68A6E77D-...}.geojson` has `poly_PolygonDateTime`
 **2026/08/27 18:56** against a forecast window of 2026-09-20 18:00Z to
@@ -464,7 +528,7 @@ What the perimeter does establish is location, and it checks out: geometry is
 self-consistent (709.1 ha computed against 714.7 ha stated, 99.2%) and the forecast
 ignition sits inside it, 108 m from the nearest vertex.
 
-## 10. The two fuel paths differ cell by cell
+## 11. The two fuel paths differ cell by cell
 
 Measured on Silver, and it applies to **every** comparison including Union and Red
 Bank, where it was never checked:
@@ -487,7 +551,7 @@ Terrain, by contrast, agrees closely: the LANDFIRE DEM cut reproduced WRF's `ZSF
 range to 637-2299 m against 637-2300 m. That is the first check of the `altitude`
 field in real relief, which 09-21 §10 flagged as untested on flat fires.
 
-## 11. Open items
+## 12. Open items
 
 1. **Nothing is pushed**, on either branch, now across two sessions.
 2. **§1 is two complex cases**, sitting either side of 1.0. The *sign* of the area
@@ -550,13 +614,14 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
     is the tightest radius averaging more than a handful of cells, and below that it
     reads one or two RTMA cells with whatever noise they carry.
 
-    The deeper fix is Md as a **field**. ForeFire's fuel table is per-category, so a
-    spatially varying Md needs the table mechanism rethought, not just a different
-    average.
+    The deeper fix is Md as a **field** — see §8, which finds the layer machinery
+    already exists but that dead moisture is wired to the table with the layer
+    registration commented out, and that rebuilding the container to change it is not
+    currently achievable.
 
-## 12. NEXT SESSION
+## 13. NEXT SESSION
 
-1. **Finish Cotton 2** (§11 item 9). The cache should now cover its wind reversal,
+1. (see §12 item 9). The cache should now cover its wind reversal,
    14 netcdfs of the pre-shift window are already built, and it is both a
    mid-roughness point for §1 and the only case so far with a large wind shift in it.
 2. **Fill in §1 cheaply.** Run `wn_vs_wrf.py` on more fires spanning roughness — one
