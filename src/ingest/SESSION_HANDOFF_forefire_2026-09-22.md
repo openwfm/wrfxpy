@@ -44,8 +44,10 @@ hypothesis. Terrain roughness is `ZSF` std over the fire grid, which is the numb
     Red Bank      31.5 m    -          -       -        1.035            -          -
     Silver       364.7 m    0.765     49.1     0.109    0.717          0.937      514 m
     Dome         504.1 m    1.175     35.9     0.396    1.164          0.991      455 m
+    Cotton 2     184.4 m    1.119     54.3     0.20*    1.082          0.967        -
 
-    * Union: relief 21-93 m; std not computed.
+    * Union: relief 21-93 m; std not computed.  Cotton 2 anomR is a rough mean over
+      hours with R >= 0.3; its wind reversal makes several hours unusable.
     + Union is an ensemble mean against a single WRF chained-track perimeter, not
       ensemble against ensemble.  Red Bank, Silver and Dome are ensemble against
       ensemble, each at a single common valid time.
@@ -305,88 +307,127 @@ igniting a point at the overpass time. That would remove the largest confound in
 containment-time score above, and it is a different initialisation problem from
 anything `forefire_grib.py` currently does.
 
-## 7. Cotton 2 and the mesh-sensitivity experiment — RESULTS PENDING
-
-**Written 2026-09-23 while the runs were still going. Everything below is measured;
-the ensemble and mesh results are the parts still missing and are marked as such.**
+## 7. Cotton 2 — winds, mesh and moisture
 
 `COTTON_2_2026-09-21_20_00_00_283A99DF-AFD8-4F6A-8CA4-F827DA0AFBCD`, Napa County,
 California. Ignition 2026-09-21 21:26:54Z at 38.63331, -122.06932. 30 km at 25 m.
-**`ZSF` std 184.4 m**, relief 23-927 m — the mid-roughness point between Red Bank
-(31.5) and Silver (365) that §1 is missing, and a second California case.
+**`ZSF` std 184.4 m** — the mid-roughness point between Red Bank (31.5) and Silver
+(365), and a second California case. Deferred a day on 09-22 because its ~164 deg
+wind reversal began on the last hour the f03 cache reached; by 09-23 the cache
+covered the whole window with 31 gap-free GRIBs.
 
-### Why it was deferred a day, and what that bought
+Five runs, each differing from a neighbour in exactly one thing:
 
-Its interest is a **~164 deg wind reversal**. Measured off the WRF run, domain-mean
-direction the wind blows *from*:
+    forefire_md_const     WRF winds,  constant Md
+    forefire              WRF winds,  per-step Md
+    forefire_hrrr_m25     HRRR winds, per-step Md, 25 m solve
+    forefire_hrrr_m50     HRRR winds, per-step Md, 50 m solve
+    forefire_hrrr_m100    HRRR winds, per-step Md, 100 m solve
 
-    19:00 09-21 -> 11:00 09-22   steady SW, 194-227 deg   R 0.79-0.96
-    12:00 09-22                  360 deg   <== the reversal   R 0.118
-    13:00 -> 00:00 09-23         339 -> 179, round through N, NE, E to SE
+**Reference:** WRF-SFIRE's own fire, from wrfout `FIRE_AREA` (verified cumulative —
+monotonic, max 1.0, nonzero-cell count ~ sum, while `FUEL_FRAC_BURNT` is the
+per-timestep rate): **817.9 ha**, stalling 09:00-18:00Z at 0.7-4.9 ha/h as its
+`FMC_GC_F` climbs past 0.16.
 
-On 09-22 the f03 cache reached only 12:00Z, so the reversal began on the last
-available hour and everything after was out of range. Held overnight rather than run
-on the pre-shift window. By 09-23 10:00Z the cache covered to 09-23 02:00Z — **31
-GRIBs, no gaps** — past the WRF end of 09-23 00:00Z. The 15 netcdfs built on 09-22
-were reused untouched; `forefire_grib` skipped them and built only the new hours.
+### Mesh: it barely matters, and that is the operationally useful result
 
-**Compare the steady regimes either side, not across the shift.** R falls to 0.161 at
-11:00 and 0.118 at 12:00, below the 0.3 floor, so direction statistics through the
-transition are meaningless regardless of data.
+    solve mesh   ensemble mean   ratio to 25 m   build time
+      25 m          4719.9 ha         -            ~65 min
+      50 m          4656.0 ha       0.986          ~18 min
+     100 m          4636.6 ha       0.982           ~5 min
 
-### Cost, measured — and a correction to 09-21 §1
+**Under 2% across a 4x mesh range, for 13x the cost.** The prediction in §1 held:
+fire area follows the bulk wind and ignores the field's detail.
 
-09-21 §1 says a step is "dominated by the warps and the netcdf write, not the solve."
-**That is wrong.** Timed on this fire, 1200x1200 at a 25 m solve, from netcdf mtimes
-over 12 consecutive steps:
+Direction statistics are **even less sensitive** — mesh changes them by under 0.5%:
 
-    total per step                    ~145 s
-      WindNinja solve                 ~140 s   ~97%
-      gdalwarp x2 (vel, ang)             2.2 s
-      read_asc x2 (np.loadtxt)           1.2 s
-      conda activate x3                  1.1 s
-      apply_windrf + write_ff_nc        <0.1 s
+                     dir RMS mean   at reversal 10:00Z   >90 deg   peak B/A
+      25 m               54.3            118.3            57.5%      2.97
+      50 m               54.2            118.1            57.4%      2.59
+     100 m               54.1            117.8            57.4%      2.26
 
-Everything on the Python side totals under 5 s. Two plausible culprits were checked
-and cleared: `np.loadtxt` on a 1.44 M-value ASCII grid is 0.6 s (`np.fromstring` is
-4.3x faster and irrelevant at this scale), and `remap_fuel`'s scipy distance
-transform is 0.6 s and runs once per fire, not per step.
+**The only thing the mesh changes is the extremes**: peak B/A falls ~3.0 -> ~2.3 from
+25 m to 100 m, which is 09-18 §4's "peak speed keeps climbing as the mesh refines"
+seen from the other end. Peaks move 30%, area moves 2%. **Mesh buys extremes and the
+fire ignores extremes.**
 
-**So the only cost lever is the WindNinja mesh**, which scales as `cells^0.93`:
+### The wind reversal is not resolved, at any scale
 
-    solve mesh   cells (30 km)   est. per step   27 steps
-      25 m          1.44 M          ~145 s        ~65 min
-      50 m          0.36 M           ~40 s        ~18 min
-     100 m          0.09 M           ~11 s         ~5 min
+At 10:00Z, the onset, still coherent at R = 0.53 so the numbers mean something:
+**direction RMS 118 deg with 57% of cells more than 90 deg wrong**, and the bias
+swings +69 deg then -63 deg in consecutive hours. Through 11:00-14:00 R falls to
+0.18-0.28, below the 0.3 floor, so those hours cannot be judged at all.
 
-Also worth knowing for any future low-latency path: netcdf assembly is effectively
-free, so cached or shared WindNinja fields would make a run cost seconds.
+**Refining the mesh does not help.** If capturing a synoptic wind shift matters, this
+is a limit of the method, not of the resolution it is run at.
 
-### The mesh experiment
+### Winds
 
-Same domain, fire grid, GRIBs, ignition and `windrf`; **the only variable is
-`--wn-mesh`**, at 25, 50 and 100 m. Results land in `forefire_hrrr_m50` and
-`forefire_hrrr_m100` beside the 25 m run. The WRF ensemble is the shared reference
-and is run once (`--skip-wrf` on the variants).
+`HRRR/WRF = 1.082` at 25 m, both moisture-on. Cotton 2 sits between the flat cases
+(~1.0) and the complex ones (Silver 0.72, Dome 1.16), consistent with §1.
 
-**The question it answers has not been asked before.** 09-18 §4 measured mesh
-convergence **in the wind field** — RMS speed error 0.526 -> 0.217 m/s from 300 m to
-100 m with no plateau, peak speed climbing 11.3 -> 20.0 m/s — but never whether any
-of that reaches the fire.
+### Moisture: real, and smaller than it first appeared
 
-**The prediction, stated before the answer is known.** Silver and Dome showed the
-fire tracks the speed bias and ignores direction scatter (§1). So fire area should
-follow `B/A` across meshes and be largely indifferent to the rest of the field's
-detail. If the three meshes give similar `B/A` and similar areas, the 65-minute 25 m
-solve buys nothing over the 5-minute 100 m one **for this purpose**, which would
-matter operationally. If area varies strongly with mesh while `B/A` does not, the
-speed-bias mechanism is falsified — the more interesting outcome.
+Same WRF winds, constant against per-step Md:
 
-### Still missing
+    chained track      MdConst 5325.9 ha, 0 of 53 hours stalled
+                       MdVary  1936.2 ha, 8 of 53 hours stalled
+    ensemble mean      MdConst 5587.5 ha  ->  MdVary 4362.4 ha   (0.781)
+    ensemble spread    1.40 -> 6.15
 
-Ensemble comparison at 25 m; `B/A` and direction statistics per mesh; fire areas per
-mesh; and whether the reversal is captured. Fill these in and drop the PENDING from
-the heading.
+**The stall is reproduced and it is partial, as predicted from per-fuel `me`.**
+MdVary decelerates from 09:00, bottoms at ~2.2 ha/h around 15:00 and recovers by
+16:30 — it never stops. Cotton 2 is 56% cat 2 (`me` 0.15) and 25% cat 5 (`me` 0.20),
+so the majority arrests while a quarter creeps. A single global `me` would have
+predicted a hard stop; WRF-SFIRE's own residual 0.7-1.7 ha/h shows the same shape.
+
+**The track and the ensemble mean differ by 2.3x on the same run**, because
+later-launched members start after the moisture peak and never stall — which is also
+why spread explodes from 1.40 to 6.15. **For an 8 h product launched into a rising
+moisture window the member that matters is the one starting at forecast time, not the
+mean.**
+
+**A correction.** An earlier reading of this said moisture "moves area by 550%" and
+dwarfed the wind effects. **That was wrong** — it confused the size of the gap with
+the size of the fix. Per-step moisture closes the gap to WRF-SFIRE from 6.8x to 5.3x
+on the ensemble mean. It is clearly right, and it reproduces a mechanism ForeFire
+structurally lacked, but it does not explain the overprediction.
+
+### The overprediction is the open problem
+
+    WRF-SFIRE        817.9 ha
+    ForeFire         4362 ha ensemble mean / 1936 ha track, with moisture on
+
+**A 5.3x overprediction remains after winds (8%), mesh (2%) and moisture (22%) are
+accounted for.** Per JH this tendency for ForeFire to overpredict relative to
+WRF-SFIRE has been noticed repeatedly, so it is a pattern rather than a Cotton 2
+quirk, and it is now the largest known discrepancy in this work.
+
+**JH's suggested direction:** determine which observables make the use of **wind
+adjustment factors** sensible. That is a different lever from anything tried so far —
+`windrf` and ForeFire's own `windReductionFactor` are currently taken from the
+namelist and the template without being tied to anything measured. 09-18 §5 warns
+that `UF`/`VF` already carry `windrf`, and 09-18 §7 that a `wRF` calibrated against
+WindNinja means something different from one calibrated against coupled winds, so the
+two must not be mixed.
+
+### A hazard that cost three mistakes this session
+
+**`cleanup_ff_run` empties the run directory it is given** (`mv {run_dir}/* {dest}/.`).
+That consumed:
+
+- the first 25 m ensemble, when the 50 m variant wrote into the same `forefire_hrrr`
+  that still held it — identical filenames, silently overwritten;
+- `timing_table_grib.csv`, which a later WRF rerun needed and could not find.
+
+Pass a directory you are willing to lose, never write two runs into one destination,
+and rename results immediately rather than leaving a directory occupied for the next
+stage to walk into.
+
+**Also:** moisture was enabled *mid-sweep*, so the original 25 m run was constant-Md
+while 50 m and 100 m were not. The 25 m was rebuilt with moisture on rather than
+comparing across a changed configuration. Do not change configuration inside an
+experiment.
 
 ## 8. Silver-specific caveats that do not affect the ratio
 
@@ -470,8 +511,19 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
 8. **Ensemble spread does not generalise** (§5). Three fires give three orderings:
    HRRR more dispersed on Red Bank and Dome, tighter on Silver. Do not read a
    spread difference as meaningful without more cases.
-9. **Cotton 2 is running as of 2026-09-23, results pending — see §7.** Deferred on
-   09-22 until the cache covered its wind shift; it now does.
+9. **ForeFire overpredicts against WRF-SFIRE by ~5.3x on Cotton 2**, after winds,
+   mesh and moisture are accounted for (§7). Per JH this tendency has been noticed
+   repeatedly. **This is now the largest known discrepancy in this work.** His
+   suggested direction: work out which observables make **wind adjustment factors**
+   sensible, which is a lever nothing so far has touched.
+10. **`cleanup_ff_run` empties the run directory it is given** (§7) — it destroyed an
+    ensemble and a timing table this session. Never point two runs at one
+    destination, and rename results immediately.
+11. **Per-step moisture is on by default now** (`etc/forefire.json`, untracked).
+    CONUS only, deliberately; off-grid fires keep the default table. The cron moved
+    from every 20 minutes to `10 0 * * *` after interfering twice.
+12. **Md is a domain-mean scalar per step**, not a field. The real moisture varies
+    across a 30 km domain and ForeFire is being handed one number for all of it.
 
 ## 12. NEXT SESSION
 
