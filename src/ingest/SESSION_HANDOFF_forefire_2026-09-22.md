@@ -672,7 +672,86 @@ afternoon's work.
 not a field.** A field is the better answer and it is blocked on a build problem, not
 on a design one.
 
-## 11. Silver-specific caveats that do not affect the ratio
+## 11. Hot Spring 226 — FMDA saw the rain and barely responded
+
+`Hot_Spring_226_2026-09-21_16_00_00_F99FF1C2-AB69-44DD-A118-082DF3E7E09A`, Hot Spring
+County, Arkansas. Ignition 2026-09-21 17:17:20Z at 34.4076, -92.6637. Flat (`ZSF` std
+30.3 m), timber litter — cat 9 33%, cat 8 24%, cat 10 19%, `me` 0.25-0.30.
+
+JH's question: the forecasts matched closely, but there was a jump in fuel moisture in
+the window, **possibly precipitation FMDA was blind to and WRF was not.**
+
+### FMDA was not blind to it
+
+    rain event 22:00-00:00Z
+      WRF   RAINNC 0.00 -> 0.23 mm accumulated    Md 0.0772 -> 0.1030   (+0.0258)
+      FMDA  PRECIP 0.009 then 0.050               Md 0.0637 -> 0.0667   (+0.0030)
+
+**FMDA's `PRECIP` registers the event in exactly the hours WRF does.** The difference
+is the *response*: WRF's fuel moisture jumps **8.6x** more than FMDA's for the same
+rain. Whether that is FMDA's Kalman update damping a small forcing against its RAWS
+observations, or a genuinely different wetting response, is not separable from this.
+
+Over the whole 27 hours the two agree well — **correlation 0.770, bias +0.0021, RMS
+difference 0.0236**, FMDA peaking slightly higher (0.160 against 0.146). A localised
+three-hour discrepancy inside a well-tracked series, not systematic blindness.
+
+### Why the forecasts agreed anyway
+
+Neither source ever exceeds 0.16 against `me` of 0.25-0.30, so **moisture never
+approaches extinction here and cannot drive a stall in either model.** Same regime as
+Dome; the opposite of Cotton 2, where grass at `me` 0.15 was crossed for 13 hours.
+
+### Re-run with per-step moisture
+
+    growth rate        ForeFire (Md vary)   WRF-SFIRE
+      22:00                 85.4 ha/h          11.8
+      23:00                 93.5               23.0
+      00:00                 72.5  <- dip       17.3  <- dip
+      01:00                 80.0               26.7
+
+**Both dip at 00:00Z and both recover** — ForeFire to 78% of its prior rate,
+WRF-SFIRE to 75%. Per-step moisture *does* reproduce the feature at comparable
+relative depth, which **falsifies** a prediction that the 8.6x weaker wetting response
+would give a much shallower dip.
+
+**The absolute overprediction is untouched:** ForeFire 1551.8 ha over 24.5 h against
+WRF-SFIRE's 440.9 ha, **3.5x** — consistent with Dome (6.0x against observation), Red
+Bank (4.9x) and Cotton 2 (5.3x).
+
+### The premise rested on a truncated run
+
+**"ForeFire matched WRF-SFIRE closely" came from a run that stopped early.** The old
+constant-Md result covered 17:30-05:00 and reached 630.6 ha, which against 440.9 ha
+looked reasonable. The complete run reaches 1551.8 ha. The agreement was the run
+stopping, not the models agreeing. The preserved `forefire_md_const` is **not** a
+clean const-vs-vary comparison for the same reason — 24 perimeters against 50.
+
+## 12. Most recent runs were truncated, and why
+
+Surveying the last 36 workspaces with ForeFire output: **21 are truncated**, last
+perimeter earlier than last wrfout.
+
+    Calhoun_259    last wrfout 09-23 09:00    last FF perimeter 09-22 21:00
+    BOON           last wrfout 09-23 00:00    last FF perimeter 09-22 12:00
+
+**The cause is scheduling, not failure.** The cron fires at 00:10 while WRF is still
+writing wrfouts, so `make_timing_table` globs a partial set and the run stops there.
+Re-running once WRF has finished picks up the full set.
+
+**Caution on the survey method:** runs made *before* the 09-21 clock fix carry
+`valid_at` stamps that run ahead of real time, so they appear "complete" against the
+last wrfout when they are not. The test is only meaningful for post-fix runs —
+identifiable by having many distinct `fuelsTableFile` entries rather than one.
+
+**Per JH, all recent forecasts are worth re-running with fuel moisture where
+possible.** `ff.run_days(days2run=8, overwrite=True)` does this and was launched.
+
+**The nightly cron will keep producing truncated runs** unless it is scheduled after
+WRF reliably finishes, or made to skip fires whose WRF is still going. Nothing does
+either yet.
+
+## 13. Silver-specific caveats that do not affect the ratio
 
 - **`fire_init` was not invoked for this fire**, confirmed by measurement: cells
   inside the 2026-08-27 perimeter are 9.6% `NFUEL_CAT == 14` against 13.3% outside.
@@ -685,7 +764,7 @@ on a design one.
 - **The only perimeter available predates the forecast by 24 days** (§9), so nothing
   here is scored against observation.
 
-## 12. A perimeter can be much older than the forecast
+## 14. A perimeter can be much older than the forecast
 
 `ngfs/perims/Silver_{68A6E77D-...}.geojson` has `poly_PolygonDateTime`
 **2026/08/27 18:56** against a forecast window of 2026-09-20 18:00Z to
@@ -707,7 +786,7 @@ What the perimeter does establish is location, and it checks out: geometry is
 self-consistent (709.1 ha computed against 714.7 ha stated, 99.2%) and the forecast
 ignition sits inside it, 108 m from the nearest vertex.
 
-## 13. The two fuel paths differ cell by cell
+## 15. The two fuel paths differ cell by cell
 
 Measured on Silver, and it applies to **every** comparison including Union and Red
 Bank, where it was never checked:
@@ -730,7 +809,7 @@ Terrain, by contrast, agrees closely: the LANDFIRE DEM cut reproduced WRF's `ZSF
 range to 637-2299 m against 637-2300 m. That is the first check of the `altitude`
 field in real relief, which 09-21 §10 flagged as untested on flat fires.
 
-## 14. Open items
+## 16. Open items
 
 1. **Nothing is pushed**, on either branch, now across two sessions.
 2. **§1 is two complex cases**, sitting either side of 1.0. The *sign* of the area
@@ -798,7 +877,7 @@ field in real relief, which 09-21 §10 flagged as untested on flat fires.
     registration commented out, and that rebuilding the container to change it is not
     currently achievable.
 
-## 15. NEXT SESSION
+## 17. NEXT SESSION
 
 1. (see §12 item 9). The cache should now cover its wind reversal,
    14 netcdfs of the pre-shift window are already built, and it is both a
