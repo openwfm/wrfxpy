@@ -46,8 +46,10 @@ from __future__ import print_function
 import argparse
 import glob
 import json
+import re
 import os.path as osp
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 
 import numpy as np
 from pyproj import Proj
@@ -106,15 +108,101 @@ def elongation(geom):
 
 
 def _obs_time(props):
+    """Observation time, from either date format NIFC ships.
+
+    Per-fire files use '2026/09/15 16:09:00'; the year-to-date collections use
+    RFC-822, '"Wed, 16 Sep 2026 13:31:00 GMT"'.  Both appear in ngfs/perims.
+    """
     for k in ('poly_PolygonDateTime', 'poly_DateCurrent'):
         v = props.get(k)
-        if v:
-            for fmt in ('%Y/%m/%d %H:%M:%S', '%Y-%m-%dT%H:%M:%SZ'):
-                try:
-                    return datetime.strptime(v, fmt)
-                except ValueError:
-                    pass
+        if not v:
+            continue
+        for fmt in ('%Y/%m/%d %H:%M:%S', '%Y-%m-%dT%H:%M:%SZ'):
+            try:
+                return datetime.strptime(v, fmt)
+            except ValueError:
+                pass
+        try:
+            return parsedate_to_datetime(v).replace(tzinfo=None)
+        except Exception:
+            pass
     return None
+
+
+def extract_from_ytd(path, irwin):
+    """Pull one fire's feature out of a year-to-date perimeter collection.
+
+    `ngfs/perims/perims_ytd_<date>.geojson` holds every fire's latest perimeter in a
+    single ~170 MB line, so these are read as text and the one feature is cut out
+    rather than parsing the whole collection.
+
+    Two traps.  `poly_IRWINID` is `"{AACFD673-...}"` — **literal braces inside a
+    string** — so naive brace matching starts from the wrong place and never closes;
+    the feature start is found with rfind on '{"type":"Feature"' instead, and the
+    forward scan tracks whether it is inside a string.  And the dates here are
+    RFC-822, not the per-fire files' '%Y/%m/%d' (handled in _obs_time).
+    """
+    with open(path) as fh:
+        txt = fh.read()
+    i = txt.find(irwin)
+    if i < 0:
+        return None
+    j = txt.rfind('{"type":"Feature"', 0, i)
+    if j < 0:
+        return None
+    depth = 0
+    k = j
+    instr = False
+    esc = False
+    while k < len(txt):
+        c = txt[k]
+        if esc:
+            esc = False
+        elif c == '\\':
+            esc = True
+        elif c == '"':
+            instr = not instr
+        elif not instr:
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    break
+        k += 1
+    try:
+        return json.loads(txt[j:k + 1])
+    except ValueError:
+        return None
+
+
+def ytd_series(ytd_dir, irwin, since=None, until=None):
+    """Every distinct perimeter for one fire across the ytd collections.
+
+    Returns [(time, feature, source_file)] sorted by time, de-duplicated on
+    poly_PolygonDateTime, since consecutive daily files usually repeat the same
+    perimeter until a new one is flown.
+    """
+    out = {}
+    for f in sorted(glob.glob(osp.join(ytd_dir, 'perims_ytd_*.geojson'))):
+        base = osp.basename(f)
+        if since or until:
+            #cheap date filter on the filename before reading 170 MB
+            m = re.search(r'perims_ytd_(\d{4}-\d{2}-\d{2})', base)
+            if m:
+                d = m.group(1)
+                if since and d < since:
+                    continue
+                if until and d > until:
+                    continue
+        feat = extract_from_ytd(f, irwin)
+        if not feat:
+            continue
+        t = _obs_time(feat.get('properties', {}))
+        if t is None or t in out:
+            continue
+        out[t] = (feat, base)
+    return [(t, out[t][0], out[t][1]) for t in sorted(out)]
 
 
 def _valid_at(fc):
@@ -203,7 +291,17 @@ def score(obs_path, model_dir, pattern='*final*.geojson', at=None):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('observed', help='NIFC/IRWIN perimeter geojson')
+    p.add_argument('observed', nargs='?', default=None,
+                   help='NIFC/IRWIN perimeter geojson; omit when using --irwin')
+    p.add_argument('--irwin', default=None,
+                   help='IRWIN id (with or without braces) to pull from the '
+                        'year-to-date collections instead of a single file')
+    p.add_argument('--ytd-dir', default='/data/jhaley/wrfxpy/ngfs/perims',
+                   help='directory holding perims_ytd_*.geojson')
+    p.add_argument('--since', default=None, help='earliest ytd file date, YYYY-MM-DD')
+    p.add_argument('--until', default=None, help='latest ytd file date, YYYY-MM-DD')
+    p.add_argument('--list', action='store_true',
+                   help='with --irwin, list the perimeters found and stop')
     p.add_argument('model_dir', help='directory of ForeFire geojson output')
     p.add_argument('--pattern', default='*final*.geojson',
                    help="glob for modelled perimeters (default '*final*.geojson'; "
@@ -214,7 +312,32 @@ def main():
                         'attr_ContainmentDateTime. Format YYYY-MM-DDTHH:MM:SS')
     a = p.parse_args()
     at = datetime.strptime(a.at, '%Y-%m-%dT%H:%M:%S') if a.at else None
-    score(a.observed, a.model_dir, a.pattern, at=at)
+
+    obs_path = a.observed
+    if a.irwin:
+        irwin = a.irwin.strip('{}')
+        series = ytd_series(a.ytd_dir, irwin, a.since, a.until)
+        if not series:
+            raise SystemExit('no perimeters for %s in %s' % (irwin, a.ytd_dir))
+        if a.list:
+            for t, feat, src in series:
+                pr = feat.get('properties', {})
+                print('%s  %10s acres  %s' % (t, pr.get('poly_GISAcres'), src))
+            return
+        #pick the perimeter nearest the scoring target, so an in-window observation
+        #is used rather than whichever file happened to be read last
+        target = at or max(t for t, _, _ in series)
+        t, feat, src = min(series, key=lambda r: abs((r[0] - target).total_seconds()))
+        print('using the %s perimeter from %s (%d of %d available)\n'
+              % (t, src, [r[0] for r in series].index(t) + 1, len(series)))
+        import tempfile
+        fh = tempfile.NamedTemporaryFile('w', suffix='.geojson', delete=False)
+        json.dump({'type': 'FeatureCollection', 'features': [feat]}, fh)
+        fh.close()
+        obs_path = fh.name
+    if not obs_path:
+        raise SystemExit('give an observed geojson or --irwin')
+    score(obs_path, a.model_dir, a.pattern, at=at)
 
 
 if __name__ == '__main__':
