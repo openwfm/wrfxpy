@@ -128,6 +128,138 @@ def read_fmda_fmc(geo_dir,lat,lon,radius_km=10,classes=(0,),weights=None):
         return None
 
 
+#Anderson (1982) dead fuel load by size class, tons/acre, and the 1-h SAV each fuel
+#model uses, ft^-1.  These are not decorative: surface-area weighting built from them
+#reproduces the 'sd' column of etc/ff_fuels_behave13.csv to 4 significant figures for
+#every fuel with no live load (1,3,6,7,8,9,11,12,13).  The five that carry live load
+#read high by 0.2-15.8%, ordered exactly by live/dead ratio (5 > 4 > 10 > 2 > 7),
+#because the table's characteristic SAV folds in live surface area while this sum is
+#dead-only.  Md is the dead moisture -- live is the separate Ml column -- so dead-only
+#is the right weighting here, and the agreement confirms the loads match the table.
+DEAD_LOAD_13 = {                       # 1-h, 10-h, 100-h
+    1:  (0.74,  0.00,  0.00), 2:  (2.00,  1.00,  0.50), 3:  (3.01,  0.00,  0.00),
+    4:  (5.01,  4.01,  2.00), 5:  (1.00,  0.50,  0.00), 6:  (1.50,  2.50,  2.00),
+    7:  (1.13,  1.87,  1.50), 8:  (1.50,  1.00,  2.50), 9:  (2.92,  0.41,  0.15),
+    10: (3.01,  2.00,  5.01), 11: (1.50,  4.51,  5.51), 12: (4.01, 14.03, 16.53),
+    13: (7.01, 23.04, 28.05),
+}
+SAV_1H_13 = {1: 3500, 2: 3000, 3: 1500, 4: 2000, 5: 2000, 6: 1750, 7: 1750,
+             8: 2000, 9: 2500, 10: 2000, 11: 1500, 12: 1500, 13: 1500}
+SAV_10H, SAV_100H = 109.0, 30.0
+#WRF-SFIRE's own per-fuel moisture-class weights; see cawfe_class_weights
+CAWFE_NAMELIST = '/data/jhaley/wrfxpy/etc/nlists/default.fire_cawfe_13'
+
+
+#per-fuel moisture-class weights read from a WRF-SFIRE namelist, cached by path
+_FMC_GW = {}
+
+
+#Fuels where default.fire_cawfe_13 disagrees with Anderson's own size-class loads and
+#Anderson is the one to believe.  Fuel 9 is hardwood litter, which Anderson loads as
+#2.92/0.41/0.15 -- overwhelmingly 1-h -- while the namelist gives 0.066/0.930/0.003,
+#1-h and 10-h apparently transposed.  A 93% 10-h weight makes eastern hardwood fires
+#nearly unresponsive to diurnal drying, which is wrong for a litter fuel.  Fuel 2 is
+#timber grass and understory and the namelist puts 0.625 on 100-h, which does not
+#describe a grass understory either.  Set to [] to follow the namelist exactly.
+CAWFE_ANDERSON_FUELS = [2, 9]
+
+
+def cawfe_class_weights(namelist_path, n_dead=3, anderson_fuels=None):
+    """{fuel: (f_1h, f_10h, f_100h)} from a namelist's fmc_gw01..fmc_gw05 arrays.
+
+    This is **WRF-SFIRE's own weighting**, not a reconstruction of it, which makes it
+    the right choice here: every ForeFire result in this project is scored against
+    WRF-SFIRE, so the two models should read a moisture field the same way.
+    etc/nlists/default.fire_cawfe_13 carries one array per moisture class -- 1-h,
+    10-h, 100-h, 1000-h, live -- with 14 entries each, the 13 Anderson categories plus
+    the no-fuel slot.
+
+    Two facts from the table shape what this does.  fmc_gw04 (1000-h) is **all zeros**,
+    so dropping the 1000-h class costs nothing.  fmc_gw05 (live) is non-zero for fuels
+    2, 4, 5, 7 and 10, and FMDA has no live class to fill it -- the DA writes only
+    [:,:,:3] to WRF, and the two trailing FMC_GC slots are Kalman extended state, not
+    moisture.  So the dead weights are **renormalised** over the classes we actually
+    have.  Live moisture is not silently folded into Md; it stays in the table's own
+    Ml column, which is where ForeFire expects it.
+    """
+    if anderson_fuels is None:
+        anderson_fuels = CAWFE_ANDERSON_FUELS
+    key = (namelist_path, n_dead, tuple(anderson_fuels))
+    if key in _FMC_GW:
+        return _FMC_GW[key]
+    #a missing or unreadable namelist must degrade to the Anderson reconstruction,
+    #not abort a forecast: this runs per step inside a live run
+    try:
+        nml = read_namelist_fire(namelist_path)
+    except (IOError, OSError) as e:
+        print('cannot read %s (%s); falling back to Anderson loads' % (namelist_path, e))
+        _FMC_GW[key] = {}
+        return {}
+    cols = [nml.get('fmc_gw%02d' % (j + 1), []) for j in range(n_dead)]
+    if not cols or not cols[0]:
+        _FMC_GW[key] = {}
+        return {}
+    out = {}
+    for i in range(len(cols[0])):
+        fuel = i + 1
+        if fuel in anderson_fuels:
+            a = dead_class_weights(fuel, 'load')
+            if a:
+                out[fuel] = a
+                continue
+        w = [c[i] if i < len(c) else 0.0 for c in cols]
+        tot = sum(w)
+        if tot > 0:
+            out[fuel] = tuple(x / tot for x in w)
+    _FMC_GW[key] = out
+    return out
+
+
+def dead_class_weights(fuel, mode='area', namelist_path=None, anderson_fuels=None):
+    """(f_1h, f_10h, f_100h) for one Anderson category.  Two defensible weightings.
+
+    **mode='area'** is Rothermel's own: a size class counts by its *surface area*
+    A_ij = sigma_ij * w0_ij / rho_p, and the characteristic dead moisture is the
+    A-weighted mean of the class moistures.  rho_p is constant across dead classes so
+    it cancels and the weights are load x SAV, normalised.  This is what the spread
+    model actually consumes, so it is the default.
+
+    **mode='load'** weights by how much fuel is in each class, which is the plainer
+    reading of "how much of it is 1-h, 10-h and 100-h".
+
+    They are not a small variation on each other.  1-h SAV is 18x the 10-h and 67x
+    the 100-h, so area weighting stays 1-h dominated everywhere -- 1.000 for fuel 1
+    down to only 0.748 for fuel 12 -- while load weighting hands fuel 12 just 0.116 to
+    1-h and 0.478 to 100-h.  For grass the two agree exactly; for timber litter and
+    slash they disagree by more than the diurnal moisture swing itself.  Area
+    weighting is the physically correct one for a Rothermel-family rate of spread,
+    and load weighting is offered because it is what a fuel inventory reports.
+
+    Returns None for an index outside 1-13, meaning "no per-fuel split known".
+    """
+    if mode == 'cawfe':
+        w = cawfe_class_weights(namelist_path or CAWFE_NAMELIST,
+                                anderson_fuels=anderson_fuels).get(fuel)
+        if w:
+            return w
+        #an unreadable namelist degrades to **load** weighting, not area: the CAWFE
+        #table is load weighting for 11 of 13 fuels, so load is what it was trying to
+        #be.  Falling through to area here would quietly swap in a different physics
+        #(never below 0.748 on 1-h) at the moment the intended table went missing.
+        mode = 'load'
+    if fuel not in DEAD_LOAD_13:
+        return None
+    w = DEAD_LOAD_13[fuel]
+    if mode == 'load':
+        a = list(w)
+    else:
+        a = [wi * si for wi, si in zip(w, (float(SAV_1H_13[fuel]), SAV_10H, SAV_100H))]
+    tot = sum(a)
+    if tot <= 0:
+        return None
+    return tuple(x / tot for x in a)
+
+
 #grid lat/lon for an FMDA region, read once; the tile is 1258x2145 so finding the
 #nearest cell per step would otherwise re-scan 2.7 M points every time
 _FMDA_GRID = {}
@@ -141,9 +273,16 @@ def _fmda_grid(geo_file):
 
 
 def read_fmda_hourly(fmda_dir, geo_file, lat, lon, when, radius_km=10,
-                     classes=(0, 1, 2), weights=(2000.0, 109.0, 30.0)):
-    """Weighted mean dead fuel moisture at a point and a *time*, from the hourly
-    FMDA cycler output.
+                     classes=(0, 1, 2), weights=(2000.0, 109.0, 30.0),
+                     per_class=False):
+    """Dead fuel moisture at a point and a *time*, from the hourly FMDA cycler output.
+
+    With per_class=False this collapses the size classes to one number using `weights`
+    and returns a float.  With per_class=True it skips the collapse and returns the
+    per-class means as a tuple aligned with `classes`, which is what lets each fuel
+    category apply its own 1-h/10-h/100-h mix (see dead_class_weights).  A class with
+    no usable data comes back as None in that tuple rather than being dropped, so the
+    caller can tell "missing" from "dry".
 
     read_fmda_fmc reads the geogrid tile, which is one snapshot written before
     wrf.exe runs, so a whole ForeFire run gets a single Md.  The cycler instead
@@ -183,16 +322,24 @@ def read_fmda_hourly(fmda_dir, geo_file, lat, lon, when, radius_km=10,
 
     d = nc.Dataset(best)
     fmc = d.variables['FMC_GC']
-    tot = 0.0
-    wsum = 0.0
-    for c, w in zip(classes, weights):
+    means = []
+    for c in classes:
         if c >= fmc.shape[2]:
+            means.append(None)
             continue
         v = np.array(fmc[:, :, c])[within]
         v = v[np.isfinite(v) & (v > 0)]
-        if v.size == 0:
+        means.append(float(v.mean()) if v.size else None)
+    if all(m is None for m in means):
+        return None
+    if per_class:
+        return tuple(means)
+    tot = 0.0
+    wsum = 0.0
+    for m, w in zip(means, weights):
+        if m is None:
             continue
-        tot += w * float(v.mean())
+        tot += w * m
         wsum += w
     if wsum == 0:
         return None
@@ -417,7 +564,19 @@ def fuel_table_from_namelist(namelist_path,cfg,md=None,split_live=True):
 
 
 def write_fuel_table(md,cfg):
-    """Copies the base fuel table with Md replaced in every fuel class.
+    """Copies the base fuel table with Md substituted.
+
+    `md` is either a **float**, written into every fuel row, or a **tuple of the
+    1-h/10-h/100-h class moistures**, in which case each row gets its own Md: the
+    surface-area weighted mix for that Anderson category from dead_class_weights.
+    The per-class form is the physically right one -- grass is pure 1-h and responds
+    within the hour, while slash carries a quarter of its surface area in 10-h and
+    100-h fuel that lags by a day or more -- and a single scalar cannot express that
+    because it hands short grass and heavy slash the same moisture.
+
+    A row whose Index is outside 1-13, or a class that came back None, falls back to
+    the weights the caller would have used anyway, so an unknown fuel degrades to the
+    old behaviour instead of dropping out of the table.
 
     Plain text on purpose: the table is ';' separated with '\n' endings, and
     rewriting it through csv.writer appends '\r' to the last column, which makes
@@ -427,14 +586,44 @@ def write_fuel_table(md,cfg):
     out_dir = f"{cfg['run_dir']}/fueltables"
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
-    out = f"{out_dir}/fuels_Md_{md:.4f}.csv"
+    per_class = isinstance(md,(tuple,list))
+    #'area' (Rothermel surface area) or 'load'; see dead_class_weights
+    mode = cfg.get('moisture',{}).get('class_weighting','cawfe')
+    nml_path = cfg.get('moisture',{}).get('class_weight_namelist',CAWFE_NAMELIST)
+    anderson_fuels = cfg.get('moisture',{}).get('class_weight_anderson_fuels',
+                                                CAWFE_ANDERSON_FUELS)
+    if per_class:
+        vals = [m for m in md if m is not None]
+        if not vals:
+            return None
+        #fall back to the SAV mix for any class FMDA did not supply this hour
+        fb = tuple(m if m is not None else sum(vals)/len(vals) for m in md)
+        w = cfg.get('moisture',{}).get('sav_weights',[2000.0,109.0,30.0])
+        default = sum(wi*mi for wi,mi in zip(w,fb))/sum(w[:len(fb)])
+        out = (f"{out_dir}/fuels_Md_{mode}_"
+               f"{'_'.join('%.4f' % m for m in fb)}.csv")
+    else:
+        out = f"{out_dir}/fuels_Md_{md:.4f}.csv"
     lines = open(base,newline='').read().split('\n')
-    col = lines[0].split(';').index('Md')
+    head = lines[0].split(';')
+    col = head.index('Md')
+    icol = head.index('Index')
     keep = [lines[0]]
     for ln in lines[1:]:
         if not ln.strip():
             keep.append(ln); continue
-        f = ln.split(';'); f[col] = f"{md:.4f}"; keep.append(';'.join(f))
+        f = ln.split(';')
+        if per_class:
+            try:
+                wts = dead_class_weights(int(float(f[icol])), mode, nml_path,
+                                         anderson_fuels)
+            except ValueError:
+                wts = None
+            v = default if wts is None else sum(wi*mi for wi,mi in zip(wts,fb))
+        else:
+            v = md
+        f[col] = f"{v:.4f}"
+        keep.append(';'.join(f))
     open(out,'w',newline='').write('\n'.join(keep))
     return out
 
@@ -470,7 +659,12 @@ def md_series(timing_table, ign_latlon, cfg):
     if not fmda_dir or not geo_file:
         print('moisture source fmda_hourly needs fmda_dir and fmda_geo_file')
         return None
-    if mc.get('weighting', 'single') == 'sav':
+    #'per_fuel' keeps the classes apart so each fuel category can mix them itself;
+    #'sav' collapses them with one set of weights for every fuel; 'single' takes one
+    #class and ignores the rest
+    weighting = mc.get('weighting', 'single')
+    per_class = weighting == 'per_fuel'
+    if weighting in ('sav', 'per_fuel'):
         classes = tuple(mc.get('dead_classes', [0, 1, 2]))
         weights = tuple(mc.get('sav_weights', [2000.0, 109.0, 30.0]))
     else:
@@ -483,10 +677,17 @@ def md_series(timing_table, ign_latlon, cfg):
         try:
             md = read_fmda_hourly(fmda_dir, geo_file, ign_latlon[0], ign_latlon[1],
                                   row['UTC_str'], mc.get('radius_km', 10),
-                                  classes, weights)
+                                  classes, weights, per_class=per_class)
         except Exception as e:
             print(f"hourly FMDA failed at {row['UTC_str']}: {e}")
-        if md is not None and not (lo <= md <= hi):
+        #range-check every class, not the mix: one bad class should not be hidden by
+        #two good ones, and a class that fails is simply dropped for that step
+        if md is not None and per_class:
+            md = tuple(m if (m is not None and lo <= m <= hi) else None for m in md)
+            if all(m is None for m in md):
+                print(f"hourly FMDA all classes outside {lo}-{hi} at {row['UTC_str']}, ignored")
+                md = None
+        elif md is not None and not (lo <= md <= hi):
             print(f"hourly FMDA Md={md:.4f} outside {lo}-{hi} at {row['UTC_str']}, ignored")
             md = None
         out.append(md)
@@ -494,8 +695,16 @@ def md_series(timing_table, ign_latlon, cfg):
     if not got:
         print('hourly FMDA gave nothing usable; fuel tables unchanged')
         return None
-    print(f"hourly FMDA Md over {len(got)} of {len(out)} steps: "
-          f"{min(got):.4f} to {max(got):.4f}")
+    if per_class:
+        names = ('1-h', '10-h', '100-h')
+        for j in range(len(classes)):
+            v = [m[j] for m in got if m[j] is not None]
+            if v:
+                print(f"hourly FMDA {names[j] if j < 3 else 'class%d' % j} over "
+                      f"{len(v)} of {len(out)} steps: {min(v):.4f} to {max(v):.4f}")
+    else:
+        print(f"hourly FMDA Md over {len(got)} of {len(out)} steps: "
+              f"{min(got):.4f} to {max(got):.4f}")
     return out
 
 
@@ -877,7 +1086,9 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
                     #equal-moisture steps share a table, though in practice they
                     #rarely do -- Cotton 2 gave 30 distinct values over 30 steps.
                     #The tables are small text files, so this is cheap either way.
-                    key = round(md_per_step[i], 4)
+                    md_i = md_per_step[i]
+                    key = (tuple(round(m, 4) if m is not None else None for m in md_i)
+                           if isinstance(md_i, (tuple, list)) else round(md_i, 4))
                     if key not in md_tables:
                         md_tables[key] = container_path(write_fuel_table(key, cfg), cfg)
                     step_params['fuelsTableFile'] = md_tables[key]
