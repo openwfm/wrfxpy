@@ -14,6 +14,7 @@ import signal
 import re
 import math
 import shutil
+import time
 
 #---------------------------------------------------------------------------
 # configuration
@@ -2044,7 +2045,7 @@ def expected_wrfouts(wksp_dir):
     return int(m.group(2)) * 60 // hist + 1
 
 
-def wrfout_status(wksp_dir):
+def wrfout_status(wksp_dir, cfg=None):
     """(ok, message).  ok is False when ForeFire should not be run on this fire.
 
     Counts whichever source make_timing_table would actually use: wrfouts when
@@ -2065,6 +2066,18 @@ def wrfout_status(wksp_dir):
     are still appearing, make_timing_table globs a partial set, and the forecast is
     silently truncated -- 21 of 36 recent runs were truncated this way.  Re-running
     once WRF has finished fixes it.
+
+    **But a short count that has stopped changing is a different thing.** WRF ended
+    early and no amount of waiting will add a file, so the plain short-count rule
+    blocks the fire for ever.  Union_400257 sat at 52 of 55 and Ouachita_259 at 54 of
+    55 for four days, and both were skipped by every nightly run -- three hours short
+    of a full forecast, and getting none.  So if the newest output has not changed in
+    `stale_hours` (default 6), WRF is treated as finished-short and the forecast goes
+    ahead, with the shortfall stated rather than hidden.
+
+    `min_fraction` (default 0.5) is the floor: a run that died in its first hours has
+    too little weather to chain a sensible ensemble through, and a badly truncated
+    forecast is worse than none.  Both are overridable from cfg.
     """
     exp = expected_wrfouts(wksp_dir)
     n_wrf = len(glob.glob(f"{wksp_dir}/wrf/wrfout_d01_*"))
@@ -2077,8 +2090,21 @@ def wrfout_status(wksp_dir):
         return True, f"{act} of {exp} {src}, complete"
     if act == 0:
         return False, f"no wrfouts or saveouts at all, nothing to run from"
-    return False, (f"{act} of {exp} {src} -- WRF still running, skipping so the "
-                   f"forecast is not truncated")
+
+    cfg = cfg or {}
+    stale_hours = cfg.get('wrfout_stale_hours', 6)
+    min_fraction = cfg.get('wrfout_min_fraction', 0.5)
+    files = glob.glob(f"{wksp_dir}/wrf/wrfout_d01_*") + \
+            glob.glob(f"{wksp_dir}/wrf/saveout_d01_*")
+    age_h = (time.time() - max(os.path.getmtime(f) for f in files)) / 3600.0
+    if age_h >= stale_hours:
+        if act < exp * min_fraction:
+            return False, (f"{act} of {exp} {src}, idle {age_h:.1f} h -- WRF died early "
+                           f"(under {min_fraction:.0%}), too little to forecast from")
+        return True, (f"{act} of {exp} {src}, idle {age_h:.1f} h -- WRF finished short, "
+                      f"forecasting anyway ({exp - act} output(s) missing)")
+    return False, (f"{act} of {exp} {src}, last written {age_h:.1f} h ago -- WRF still "
+                   f"running, skipping so the forecast is not truncated")
 
 
 def run_forecasts(wksp_dir,forefire_dir = None, overwrite = False, cfg = None, params = None,
@@ -2097,7 +2123,7 @@ def run_forecasts(wksp_dir,forefire_dir = None, overwrite = False, cfg = None, p
 
     #do not build a forecast on a WRF run that is still writing: the cron fires while
     #wrfouts are still appearing and the result is silently truncated
-    ok,why = wrfout_status(wksp_dir)
+    ok,why = wrfout_status(wksp_dir,cfg)
     print(f"wrfouts: {why}")
     if not ok and not cfg.get('allow_partial_wrfouts'):
         return
