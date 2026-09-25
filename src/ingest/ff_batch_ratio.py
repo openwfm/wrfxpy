@@ -30,12 +30,18 @@ from ff_growth import track, wrf_track
 #inside 24 h -- and they scored 4.73x and 7.77x against a set centred near 0.58x.
 #Keying off the batch script's own mtime instead ties the window to the run being
 #scored rather than to a guessed number of hours.
-#argv[1] is the batch script whose mtime bounds the window, or a plain number of hours
+#argv[1] is the batch script whose mtime bounds the window, or a plain number of hours.
+#Try the number FIRST.  Checking osp.exists first looks harmless and is not: a bare '1'
+#matched a stray script named `1` sitting in the repo root, so `ff_batch_ratio.py 1`
+#silently took that file's mtime -- 2025-12-04 -- and scored the entire wksp archive,
+#125 fires at three different pSAF values, reported as if it were the last hour.
 ARG = sys.argv[1] if len(sys.argv) > 1 else '6'
-if osp.exists(ARG):
-    SINCE, BATCH = osp.getmtime(ARG), osp.basename(ARG)
-else:
+try:
     SINCE, BATCH = time.time() - float(ARG) * 3600, 'last %s h' % ARG
+except ValueError:
+    if not osp.exists(ARG):
+        raise SystemExit('%r is neither a number of hours nor an existing path' % ARG)
+    SINCE, BATCH = osp.getmtime(ARG), osp.basename(ARG)
 print('scoring ForeFire output written after %s (%s)\n'
       % (time.strftime('%Y-%m-%d %H:%M', time.localtime(SINCE)), osp.basename(BATCH)))
 

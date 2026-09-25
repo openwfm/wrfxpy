@@ -15,7 +15,10 @@ one to read first.
   common valid time the pSAF-0.6 overprediction was **3.85x**, not 6.74x. The widely
   quoted "ForeFire runs about 8x too much area" is substantially a timing artifact.
 - **Now running at pSAF 0.337**, which puts the 25th percentile at 1.0 — about three
-  quarters of fires overpredict, per JH's stated preference.
+  quarters of fires overpredict, per JH's stated preference. **Verified 2026-09-25 over
+  65 fires: geo mean 1.55, median 1.53, 17% below 1.0x, 75% within a factor of two**
+  against a prediction of 1.46 / 1.54 / 26%. The exponent holds; the question is closed
+  at 0.337 and the templates now say so (§9 item 1).
 - **Md is now per fuel category**, weighted by WRF-SFIRE's own `fmc_gw01..03`. Effect on
   total area is small (+3.8% / -3.4%) but it is the physically right treatment.
 - **The completeness guard has an age escape.** Two fires had been blocked for four days.
@@ -298,36 +301,87 @@ the batch at a common valid time, and every number in §2 depends on it.
 
 23 commits sit unpushed on `james_ngfs`; JH pushes these manually (SSH password).
 
-## 8. In flight at handoff
+## 8. In flight at handoff — both finished, scored 2026-09-25
 
-- **pSAF 0.337 batch** — `run_days(days2run=10, overwrite=True)`, 62 workspaces, ~2 h,
-  log `/tmp/psaf_work/psaf337_batch.log`, ends with `PSAF337 BATCH COMPLETE`.
+- **pSAF 0.337 batch** — `run_days(days2run=10, overwrite=True)`, 62 workspaces, ~2 h.
   This is the first batch carrying **both** pSAF 0.337 and per-fuel moisture.
-- **Union_400257 and Ouachita_259** — queued behind it on the same `flock`, log
-  `/tmp/psaf_work/unblocked.log`. The 0.337 batch imported `forefire.py` before the age
-  escape existed, so it cannot pick them up; this run brings them onto the same footing.
+- **Union_400257 and Ouachita_259** — queued behind it on the same `flock`. The 0.337
+  batch imported `forefire.py` before the age escape existed, so it could not pick them
+  up; this run brought them onto the same footing.
 
-**Early partial read — 7 fires in, treat as a smoke test, not a result.** Geometric mean
-1.98, median 1.65 against a prediction of 1.46 / 1.54. The sample is almost all
-prescribed burns and includes a 0.7 ha fire, so it is not representative. Per-fire the
-exponent is holding loosely (Eagle 0.50 -> 1.24 against 1.37 predicted, Dalton_RX
-1.10 -> 2.80 against 3.02) with one large miss (RX_Stray_Creek 1.10 -> 9.63 against
-3.02). Extra scatter is expected because these runs also carry per-fuel moisture.
+Both completed. The nightly cron then re-ran the recent fires at 0.337 as well, so the
+scored population is everything written after the templates changed at 11:04 on 09-24.
+**The verified result is in §9 item 1.** The early 7-fire partial read that used to sit
+here (geo mean 1.98, median 1.65) was a smoke test on an unrepresentative sample and is
+superseded — it ran high, as a set of small prescribed burns would.
 
-To score when both finish:
+**The age escape worked, and this was its first real test.** Union_400257 and
+Ouachita_259 both score in the final table — 1.40x and 2.00x — where under the old rule
+they would have been skipped for a fifth consecutive night. Neither is an outlier, which
+is the point: nothing about those fires ever needed explaining.
+
+Scored with:
 
     cd /data/jhaley/wrfxpy && PYTHONPATH=src:src/ingest \
-      python src/ingest/ff_batch_ratio.py /tmp/psaf_work/psaf337_batch.py
+      python src/ingest/ff_batch_ratio.py 18
+
+The argument is hours. The batch script whose mtime would normally bound the window had
+already been cleaned out of `/tmp/psaf_work`, so the window was taken from the templates'
+own mtime instead — the moment pSAF became 0.337, which is the same boundary.
 
 ## 9. Open items
 
-1. **Verify 0.337 against the prediction** (geo mean 1.46, median 1.54, 26% below 1.0x).
-   A large miss means the exponent does not hold over a 1.9x pSAF move, which would be
-   new information — it held exactly over the 0.6 -> 0.175 move.
-2. **pSAF probably belongs per fire, not global.** The size dependence is still there:
-   `ratio ~ area^-0.40`. JH's standing direction is to predict it from NGFS detection
-   fields (`frp`, `feature_frp`, `feature_detection_duration`, `fuel`, `land_cover`) over
-   a large CONUS batch. Exclude connectivity outliers like Mud_Bayou.
+1. ~~**Verify 0.337 against the prediction.**~~ **DONE 2026-09-25 — it holds.** n=65:
+
+   | | predicted | measured |
+   |---|---|---|
+   | geometric mean | 1.46 | **1.55** |
+   | median | 1.54 | **1.53** |
+   | below 1.0x | 26% | **17%** |
+   | within a factor of 2 | — | **75%** |
+
+   The median is essentially exact. **The pSAF^1.54 exponent holds over a 1.9x move**, as
+   it did over 0.6 -> 0.175, so it can be trusted for future adjustments. The batch runs
+   slightly more conservative than aimed for — 17% below 1.0x against 26% intended — which
+   is the harmless direction given JH's preference for overprediction.
+
+   Rescaling the scored set by the exponent shows 0.337 sits at the peak of the
+   within-2x curve, which is the argument for stopping here:
+
+   | pSAF | geo mean | median | below 1.0x | within 2x |
+   |------|----------|--------|-----------|-----------|
+   | 0.300 | 1.30 | 1.29 | 26% | 72% |
+   | **0.337** | **1.55** | **1.53** | **15%** | **75%** |
+   | 0.380 | 1.85 | 1.83 | 11% | 60% |
+   | 0.420 | 2.15 | 2.13 |  9% | 43% |
+
+   Going higher buys a few points fewer underpredictions and costs a lot of accuracy.
+   **The global-pSAF question is closed at 0.337.**
+
+2. **pSAF probably belongs per fire, not global.** The size dependence survives the
+   recalibration but is **about half what it was**: `ratio ~ area^-0.198` (log-log
+   r=-0.478) over the 63 fires of 10 ha or more, against `area^-0.40` at pSAF 0.6.
+
+   Quote the >=10 ha figure. The all-65 fit is `area^-0.050`, which looks like the
+   dependence has vanished, but it is flattened by two sub-10-ha fires (0.7 and 1.3 ha)
+   acting as leverage points at the far left of a log axis. That nearly went into this
+   handoff as "the size dependence is gone"; it is not.
+
+   **The residual is not a clean power law**, which matters before anyone fits one:
+
+   | WRF area | n | geo mean ratio |
+   |---|---|---|
+   | <200 ha | 20 | 1.71 |
+   | 200-600 ha | 25 | 1.77 |
+   | >600 ha | 20 | 1.18 |
+
+   Non-monotonic — small and mid-size fires behave alike and it is the **large** fires
+   that are better, so a single exponent is a poor description of the shape.
+
+   JH's standing direction is unchanged: predict the per-fire correction from NGFS
+   detection fields (`frp`, `feature_frp`, `feature_detection_duration`, `fuel`,
+   `land_cover`) over a large CONUS batch. Fit the residual around 0.337 rather than the
+   raw overprediction, and exclude connectivity outliers like Mud_Bayou.
 3. **Raise fuels 2 and 9 upstream.** `default.fire_cawfe_13` has fuel 9 at
    0.066/0.930/0.003 where Anderson gives 0.839/0.118/0.043 — 1-h and 10-h transposed.
    Per JH hardwood litter is mostly a 1-hour fuel. We now diverge from WRF-SFIRE here
@@ -338,11 +392,23 @@ To score when both finish:
 5. **Score against observations, not only WRF-SFIRE.** WRF-SFIRE is not truth: on Dome it
    ran 0.68x an IR perimeter while ForeFire ran 6.0x. Calibrating pSAF model-to-model
    inherits WRF-SFIRE's own bias.
-6. **Two fires still unscored** — Nethery and STEEL_PASS had no overlapping valid time.
+6. **Three fires still unscored** — Nethery, STEEL_PASS and now Eagle_Springs have no
+   valid time in common between the two models, so the ratio is undefined rather than
+   bad. `ff_batch_ratio.py` lists them instead of dropping them. Worth one look at why
+   the tracks do not overlap; three out of 68 is small but it is not shrinking.
 
 ## 10. NEXT SESSION
 
-Start by scoring the 0.337 batch (§8). If it lands near the prediction, the global-pSAF
-question is closed at "0.34, with a known size dependence" and the next real move is
-item 2 — per-fire pSAF from detection data, which is the only thing that addresses the
-`area^-0.40` slope rather than centring around it.
+Scoring the 0.337 batch is **done** (§9 item 1) — it matched the prediction, the exponent
+holds, and the global-pSAF question is closed at 0.337. The templates now carry a comment
+recording where that number came from.
+
+The next real move is **item 2, per-fire pSAF from detection data**. It is the only thing
+that addresses the residual structure rather than centring around it, and there is now a
+concrete target: a `area^-0.198` slope over fires of 10 ha or more, non-monotonic, with
+large fires already at 1.18x and the small and mid-size bins near 1.75x.
+
+Worth weighing item 5 first, though. The whole calibration is model-vs-model, and
+WRF-SFIRE is not truth — on Dome it ran 0.68x an IR perimeter. Fitting a per-fire
+correction against WRF-SFIRE would bake its bias in fire by fire rather than on average,
+which is harder to undo later than a single global constant.
