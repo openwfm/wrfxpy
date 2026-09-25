@@ -12,9 +12,17 @@ written. HRRR turns that from untidy into urgent -- 34 hourly leads at ~420 MB i
 ~14 GB per cycle and ~56 GB a day at four cycles, where NAM218's 3-hourly leads were a
 fraction of that.
 
-**Age alone is the rule, and that is a deliberate choice.** Per JH these files are
-archived on AWS and can be re-downloaded if a forecast ever has to be rerun, so losing
-a month-old GRIB costs download time and nothing else.
+**Age alone is the rule for sources that can be re-fetched**, and that is a deliberate
+choice: per JH the HRRR files are archived on AWS, so losing a month-old one costs
+download time and nothing else.
+
+**The NAM sources are the opposite case and are protected.** NAM is being retired, and
+per JH those files will become unavailable -- once they are gone the cache is the only
+copy, and no amount of download time brings them back. So `replaceable: False` keeps
+every NAM variety out of the default sweep entirely. Naming one explicitly still works
+for a dry run, but actually deleting it needs `--force-irreplaceable` on top of
+`--apply`. That friction is deliberate: it is the difference between reclaiming space
+and destroying an archive.
 
 The previous version instead refused to delete any file still symlinked from a
 workspace's `wps/<SOURCE>/GRIBFILE.???`. That sounds safer and is a trap at this scale:
@@ -39,18 +47,33 @@ import sys
 import time
 
 
-#Where each source's files live under the ingest directory.  HRRR nests a grid
-#directory ('conus') that the NAM sources do not, hence the extra level.  The key is
-#also the name of the per-source staging directory under <wksp>/*/wps/.
+#Where each source's files live under the ingest directory, and whether losing one is
+#recoverable.  HRRR nests a grid directory ('conus') that the NAM sources do not, hence
+#the extra level.  The key is also the name of the per-source staging directory under
+#<wksp>/*/wps/.
+#
+#replaceable=True  -> still published and archived on AWS; re-downloading is the only
+#                     cost of deleting one, so these are swept by default.
+#replaceable=False -> NAM, which is being retired.  When it goes the files become
+#                     unavailable and this cache is the only copy.  Never swept unless
+#                     named explicitly AND --force-irreplaceable is given.
 SOURCES = {
-    'HRRR':    'HRRR/hrrr.*/*/*.grib2',
-    'HRRRA':   'HRRRA/hrrr.*/*/*.grib2',
-    'HRRR_AK': 'HRRR_AK/hrrr.*/*/*.grib2',
-    'NAM218':  'NAM218/nam.*/*.grib2',
-    'NAM198':  'NAM198/nam.*/*.grib2',
-    'NAM196':  'NAM196/nam.*/*.grib2',
-    'NAM227':  'NAM227/nam.*/*.grib2',
+    'HRRR':    ('HRRR/hrrr.*/*/*.grib2',    True),
+    'HRRRA':   ('HRRRA/hrrr.*/*/*.grib2',   True),
+    'HRRR_AK': ('HRRR_AK/hrrr.*/*/*.grib2', True),
+    'NAM218':  ('NAM218/nam.*/*.grib2',     False),
+    'NAM198':  ('NAM198/nam.*/*.grib2',     False),
+    'NAM196':  ('NAM196/nam.*/*.grib2',     False),
+    'NAM227':  ('NAM227/nam.*/*.grib2',     False),
 }
+
+
+def glob_of(source):
+    return SOURCES[source][0]
+
+
+def replaceable(source):
+    return SOURCES[source][1]
 
 
 def human(n):
@@ -79,7 +102,7 @@ def linked_files(wksp_root, source):
 
 def sweep(ingest_root, wksp_root, source, max_age_s, now, keep_linked=False):
     """(doomed, kept_recent, kept_linked) for one source."""
-    cache = glob.glob(osp.join(ingest_root, SOURCES[source]))
+    cache = glob.glob(osp.join(ingest_root, glob_of(source)))
     if not cache:
         return [], 0, 0
     in_use = linked_files(wksp_root, source) if keep_linked else set()
@@ -103,8 +126,10 @@ def main():
         description='Prune cached forecast GRIBs older than --days. '
                     'Dry run unless --apply is given.')
     p.add_argument('sources', nargs='*', default=None,
-                   help='sources to sweep (default: every one present in the cache). '
-                        'Known: ' + ', '.join(sorted(SOURCES)))
+                   help='sources to sweep (default: every re-downloadable one present '
+                        'in the cache, which excludes every NAM variety). Known: '
+                        + ', '.join('%s%s' % (k, '' if replaceable(k) else ' [protected]')
+                                    for k in sorted(SOURCES)))
     p.add_argument('--days', type=float, default=30.0,
                    help='delete files older than this many days (default: 30). These '
                         'are re-downloadable from the AWS archive.')
@@ -114,19 +139,34 @@ def main():
                    help='also spare any file still symlinked from a workspace wps '
                         'directory. Off by default: workspaces are never pruned either, '
                         'so this eventually pins the whole cache.')
+    p.add_argument('--force-irreplaceable', action='store_true',
+                   help='permit deleting a protected source (any NAM). Required on top '
+                        'of --apply, because NAM is being retired and this cache will '
+                        'be the only copy.')
     p.add_argument('--apply', action='store_true',
                    help='actually delete. Without it, nothing is removed.')
     args = p.parse_args()
 
+    #Default sweeps only what can be downloaded again.  A protected source has to be
+    #named on the command line to be considered at all, so a bare run can never touch
+    #the NAM archive however the cache is laid out.
     sources = args.sources or [s for s in sorted(SOURCES)
-                               if osp.isdir(osp.join(args.ingest, s))]
+                               if replaceable(s) and osp.isdir(osp.join(args.ingest, s))]
     unknown = [s for s in sources if s not in SOURCES]
     if unknown:
         raise SystemExit('unknown source(s): %s\nknown: %s'
                          % (', '.join(unknown), ', '.join(sorted(SOURCES))))
     if not sources:
-        print('no known GRIB sources found under %s' % args.ingest)
+        print('no re-downloadable GRIB sources found under %s' % args.ingest)
         return
+
+    protected = [s for s in sources if not replaceable(s)]
+    if protected:
+        print('WARNING: %s %s being retired; once it is gone this cache is the only '
+              'copy.' % (', '.join(protected), 'are' if len(protected) > 1 else 'is'))
+        if args.apply and not args.force_irreplaceable:
+            raise SystemExit('refusing to delete %s without --force-irreplaceable'
+                             % ', '.join(protected))
 
     now = time.time()
     max_age_s = args.days * 24 * 3600
