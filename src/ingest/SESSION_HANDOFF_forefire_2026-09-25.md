@@ -293,7 +293,7 @@ calibration did not have to be redone, the first is why the bug was worth findin
   Cosmetic here, but it is the same signature as a genuinely broken chain, so it makes
   real breakage harder to spot.
 
-## 8. Driving ForeFire from HRRR *forecasts* — pieces 1 and 2 of 4 done
+## 8. Driving ForeFire from HRRR *forecasts* — pieces 1, 2 and 3 done
 
 Per JH: `hrrr_cycler.py` can drive FMDA from HRRR forecasts, and the same cycles should
 drive the WindNinja interpolation. NAM218 is deprecated in a few weeks and caching moves
@@ -392,6 +392,54 @@ has nothing older than 30 days, so it is unaffected.
 **Still to do for piece 1:** a cron entry for the sweep, and a decision on whether to
 keep `sats = ['NAM','HRRR']` running both through the transition -- that adds ~56 GB/day
 of HRRR on top of NAM. Neither was done unasked.
+
+### Piece 3: FMDA forecast mode runs, and ForeFire can read it (`0c88972`, `1f39148`)
+
+`./hrrr_cycler.sh f CONUS_HRRR` had never been run. It works: it seeds from an
+assimilated analysis at the cycle, then advances without DA, pinning to the 12z cycle.
+9 leads in 25 minutes, no errors, ~90 s per lead. `forecast_length` set to 12 (via
+`etc/fmda_cycler.json`, which is a **symlink** to `fmda_cycler_conus.json`).
+
+The naming confirms the reader: `fcst_hour` counts from `cycle`, not `cycle_start`, so
+valid time = the cycle in the name + NN. `read_fmda_hourly` now parses with `_FMDA_RE`
+and orders candidates by nearest valid time, then analysis over forecast, then shortest
+lead. Verified byte-identical output on the analysis-only path.
+
+**Not done: repointing `fmda_dir` at CONUS_HRRR.** That changes every nightly forecast,
+so it belongs with the piece 4 pSAF check, not ahead of it.
+
+### Where the 1-hour fuel goes under the 0.02 floor, and why it matters
+
+The floor is not an edge case. Over the forecast window the fraction of CONUS under it
+climbs from 0.00% at 15:00 UTC to **2.18% at 23:00** -- ordinary afternoon drying.
+Concentrated overwhelmingly in the interior West, at 23:00 UTC = late afternoon there:
+
+| region | cells < 0.02 | % of box |
+|---|---|---|
+| Great Basin / Intermountain (36-45N, 122-110W) | 16682 | **14.75%** |
+| N Rockies / Plains (44-49N, 115-100W) | 5071 | **7.00%** |
+| S Texas / W Gulf (25-31N, 101-94W) | 294 | 0.56% |
+| East of 95W | 754 | 0.10% |
+
+Not a localized artifact -- a coherent regional signal exactly where and when fires run.
+Eagle_Springs (45.7N, -107.7) sits in the N Rockies box.
+
+**Part of the field is negative, and that reframes the floor.** The 1-hour minimum is
+**-0.0594**; 2991 cells (0.16%) are below zero. Fuel moisture cannot be negative, so
+`valid_range` is not rejecting implausibly dry fuel -- it is rejecting **filter
+undershoot**. Two checks say that is exactly what it is:
+
+- The histogram decays smoothly through zero (340835 cells in 0.08-0.12, then 235758,
+  122715, 44700, 27930, 9730, then 2811 negative, 168, 12). No spike, no second mode --
+  the tail of a distribution whose mode is well above zero, continuing past it.
+- Negatives sit where the fuel is genuinely driest: the neighbourhood mean around a
+  negative cell is **0.0168** against **0.1411** domain-wide, eight times drier.
+
+So clamping is the right treatment and the old substitution was the wrong one in the
+worst possible place: at peak burning time, in the driest 15% of the Great Basin, it
+replaced a near-zero fine-fuel moisture with roughly the 100-hour value and stopped any
+fire there from spreading. Had forecast moisture been switched on before the clamp
+landed, this would have fired routinely rather than occasionally.
 
 ### Pieces 3 and 4, not started
 
