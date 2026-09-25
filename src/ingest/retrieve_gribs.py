@@ -56,9 +56,14 @@ if __name__ == '__main__':
     js.ingest_dir = ingest_dir
 
     grib_src = None
+    #'elif', not 'if'.  With a plain 'if' the HRRR branch set grib_src and then fell
+    #into the HRRR_AK/NAM/... chain below, matched nothing, and hit its else -- so
+    #'retrieve_gribs.sh HRRR' always died with "Invalid GRIB source HRRR" even though
+    #the source is fully supported.  HRRR_AK was unaffected because it is the chain's
+    #own first test.
     if grib_src_name == 'HRRR':
         grib_src = HRRR(js)
-    if grib_src_name == 'HRRR_AK':
+    elif grib_src_name == 'HRRR_AK':
         grib_src = HRRR_AK(js)
     elif grib_src_name == 'NAM':
         grib_src = NAM218(js)
@@ -89,7 +94,10 @@ if __name__ == '__main__':
 
     logging.info('SUCCESS, the following files are now available:')
     print('')
-    for g in gribs:
+    #retrieve_gribs returns a manifest dict, not a list, so iterating it printed the
+    #dict's keys -- 'ingest/grib_files', 'ingest/colmet_prefix' and so on, which read
+    #exactly like paths and made an empty download look like a successful one.
+    for g in (gribs['grib_files'] if isinstance(gribs, dict) else gribs):
         print((osp.join(ingest_dir, g)))
 
     print('\n** NOTE **')
