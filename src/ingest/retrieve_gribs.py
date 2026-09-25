@@ -39,9 +39,13 @@ import os.path as osp
 
 ## Standalone script that can be used to simply download files
 if __name__ == '__main__':
-    if len(sys.argv) != 5:
-        print(('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory>' % sys.argv[0]))
+    if len(sys.argv) not in (5, 6):
+        print(('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory> [esmf_cycle_start]' % sys.argv[0]))
         print('       supported GRIB sources: HRRR, HRRR_AK, NAM, NAM227, NAM196, NAM198, CFSR_P, CFSR_S, NARR, GFSA, GFSF_P, GFSF_S')
+        print('       cycle_start pins which forecast cycle is used instead of letting')
+        print('       the source pick the most recent one.  Needed for HRRR, whose')
+        print('       cycle_hours is 1: without it a caller asking for the 00/06/12/18')
+        print('       cycles silently gets whatever hourly cycle happens to be newest.')
         sys.exit(-1)
 
 
@@ -53,6 +57,10 @@ if __name__ == '__main__':
     from_utc = esmf_to_utc(sys.argv[2])
     to_utc = esmf_to_utc(sys.argv[3])
     ingest_dir = sys.argv[4]
+    #optional: pin the cycle rather than taking the source's most recent.  The
+    #parameter has always existed on retrieve_gribs -- hrrr_cycler passes it -- but was
+    #not reachable from the command line, which is how cache_grib_files drives this.
+    cycle_start = esmf_to_utc(sys.argv[5]) if len(sys.argv) == 6 else None
     js.ingest_dir = ingest_dir
 
     grib_src = None
@@ -90,7 +98,11 @@ if __name__ == '__main__':
 
     logging.info('Initiating download of files from GRIB source %s' % grib_src_name)
 
-    gribs = grib_src.retrieve_gribs(from_utc, to_utc)
+    if cycle_start is not None:
+        logging.info('pinning forecast cycle to %s' % cycle_start)
+        gribs = grib_src.retrieve_gribs(from_utc, to_utc, cycle_start=cycle_start)
+    else:
+        gribs = grib_src.retrieve_gribs(from_utc, to_utc)
 
     logging.info('SUCCESS, the following files are now available:')
     print('')
