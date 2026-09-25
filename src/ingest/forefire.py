@@ -263,6 +263,11 @@ def dead_class_weights(fuel, mode='area', namelist_path=None, anderson_fuels=Non
 
 #grid lat/lon for an FMDA region, read once; the tile is 1258x2145 so finding the
 #nearest cell per step would otherwise re-scan 2.7 M points every time
+#fmda-<CODE>-<YYYYMMDD>-<HH>[-fNN].nc -- the same shape src/cleanup_fmda.py parses.
+#Without the optional lead group, forecast-mode output is unreadable here.
+_FMDA_RE = re.compile(r'^fmda-(?P<code>.+)-(?P<date>\d{8})-(?P<hour>\d{2})'
+                      r'(?:-f(?P<lead>\d+))?\.nc$')
+
 _FMDA_GRID = {}
 
 
@@ -302,15 +307,29 @@ def read_fmda_hourly(fmda_dir, geo_file, lat, lon, when, radius_km=10,
     when = pd.Timestamp(when)
     if when.tzinfo is not None:
         when = when.tz_convert('UTC').tz_localize(None)
-    #nearest hour on disk; the cycler names by valid time
-    cand = glob.glob(f"{fmda_dir}/*/fmda-*-????????-??.nc")
+    #Nearest valid time on disk.  The analysis cycler names by valid time, but
+    #hrrr_cycler in forecast mode appends '-fNN' and then the name carries the
+    #**cycle**: the valid time is cycle + NN.  The old glob could not match those names
+    #at all, and its slicing parser assumed name == valid time, so forecast output was
+    #invisible -- which is why a forward forecast silently fell back to the default
+    #fuel table partway through its own window.
+    cand = []
+    for path in glob.glob(f"{fmda_dir}/*/fmda-*.nc"):
+        m = _FMDA_RE.match(os.path.basename(path))
+        if not m:
+            continue
+        cycle = pd.Timestamp(m.group('date') + 'T' + m.group('hour') + ':00:00')
+        lead = int(m.group('lead') or 0)
+        cand.append((cycle + pd.Timedelta(hours=lead), lead, path))
     if not cand:
         return None
-    def _t(path):
-        stem = os.path.basename(path)[:-3]
-        return pd.Timestamp(stem[-11:-3] + 'T' + stem[-2:] + ':00:00')
-    best = min(cand, key=lambda f: abs((_t(f) - when).total_seconds()))
-    if abs((_t(best) - when).total_seconds()) > 3600 * 2:
+    #Prefer, in order: the nearest valid time, then an analysis over a forecast, then
+    #the shortest lead.  Distance dominates so an exact hour is never passed over, and
+    #the analysis tiebreak matters because only the analysis assimilated observations
+    #-- a forecast should fill the future, not overwrite a past hour that was measured.
+    vt, lead, best = min(cand, key=lambda c: (abs((c[0] - when).total_seconds()),
+                                              c[1] > 0, c[1]))
+    if abs((vt - when).total_seconds()) > 3600 * 2:
         return None
 
     lat2d, lon2d = _fmda_grid(geo_file)
