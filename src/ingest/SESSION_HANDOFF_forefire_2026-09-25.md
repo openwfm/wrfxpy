@@ -1,7 +1,9 @@
 # ForeFire session handoff — 2026-09-25
 
-A short session: the scoring pass that the 09-24 handoff's §10 asked for, plus writing the
-result down where it will survive. One bug fixed along the way (§6).
+Started as the scoring pass the 09-24 handoff's §10 asked for. It closed the pSAF
+question (§2), then turned up a moisture bug that had been silently extinguishing fires
+(§7), and ended with three of the four pieces of HRRR-forecast-driven forecasting built
+and running (§8). Five bugs fixed in total.
 
 ## 1. TL;DR
 
@@ -29,9 +31,16 @@ result down where it will survive. One bug fixed along the way (§6).
   forecast cycles need no WindNinja change. `retrieve_gribs.sh HRRR` was dead on an
   `if`/`elif` slip and is fixed; `find_gribs` now picks a cycle deterministically and
   honours an `issue_utc` so hindcast scores cannot use cycles issued after the fire
-  started. FMDA forecast mode is written but has never been run.
-- **Nothing was re-run.** The scored population is the 0.337 batch from 09-24 plus the
-  nightly cron; the only run today was a 27 ha smoke test to prove the templates parse.
+  started. **FMDA forecast mode now runs** -- 9 leads, 25 min, no errors -- and ForeFire
+  can read its `-fNN` output. Pieces 1, 2 and 3 done; only the pSAF re-check is left.
+- **The 0.02 moisture floor is hit routinely, not exceptionally (§8).** 2.18% of CONUS
+  by late afternoon, 14.75% of the Great Basin -- and part of that field is *negative*,
+  so the floor is rejecting filter undershoot rather than implausible dryness. JH
+  confirms the regions match the web server's moisture maps.
+- **Two `retrieve_gribs.py` bugs, one per repo.** The `if`/`elif` slip above, and in the
+  release repo `== 'NAM' or 'NAM218'` -- a truthy string that silently routed NAM227,
+  CFSR, NARR, GFSA, GFSF, RAP and every RRFS_* to NAM218 (`e1444cc`). RRFS is a candidate
+  NAM replacement, so that one would have bitten exactly when it mattered.
 
 ## 2. The result
 
@@ -389,9 +398,29 @@ Default sweep at 30 days is 6.9 GB of HRRR_AK. Naming NAM218 would show 2.5 TB a
 NAM198 1.9 TB; **those were deliberately not applied.** The HRRRA cache ForeFire reads
 has nothing older than 30 days, so it is unaffected.
 
-**Still to do for piece 1:** a cron entry for the sweep, and a decision on whether to
-keep `sats = ['NAM','HRRR']` running both through the transition -- that adds ~56 GB/day
-of HRRR on top of NAM. Neither was done unasked.
+**The two ingest trees are now one.** `cache_grib_files.py` fills
+`/data/jhaley/wrfxpy/ingest/HRRR` while the FMDA cycler reads
+`/data/jhaley/clean_wrfxpy/wrfxpy/ingest/HRRR` -- separate directories, so every GRIB was
+being fetched twice (~56 GB/day duplicated). Per JH the second is now a **symlink** to
+the first. The merge kept both sides: 7 GRIBs existed only in the cycler tree, plus the
+`.size` sidecars the downloader uses for cache bookkeeping, and the 2 collisions were
+byte-identical before removal. Verified that writes through the link land in the shared
+tree, so future cycler downloads populate the one cache.
+
+**A second, worse `retrieve_gribs` bug, in the *other* repo** (`e1444cc` on
+`release-fmda-fixes`). The two repos carry diverged copies of this file; the clean one is
+newer and had `elif grib_src_name == 'NAM' or 'NAM218':`, which parses as
+`(name == 'NAM') or ('NAM218')`. A non-empty string is truthy, so the branch matched
+**every name that reached it**: NAM227, CFSR_P/S, NARR, GFSA, GFSF_P/S, RAP and every
+RRFS_* silently resolved to NAM218, downloaded NAM data under the requested name, and
+printed NAM's Vtable as the one to use. Only HRRR_S and HRRR escaped, being earlier in
+the chain. It matters now rather than eventually: **RRFS is a candidate NAM replacement**,
+and every attempt to retrieve it would have quietly returned NAM218 right up to the point
+NAM stops being published.
+
+**Still to do for piece 1:** a cron entry for the sweep, and a decision on when NAM comes
+out of `sats`. Per JH keep both for now and compare NAM- vs HRRR-driven forecasts as the
+deprecation date approaches. Neither was done unasked.
 
 ### Piece 3: FMDA forecast mode runs, and ForeFire can read it (`0c88972`, `1f39148`)
 
@@ -422,7 +451,10 @@ Concentrated overwhelmingly in the interior West, at 23:00 UTC = late afternoon 
 | East of 95W | 754 | 0.10% |
 
 Not a localized artifact -- a coherent regional signal exactly where and when fires run.
-Eagle_Springs (45.7N, -107.7) sits in the N Rockies box.
+Eagle_Springs (45.7N, -107.7) sits in the N Rockies box. **JH confirms these regions
+match the moisture maps the cycler pushes to the web server**, which is an independent
+check on the whole chain: the reader, the grid indexing and the regional breakdown all
+agree with a product produced by a different code path.
 
 **Part of the field is negative, and that reframes the floor.** The 1-hour minimum is
 **-0.0594**; 2991 cells (0.16%) are below zero. Fuel moisture cannot be negative, so
@@ -441,41 +473,30 @@ replaced a near-zero fine-fuel moisture with roughly the 100-hour value and stop
 fire there from spreading. Had forecast moisture been switched on before the clamp
 landed, this would have fired routinely rather than occasionally.
 
-### Pieces 3 and 4, not started
+### Piece 4, the only one left: the pSAF re-check
 
-1. ~~**`cache_grib_files.py` -> HRRR with pinned cycles.**~~ **DONE, above.** Original note: It already snaps to
-   `int(hour/6)*6` = 00/06/12/18, window +33 h, two cycles of lookback, four times a day.
-   **The trap:** NAM218 has `cycle_hours = 6` so cycle selection lands on those hours
-   naturally, but **HRRR has `cycle_hours = 1`** — with no explicit `cycle_start` it
-   picks the most recent *hourly* cycle and the 00/06/12/18 intent is silently lost. The
-   `cycle_start` parameter exists on `retrieve_gribs` and `hrrr_cycler` uses it; only the
-   CLI does not expose it. Also needs a **retention sweep for `ingest/HRRR`**: ~420 MB per
-   file, 34 leads is ~14 GB per cycle, ~56 GB/day at four cycles, and nothing prunes
-   `ingest/` (the HRRRA cache is already 108 GB). `cleanup_fmda.py` covers only
-   `wksp_fmda`.
-2. **FMDA forecast mode.** `./hrrr_cycler.sh f CONUS_HRRR` exists but **has never been
-   run** — zero `-fNN` files on disk. It composes correctly: lead N seeds from lead N-1,
-   lead 0 is the analysis file the hourly `27 * * * *` cron already writes, and DA is
-   properly skipped for `fcst_hour > 0`. `forecast_length` is unset in
-   `etc/fmda_cycler.json` so it defaults to 48. **Use a separate flock** —
-   `hrrr_cycler_fmda.lock` is held by the hourly analysis run.
+Changing the moisture source changes Md at every step of every fire, so this gets
+measured, not assumed.
 
-   Then teach `read_fmda_hourly`: its glob `fmda-*-????????-??.nc` does not match
-   `-f06.nc` at all, and `_t()` assumes the name is the valid time when for a forecast
-   file the name is the **cycle** and the valid time is cycle + NN. Reuse
-   `cleanup_fmda.CYCLE_RE`, which already has the optional `(?:-f\d+)?`. **Prefer analysis
-   over forecast where both cover an hour** — the analysis assimilated observations, so
-   forecast files should fill only the future.
+1. **Repoint `etc/forefire.json`**: `fmda_dir` -> `wksp_fmda/CONUS_HRRR`,
+   `fmda_geo_file` -> `CONUS_HRRR-geo.nc`. Both exist and are current. This is the one
+   change; nothing else moves, so the comparison isolates the moisture source.
+2. **Re-run and score** with `ff_batch_ratio.py`, passing the batch script so the window
+   is bounded by its mtime (§6 -- a bare number can be captured by a filename).
+3. **Compare against the clean baseline in §2**: geo mean 1.56, median 1.53, 25th
+   percentile 1.11, n=58.
+4. **Decide**: keep 0.337 if the 25th percentile stays within ~10% of 1.11 -- that is
+   inside the ~3% per-fire reproducibility noise (§4) plus sampling noise on 58 fires.
+   Otherwise `pSAF_new = 0.337 / p25^(1/1.54)`.
 
-   **ForeFire is currently pointed at the one product that cannot forecast**:
-   `etc/forefire.json` has `fmda_dir` -> `wksp_fmda/CONUS`, the **RTMA**-driven region.
-   The HRRR-driven one is `CONUS_HRRR`, already cycling hourly. Both geo files exist.
-3. **pSAF re-check.** Changing the moisture source changes Md at every step of every
-   fire. Switch `fmda_dir` alone, re-run, score, and compare against the clean baseline
-   in §2: geo mean 1.56, median 1.53, 25th percentile 1.11, n=58. Keep 0.337 if the 25th
-   percentile stays within ~10% of 1.11; otherwise `pSAF_new = 0.337 / p25^(1/1.54)`.
-   Per JH the RTMA/HRRR difference in resulting spread is small. Watch the per-fire
-   scatter rather than the mean — §7 is the cautionary tale.
+Per JH the RTMA/HRRR difference in resulting spread is small, so the constant will
+probably survive. **Watch the per-fire scatter rather than the mean anyway**: §7 is the
+cautionary tale, where a bug that moved Eagle_Springs from unscorable to 0.84 moved the
+58-fire aggregate from 1.55 to 1.56.
+
+Once forecast FMDA is in the loop, a *forecast-driven* run should be scored separately
+from an analysis-driven hindcast -- and with `--issue-utc` set (§8, piece 2), or the
+score silently credits cycles issued after the fire started.
 
 ## 9. Open items
 
@@ -490,22 +511,26 @@ move, now with a concrete target (§3).
 
 ## 10. NEXT SESSION
 
-**Pieces 3 and 4 of §8** — FMDA forecast mode (`./hrrr_cycler.sh f CONUS_HRRR`, never
-run), teaching `read_fmda_hourly` the `-fNN` naming, repointing `fmda_dir` at
-`CONUS_HRRR`, then the pSAF re-check against the §2 baseline.
+**Piece 4 of §8: the pSAF re-check.** Repoint `fmda_dir` at `CONUS_HRRR`, re-run, score,
+compare against geo mean 1.56 / median 1.53 / 25th pct 1.11 (n=58). Everything it needs
+is in place -- pieces 1, 2 and 3 are done and committed.
 
-Pieces 1 and 2 are done. Two loose ends from piece 1: a cron entry for
-`clean_grib_cache.py`, and whether to run both NAM and HRRR through the transition.
+Two loose ends from piece 1, both left deliberately for JH:
 
-The per-fire pSAF work below is still the larger scientific question, but §8 is the one
-with a deadline.
+- a cron entry for `clean_grib_cache.py` (nothing prunes `ingest/` yet);
+- when NAM comes out of `sats` in `cache_grib_files.py`. Per JH, keep both for now and
+  run NAM-vs-HRRR forecast comparisons as the deprecation date approaches. **Scope that
+  to WRF-SFIRE**: `resolve_grib_source` takes either, but WindNinja *silently garbles*
+  NAM218 -- exits 0, plausible valid time, speeds of 25.8 to 45,632 m/s -- so any
+  ForeFire-side number from NAM winds would be garbage that does not announce itself.
 
-Item 2, but weigh item 5 first. The entire calibration is model-vs-model and WRF-SFIRE is
-not truth; on Dome it ran 0.68x an IR perimeter while ForeFire ran 6.0x. A **global**
-constant fitted against WRF-SFIRE inherits its bias on average, which is easy to revise
-later. A **per-fire** correction fitted the same way would bake that bias in fire by
-fire, which is not. If there are enough usable IR perimeters to fit against instead, that
-ordering is worth the delay.
+Longer term, the per-fire pSAF question (§9 item 2) is the larger scientific one, but
+weigh §9 item 5 first. The whole calibration is model-vs-model and WRF-SFIRE is not
+truth; on Dome it ran 0.68x an IR perimeter while ForeFire ran 6.0x. A **global**
+constant fitted against WRF-SFIRE inherits that bias on average, which is easy to revise
+later. A **per-fire** correction fitted the same way would bake it in fire by fire, which
+is not. If there are enough usable IR perimeters to fit against instead, that ordering is
+worth the delay.
 
 Commits remain unpushed on `james_ngfs` and `release-fmda-fixes`; JH pushes them manually
 (SSH password).
