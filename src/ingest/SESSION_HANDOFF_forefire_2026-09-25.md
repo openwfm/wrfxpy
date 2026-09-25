@@ -293,7 +293,7 @@ calibration did not have to be redone, the first is why the bug was worth findin
   Cosmetic here, but it is the same signature as a genuinely broken chain, so it makes
   real breakage harder to spot.
 
-## 8. Driving ForeFire from HRRR *forecasts* — piece 2 of 4 done
+## 8. Driving ForeFire from HRRR *forecasts* — pieces 1 and 2 of 4 done
 
 Per JH: `hrrr_cycler.py` can drive FMDA from HRRR forecasts, and the same cycles should
 drive the WindNinja interpolation. NAM218 is deprecated in a few weeks and caching moves
@@ -352,9 +352,50 @@ Tested against a synthetic three-cycle cache: the publication boundary is exact 
 calls, the real HRRRA cache selects byte-identically to before, and a full
 `build_step_ncs` run through WindNinja is unchanged.
 
-### Pieces 1, 3 and 4, not started
+### Piece 1: HRRR cycles cached, and the cache finally has retention (`d979f2e`, `207eb8c`)
 
-1. **`cache_grib_files.py` -> HRRR with pinned cycles.** It already snaps to
+**The pinning trap was real.** `cache_grib_files.py` computes 00/06/12/18 and hands
+`retrieve_gribs` the *range*; NAM218 lands on those cycles by itself because its
+`cycle_hours` is 6. **HRRR's is 1**, so the same call takes whatever hourly cycle is
+newest -- 14z at 15:40Z -- and the whole 00/06/12/18 scheme would have been lost with
+nothing failing. `retrieve_gribs` has always accepted `cycle_start` (hrrr_cycler passes
+it) but the CLI did not expose it, and `retrieve_gribs.sh` forwarded only `$1..$4`, so a
+fifth argument vanished silently. Both fixed; `PINNED_CYCLE = {'HRRR'}` pins HRRR and
+leaves NAM's behaviour untouched.
+
+Verified against the live archive: pinned to 06z for a window valid 18:00-19:00Z it
+fetches `t06z.wrfprsf12/f13`, where unpinned it took ~14z.
+
+**Retention, and the asymmetry that drives it.** `ingest/` had never had any. There was
+an untracked `clean_grib_cache.py` whose idea -- never delete a GRIB a workspace still
+symlinks from `wps/<SRC>/GRIBFILE.???` -- is right but is a trap as a *default*:
+workspaces are never pruned either, so every old run pins its GRIBs forever and the
+sweep reclaims steadily less until it reclaims nothing. It survives as `--keep-linked`.
+
+The rewrite turns on a per-source `replaceable` flag, because the two halves of the
+cache have opposite risk:
+
+| | status | default |
+|---|---|---|
+| HRRR, HRRRA, HRRR_AK | archived on AWS, cheap to refetch | **swept** |
+| NAM218/198/196/227 | **being retired -- this cache becomes the only copy** | **protected** |
+
+Per JH, keep the NAM gribs of all varieties. A bare run therefore cannot touch them
+however the cache is laid out; naming one still works for a dry run, with a warning, but
+`--apply` on a protected source refuses unless `--force-irreplaceable` is also given
+(exit 1). Dry runs stay unrestricted -- only the irreversible step gains friction.
+
+Default sweep at 30 days is 6.9 GB of HRRR_AK. Naming NAM218 would show 2.5 TB and
+NAM198 1.9 TB; **those were deliberately not applied.** The HRRRA cache ForeFire reads
+has nothing older than 30 days, so it is unaffected.
+
+**Still to do for piece 1:** a cron entry for the sweep, and a decision on whether to
+keep `sats = ['NAM','HRRR']` running both through the transition -- that adds ~56 GB/day
+of HRRR on top of NAM. Neither was done unasked.
+
+### Pieces 3 and 4, not started
+
+1. ~~**`cache_grib_files.py` -> HRRR with pinned cycles.**~~ **DONE, above.** Original note: It already snaps to
    `int(hour/6)*6` = 00/06/12/18, window +33 h, two cycles of lookback, four times a day.
    **The trap:** NAM218 has `cycle_hours = 6` so cycle selection lands on those hours
    naturally, but **HRRR has `cycle_hours = 1`** — with no explicit `cycle_start` it
@@ -401,11 +442,12 @@ move, now with a concrete target (§3).
 
 ## 10. NEXT SESSION
 
-**Piece 1 of §8** — `cache_grib_files.py` onto HRRR with pinned 00/06/12/18 cycles, plus
-the `ingest/HRRR` retention sweep. It is the prerequisite for everything else in §8 and
-the NAM218 deprecation puts a clock on it.
+**Pieces 3 and 4 of §8** — FMDA forecast mode (`./hrrr_cycler.sh f CONUS_HRRR`, never
+run), teaching `read_fmda_hourly` the `-fNN` naming, repointing `fmda_dir` at
+`CONUS_HRRR`, then the pSAF re-check against the §2 baseline.
 
-After that, pieces 3 and 4 of §8 (FMDA forecast mode, then the pSAF re-check).
+Pieces 1 and 2 are done. Two loose ends from piece 1: a cron entry for
+`clean_grib_cache.py`, and whether to run both NAM and HRRR through the transition.
 
 The per-fire pSAF work below is still the larger scientific question, but §8 is the one
 with a deadline.
