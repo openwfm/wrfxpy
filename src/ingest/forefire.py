@@ -597,8 +597,21 @@ def write_fuel_table(md,cfg):
         vals = [m for m in md if m is not None]
         if not vals:
             return None
-        #fall back to the SAV mix for any class FMDA did not supply this hour
-        fb = tuple(m if m is not None else sum(vals)/len(vals) for m in md)
+        #A class FMDA did not supply at all is filled from the nearest class that it
+        #did, not from the mean of all of them.  The comment here used to say "the SAV
+        #mix" while the code took a plain unweighted mean, and that mean is what turned
+        #a missing 1-h class into roughly the 100-h value -- see the Eagle_Springs note
+        #in md_series.  Neighbouring size classes track each other; the 1-h and the
+        #100-h do not, least of all while the fuels are drying.  Out-of-range values no
+        #longer arrive here as None (md_series clamps them), so this now handles only a
+        #genuinely absent class.
+        def nearest(k):
+            for step in range(1, len(md)):
+                for j in (k - step, k + step):
+                    if 0 <= j < len(md) and md[j] is not None:
+                        return md[j]
+            return vals[0]
+        fb = tuple(m if m is not None else nearest(k) for k, m in enumerate(md))
         w = cfg.get('moisture',{}).get('sav_weights',[2000.0,109.0,30.0])
         default = sum(wi*mi for wi,mi in zip(w,fb))/sum(w[:len(fb)])
         out = (f"{out_dir}/fuels_Md_{mode}_"
@@ -681,16 +694,46 @@ def md_series(timing_table, ign_latlon, cfg):
                                   classes, weights, per_class=per_class)
         except Exception as e:
             print(f"hourly FMDA failed at {row['UTC_str']}: {e}")
-        #range-check every class, not the mix: one bad class should not be hidden by
-        #two good ones, and a class that fails is simply dropped for that step
+        #Range-check every class, not the mix, so one bad class is not hidden by two
+        #good ones -- but **clamp** it rather than dropping it.  Dropping looks like the
+        #cautious choice and is the opposite.  A dropped class is filled in by
+        #write_fuel_table from the classes that survived, so an out-of-range *dry* 1-h
+        #value is replaced by something close to the 100-h value, which is the wettest
+        #and slowest-responding class.  Eagle_Springs (2026-09-24) is the case: FMDA gave
+        #1-h moisture of 0.011 down to 0.004, under the 0.02 floor, so the 1-h class was
+        #dropped and became 0.213 -- fuel 2's Md went to 0.194 against me=0.15 and the
+        #fire could not spread at all.  ForeFire held 0.95 ha for 24 h where WRF-SFIRE
+        #burned 1297 ha and the same run with Md=0.1 burned ~1100.
+        #
+        #The failure is worst exactly when it is most dangerous.  Per JH, 1-h and 10-h
+        #dry with 100-h wet is the signature of a sharp temperature rise and humidity
+        #drop just before ignition; the 100-h class still carries pre-drying moisture,
+        #so borrowing from it during a rapid-drying event imports stale, wet data into
+        #the class that matters most for spread.
+        #
+        #Clamping keeps the physical ordering 1-h <= 10-h <= 100-h and never invents a
+        #fuel wetter than any class actually reported.  Here it gives Md 0.0837, which
+        #burns, against the correct 0.0787.
+        clamp = lambda m: min(max(m, lo), hi)
         if md is not None and per_class:
-            md = tuple(m if (m is not None and lo <= m <= hi) else None for m in md)
+            fixed = []
+            for k, m in enumerate(md):
+                if m is None:
+                    fixed.append(None)
+                elif lo <= m <= hi:
+                    fixed.append(m)
+                else:
+                    print(f"hourly FMDA class {classes[k]} = {m:.4f} outside "
+                          f"{lo}-{hi} at {row['UTC_str']}, clamped to {clamp(m):.4f}")
+                    fixed.append(clamp(m))
+            md = tuple(fixed)
             if all(m is None for m in md):
-                print(f"hourly FMDA all classes outside {lo}-{hi} at {row['UTC_str']}, ignored")
+                print(f"hourly FMDA gave no classes at {row['UTC_str']}, ignored")
                 md = None
         elif md is not None and not (lo <= md <= hi):
-            print(f"hourly FMDA Md={md:.4f} outside {lo}-{hi} at {row['UTC_str']}, ignored")
-            md = None
+            print(f"hourly FMDA Md={md:.4f} outside {lo}-{hi} at "
+                  f"{row['UTC_str']}, clamped to {clamp(md):.4f}")
+            md = clamp(md)
         out.append(md)
     got = [m for m in out if m is not None]
     if not got:
