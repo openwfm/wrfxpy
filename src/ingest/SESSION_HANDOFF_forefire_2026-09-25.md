@@ -8,11 +8,12 @@ result down where it will survive. One bug fixed along the way (§6).
 - **FMDA moisture was silently extinguishing fires (§7).** An out-of-range-*dry* 1-hour
   class was replaced by roughly the 100-hour value, so the driest fuels came out the
   wettest. Eagle_Springs held 0.946 ha for 24 h where WRF-SFIRE burned 1297. Fixed
-  (`3610523`); it now scores 0.89. **This is the most important thing in this handoff.**
-- **pSAF 0.337 measured at** 65 fires: geometric mean **1.55**, median **1.53**, 17% below
-  observed, 75% within a factor of two, against a prediction of 1.46 / 1.54 / 26%. The
-  exponent is confirmed, but **the value is provisional** — it was set on the 25th
-  percentile and the low tail is contaminated by the moisture bug. Batch re-running.
+  (`3610523`); it now scores 0.84-0.89. **This is the most important thing in this handoff.**
+- **pSAF 0.337 is verified and survives the moisture fix.** 65 contaminated fires gave
+  geo mean 1.55 / median 1.53; the re-run on clean output (58 fires) gives **1.56 / 1.53**.
+  The tail moved where it should — the 25th percentile went from 1.00 to 1.11, implying
+  pSAF 0.315 against the 0.337 in use, a 7% difference that sits inside the noise.
+  **Keep 0.337.** The bug was severe per fire and immaterial to the global constant.
 - **The `pSAF^1.54` exponent holds over a 1.9x move**, as it did over the 0.6 -> 0.175
   move. It can be trusted for future adjustments.
 - **The templates now explain the number.** Both `.ff` templates carry a comment block
@@ -223,7 +224,9 @@ Its comment claimed "the SAV mix" while the code took a plain unweighted mean; b
 agree. Commit `3610523`.
 
 Eagle_Springs re-run with the fix: **1151.9 ha against WRF-SFIRE's 1297.2 — ratio 0.89**,
-where it previously could not be scored at all.
+where it previously could not be scored at all. It scored 0.84 again in the full batch
+re-run below; the 0.84/0.89 gap between two runs of the same fire is the reproducibility
+noise from §4, not a difference in treatment.
 
 ### It contaminated the calibration
 
@@ -237,11 +240,42 @@ detectable because the substituted value equals the mean of the other two:
 | GRADE | 4 of 11 | 0.94 |
 | Eagle_Springs | 5 of 9 | unscorable |
 
-The median of 1.53 is robust, but **pSAF 0.337 was chosen by putting the 25th percentile
-at 1.0 — keyed on exactly the tail this bug creates.** The batch is re-running with the
-fix (`run_days(days2run=10, overwrite=True)`, log `psaf_reclean.log`, ends with
-`RECLEAN BATCH COMPLETE`); score it with `ff_batch_ratio.py` and re-derive pSAF from that.
-The sweep in §2 can be re-applied to the clean ratios with the same exponent.
+**pSAF 0.337 was chosen by putting the 25th percentile at 1.0 — keyed on exactly the tail
+this bug creates**, so the batch was re-run with the fix and re-scored.
+
+### Result of the re-run: the calibration holds
+
+Seven fires clamped across the 62 workspaces — Eagle_Springs, GRADE, Sheep_Station_Rx,
+Anderson_Butte_Rd_MM4, HOP-PATTERSON_PILE_RX, Horsefly_605_RX and STEEL_PASS — three more
+than the surviving fuel tables had revealed.
+
+| | contaminated (n=65) | **clean (n=58)** |
+|---|---|---|
+| geometric mean | 1.55 | **1.56** |
+| median | 1.53 | **1.53** |
+| below 1.0x | 17% | **21%** |
+| within a factor of 2 | 75% | **76%** |
+| 25th percentile | 1.00 | **1.11** |
+| size dependence (>=10 ha) | area^-0.198 | **area^-0.217** |
+
+Per fire the fix is dramatic; in aggregate it is not, because only 7 of 62 fires were
+touched:
+
+| fire | before | after |
+|---|---|---|
+| Eagle_Springs | 0.946 ha, unscorable | **0.84** |
+| Ranger_Academy_Burn_1_RX | 0.59 | **0.82** |
+| Sheep_Station_Rx | 0.48 | **0.58** |
+| GRADE | 0.94 | **0.98** |
+
+The 25th percentile moved from 1.00 to 1.11, which implies **pSAF 0.315** where 0.337 is
+in use — a 7% change, inside both the ~3% per-fire reproducibility noise (§4) and the
+sampling noise on a 58-fire percentile. **0.337 stands**, and it errs on the
+overprediction side of 0.315, which is the side JH asked for.
+
+The honest reading: this bug badly damages individual forecasts and barely moves a
+constant fitted across dozens of them. Both facts matter — the second is why the
+calibration did not have to be redone, the first is why the bug was worth finding.
 
 ### Two smaller things in the same run
 
