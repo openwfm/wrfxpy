@@ -25,6 +25,11 @@ result down where it will survive. One bug fixed along the way (§6).
   of hours that matched a filename. Fixed (§6). It did not affect any number here.
 - **Reruns are not reproducible to better than ~3%**, so differences below about 5%
   between ForeFire configurations are noise (§4).
+- **Real forecasting is now unblocked (§8).** HRRR and HRRRA are the same product, so
+  forecast cycles need no WindNinja change. `retrieve_gribs.sh HRRR` was dead on an
+  `if`/`elif` slip and is fixed; `find_gribs` now picks a cycle deterministically and
+  honours an `issue_utc` so hindcast scores cannot use cycles issued after the fire
+  started. FMDA forecast mode is written but has never been run.
 - **Nothing was re-run.** The scored population is the 0.337 batch from 09-24 plus the
   nightly cron; the only run today was a 27 ha smoke test to prove the templates parse.
 
@@ -288,7 +293,102 @@ calibration did not have to be redone, the first is why the bug was worth findin
   Cosmetic here, but it is the same signature as a genuinely broken chain, so it makes
   real breakage harder to spot.
 
-## 8. Open items
+## 8. Driving ForeFire from HRRR *forecasts* — piece 2 of 4 done
+
+Per JH: `hrrr_cycler.py` can drive FMDA from HRRR forecasts, and the same cycles should
+drive the WindNinja interpolation. NAM218 is deprecated in a few weeks and caching moves
+to HRRR forecast cycles at 00/06/12/18. That is what turns this into real forecasting
+rather than hindcasting.
+
+**The wind side was almost already built.** `HRRR` and `HRRRA` retrieve the *same*
+product — `hrrr.tHHz.wrfprsfNN.grib2`. HRRRA is just "always lead 3, from the cycle
+three hours back". Same grid, same variables, so WindNinja needs nothing. And
+`_grib_valid_time` already computed **cycle + lead**, `grib_dir` was already a parameter,
+the cache layout `hrrr.YYYYMMDD/conus/` already matches the glob, and `hrrr_cycler.py`
+never deletes GRIBs.
+
+### Two bugs found on the way in (`16161c7`)
+
+`retrieve_gribs.py` had `if grib_src_name == 'HRRR'` followed by a second **`if`** rather
+than `elif`, so the HRRR branch set the source and then fell through the HRRR_AK/NAM
+chain, matched nothing and hit its `else`. **`./retrieve_gribs.sh HRRR ...` always died
+with "Invalid GRIB source HRRR"** despite HRRR being fully supported. Since
+`cache_grib_files.py` drives caching through that script, switching its source list to
+HRRR would have failed on the first call.
+
+Its success report also iterated the returned *manifest dict*, printing keys like
+`ingest/grib_files` and `ingest/colmet_prefix` — which read exactly like paths and made
+an empty download look like a successful one.
+
+Verified after the fix: it retrieved `hrrr.t12z.wrfprsf09/f10`, valid 21:00 and 22:00 UTC
+with the clock at 15:40 UTC — real future data — and `find_gribs` mapped them correctly
+with no change.
+
+### Piece 2: deterministic cycle choice and an issue time (`42fa193`)
+
+`find_gribs` kept whichever file `glob` returned first, commented "a later lead wins
+nothing, so keep the first". True of the analysis cache, where each valid time has
+exactly one file. **False as soon as forecast cycles are cached**: 12z+f09 and 18z+f03
+are both valid at 21:00 and differ by six hours of forecast error.
+
+For a fixed valid time, newest cycle and shortest lead are the same ordering (valid =
+cycle + lead), so one rule covers both: **smallest lead wins**, ties broken on the path
+so repeated calls agree.
+
+**`issue_utc` is the part that matters for verification.** Without it, "forecasting" a
+fire from last week would quietly use cycles issued *after* the fire started, and every
+hindcast score would be optimistic — which matters because the 8-hour product will be
+judged on exactly those scores. With it, only cycles published by that moment are
+eligible: `cycle + issue_lag_h <= issue_utc`, the lag defaulting to 1 h to match
+`HRRR.hours_behind_real_time`. A valid time whose every candidate post-dates the issue
+time is **dropped, not back-filled** — it genuinely could not have been forecast.
+
+Default `issue_utc=None` keeps the old behaviour, which is what a retrospective analysis
+run wants. Exposed as `--issue-utc` on `forefire_grib.py` and as a `build_step_ncs`
+keyword.
+
+Tested against a synthetic three-cycle cache: the publication boundary is exact (18:59 ->
+12z f09, 19:00 -> 18z f03), `issue_lag_h` works as a knob, selection is stable across
+calls, the real HRRRA cache selects byte-identically to before, and a full
+`build_step_ncs` run through WindNinja is unchanged.
+
+### Pieces 1, 3 and 4, not started
+
+1. **`cache_grib_files.py` -> HRRR with pinned cycles.** It already snaps to
+   `int(hour/6)*6` = 00/06/12/18, window +33 h, two cycles of lookback, four times a day.
+   **The trap:** NAM218 has `cycle_hours = 6` so cycle selection lands on those hours
+   naturally, but **HRRR has `cycle_hours = 1`** — with no explicit `cycle_start` it
+   picks the most recent *hourly* cycle and the 00/06/12/18 intent is silently lost. The
+   `cycle_start` parameter exists on `retrieve_gribs` and `hrrr_cycler` uses it; only the
+   CLI does not expose it. Also needs a **retention sweep for `ingest/HRRR`**: ~420 MB per
+   file, 34 leads is ~14 GB per cycle, ~56 GB/day at four cycles, and nothing prunes
+   `ingest/` (the HRRRA cache is already 108 GB). `cleanup_fmda.py` covers only
+   `wksp_fmda`.
+2. **FMDA forecast mode.** `./hrrr_cycler.sh f CONUS_HRRR` exists but **has never been
+   run** — zero `-fNN` files on disk. It composes correctly: lead N seeds from lead N-1,
+   lead 0 is the analysis file the hourly `27 * * * *` cron already writes, and DA is
+   properly skipped for `fcst_hour > 0`. `forecast_length` is unset in
+   `etc/fmda_cycler.json` so it defaults to 48. **Use a separate flock** —
+   `hrrr_cycler_fmda.lock` is held by the hourly analysis run.
+
+   Then teach `read_fmda_hourly`: its glob `fmda-*-????????-??.nc` does not match
+   `-f06.nc` at all, and `_t()` assumes the name is the valid time when for a forecast
+   file the name is the **cycle** and the valid time is cycle + NN. Reuse
+   `cleanup_fmda.CYCLE_RE`, which already has the optional `(?:-f\d+)?`. **Prefer analysis
+   over forecast where both cover an hour** — the analysis assimilated observations, so
+   forecast files should fill only the future.
+
+   **ForeFire is currently pointed at the one product that cannot forecast**:
+   `etc/forefire.json` has `fmda_dir` -> `wksp_fmda/CONUS`, the **RTMA**-driven region.
+   The HRRR-driven one is `CONUS_HRRR`, already cycling hourly. Both geo files exist.
+3. **pSAF re-check.** Changing the moisture source changes Md at every step of every
+   fire. Switch `fmda_dir` alone, re-run, score, and compare against the clean baseline
+   in §2: geo mean 1.56, median 1.53, 25th percentile 1.11, n=58. Keep 0.337 if the 25th
+   percentile stays within ~10% of 1.11; otherwise `pSAF_new = 0.337 / p25^(1/1.54)`.
+   Per JH the RTMA/HRRR difference in resulting spread is small. Watch the per-fire
+   scatter rather than the mean — §7 is the cautionary tale.
+
+## 9. Open items
 
 Items 3, 4, 5 and 6 of the 09-24 handoff's §9 are untouched and still open: the fuel 2/9
 transposition upstream, the false "unknown moisture source" log message, scoring against
@@ -299,7 +399,16 @@ now **two**, Nethery and STEEL_PASS: Eagle_Springs turned out to be the moisture
 Item 1 is closed. Item 2 — per-fire pSAF from NGFS detection fields — is the next real
 move, now with a concrete target (§3).
 
-## 9. NEXT SESSION
+## 10. NEXT SESSION
+
+**Piece 1 of §8** — `cache_grib_files.py` onto HRRR with pinned 00/06/12/18 cycles, plus
+the `ingest/HRRR` retention sweep. It is the prerequisite for everything else in §8 and
+the NAM218 deprecation puts a clock on it.
+
+After that, pieces 3 and 4 of §8 (FMDA forecast mode, then the pSAF re-check).
+
+The per-fire pSAF work below is still the larger scientific question, but §8 is the one
+with a deadline.
 
 Item 2, but weigh item 5 first. The entire calibration is model-vs-model and WRF-SFIRE is
 not truth; on Dome it ran 0.68x an IR perimeter while ForeFire ran 6.0x. A **global**
