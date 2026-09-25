@@ -5,9 +5,14 @@ result down where it will survive. One bug fixed along the way (§6).
 
 ## 1. TL;DR
 
-- **pSAF 0.337 is verified and the global-pSAF question is closed.** 65 fires: geometric
-  mean **1.55**, median **1.53**, 17% below observed, 75% within a factor of two, against
-  a prediction of 1.46 / 1.54 / 26%.
+- **FMDA moisture was silently extinguishing fires (§7).** An out-of-range-*dry* 1-hour
+  class was replaced by roughly the 100-hour value, so the driest fuels came out the
+  wettest. Eagle_Springs held 0.946 ha for 24 h where WRF-SFIRE burned 1297. Fixed
+  (`3610523`); it now scores 0.89. **This is the most important thing in this handoff.**
+- **pSAF 0.337 measured at** 65 fires: geometric mean **1.55**, median **1.53**, 17% below
+  observed, 75% within a factor of two, against a prediction of 1.46 / 1.54 / 26%. The
+  exponent is confirmed, but **the value is provisional** — it was set on the 25th
+  percentile and the low tail is contaminated by the moisture bug. Batch re-running.
 - **The `pSAF^1.54` exponent holds over a 1.9x move**, as it did over the 0.6 -> 0.175
   move. It can be trusted for future adjustments.
 - **The templates now explain the number.** Both `.ff` templates carry a comment block
@@ -162,17 +167,105 @@ named `18.01` — and re-running the 1 h check after the fix returns exactly the
 that was re-run. **Worth deleting `/data/jhaley/wrfxpy/1`**; it is an old scratch script,
 but it is not this tool's job to be robust against it and now it is.
 
-## 7. Open items
+## 7. The big one — FMDA moisture was silently extinguishing fires
+
+JH flagged Eagle_Springs as a run whose ForeFire steps "didn't complete properly". They
+completed: 54 steps, no crash, no parse error. **The fire was extinguished by its own
+moisture input** and sat at 0.946 ha for 24 hours. WRF-SFIRE burned 1297 ha.
+
+### The chain
+
+FMDA reported the 1-hour dead fuel moisture at the fire as very dry — 0.0113, 0.0076,
+0.0051, 0.0042 over 21:00-00:00 UTC. All are under the `valid_range` floor of 0.02, so
+`md_series` set that class to None. `write_fuel_table` then filled the gap with **the
+unweighted mean of the classes that survived**:
+
+    (0.0798 + 0.3463) / 2 = 0.2130      <- matches the written table filename exactly
+
+Fuel 2 — 86% of the domain and the fuel under the fire — carries cawfe weights
+(0.5714, 0.2857, 0.1429), so:
+
+    0.5714*0.2130 + 0.2857*0.0798 + 0.1429*0.3463 = 0.1940   against me = 0.15
+
+Above extinction. No spread, anywhere, for ten steps. By the time FMDA rose back over the
+floor at 02:00 the front had been frozen for five hours and never recovered.
+
+| treatment | fuel 2 Md | outcome |
+|---|---|---|
+| all three classes, as FMDA gave them | 0.0787 | burns |
+| **1-h dropped, filled from the mean** | **0.1940** | **dead** — what ran |
+| 1-h dropped, SAV weights renormalised | 0.1686 | still dead |
+| **1-h clamped to the 0.02 floor** | **0.0837** | burns — the fix |
+
+Wind and fuel were both exonerated first: fuel under the fire is category 2, and the winds
+(0.5-1.2 m/s) were *higher* than RX_Stray_Creek's, which burned 270 ha. The controlled
+test was re-running the identical fire with moisture off — **1100 ha**, against
+WRF-SFIRE's 1297. Nothing was wrong except the moisture.
+
+### Why this is the dangerous direction
+
+It fires precisely when the fine fuels are driest. **Per JH the pattern here — 1-h and
+10-h dry, 100-h wet — is the signature of a sharp temperature rise and humidity drop
+shortly before ignition.** The 100-hour class lags by design and is still carrying
+pre-drying moisture, so borrowing from it during a rapid-drying event imports stale wet
+data into the class that matters most for spread. WRF-SFIRE's own `FMC_GC` agrees: its
+1-hour class sits at 0.103 and never exceeds 0.116.
+
+This also sharpens JH's standing rule that moisture in the 5-6% range predicts big
+growth: the bug converted exactly that regime into no fire at all.
+
+### The fix
+
+`md_series` now **clamps** to `valid_range` and logs every clamp. `write_fuel_table` still
+has to fill a genuinely absent class, but takes the **nearest** class rather than the mean
+of all of them — neighbouring size classes track each other, the 1-h and 100-h do not.
+Its comment claimed "the SAV mix" while the code took a plain unweighted mean; both now
+agree. Commit `3610523`.
+
+Eagle_Springs re-run with the fix: **1151.9 ha against WRF-SFIRE's 1297.2 — ratio 0.89**,
+where it previously could not be scored at all.
+
+### It contaminated the calibration
+
+Only 9 batch fires still have their `fueltables` directory, and **4 of those 9 are hit** —
+detectable because the substituted value equals the mean of the other two:
+
+| fire | tables affected | ratio in the 0.337 table |
+|---|---|---|
+| Sheep_Station_Rx | 4 of 11 | **0.48** — lowest in the batch |
+| Ranger_Academy_Burn_1_RX | 59 of 1532 | **0.59** — fourth lowest |
+| GRADE | 4 of 11 | 0.94 |
+| Eagle_Springs | 5 of 9 | unscorable |
+
+The median of 1.53 is robust, but **pSAF 0.337 was chosen by putting the 25th percentile
+at 1.0 — keyed on exactly the tail this bug creates.** The batch is re-running with the
+fix (`run_days(days2run=10, overwrite=True)`, log `psaf_reclean.log`, ends with
+`RECLEAN BATCH COMPLETE`); score it with `ff_batch_ratio.py` and re-derive pSAF from that.
+The sweep in §2 can be re-applied to the clean ratios with the same exponent.
+
+### Two smaller things in the same run
+
+- **Per-step moisture stops partway.** From step 27 of 54 the fuel table reverted to the
+  base `ff_fuels_behave13.csv` at Md=0.1, because FMDA is an *analysis* and has no files
+  past the present while the forecast runs to 09-26. Inherent, not a bug, but it means a
+  forward forecast loses its moisture signal partway — worth thinking about for the
+  8-hour low-latency target, where most of the window is in the future.
+- **The last step writes an empty front** with the timestamp reset to the anchor.
+  Cosmetic here, but it is the same signature as a genuinely broken chain, so it makes
+  real breakage harder to spot.
+
+## 8. Open items
 
 Items 3, 4, 5 and 6 of the 09-24 handoff's §9 are untouched and still open: the fuel 2/9
 transposition upstream, the false "unknown moisture source" log message, scoring against
-observations rather than only WRF-SFIRE, and the three fires with no overlapping valid
-time (Nethery, STEEL_PASS, Eagle_Springs).
+observations rather than only WRF-SFIRE, and the fires with no overlapping valid time --
+now **two**, Nethery and STEEL_PASS: Eagle_Springs turned out to be the moisture bug in
+§7, not a timing problem, and scores 0.89 once it can burn.
 
 Item 1 is closed. Item 2 — per-fire pSAF from NGFS detection fields — is the next real
 move, now with a concrete target (§3).
 
-## 8. NEXT SESSION
+## 9. NEXT SESSION
 
 Item 2, but weigh item 5 first. The entire calibration is model-vs-model and WRF-SFIRE is
 not truth; on Dome it ran 0.68x an IR perimeter while ForeFire ran 6.0x. A **global**
