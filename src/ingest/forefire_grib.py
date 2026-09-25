@@ -366,30 +366,72 @@ def as_naive_utc(when):
     return ts
 
 
-def _grib_valid_time(path):
-    """Valid time of a cached HRRR wrfprs file, from its cycle and lead hour."""
-    base = osp.basename(path)
-    m = _GRIB_RE.search(base)
+def _grib_parts(path):
+    """(cycle, lead_hours, valid_time) of a cached HRRR wrfprs file, or None.
+
+    The analysis cache (HRRRA) is all lead 3, so the cycle and the lead used to be
+    incidental and only their sum was returned.  Forecast cycles make both matter:
+    several files can carry the same valid time and they are not interchangeable.
+    """
+    m = _GRIB_RE.search(osp.basename(path))
     if not m:
         return None
     day = re.search(r'hrrr\.(\d{8})', path)
     if not day:
         return None
     cycle = pd.Timestamp('{}T{}:00:00'.format(day.group(1), m.group(1)))
-    return cycle + pd.Timedelta(hours=int(m.group(2)))
+    lead = int(m.group(2))
+    return cycle, lead, cycle + pd.Timedelta(hours=lead)
 
 
-def find_gribs(start_utc, end_utc, grib_dir=None):
-    """Cached HRRR files whose valid time falls in [start, end], in time order."""
+def _grib_valid_time(path):
+    """Valid time of a cached HRRR wrfprs file, from its cycle and lead hour."""
+    parts = _grib_parts(path)
+    return parts[2] if parts else None
+
+
+def find_gribs(start_utc, end_utc, grib_dir=None, issue_utc=None, issue_lag_h=1.0):
+    """Cached HRRR files whose valid time falls in [start, end], in time order.
+
+    One file per valid time.  With the analysis cache that was trivial -- every file
+    is lead 3, so each valid time had exactly one -- and the old code just kept
+    whichever `glob` happened to return first.  Forecast cycles break that: 12z+f09
+    and 18z+f03 are both valid at 21:00 and differ by six hours of forecast error, so
+    the arbitrary choice became a silent one.
+
+    **For a fixed valid time, newest cycle and shortest lead are the same ordering**
+    (valid = cycle + lead), so one rule covers both: take the smallest lead.
+
+    `issue_utc` is what makes a hindcast honest.  Without it, "forecasting" a fire
+    from last week would quietly use cycles issued after the fire had already started
+    and every verification score would be optimistic.  Given it, only cycles that had
+    actually been published by that moment are eligible -- `cycle + issue_lag_h <=
+    issue_utc`.  `issue_lag_h` defaults to 1, matching HRRR.hours_behind_real_time.
+    Leaving `issue_utc` as None keeps the old behaviour of using the best file on
+    disk, which is what a retrospective analysis run wants.
+
+    A valid time whose every candidate post-dates `issue_utc` is dropped, not
+    back-filled: it genuinely could not have been forecast at that moment.
+    """
     grib_dir = grib_dir or HRRR_CACHE
     start_utc, end_utc = as_naive_utc(start_utc), as_naive_utc(end_utc)
-    found = {}
+    if issue_utc is not None:
+        issue_utc = as_naive_utc(issue_utc)
+    best = {}
     for path in glob.glob(osp.join(grib_dir, 'hrrr.*', '*', '*.grib2')):
-        vt = _grib_valid_time(path)
-        if vt is not None and start_utc <= vt <= end_utc:
-            #one file per valid time; a later lead wins nothing, so keep the first
-            found.setdefault(vt, path)
-    return [(vt, found[vt]) for vt in sorted(found)]
+        parts = _grib_parts(path)
+        if parts is None:
+            continue
+        cycle, lead, vt = parts
+        if not (start_utc <= vt <= end_utc):
+            continue
+        if issue_utc is not None and cycle + pd.Timedelta(hours=issue_lag_h) > issue_utc:
+            continue
+        #smallest lead wins; ties broken on the path so a rerun picks the same file
+        key = (lead, path)
+        if vt not in best or key < best[vt][0]:
+            best[vt] = (key, path)
+    return [(vt, best[vt][1]) for vt in sorted(best)]
 
 
 def grib_timing_table(ign_utc, gribs):
@@ -429,20 +471,31 @@ def grib_timing_table(ign_utc, gribs):
 
 def build_step_ncs(lat, lon, ign_utc, out_dir, grid_code, steps=8, domain_km=30.0,
                    fire_dx=30.0, grib_dir=None, time_zone='America/Denver',
-                   wn_mesh=None, windrf=None, work_dir=None, overwrite=False):
+                   wn_mesh=None, windrf=None, work_dir=None, overwrite=False,
+                   issue_utc=None):
     """Build the per-step ForeFire netcdfs for one fire.
 
     Returns the timing table.  Writes `FF_<step>_<grid_code>_<UTC>.nc` into
     out_dir, which is what make_script_set looks for and skips rebuilding.
     """
     ig_time = as_naive_utc(ign_utc)
-    #one extra valid time: the sequence needs a step beyond the last one it runs,
-    #because each step's END_STEP is the next row's ign_seconds.
-    gribs = find_gribs(ig_time, ig_time + pd.Timedelta(hours=steps + 1), grib_dir)
+    #Start an hour before the ignition's own hour so the ignition falls *inside* a
+    #step rather than before the first one.  make_timing_table's convention is that
+    #ForeFire's t=0 is the step containing the ignition; if the search starts at the
+    #ignition instead, that step is never built and the fire silently starts at the
+    #next whole hour.  Rows genuinely before the ignition come back as -9999 and are
+    #skipped as spinup.  One extra valid time at the end supplies the last END_STEP.
+    search_start = ig_time.floor('H') - pd.Timedelta(hours=1)
+    #issue_utc restricts the cache to cycles published by that moment, which is how a
+    #hindcast is kept honest; None uses the best file on disk (retrospective analysis)
+    gribs = find_gribs(search_start, ig_time + pd.Timedelta(hours=steps + 1), grib_dir,
+                       issue_utc=issue_utc)
     if len(gribs) < steps + 1:
         logging.warning('asked for %d steps but the cache covers %d valid times '
-                        'from %s -- the run will be shorter',
-                        steps, len(gribs), ig_time)
+                        'from %s -- the run will be shorter%s',
+                        steps, len(gribs), ig_time,
+                        '' if issue_utc is None
+                        else ' (restricted to cycles issued by %s)' % issue_utc)
     tt = grib_timing_table(ign_utc, gribs)
 
     if not osp.isdir(out_dir):
@@ -506,6 +559,10 @@ def main():
                    help='WindNinja solve mesh in m; defaults to --fire-dx. Coarsening '
                         'here is interpolation, not resolved detail')
     p.add_argument('--grib-dir', default=None, help='default: the FMDA HRRR cache')
+    p.add_argument('--issue-utc', default=None,
+                   help='pretend the forecast is being issued at this time and use '
+                        'only HRRR cycles published by then, e.g. 2026-09-25T12:00:00Z. '
+                        'Omit to use the best file on disk (retrospective analysis).')
     p.add_argument('--time-zone', default='America/Denver',
                    help='required by WindNinja; only affects its output filenames')
     p.add_argument('--windrf', default=None,
@@ -526,7 +583,8 @@ def main():
 
     build_step_ncs(args.lat, args.lon, args.ign_utc, args.out_dir, grid_code,
                    steps=args.steps, domain_km=args.domain_km, fire_dx=args.fire_dx,
-                   grib_dir=args.grib_dir, time_zone=args.time_zone,
+                   grib_dir=args.grib_dir, issue_utc=args.issue_utc,
+                   time_zone=args.time_zone,
                    wn_mesh=args.wn_mesh, windrf=windrf, overwrite=args.overwrite)
 
 
