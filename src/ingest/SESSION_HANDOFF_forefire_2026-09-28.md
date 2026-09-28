@@ -23,6 +23,10 @@ anywhere in the loop. Winds and fuel moisture both come from HRRR forecasts.
 - **Piece 4 is done: keep 0.337 (§6).** On HRRR moisture the batch gives geo mean 1.39
   against 1.54 paired, but the 25th percentile — the actual calibration target — moves
   only 1.11 -> 1.05, implying 0.326. Inside the noise.
+- **BOON is a counterexample to "HRRR is better" (§7).** RTMA put fuel 2 above extinction
+  overnight and reproduced a stall WRF-SFIRE independently shows; HRRR missed it by 0.003
+  and ran 2.94x against RTMA's 1.83x. At BOON HRRR is 0.03 drier than RTMA -- ten times
+  the difference at either §5 sample domain, so §5 was under-sampled.
 - **Caution: a regional moisture comparison under-predicted the impact.** §5's 0.2-0.4
   point difference implied the calibration was safe by a wide margin; the real aggregate
   move was 10-15% in area, because area does not respond proportionally to moisture near
@@ -173,7 +177,58 @@ elsewhere for a visual pass. The scored table is committed under `src/ingest/ref
 so the next A/B does not depend on a scratchpad. For side-by-side runs use
 `sweep_ff_params`, which takes `dest_dir` and `suffix`.
 
-## 7. Open items
+## 7. BOON — a counterexample, and a correction to §5
+
+JH noticed the RTMA-driven BOON run nearly stalled around step 45 with growth only in
+patches, then made big jumps that looked questionable. Both halves check out, and the
+conclusion runs against the general prior.
+
+**The stall is fuel 2 crossing extinction.** Reconstructing both moisture series for
+BOON's 52 steps (Mendocino County, mixed fuels: 2, 5 and 10 near the ignition):
+
+| | fuel 2 (me 0.15) | fuel 5 (me 0.20) | fuel 10 (me 0.25) |
+|---|---|---|---|
+| RTMA | 0.086-0.185, **blocked 22 of 52 steps** | 0.075-0.191, never | 0.114-0.170, never |
+| HRRR | 0.059-**0.147**, never blocked | 0.046-0.149, never | 0.089-0.139, never |
+
+The blocked steps are overnight local (PDT = UTC-7). Fuels 5 and 10 keep burning
+throughout, which is exactly JH's "only small growth in some areas": the grass shuts off
+and the fire creeps on in the heavier fuels.
+
+**The jumps are not an artifact.** WRF-SFIRE does the same thing on its own: growth falls
+from 21.7 ha/h at 20:00 local to 2.2-3.8 ha/h from 03:00 to 10:00, then goes 3.4 -> 29.9
+-> 63 -> 81 -> 96 -> **110.8 ha/h** through the afternoon. That is the burning period, and
+the RTMA run reproduced it. The HRRR run, which never stalls, is smooth throughout and
+shows no such structure.
+
+**On this fire RTMA is the better product.**
+
+| | final | vs WRF-SFIRE |
+|---|---|---|
+| WRF-SFIRE | 603 ha | — |
+| ForeFire, RTMA moisture | 1103 ha | 1.83x |
+| ForeFire, HRRR moisture | 1776 ha | 2.94x |
+
+HRRR misses the stall by **0.003** -- its fuel 2 peaks at 0.147 against a threshold of
+0.150. RTMA did not get closer by luck; it reproduced a physical overnight stall that
+WRF-SFIRE independently shows.
+
+**The correction to §5.** At BOON, HRRR runs **0.027-0.038 drier than RTMA** throughout,
+with a similar diurnal amplitude -- a regional dry bias, roughly **ten times** the
+difference measured at either sample domain (+0.002 Sierra, -0.004 panhandle). So §5's
+"the products differ by 0.2-0.4 points" was under-sampled: the difference is regionally
+variable and two domains did not capture it. That also explains why the batch-wide area
+change (§6, 10-15%) so far exceeded what §5 implied -- it is not only the extinction
+non-linearity, the underlying moisture difference is itself much larger in some regions.
+
+**What this does not settle.** §6's aggregate still says keep pSAF 0.337, and the 25th
+percentile is a robust statistic. But "HRRR is the better product" is not established
+fire by fire, and BOON is a clear case against it. The useful next test is not another
+regional moisture comparison but a **per-fire** one: for the fires that moved most in §6,
+which product's Md series matches the stall structure WRF-SFIRE shows? That is a
+falsifiable question and BOON answers it against HRRR.
+
+## 8. Open items
 
 1. ~~**Piece 4, the pSAF re-check.**~~ **DONE — see §6. Keep 0.337.**
 2. ~~**FMDA forecast mode has no schedule.**~~ **DONE** — cron entry added:
@@ -202,7 +257,7 @@ so the next A/B does not depend on a scratchpad. For side-by-side runs use
    upstream, the false "unknown moisture source" log line, scoring against observations
    rather than only WRF-SFIRE, and the two fires with no overlapping valid time.
 
-## 8. NEXT SESSION
+## 9. NEXT SESSION
 
 **Re-run `fmda_fcst_skill.py` once the cron has accumulated cycles.** The forecast-vs-
 analysis result in this session came from 2 cycles with n=1 at leads 3-9, and JH's read
