@@ -87,10 +87,21 @@ mid-run, not marginally.
    `CONUS_HRRR`, so the moisture feeding every fire has changed under a calibration that
    was fitted on RTMA-driven output. Recipe in the 09-25 handoff §8. Baseline to beat:
    geo mean 1.56, median 1.53, 25th percentile 1.11, n=58.
-2. **FMDA forecast mode has no schedule.** It is run by hand. For the pipeline to be
-   usable on demand the `-fNN` files have to be fresh, which means a cron entry after
-   each 00/06/12/18 cycle. **Use a separate flock** — `hrrr_cycler_fmda.lock` is held by
-   the hourly analysis run. ~90 s per lead; `forecast_length` is 12.
+2. ~~**FMDA forecast mode has no schedule.**~~ **DONE** — cron entry added:
+
+       30 2,8,14,20 * * *   ./hrrr_cycler.sh f CONUS_HRRR
+
+   One run per 6-hourly HRRR cycle. At 02/08/14/20 local (MDT) `cycle_start` lands on
+   00/06/12/18Z respectively, ~2 h after the cycle so the leads have published, giving
+   11 leads and ~11 h of forward moisture per run.
+
+   **Correction to what this item first said.** It advised a *separate* flock. That is
+   wrong and would have been a data race: forecast mode is **not read-only**. Lead 1
+   seeds from lead 0, which is the cycle's *analysis* file, and it writes that file
+   itself when it is missing — the 2026-09-28 run ran DA three times and created
+   `fmda-CONUS_HRRR-20260928-10.nc`. It therefore shares `hrrr_cycler_fmda.lock` with
+   the hourly analysis. Minute 30 because 11 leads take ~35 min and the analysis fires
+   at :27, leaving 57 minutes of clear air.
 3. **The last step of a run loses its front** — writes an empty geometry with the
    timestamp reset to the anchor. Seen on Eagle_Springs and again here. Harmless to the
    forecast, but it is the same signature as a genuinely broken chain, so it makes real
@@ -106,8 +117,9 @@ mid-run, not marginally.
 
 Piece 4. Everything it needs is in place, and the moisture source has changed under it.
 
-Then item 2 above, because an on-demand pipeline that depends on a hand-run FMDA job is
-not yet operational.
+Item 2 is now done, so the pipeline no longer depends on a hand-run FMDA job — but the
+first few cron firings are worth watching: confirm `-fNN` files appear for each of the
+00/06/12/18Z cycles and that the hourly analysis at :27 is never starved.
 
 `etc/forefire.json` is gitignored; `etc/forefire.json.initial` carries the required keys
 (`09594ab`) and is the only version-controlled record of what a working install needs.
