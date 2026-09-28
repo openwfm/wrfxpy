@@ -171,11 +171,20 @@ The HRRR set also has slightly better factor-of-2 coverage (79% vs 76%) on the f
 despite producing less fire, which is mildly in favour of JH's view that the HRRR product
 is the better one.
 
-**Overwriting.** `run_forecasts` rewrites `<wksp>/forefire` in place, so the 09-25
-perimeters for the 50 re-run workspaces are gone from this machine; JH has them as KMLs
-elsewhere for a visual pass. The scored table is committed under `src/ingest/reference/`
-so the next A/B does not depend on a scratchpad. For side-by-side runs use
-`sweep_ff_params`, which takes `dest_dir` and `suffix`.
+**Overwriting, and where the old perimeters are.** `run_forecasts` rewrites
+`<wksp>/forefire` in place, so the 09-25 RTMA-moisture perimeters were overwritten for
+the 50 re-run workspaces. **JH preserved them**: `/home/jhaley/tmp/old_<grid_code>_*.kml`,
+350 `_final` and 352 `_steps`, covering every fire that moved most in the table above.
+The `_steps` files are the useful ones -- they show *when* the two runs diverge, not just
+the endpoint, which is what distinguishes a moisture-threshold stall from a uniform
+scaling.
+
+    /home/jhaley/tmp/old_BOON_2026-09-21_21_00_00_703D4319-...-DFFDCFDF888A_final.kml
+
+The matching new perimeters are `<wksp>/forefire/*_final.kml` and `*_steps.kml`. The
+scored table is committed under `src/ingest/reference/` so the next A/B does not depend
+on a scratchpad. For side-by-side runs in future use `sweep_ff_params`, which takes
+`dest_dir` and `suffix` and keeps both.
 
 ## 7. BOON — a counterexample, and a correction to §5
 
@@ -252,31 +261,49 @@ falsifiable question and BOON answers it against HRRR.
    breakage harder to spot.
 4. **`ff_growth.track` collapsed seven step geojsons into two rows** on the forward run.
    Did not affect the result — the areas were read from ForeFire's own logs — but it
-   would corrupt scoring, so it needs a look before piece 4.
+   would corrupt scoring, so it should be fixed before the next batch is scored.
 5. Items 3-6 of the 09-24 handoff §9 remain untouched: the fuel 2/9 transposition
    upstream, the false "unknown moisture source" log line, scoring against observations
    rather than only WRF-SFIRE, and the two fires with no overlapping valid time.
 
 ## 9. NEXT SESSION
 
-**Re-run `fmda_fcst_skill.py` once the cron has accumulated cycles.** The forecast-vs-
-analysis result in this session came from 2 cycles with n=1 at leads 3-9, and JH's read
-of it was right: the apparent wet drift was the period, not the system. The two cycles go
+**Look at the preserved perimeters (§6).** JH's own next step. The old RTMA-moisture
+runs are in `/home/jhaley/tmp/old_<grid_code>_*.kml` and the new HRRR ones in
+`<wksp>/forefire/`. Start with the fires that moved most in §6 -- Merit_Creek (+93%),
+BOON (+61%), Menogyn_Piles_RX (+45%), HOP-PATTERSON_PILE_RX (-64%),
+D6_RX_Treasured_Landscapes (-51%), Little_Blue_Stem_RX (-49%), Silver (-37%) -- all of
+which are present in both sets.
+
+**What to look for.** A uniform moisture shift scales a perimeter roughly isotropically.
+A *threshold* crossing changes its **shape**, by switching off one fuel category while
+others keep burning. §7 shows BOON is the second kind, and the `_steps` files are what
+distinguish them, because they show when the divergence starts.
+
+**Then the per-fire moisture test §7 sets up**, which is the real successor to §5. For
+each big mover, reconstruct both Md series against each fuel's moisture of extinction
+(the §7 method) and ask which product reproduces the stall structure WRF-SFIRE shows.
+BOON already answers it against HRRR. Two or three more cases would establish whether
+that is a regional bias in northern California or something wider -- and it matters,
+because §6 switched the whole pipeline to HRRR moisture on aggregate evidence that §7
+shows does not hold fire by fire.
+
+**Re-run `fmda_fcst_skill.py` once the cron has accumulated cycles.** This session's
+forecast-vs-analysis result came from 2 cycles with n=1 at leads 3-9, and JH's read of it
+was right: the apparent wet drift was the period, not the system. The two cycles go
 opposite ways (+0.061 and -0.007 at the 10-h class), and the archive confirms 09-25 was
 drying 1.1 sd faster than normal while 09-28 was moistening. The real signature is that
-the forecast **lags the analysis tendency in either direction**, which matters more than a
-bias would: it cannot be corrected away, and it is largest during exactly the rapid-drying
-events that drive fire. At 4 cycles/day x 32 leads the cron yields ~128 pairs/day, so a
-couple of days settles it. **Score against the analysis tendency, not lead alone** --
-that is what separates lag magnitude from which way the weather went.
+the forecast **lags the analysis tendency in either direction** -- which matters more
+than a bias, because it cannot be corrected away and is largest during exactly the
+rapid-drying events that drive fire. At 4 cycles/day x 32 leads the cron yields ~128
+pairs/day. **Score against the analysis tendency, not lead alone.**
 
-Then the full-duration ForeFire vs WRF-SFIRE comparison JH asked for: `forefire_forecast.py
---steps 27` covers the median WRF-SFIRE run, and both the GRIB cache (+33 h) and the new
-33 h moisture now span it.
+**The full-duration comparison JH asked for**: `forefire_forecast.py --steps 27` covers
+the median WRF-SFIRE run, and both the GRIB cache (+33 h) and the 33 h moisture span it.
 
-Watch the FMDA forecast cron. Its first firing was silently cancelled -- `flock -n` lost
-the lock to a 12-minute analysis under load 37 -- and it now uses `-w 1200` with a skip
-log, but that has not yet been seen to work.
+**Watch the FMDA forecast cron.** Its first firing was silently cancelled -- `flock -n`
+lost the lock to a 12-minute analysis under load 37 -- and it now uses `-w 1200` with a
+skip log, but that has not yet been seen to work.
 
 Commits remain unpushed on `james_ngfs` and `release-fmda-fixes`; JH pushes them manually
 (SSH password).
