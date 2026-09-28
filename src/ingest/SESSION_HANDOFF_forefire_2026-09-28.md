@@ -20,7 +20,13 @@ anywhere in the loop. Winds and fuel moisture both come from HRRR forecasts.
   by 0.2-0.4 percentage points in the quantity that reaches the fuel table, well inside
   the run-to-run noise. **But near extinction they disagree 9% of the time** in the
   Oklahoma panhandle, and pSAF cannot compensate for a fire that never starts.
-- **Piece 4 (the pSAF re-check) is still open**, now as confirmation rather than repair.
+- **Piece 4 is done: keep 0.337 (§6).** On HRRR moisture the batch gives geo mean 1.39
+  against 1.54 paired, but the 25th percentile — the actual calibration target — moves
+  only 1.11 -> 1.05, implying 0.326. Inside the noise.
+- **Caution: a regional moisture comparison under-predicted the impact.** §5's 0.2-0.4
+  point difference implied the calibration was safe by a wide margin; the real aggregate
+  move was 10-15% in area, because area does not respond proportionally to moisture near
+  extinction. Re-run rather than infer.
 
 ## 2. What was built
 
@@ -126,13 +132,50 @@ why the derived Md difference stays small. Fuels that weight the coarse classes 
 heavily would show a larger divergence, and that is worth checking before trusting this
 result across all 13 categories.
 
-## 6. Open items
+## 6. Piece 4 done — the pSAF re-check on HRRR moisture
 
-1. **Piece 4, the pSAF re-check.** §5 makes this cheaper than feared: the moisture the
-   two products deliver differs by 0.2-0.4 points, so 0.337 should survive. Still worth
-   running to confirm, and to see whether the marginal-regime threshold shift shows up
-   as more fires spreading. Recipe in the 09-25 handoff §8. Baseline: geo mean 1.56,
-   median 1.53, 25th percentile 1.11, n=58.
+Batch re-run with `fmda_dir` on `CONUS_HRRR`, scored against the preserved RTMA baseline
+(`src/ingest/reference/psaf337_rtma_baseline_2026-09-25.txt`). **Paired on the 42 fires
+present in both:**
+
+| | RTMA | HRRR | change |
+|---|---|---|---|
+| geometric mean | 1.54 | 1.39 | **-10.0%** |
+| median | 1.55 | 1.31 | -15.2% |
+| below 1.0x | 7 | 8 | |
+| within factor 2 | 34 | 33 | |
+
+69% of fires produce less fire under HRRR moisture, with a per-fire log-change sd of
+**0.300** -- individual fires move about +/-35%, extremes from -64% (HOP-PATTERSON_PILE_RX)
+to +93% (Merit_Creek). That is an order of magnitude above the ~3% reproducibility noise,
+so it is signal.
+
+**Keep 0.337.** The calibration posture was the 25th percentile at 1.0, and it is still
+there: 1.11 -> 1.05, implying pSAF **0.326**, a 3% move inside the noise. Restoring the
+*median* would want 0.371, but the median was never the target.
+
+**A prediction that was too optimistic, worth recording.** From the two-domain moisture
+comparison in §5 I said 0.337 "should survive" on the strength of a 0.2-0.4 point mean
+difference. The actual aggregate move is 10-15% in area -- the right conclusion, but by a
+narrower margin than that comparison implied. The reason is the same non-linearity the
+Oklahoma panhandle exposed: **area does not respond proportionally to moisture near
+extinction**, so a small mean difference flips fires across the threshold and moves area
+far more than the mean difference suggests. A regional moisture comparison is therefore a
+weak predictor of a calibration's stability, and is not a substitute for re-running.
+
+The HRRR set also has slightly better factor-of-2 coverage (79% vs 76%) on the full sets
+despite producing less fire, which is mildly in favour of JH's view that the HRRR product
+is the better one.
+
+**Overwriting.** `run_forecasts` rewrites `<wksp>/forefire` in place, so the 09-25
+perimeters for the 50 re-run workspaces are gone from this machine; JH has them as KMLs
+elsewhere for a visual pass. The scored table is committed under `src/ingest/reference/`
+so the next A/B does not depend on a scratchpad. For side-by-side runs use
+`sweep_ff_params`, which takes `dest_dir` and `suffix`.
+
+## 7. Open items
+
+1. ~~**Piece 4, the pSAF re-check.**~~ **DONE — see §6. Keep 0.337.**
 2. ~~**FMDA forecast mode has no schedule.**~~ **DONE** — cron entry added:
 
        30 2,8,14,20 * * *   ./hrrr_cycler.sh f CONUS_HRRR
@@ -159,16 +202,26 @@ result across all 13 categories.
    upstream, the false "unknown moisture source" log line, scoring against observations
    rather than only WRF-SFIRE, and the two fires with no overlapping valid time.
 
-## 7. NEXT SESSION
+## 8. NEXT SESSION
 
-Piece 4. Everything it needs is in place, and the moisture source has changed under it.
+**Re-run `fmda_fcst_skill.py` once the cron has accumulated cycles.** The forecast-vs-
+analysis result in this session came from 2 cycles with n=1 at leads 3-9, and JH's read
+of it was right: the apparent wet drift was the period, not the system. The two cycles go
+opposite ways (+0.061 and -0.007 at the 10-h class), and the archive confirms 09-25 was
+drying 1.1 sd faster than normal while 09-28 was moistening. The real signature is that
+the forecast **lags the analysis tendency in either direction**, which matters more than a
+bias would: it cannot be corrected away, and it is largest during exactly the rapid-drying
+events that drive fire. At 4 cycles/day x 32 leads the cron yields ~128 pairs/day, so a
+couple of days settles it. **Score against the analysis tendency, not lead alone** --
+that is what separates lag magnitude from which way the weather went.
 
-Item 2 is now done, so the pipeline no longer depends on a hand-run FMDA job — but the
-first few cron firings are worth watching: confirm `-fNN` files appear for each of the
-00/06/12/18Z cycles and that the hourly analysis at :27 is never starved.
+Then the full-duration ForeFire vs WRF-SFIRE comparison JH asked for: `forefire_forecast.py
+--steps 27` covers the median WRF-SFIRE run, and both the GRIB cache (+33 h) and the new
+33 h moisture now span it.
 
-`etc/forefire.json` is gitignored; `etc/forefire.json.initial` carries the required keys
-(`09594ab`) and is the only version-controlled record of what a working install needs.
+Watch the FMDA forecast cron. Its first firing was silently cancelled -- `flock -n` lost
+the lock to a 12-minute analysis under load 37 -- and it now uses `-w 1200` with a skip
+log, but that has not yet been seen to work.
 
-Commits remain unpushed on `james_ngfs` and `release-fmda-fixes`; JH pushes them
-manually (SSH password).
+Commits remain unpushed on `james_ngfs` and `release-fmda-fixes`; JH pushes them manually
+(SSH password).
