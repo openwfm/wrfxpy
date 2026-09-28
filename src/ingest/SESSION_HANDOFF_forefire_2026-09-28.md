@@ -16,8 +16,11 @@ anywhere in the loop. Winds and fuel moisture both come from HRRR forecasts.
   forecast silently reverted to the default fuel table partway through its own window.
 - **A genuinely forward run works**: ignition at T+30, every wind step from HRRR leads
   valid in the future, every moisture step from FMDA `-fNN` forecast files.
-- **Piece 4 (the pSAF re-check) is still open** and is now more urgent, because the
-  moisture source has changed under the calibration.
+- **The moisture switch does not break the pSAF calibration (§5).** RTMA and HRRR differ
+  by 0.2-0.4 percentage points in the quantity that reaches the fuel table, well inside
+  the run-to-run noise. **But near extinction they disagree 9% of the time** in the
+  Oklahoma panhandle, and pSAF cannot compensate for a fire that never starts.
+- **Piece 4 (the pSAF re-check) is still open**, now as confirmation rather than repair.
 
 ## 2. What was built
 
@@ -81,12 +84,55 @@ replaced by roughly the 100-hour value. The clamp fixed it. Worth keeping straig
 That question is still open and needs a case where moisture crosses `me` decisively
 mid-run, not marginally.
 
-## 5. Open items
+## 5. RTMA vs HRRR FMDA — does the pSAF calibration travel?
 
-1. **Piece 4, the pSAF re-check** — now more urgent. `fmda_dir` has moved to
-   `CONUS_HRRR`, so the moisture feeding every fire has changed under a calibration that
-   was fitted on RTMA-driven output. Recipe in the 09-25 handoff §8. Baseline to beat:
-   geo mean 1.56, median 1.53, 25th percentile 1.11, n=58.
+Per JH: two 30x30 km domains, two weeks of hourly analyses, box means. The grids differ
+(RTMA 1258x2145, HRRR 1038x1799) so there is no cell-by-cell comparison to make; a box
+mean is also what ForeFire consumes, since `md_series` takes a `radius_km` mean around
+the ignition. `src/ingest/fmda_compare_regions.py` (`c67eaf5`), 339 common hours,
+2026-09-14 to 09-28.
+
+| domain | quantity | RTMA | HRRR | HRRR-RTMA | RMS | corr |
+|---|---|---|---|---|---|---|
+| Sierra / DOME | 1-h | 0.0841 | 0.0887 | +0.0047 | 0.0097 | 0.938 |
+| (37.57, -119.62) | **fuel 2 Md** | **0.0863** | **0.0882** | **+0.0019** | 0.0060 | 0.951 |
+| Oklahoma panhandle | 1-h | 0.1244 | 0.1259 | +0.0014 | 0.0272 | 0.906 |
+| (36.75, -101.60) | 100-h | 0.1821 | 0.1597 | **-0.0224** | 0.0374 | 0.931 |
+| | **fuel 2 Md** | **0.1343** | **0.1307** | **-0.0036** | 0.0239 | 0.904 |
+
+**The answer to JH's question is yes, with a caveat.** In the quantity that actually
+reaches the fuel table the two products differ by **0.2 to 0.4 percentage points**, with
+correlations of 0.90-0.95. That is far inside the ~3% per-fire reproducibility noise
+(09-25 handoff §4), so the pSAF calibration travels and 0.337 should survive the switch.
+
+**The caveat is that moisture does not act proportionally near extinction.** Counting
+hours where fuel 2 could burn at all (Md < me = 0.15):
+
+| domain | RTMA | HRRR | disagree |
+|---|---|---|---|
+| Sierra / DOME | 339/339 | 339/339 | **0 (0%)** |
+| Oklahoma panhandle | 218/339 | 233/339 | **29 (9%)** |
+
+The Sierra sits at Md ~0.087, far below extinction, so the products are interchangeable
+there. The panhandle sits at ~0.13 against a threshold of 0.15 — close enough that the
+same 0.4-point difference flips the verdict in 9% of hours, and HRRR burns in **more**
+of them. **pSAF cannot compensate for that**: it scales the rate of a fire that spreads,
+and has no effect on one that never starts. So the calibration travels for fire *size*
+while the burn/no-burn boundary shifts slightly toward more fire in marginal regimes.
+
+**Where they differ most is the 100-hour class** (HRRR 2.2 points drier in the
+panhandle, against 0.1 for the 1-hour). Fuel 2 weights 100-h at only 0.1429, which is
+why the derived Md difference stays small. Fuels that weight the coarse classes more
+heavily would show a larger divergence, and that is worth checking before trusting this
+result across all 13 categories.
+
+## 6. Open items
+
+1. **Piece 4, the pSAF re-check.** §5 makes this cheaper than feared: the moisture the
+   two products deliver differs by 0.2-0.4 points, so 0.337 should survive. Still worth
+   running to confirm, and to see whether the marginal-regime threshold shift shows up
+   as more fires spreading. Recipe in the 09-25 handoff §8. Baseline: geo mean 1.56,
+   median 1.53, 25th percentile 1.11, n=58.
 2. ~~**FMDA forecast mode has no schedule.**~~ **DONE** — cron entry added:
 
        30 2,8,14,20 * * *   ./hrrr_cycler.sh f CONUS_HRRR
@@ -113,7 +159,7 @@ mid-run, not marginally.
    upstream, the false "unknown moisture source" log line, scoring against observations
    rather than only WRF-SFIRE, and the two fires with no overlapping valid time.
 
-## 6. NEXT SESSION
+## 7. NEXT SESSION
 
 Piece 4. Everything it needs is in place, and the moisture source has changed under it.
 
