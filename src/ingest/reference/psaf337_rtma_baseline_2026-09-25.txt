@@ -1,0 +1,80 @@
+# ForeFire/WRF-SFIRE area ratios, pSAF 0.337, RTMA-driven FMDA moisture
+#
+# The baseline the HRRR-moisture switch is measured against. Produced 2026-09-25 by
+# ff_batch_ratio.py after the FMDA clamp fix, scored at the last valid time both
+# models reach. Summary: n=58, geometric mean 1.56, median 1.53, 25th pct 1.11.
+#
+# Kept because run_forecasts overwrites <wksp>/forefire in place: re-running the
+# batch destroys the perimeters these numbers came from, so the scored table is the
+# only durable record. A future A/B should either save its table here too, or use
+# sweep_ff_params, which takes a dest_dir and suffix and keeps runs side by side.
+#
+scoring ForeFire output written after 2026-09-25 06:10 (psaf_reclean.py)
+
+fire                       common valid          FF ha     WRF ha    ratio
+Mud_Bayou                  09-21 03:00          1397.5     2741.1     0.51
+Merit_Creek                09-23 04:00             0.7        1.3     0.55
+Sheep_Station_Rx           09-25 21:00          2946.4     5078.1     0.58
+RX_CALV_BU_104-108         09-17 17:00            41.4       61.9     0.67
+Medusa_Draw                09-17 21:00          1021.6     1344.4     0.76
+Ranger_Academy_Burn_1_RX   09-25 18:00           107.5      130.4     0.82
+Eagle_Springs              09-26 00:00          1093.0     1297.2     0.84
+Menogyn_Piles_RX           09-24 21:00           246.5      281.1     0.88
+COLE                       09-18 00:00          2313.0     2631.4     0.88
+GRADE                      09-25 00:00          6010.8     6112.5     0.98
+SL_Cold_Jim_RX             09-25 21:00           210.6      214.1     0.98
+Anderson_8674              09-18 21:00           662.7      669.5     0.99
+Logan_600202               09-19 21:00           345.1      344.2     1.00
+Silver                     09-21 21:00           743.4      688.2     1.08
+rx-Core_SE_Rx              09-23 21:00           151.6      137.3     1.10
+Clark_222                  09-20 21:00           656.7      573.9     1.14
+Bienville_CPT_280_1A_and_1B_RX 09-25 18:00           116.8       94.2     1.24
+Eagle                      09-24 21:00           202.1      161.4     1.25
+SCHELL                     09-19 00:00           774.7      580.2     1.34
+WOODRIDGE                  09-19 00:00           510.8      379.5     1.35
+Union_400257               09-21 19:00           217.5      154.9     1.40
+Arkansas_100250            09-20 18:00          2905.7     2065.1     1.41
+RX_D4_Rennic_Stark_10      09-24 21:00           540.2      379.8     1.42
+CRAWFORD_CORRAL_RX         09-23 21:00          1479.6     1023.1     1.45
+GRADE                      09-25 21:00          2669.9     1825.1     1.46
+Ouachita_263               09-23 21:00           288.2      195.8     1.47
+Hot_Spring_225             09-22 18:00           662.1      442.8     1.50
+208                        09-18 00:00          4351.2     2855.2     1.52
+Marmot_Peak                09-22 21:00           752.4      491.1     1.53
+Kelly_Gulch_RX             09-25 21:00          1460.3      952.9     1.53
+Horsefly_605_RX            09-24 21:00           754.4      481.2     1.57
+Calhoun_259                09-23 09:00           495.9      315.5     1.57
+RX_WINN_BU_50              09-24 18:00           387.5      234.7     1.65
+RX_D1_3-Mile_Bravo         09-24 21:00           282.7      168.3     1.68
+Ouachita_252               09-19 21:00           443.4      257.9     1.72
+D6_RX_Treasured_Landscapes 09-25 21:00          1119.7      647.1     1.73
+Columbia_255               09-20 21:00           499.8      286.1     1.75
+Bald_Hills_Rx              09-25 00:00           809.7      449.5     1.80
+BOON                       09-23 00:00          1105.1      602.9     1.83
+RX_D5_Two_Short_Unit_18    09-22 18:00           573.1      293.7     1.95
+SB_River_Unit_RX           09-25 00:00           194.6       99.7     1.95
+D4_RX_Roundhouse           09-24 21:00           900.0      457.9     1.97
+Little_Blue_Stem_RX        09-24 21:00           408.3      205.0     1.99
+Ouachita_259               09-21 23:00           206.1      103.2     2.00
+CABIN_SPRINGS              09-24 21:00          1151.2      563.8     2.04
+HOP-PATTERSON_PILE_RX      09-22 21:00          1916.4      882.4     2.17
+Unit_16-20_Rx              09-18 18:00           333.4      147.9     2.25
+D7_Saw_Creek_-_RX          09-24 21:00           768.8      312.1     2.46
+Bonanza_Ridge_RX           09-25 21:00          1553.5      585.6     2.65
+Poker                      09-18 00:00           182.8       68.6     2.66
+Dalton_RX                  09-24 21:00           609.6      217.4     2.80
+Dallas_500221              09-20 21:00            29.2       10.4     2.81
+Anderson_Butte_Rd_MM4      09-22 03:00          1077.5      382.6     2.82
+Clark_500220               09-20 00:00           387.2      135.8     2.85
+Lonesome_Wood_RX_Unit_31B  09-17 21:00           393.0      125.5     3.13
+FLORISTON                  09-17 18:00          1486.2      406.7     3.65
+Bear_Gulch_Rx              09-17 21:00           830.8      145.7     5.70
+RX_Stray_Creek__LCRD       09-24 21:00           270.8       27.2     9.96
+
+n=58   geometric mean 1.56   median 1.53   min 0.51   max 9.96
+below 1.0x (underpredict): 12 of 58 (21%)
+within a factor of 2:      44 of 58 (76%)
+
+skipped 2:
+  wfc-Nethery_2026-09-21_06_00_00_5AE8482F-A4E4-4CF8-8 no common valid time
+  wfc-STEEL_PASS_2026-09-16_01_00_00_21A7421D-E506-4F5 no common valid time
