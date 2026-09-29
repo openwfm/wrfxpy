@@ -138,15 +138,62 @@ analogue, so that work stands. But the ensemble **spread** has never been examin
 outliers like Bigfoot's member 4 — a 2.2x excursion from one barrier breach — are
 invisible to everything currently in the repo.
 
+
+## 5b. The `-r max` barrier mask works at 50 m (`0d1d2f1`)
+
+Tried the cheaper lever from §4 rather than buffering the LANDFIRE tif. A second warp of
+the same source with `-r max` marks any target cell containing a barrier cell.
+
+It works on the raw codes because every genuine barrier (92, 94-99) sits numerically
+above the two `remap_fuel` deliberately fills -- 91 urban/roads and 93 agriculture -- so
+a barrier cannot be outvoted by surrounding fuel. Snow/ice at 92 is the one exception,
+outranked by 93; rare in fire season.
+
+| res | near only | **with max** | pieces | non-burnable |
+|---|---|---|---|---|
+| 25 m | 16.62 km | 16.72 km | 506 -> 381 | 0.90 -> 1.33% |
+| **50 m** | **5.93 km** | **14.63 km** | 312 -> 182 | 0.88 -> 1.61% |
+| 100 m | 5.24 km | 7.47 km | 171 -> 89 | 0.88 -> 1.94% |
+
+**50 m with the mask recovers 88% of the 25 m barrier continuity at a quarter of the
+cost.** 100 m still loses the river even with it, so the mask does not rescue 100 m.
+The cost is over-stated barrier width, which is the safe direction.
+
+### The ensemble is where it shows, and the chained track barely notices
+
+| member | 100 m no mask | 50 m no mask | **50 m + mask** |
+|---|---|---|---|
+| 3 | 169.2 | 286.1 | 207.8 |
+| **4** (the river jumper) | **379.6** | 282.4 | **198.5** |
+| 5 | 156.3 | 253.4 | 182.4 |
+
+Member 4 goes from 2.2x its neighbours to *below* member 3. Ensemble **max/median falls
+3.11 -> 1.66 -> 1.50**. The chained progression moves only 192.9 -> 161.3 ha and never
+flags anything -- which is §5's point restated: the diagnostic that catches this is the
+one nothing in the repo computes.
+
+**Recommended configuration: 50 m with the barrier mask.**
+
+**It does not touch highways.** The mask restores only barriers `remap_fuel` was already
+keeping. Code 91 is still filled by design, 13,359 cells against 2,443 of river in this
+domain, so §4 stands unaddressed.
+
+**It moves the calibration again.** pSAF 0.337 was fitted at 25 m with no mask; 50 m +
+mask gives 161.3 ha where 25 m gave 214.7, implying roughly
+`0.337 * (214.7/161.3)^(1/1.54) = 0.41`. Mesh, mask and pSAF are now a three-way coupled
+choice, and the honest way to settle it is against observed perimeters rather than
+against each other.
+
 ## 6. Open items
 
-1. **Barrier preservation** (§4). Try the `-r max` barrier mask first; it is cheaper than
-   buffering and mesh-independent. Then decide whether to stop erasing code 91, which
-   needs an external roads layer to separate highways from developed land.
+1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
+   open for **roads**: whether to stop erasing code 91, which needs an external roads
+   layer to separate an interstate from a subdivision. That is the larger loss.
 2. **Score the ensemble members** (§5). At minimum report the spread and flag outliers;
    a member that is 2x its neighbours is a barrier breach or a bad wind field.
-3. **Pick a default mesh**, and re-derive pSAF with it (§3). 50 m at pSAF ~0.36 is the
-   obvious candidate, but only for fires where barriers do not matter.
+3. **Pick a default mesh and mask, then re-derive pSAF** (§3, §5b). 50 m + mask is the
+   candidate, implying pSAF ~0.41. Settle it against observed perimeters: three
+   configurations that differ by 25% in area cannot be ranked against each other.
 4. Carried from 09-28: `--issue-utc` on every forecast run; perimeter scoring has its own
    calibration (score at containment, IoU 0.25 is a success, check detection dates);
    `ff_domain_connectivity.py` before any per-fire fit; re-run `fmda_fcst_skill.py` once
