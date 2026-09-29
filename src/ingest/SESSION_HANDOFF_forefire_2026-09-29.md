@@ -10,7 +10,8 @@ breaks — one of which is a deliberate choice rather than a bug.
   the cron `flock` was working around (`d814825`).
 - **Bigfoot ran end to end** — a VIIRS-only fire with no WRF-SFIRE workspace, 27 steps,
   `--issue-utc` honoured. This closes the `--steps 27` unknown.
-- **50 m is the timing sweet spot**: 20 min against 77 at 25 m, for 90% of the area.
+- **50 m with rivers masked is the chosen configuration**, per JH: 20 min against 77 at
+  25 m, and the `-r max` pass recovers 88% of the 25 m barrier continuity (§5b).
 - **But 50 m does not restore barrier continuity.** Longest unbroken non-burnable run is
   5.93 km at 50 m against 16.62 km at 25 m — essentially 100 m's 5.24 km. Area degrades
   smoothly with resolution; **connectivity collapses between 25 m and 50 m and then
@@ -172,7 +173,7 @@ Member 4 goes from 2.2x its neighbours to *below* member 3. Ensemble **max/media
 flags anything -- which is §5's point restated: the diagnostic that catches this is the
 one nothing in the repo computes.
 
-**Recommended configuration: 50 m with the barrier mask.**
+**Decided, per JH: 50 m with rivers masked this way is the resolution to aim for.**
 
 **It does not touch highways.** The mask restores only barriers `remap_fuel` was already
 keeping. Code 91 is still filled by design, 13,359 cells against 2,443 of river in this
@@ -201,9 +202,55 @@ against each other.
 
 ## 7. NEXT SESSION
 
-WRF-SFIRE is running Bigfoot for comparison (per JH). Once it lands, that is the first
-genuine ForeFire-vs-WRF-SFIRE test on a fire neither was tuned to — and Bigfoot has a
-river barrier, which makes it a useful case for §4.
+**The task JH set: run the latest WRF-SFIRE forecasts as real forecasts, and test
+pSAF 0.41.**
+
+That means driving ForeFire from each fire's own job file with no WRF-SFIRE in the loop
+-- `forefire_forecast.py <job.json> --fire-dx 50 --steps 27 --issue-utc <just after
+ignition>` -- and scoring the result against that fire's WRF-SFIRE run. It is the first
+test of the whole pipeline in the configuration it would actually be used in, rather
+than of one piece at a time.
+
+Set `propagationSpeedAdjustmentFactor` to **0.41** in both templates under
+`/home/jhaley/forefire/tests` before starting. The value comes from §5b: 50 m + mask
+gives 161.3 ha where the 25 m run pSAF 0.337 was fitted on gave 214.7, so
+`0.337 * (214.7/161.3)^(1/1.54) = 0.41`. It is a prediction, not a measurement -- the
+point of the batch is to find out whether it holds.
+
+**Four things that will bite if they are not planned for.**
+
+1. **`--issue-utc` is the whole point.** Without it `find_gribs` takes the best file on
+   disk, which for a past fire means cycles published after ignition, and the scores come
+   out optimistic with nothing to show for it. Set it to roughly an hour after each
+   fire's ignition.
+2. **Only recent fires are eligible.** The forward path needs HRRR *forecast* GRIBs
+   spanning the run, and that cache starts **2026-09-25 12:00** -- it was only switched on
+   this week. Fires ignited before then cannot be run this way at all. Check coverage
+   with `find_gribs` before building a fire list, rather than discovering it per fire.
+3. **Budget the time, or run concurrently.** A 50 m run is about 20 min of netcdf build
+   plus the ForeFire chain -- call it 30 min. A 50-fire batch is 25 hours serially. The
+   per-job binding (§2) removed the shared run directory specifically so fires *can* run
+   at once; that is the payoff to spend here. Watch memory: WindNinja scales with cell
+   count and 384k cells is roughly 14 GB, so concurrency is RAM-bound, not CPU-bound.
+4. **Score the ensemble, not only the chained track** (§5, §5b). `ff_batch_ratio.py` reads
+   the chained progression and would have missed both the river jump and its repair.
+   Report member spread and flag any member more than about 2x its neighbours.
+
+**Bigfoot is the natural first case.** WRF-SFIRE is running it (per JH), it has the river
+barrier that motivated §5b, and it has already been run at 25, 50 and 100 m with and
+without the mask, so the ForeFire side is a known quantity.
+
+**Do not rank configurations against each other.** 25 m, 50 m and 50 m + mask differ by
+25% in area; WRF-SFIRE is not truth either (on Dome it ran 0.68x an IR perimeter). Three
+numbers that disagree cannot settle which is right. Observed perimeters are the only
+arbiter, with the standing calibration: score at containment time, IoU 0.25 is a success,
+and check detection dates first.
+
+**Still open from §4, and larger than anything above:** highways are erased by design.
+`remap_fuel` fills LANDFIRE code 91 with the nearest burnable fuel -- 13,359 cells against
+2,443 of river kept in Bigfoot's domain. The `-r max` mask does not touch it, because the
+code is filled before any resampling question arises. Separating an interstate from a
+subdivision needs an external roads layer.
 
 Commits remain unpushed on `james_ngfs` and `release-fmda-fixes`; JH pushes them manually
 (SSH password).
