@@ -329,6 +329,50 @@ have nothing to do with spread rate.
 (Its relief column reads 11986 m on Mud_Bayou, which is a fill value in the altitude
 field, not terrain. Do not trust that column without checking.)
 
+
+### Connectivity over the whole batch (2026-09-29)
+
+`ff_domain_connectivity.py` run over all **361** retained fire domains.
+
+| | min | 10th | median | 90th | max |
+|---|---|---|---|---|---|
+| burnable | 0.347 | 0.880 | 0.981 | 0.998 | 1.000 |
+| reach | 0.000 | 0.776 | 0.999 | 1.000 | 1.000 |
+| fragility | 0.008 | 0.015 | 0.053 | 0.350 | 1.000 |
+
+**70 of 361 flagged (19%)** at burnable<0.80, reach<0.90 or fragility>0.50. The worst:
+STEEL_PASS (43.5% burnable, **0.0% reachable**), Silver (fragility 1.00), Foster (0.96),
+Bear_River_MBR_Unit_2c_RX (0.3% reachable), **Mud_Bayou (47.6% burnable, 0.72)** -- the
+known bridge-crossing case, correctly picked out without being told about it.
+
+**STEEL_PASS explains itself.** It is one of the fires logged as "no common valid time"
+and therefore unscorable; with none of its burnable fuel reachable from the ignition
+there was never going to be a fire to score.
+
+### Do flagged fires distort the calibration? Noise, not bias.
+
+| | flagged (n=14) | clean (n=38) |
+|---|---|---|
+| geometric mean | 1.398 | 1.458 |
+| median | 1.315 | 1.335 |
+| **sd of log ratio** | **0.698** | **0.484** |
+| within factor 2 | 71% | 79% |
+
+Central tendency matches; **scatter is 45% larger**. Excluding them moves the implied
+pSAF from 0.328 to 0.323, against 0.337 in use -- negligible.
+
+**So: keep them in the global calibration, drop them from anything fitted per fire.**
+Excluding 27% of the scored set to move a constant by 1.5% is a bad trade. But for the
+NGFS-predicted per-fire pSAF (09-24 handoff §9 item 2) the extra scatter is precisely
+what would corrupt the fit, and that is the same reasoning already recorded for
+Mud_Bayou. Run this first and exclude the flagged fires there.
+
+**A bug in the metric, fixed.** The first run reported fragility down to **-0.583**, which
+is impossible by its definition. When the ignition cell fell out of every component after
+erosion, the nearest-surviving-component fallback could select a *different and larger*
+component, giving reach2 > reach. Now intersected with the original reachable component
+first; the range is [0.008, 1.000] and STEEL_PASS moved to the top of the ranking.
+
 ## 8. Open items
 
 1. ~~**Piece 4, the pSAF re-check.**~~ **DONE — see §6. Keep 0.337.**
