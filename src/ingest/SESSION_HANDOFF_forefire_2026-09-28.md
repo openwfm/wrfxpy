@@ -373,6 +373,47 @@ erosion, the nearest-surviving-component fallback could select a *different and 
 component, giving reach2 > reach. Now intersected with the original reachable component
 first; the range is [0.008, 1.000] and STEEL_PASS moved to the top of the ranking.
 
+
+### Merit_Creek was a failed run, not a moisture effect (2026-09-29)
+
+JH noticed Merit_Creek's `_steps.kml` showed only a few steps. It is worse than a small
+fire -- the RTMA run **died two hours in**:
+
+| | perimeters | ForeFire ha | WRF ha at the common time | ratio |
+|---|---|---|---|---|
+| RTMA | **3** of 53 step files | 0.7 | 1.3 | 0.55 |
+| HRRR | 53 | **207.4** | 194.8 | **1.06** |
+
+The scorer takes the latest time **both** models reach, so the RTMA run was compared
+against WRF-SFIRE two hours in: small against small, giving a ratio of 0.55 that looked
+entirely ordinary. Comparing it with the healthy run's 1.06 produced a "+93% moisture
+effect" that put Merit_Creek at the top of the movers list and into the per-fire stall
+analysis. **None of that was real.** JH confirms the HRRR run tracks WRF-SFIRE closely,
+which the numbers agree with -- 207.4 against 194.8 is one of the closest matches in the
+batch.
+
+**This does not touch §6.** Only 1 of the 42 paired fires was scored at a different valid
+time. Excluding it the effect is slightly *larger*: geo mean -11.7% against -10.0%,
+median -15.9% against -15.2%. Keep pSAF 0.337.
+
+**It does invalidate Merit_Creek's place in §7.** It was one of the two fires counted as
+"RTMA reproduces the stall". RTMA did not reproduce a stall there; it produced a
+degenerate run. The §7 tally becomes RTMA 1 (BOON), HRRR 1 (D6), neither 1
+(HOP-PATTERSON) -- which strengthens rather than changes the conclusion that **neither
+product is better**.
+
+**Guard added** to `ff_batch_ratio.py`: skip a fire whose ForeFire track covers under
+half the WRF window, or under half of whose step files yield a perimeter. It fires on
+nothing in the current batch -- the genuinely truncated runs are already caught as "no
+common valid time", and Merit_Creek's RTMA output has been overwritten -- but the failure
+is silent and the ratio it produces is plausible, which is exactly why it needs a guard
+rather than an eye.
+
+**A bug in that guard, caught before it did damage.** The step-file test globbed
+`*.geojson`, but a run writes one `final` geojson per step and `track()` skips those, so
+the denominator was doubled. It flagged Bear_River, COTTON_2 and Huckleberry as truncated
+at "47 of 108" when 47 of 54 is healthy. Now counts only what `track()` reads.
+
 ## 8. Open items
 
 1. ~~**Piece 4, the pSAF re-check.**~~ **DONE — see §6. Keep 0.337.**
