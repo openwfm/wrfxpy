@@ -411,18 +411,34 @@ BOON (+61%), Menogyn_Piles_RX (+45%), HOP-PATTERSON_PILE_RX (-64%),
 D6_RX_Treasured_Landscapes (-51%), Little_Blue_Stem_RX (-49%), Silver (-37%) -- all of
 which are present in both sets.
 
-**What to look for.** A uniform moisture shift scales a perimeter roughly isotropically.
-A *threshold* crossing changes its **shape**, by switching off one fuel category while
-others keep burning. §7 shows BOON is the second kind, and the `_steps` files are what
-distinguish them, because they show when the divergence starts.
+**What to look for, and a falsifiable prediction.** A smooth moisture offset scales a
+perimeter roughly isotropically; a *threshold* crossing changes its **shape**, by
+switching off one fuel category while others keep burning. By the corrected §7 analysis
+**BOON, Merit_Creek, Little_Blue_Stem_RX, D6 and Menogyn cross thresholds; HOP-PATTERSON
+and Silver do not** -- so those last two should scale rather than change shape. If they
+show shape changes instead, the smooth-offset reading is wrong. The `_steps` files are
+what distinguish the two, because they show when the divergence starts.
 
-**Then the per-fire moisture test §7 sets up**, which is the real successor to §5. For
-each big mover, reconstruct both Md series against each fuel's moisture of extinction
-(the §7 method) and ask which product reproduces the stall structure WRF-SFIRE shows.
-BOON already answers it against HRRR. Two or three more cases would establish whether
-that is a regional bias in northern California or something wider -- and it matters,
-because §6 switched the whole pipeline to HRRR moisture on aggregate evidence that §7
-shows does not hold fire by fire.
+**The per-fire moisture test is done** (§7, 2026-09-29) -- do not redo it. Over all seven
+movers **neither product reproduces WRF-SFIRE's stalls better**, and BOON was the
+extreme case rather than a representative one. What came out of it instead: the
+HRRR/RTMA moisture **ratio**, area-weighted over the whole domain, separates all seven
+fires by sign, and threshold crossings are *not* the main mechanism -- HOP-PATTERSON and
+Silver have zero crossings and still move -64% and -37%.
+
+**Run `ff_domain_connectivity.py` before any per-fire fit.** Over all 361 domains it
+flags 70 (19%) as connectivity-gated -- fires whose area changes because the fire reaches
+a region or does not, which has nothing to do with spread rate. It finds Mud_Bayou
+unprompted (47.6% burnable, fragility 0.72) and explains STEEL_PASS, long logged as
+unscorable, as having **0.0% of its burnable fuel reachable from the ignition**.
+
+Those fires are **noise, not bias**: the same central tendency as clean fires but 45%
+more scatter in the log ratio (sd 0.698 against 0.484). So **keep them in the global
+calibration** -- excluding 27% of the scored set to move pSAF from 0.328 to 0.323 is a
+bad trade -- and **exclude them from the NGFS per-fire pSAF fit** (09-24 handoff §9 item
+2), where scatter is exactly what corrupts a fitted relationship. That is the same
+reasoning already standing for Mud_Bayou, now measurable across the batch rather than
+case by case.
 
 **Re-run `fmda_fcst_skill.py` once the cron has accumulated cycles.** This session's
 forecast-vs-analysis result came from 2 cycles with n=1 at leads 3-9, and JH's read of it
