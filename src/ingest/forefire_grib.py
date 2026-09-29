@@ -62,6 +62,17 @@ HRRR_CACHE = '/data/jhaley/clean_wrfxpy/wrfxpy/ingest/HRRRA'
 WINDRF_13 = np.array([0.36, 0.36, 0.44, 0.55, 0.42, 0.44, 0.44,
                       0.36, 0.36, 0.36, 0.36, 0.43, 0.46, 1e-7])
 NO_FUEL_CAT = 14
+
+#LANDFIRE FBFM13 non-burnable codes that are genuine fire breaks, as opposed to the ones
+#remap_fuel deliberately fills in: 91 (urban/developed, which is how roads are coded) and
+#93 (agriculture).  Water is 98 and barren 99.
+#
+#All of these sit numerically ABOVE 91 and 93, which is what makes the `-r max` trick
+#work: warping the raw codes with max returns a barrier code whenever any barrier cell
+#falls inside the target cell, and cannot be outvoted by surrounding fuel.  The one
+#exception is snow/ice at 92, which 93 outranks -- rare in fire season and not worth a
+#second pass.
+BARRIER_CODES = (92, 94, 95, 96, 97, 98, 99)
 #category 14 cannot burn and its 1e-7 is a sentinel, not a reduction.  Applying it
 #would punch near-zero wind holes into the field, so non-burnable cells take the
 #modal burnable factor instead, keeping the field continuous across them.
@@ -169,13 +180,23 @@ def read_asc(path):
     return np.flipud(a)
 
 
-def remap_fuel(raw):
+def remap_fuel(raw, raw_max=None):
     """LANDFIRE FBFM13 codes -> NFUEL_CAT, following etc/../var_wisdom.py.
 
     Anderson categories 1-13 pass through.  15-90, 92 and 94-99 are non-burnable
     and become 14.  0, 91 (urban) and 93 (agriculture) take their nearest valid
     neighbour, as geogrid's 'nearest' fill does, so a fire is not stopped by a
     road or a field boundary that LANDFIRE happens to label unburnable.
+
+    `raw_max` is the same source warped with `-r max` instead of `-r near`, and it is
+    what keeps linear barriers connected.  Nearest-neighbour sampling keeps a river only
+    where a target cell centre happens to land on it, so a continuous river becomes a
+    dashed one: measured on Bigfoot, the longest unbroken non-burnable run fell from
+    16.62 km at 25 m to 5.24 km at 100 m, while the total barrier *area* was preserved
+    (861 ha against 842).  The resampling conserves area and destroys topology, and for
+    a barrier the topology is the whole function.  With `max`, any target cell containing
+    a barrier cell becomes one -- which over-states barrier width slightly, in the safe
+    direction.
     """
     f = np.rint(raw).astype(np.int32)
     out = np.full(f.shape, NO_FUEL_CAT, dtype=np.int16)
@@ -189,6 +210,12 @@ def remap_fuel(raw):
         idx = ndimage.distance_transform_edt(~valid, return_distances=False,
                                              return_indices=True)
         out[nearest] = out[idx[0][nearest], idx[1][nearest]]
+
+    #restore barriers the nearest-neighbour pass dropped.  Applied last, so it also
+    #overrides the fill above where a cell holds both a road and a river.
+    if raw_max is not None:
+        m = np.rint(raw_max).astype(np.int32)
+        out[np.isin(m, BARRIER_CODES)] = NO_FUEL_CAT
     return out
 
 
@@ -513,7 +540,9 @@ def build_step_ncs(lat, lon, ign_utc, out_dir, grid_code, steps=8, domain_km=30.
     dem_asc = _warp(dem_tif, osp.join(work_dir, 'dem.asc'), domain, 'near')
     altitude = read_asc(dem_asc)
     fuel_asc = _warp(FUEL_TIF, osp.join(work_dir, 'fuel.asc'), domain, 'near')
-    fuel = remap_fuel(read_asc(fuel_asc))
+    #second pass with max, so a barrier narrower than a cell is not sampled away
+    fuel_max_asc = _warp(FUEL_TIF, osp.join(work_dir, 'fuel_max.asc'), domain, 'max')
+    fuel = remap_fuel(read_asc(fuel_asc), read_asc(fuel_max_asc))
     logging.info('fuels: %d of %d cells burnable; terrain %.0f-%.0f m',
                  int(((fuel >= 1) & (fuel <= 13)).sum()), fuel.size,
                  float(np.nanmin(altitude)), float(np.nanmax(altitude)))
