@@ -23,7 +23,12 @@ anywhere in the loop. Winds and fuel moisture both come from HRRR forecasts.
 - **Piece 4 is done: keep 0.337 (§6).** On HRRR moisture the batch gives geo mean 1.39
   against 1.54 paired, but the 25th percentile — the actual calibration target — moves
   only 1.11 -> 1.05, implying 0.326. Inside the noise.
-- **BOON is a counterexample to "HRRR is better" (§7).** RTMA put fuel 2 above extinction
+- **Neither moisture product reproduces WRF-SFIRE's stalls better (§7).** Over the seven
+  biggest movers RTMA matches on two, HRRR on one, neither on a fourth. BOON is the
+  extreme case, not a representative one. The sign of the RTMA/HRRR difference predicts
+  the direction of every area change, and that difference runs -0.064 to +0.042 per
+  fire -- 10-20x §5's estimate, and **regionally signed**, so averaging domains hides it.
+- **BOON alone looked like a counterexample to "HRRR is better" (§7).** RTMA put fuel 2 above extinction
   overnight and reproduced a stall WRF-SFIRE independently shows; HRRR missed it by 0.003
   and ran 2.94x against RTMA's 1.83x. At BOON HRRR is 0.03 drier than RTMA -- ten times
   the difference at either §5 sample domain, so §5 was under-sampled.
@@ -236,6 +241,49 @@ fire by fire, and BOON is a clear case against it. The useful next test is not a
 regional moisture comparison but a **per-fire** one: for the fires that moved most in §6,
 which product's Md series matches the stall structure WRF-SFIRE shows? That is a
 falsifiable question and BOON answers it against HRRR.
+
+
+### The seven big movers — BOON was not representative (2026-09-29)
+
+Applying the same reconstruction to every fire that moved most in §6
+(`src/ingest/ff_moisture_stall_test.py`, `7135030`):
+
+| fire | dArea | fuel | Md RTMA | Md HRRR | HRRR-RTMA | mechanism |
+|---|---|---|---|---|---|---|
+| Merit_Creek | **+93%** | 10 | 0.2560 | 0.1925 | **-0.064** | threshold, 27 steps |
+| BOON | **+61%** | 2 | 0.1367 | 0.0992 | **-0.038** | threshold, 22 steps |
+| Menogyn_Piles_RX | **+45%** | 10 | 0.1783 | 0.1669 | -0.012 | smooth |
+| HOP-PATTERSON_PILE_RX | -64% | 8 | 0.1802 | 0.1830 | +0.003 | smooth |
+| D6_RX_Treasured_Landscapes | -51% | 5 | 0.0983 | 0.1401 | **+0.042** | threshold, 9 steps |
+| Little_Blue_Stem_RX | -49% | 10 | 0.1485 | 0.1880 | **+0.039** | smooth |
+| Silver | -37% | 5 | 0.0821 | 0.1205 | **+0.039** | smooth |
+
+**The sign of the moisture difference predicts the direction of the area change in all
+seven.** HRRR drier -> more fire; HRRR wetter -> less fire.
+
+**§5 was worse than under-sampled.** Per-fire differences run -0.064 to +0.042 against
+the +/-0.004 measured at the two sample domains -- 10 to 20x larger -- and, more
+importantly, the difference **changes sign regionally**. Averaging over domains would
+have hidden it completely. A two-domain comparison is not a valid way to assess this.
+
+**Only 3 of 7 are threshold crossings** (Merit_Creek, BOON, D6). The other four are
+smooth offsets, so their perimeters should scale rather than change shape -- a concrete
+prediction for the KML comparison.
+
+**Correction to the §7 lean.** §7 suggested RTMA might be the better product. Over seven
+fires that does not hold. Of the four where WRF-SFIRE genuinely stalls (>30% of hours
+below a quarter of peak growth): RTMA matches on **Merit_Creek** and **BOON**, HRRR
+matches on **D6**, and neither explains **HOP-PATTERSON** (WRF stalls 41%, neither product
+blocks). Each also blocks spuriously once where WRF shows no stall -- RTMA on Menogyn (16
+steps), HRRR on Little_Blue_Stem (14). That is 2-1 and 1-1 on seven fires: noise. **BOON
+is the extreme case** -- WRF stalls 77% of its hours there against 0-41% elsewhere --
+**not a representative one.** Neither product is systematically better at reproducing
+stalls, and §6's aggregate remains the only solid basis for preferring HRRR.
+
+**One case unexplained.** HOP-PATTERSON_PILE_RX moved -64% on a +0.003 moisture
+difference in its dominant fuel. Every other fire's magnitude tracks its moisture
+difference; this one does not. Either a non-dominant fuel carries it or something other
+than moisture is involved.
 
 ## 8. Open items
 
