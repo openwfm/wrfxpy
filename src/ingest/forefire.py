@@ -39,22 +39,102 @@ def load_ff_cfg(cfg_path=FF_CFG_PATH):
     with open(path,'r') as openfile:
         return json.load(openfile)
 
-def container_path(host_path,cfg):
-    #where the apptainer bind makes a host path visible inside the container
-    #forefire is handed bare filenames and resolves them against the working
-    #directory, so a run directory outside the bind fails with files "missing"
-    #inside a container that simply cannot see them -- catch that here instead
+#Where a run directory is mounted inside the container.  Fixed, so the container side
+#of every path is the same whatever the host directory is -- which is the whole point of
+#binding per job rather than sharing one directory.
+WORK_CONTAINER_DIR = '/work'
+
+#Where the wrfxpy workspace root is mounted.  Bound whole because its children's names
+#contain colons, which apptainer's bind syntax cannot carry.
+WKSP_CONTAINER_DIR = '/wksp'
+
+
+def _run_mount(cfg,run_dir):
+    """(host_src, container_dst) for the run directory's own bind, or None.
+
+    None means the run directory is already reachable through the shared bind.
+
+    **Apptainer bind specs are colon-delimited and cannot carry a colon in a path.**
+    A wrfxpy workspace name embeds the ESMF timestamp -- `...-2026-09-28_18:00:00-33` --
+    so binding one directly fails with `bad bind syntax`.  Where that happens the
+    nearest colon-free ancestor is bound instead and `--pwd` still points at the job's
+    own directory, which is what actually provides the isolation.  The
+    `wksp_forefire/<grid_code>` layout has no colons, so it binds directly.
+    """
+    if run_dir is None:
+        return None
+    run_abs = os.path.abspath(run_dir).rstrip('/')
+    host_bind = cfg['apptainer']['bind_host'].rstrip('/')
+    if run_abs == host_bind or run_abs.startswith(f"{host_bind}/"):
+        return None
+    if ':' not in run_abs:
+        return run_abs, WORK_CONTAINER_DIR
+    #walk up to the last colon-free ancestor and bind that
+    parts = run_abs.split('/')
+    keep = []
+    for part in parts:
+        if ':' in part:
+            break
+        keep.append(part)
+    anc = '/'.join(keep) or '/'
+    return anc, WKSP_CONTAINER_DIR
+
+
+def container_path(host_path,cfg,run_dir=None):
+    """Where the apptainer binds make a host path visible inside the container.
+
+    ForeFire is handed bare filenames and resolves them against its working directory,
+    so a path the container cannot see fails as a *missing file* rather than as a bad
+    mount.  This raises instead.
+
+    Binding the run directory in its own right is what lets results be written straight
+    into a job's own folder, and -- more importantly -- removes the single shared run
+    directory that `run_forecasts` wipes on entry.  Two fires running at once used to
+    destroy each other's netcdfs mid-step; on Union_400257 that emptied 26 of 47
+    ensemble members.
+    """
+    abs_path = os.path.abspath(host_path).rstrip('/')
     host_bind = cfg['apptainer']['bind_host'].rstrip('/')
     cont_bind = cfg['apptainer']['bind_container'].rstrip('/')
-    abs_path = os.path.abspath(host_path).rstrip('/')
-    if abs_path != host_bind and not abs_path.startswith(f"{host_bind}/"):
-        raise ValueError(
-            f"{abs_path} is outside the apptainer bind {host_bind}, so ForeFire "
-            f"would not see it. Put it under bind_host, or widen bind_host in {FF_CFG_PATH}.")
-    return cont_bind + abs_path[len(host_bind):]
+    #the shared bind wins: a path already reachable there must not claim a mount that
+    #bind_flags does not create
+    if abs_path == host_bind or abs_path.startswith(f"{host_bind}/"):
+        return cont_bind + abs_path[len(host_bind):]
+    mnt = _run_mount(cfg,run_dir)
+    if mnt:
+        src,dst = mnt
+        if abs_path == src:
+            return dst
+        if abs_path.startswith(f"{src}/"):
+            return dst + abs_path[len(src):]
+    raise ValueError(
+        f"{abs_path} is visible to neither apptainer bind: not under the shared "
+        f"{host_bind}, and not under the run directory {run_dir!r}. Put it in the "
+        f"run directory, or under bind_host in {FF_CFG_PATH}.")
+
+
+def bind_flags(cfg,run_dir=None):
+    """The --bind arguments, as a flat list ready to splice into the apptainer command.
+
+    Both binds are writable: ForeFire resolves bare filenames against its working
+    directory and writes its restart scripts and perimeters there, so whichever mount
+    carries the working directory has to accept writes.
+    """
+    host_bind = cfg['apptainer']['bind_host'].rstrip('/')
+    cont_bind = cfg['apptainer']['bind_container'].rstrip('/')
+    out = ['--bind', f"{host_bind}:{cont_bind}"]
+    mnt = _run_mount(cfg,run_dir)
+    if mnt:
+        out += ['--bind', f"{mnt[0]}:{mnt[1]}"]
+    for b in out[1::2]:
+        if b.count(':') != 1:
+            raise ValueError(
+                f"bind {b!r} has a colon in a path; apptainer cannot express that.")
+    return out
+
 
 def bind_flag(cfg):
-    #the --bind argument, host:container
+    #kept for callers that predate the per-job bind; the shared mount only
     return f"{cfg['apptainer']['bind_host'].rstrip('/')}/:{cfg['apptainer']['bind_container'].rstrip('/')}/"
 
 def ff_nc_name(step,grid_code,utc_str):
@@ -451,7 +531,7 @@ def read_namelist_fire(path):
     return values
 
 
-def fuel_table_from_namelist(namelist_path,cfg,md=None,split_live=True):
+def fuel_table_from_namelist(namelist_path,cfg,md=None,split_live=True,out_dir=None):
     """Write a ForeFire fuel table whose Rothermel inputs come from namelist.fire.
 
     The shipped fuelstrans.csv is a mapping of the 40-category Scott & Burgan
@@ -570,7 +650,7 @@ def fuel_table_from_namelist(namelist_path,cfg,md=None,split_live=True):
         out.append(';'.join(fields))
 
     tag = 'nml' + (f"_Md{md:g}" if md is not None else '')
-    dest = f"{cfg['run_dir']}/fueltables/fuels_{tag}.csv"
+    dest = f"{out_dir or cfg['run_dir'] + '/fueltables'}/fuels_{tag}.csv"
     os.makedirs(os.path.dirname(dest),exist_ok=True)
     with open(dest,'w',newline='\n') as fh:
         fh.write('\n'.join(out) + '\n')
@@ -583,7 +663,7 @@ def fuel_table_from_namelist(namelist_path,cfg,md=None,split_live=True):
     return dest
 
 
-def write_fuel_table(md,cfg):
+def write_fuel_table(md,cfg,out_dir=None):
     """Copies the base fuel table with Md substituted.
 
     `md` is either a **float**, written into every fuel row, or a **tuple of the
@@ -603,7 +683,9 @@ def write_fuel_table(md,cfg):
     ForeFire fail to find 'me' and silently stop the fire from spreading.
     """
     base = cfg['fuels_table']
-    out_dir = f"{cfg['run_dir']}/fueltables"
+    #per-run tables belong in the run directory, so a job carries its own moisture
+    #record and two jobs cannot overwrite each other's tables
+    out_dir = out_dir or f"{cfg['run_dir']}/fueltables"
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     per_class = isinstance(md,(tuple,list))
@@ -661,13 +743,14 @@ def write_fuel_table(md,cfg):
     return out
 
 
-def moisture_params(wksp_dir,ign_latlon,cfg):
+def moisture_params(wksp_dir,ign_latlon,cfg,run_dir=None):
     """{'fuelsTableFile': <container path>} for a run, or {} to leave it alone."""
     md,why = resolve_md(wksp_dir,ign_latlon,cfg)
     print(f"ForeFire fuel moisture: {why}")
     if md is None:
         return {}
-    return {'fuelsTableFile': container_path(write_fuel_table(md,cfg),cfg)}
+    ft = write_fuel_table(md,cfg,out_dir=(run_dir+'/fueltables') if run_dir else None)
+    return {'fuelsTableFile': container_path(ft,cfg,run_dir=run_dir)}
 
 
 def md_series(timing_table, ign_latlon, cfg):
@@ -1153,7 +1236,9 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
                     key = (tuple(round(m, 4) if m is not None else None for m in md_i)
                            if isinstance(md_i, (tuple, list)) else round(md_i, 4))
                     if key not in md_tables:
-                        md_tables[key] = container_path(write_fuel_table(key, cfg), cfg)
+                        ft = write_fuel_table(key, cfg,
+                                              out_dir=forefire_dir + '/fueltables')
+                        md_tables[key] = container_path(ft, cfg, run_dir=forefire_dir)
                     step_params['fuelsTableFile'] = md_tables[key]
                 if step_params:
                     file_content = apply_ff_params(file_content,step_params)
@@ -1472,7 +1557,7 @@ def stage_ff_nc(wksp_dir,timing_table,grid_code,cfg):
     wind_scale = float(cfg.get('wind_scale',1.0) or 1.0)
     suffix = '' if wind_scale == 1.0 else f"_w{wind_scale:g}"
     stage_dir = f"{cfg['run_dir']}/nc_{grid_code}{suffix}"
-    container_path(stage_dir,cfg)
+    container_path(stage_dir,cfg,run_dir=stage_dir)
     if not os.path.exists(stage_dir):
         os.makedirs(stage_dir)
 
@@ -1535,7 +1620,7 @@ def sweep_ff_params(wksp_dir,param_sets,cfg=None,overwrite=False,reuse_nc=True,t
     for i,params in enumerate(param_sets):
         tag = tags[i] if tags is not None else param_tag(params)
         run_dir = f"{cfg['run_dir']}/{tag}"
-        container_path(run_dir,cfg)
+        container_path(run_dir,cfg,run_dir=run_dir)
         if not os.path.exists(run_dir):
             os.makedirs(run_dir)
 
@@ -1606,9 +1691,11 @@ def run_timing_table(df,overwrite=False,cfg=None,run_dir=None,dest_dir=None):
     if cfg is None:
         cfg = load_ff_cfg()
     HOST_BIND_DIR = run_dir if run_dir else cfg['run_dir']
-    CONTAINER_PWD = container_path(HOST_BIND_DIR,cfg)
+    #the run directory is mounted at /work in its own right, so it can live anywhere --
+    #including straight inside <wksp>/forefire, which is where the results are wanted
+    CONTAINER_PWD = container_path(HOST_BIND_DIR,cfg,run_dir=HOST_BIND_DIR)
     SIF_IMAGE = cfg['apptainer']['sif_image']
-    BIND_FLAG = bind_flag(cfg)
+    BIND_FLAGS = bind_flags(cfg,run_dir=HOST_BIND_DIR)
     timeout_s = cfg['apptainer'].get('timeout_s',240)
 
     # Load your dataframe (replace with your actual data source)
@@ -1646,7 +1733,7 @@ def run_timing_table(df,overwrite=False,cfg=None,run_dir=None,dest_dir=None):
             "apptainer", "exec",
             "--pwd", CONTAINER_PWD,
             "--writable-tmpfs",
-            "--bind", BIND_FLAG,
+        ] + BIND_FLAGS + [
             SIF_IMAGE,
             "forefire", "-i", script_name
         ]
@@ -1720,9 +1807,16 @@ def cleanup_ff_run(forefire_dir,wksp_dir,grid_code,cfg=None,dest_dir=None,suffix
         dest_dir = f"{wksp_dir}/forefire"
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
-    #move all the files in the forefire_dir to the destination_dir
-    
-    os.system(f"mv {forefire_dir}/* {dest_dir}/.")
+    #move all the files in the forefire_dir to the destination_dir -- unless the run
+    #wrote straight into it, which is what a per-job apptainer bind allows.  'mv dir/*
+    #dir/.' would fail on every file, so the copy step simply does not apply.
+    if os.path.abspath(forefire_dir) != os.path.abspath(dest_dir):
+        #quoted, and not through a shell.  Real grid_codes carry spaces (10 of 28,695),
+        #'&' and parentheses, any of which turn an unquoted `mv a/* b/.` into something
+        #other than a move.
+        import shutil, glob as _glob
+        for src in _glob.glob(os.path.join(forefire_dir,'*')):
+            shutil.move(src, os.path.join(dest_dir, os.path.basename(src)))
 
     finalize_ff_outputs(dest_dir,grid_code,cfg=cfg,suffix=suffix)
 
@@ -2178,7 +2272,7 @@ def run_forecasts(wksp_dir,forefire_dir = None, overwrite = False, cfg = None, p
     if forefire_dir is None:
         forefire_dir = cfg['run_dir']
     #fail now, not after an hour of netcdf building, if the container cannot see it
-    container_path(forefire_dir,cfg)
+    container_path(forefire_dir,cfg,run_dir=forefire_dir)
     #read information about the fire
     t0 = pd.Timestamp.now()
     start_utc,ign_utc,ign_latlon,grid_code = read_input(wksp_dir)

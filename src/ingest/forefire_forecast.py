@@ -120,6 +120,110 @@ class ForeFireJobError(Exception):
     pass
 
 
+#period_hours per grib source, read off the source classes so this cannot drift from
+#what wrfxpy itself uses.  Only the attribute is needed, so nothing is instantiated.
+def _period_hours(name):
+    from ingest.NAM218 import NAM218
+    from ingest.HRRR import HRRR
+    table = {'NAM': NAM218, 'NAM218': NAM218, 'HRRR': HRRR}
+    try:
+        from ingest.NAM227 import NAM227
+        table['NAM227'] = NAM227
+    except Exception:
+        pass
+    src = table.get(str(name).upper())
+    return getattr(src, 'period_hours', 3) if src else 3
+
+
+def workspace_name(job_path):
+    """The `wfc-...` directory name wrfxpy itself would give this job.
+
+    Reproduces forecast.py:115 --
+
+        'wfc-' + grid_code + '-' + utc_to_esmf(start_utc) + '-%02d' % fc_hrs
+
+    -- including the detail that makes it non-obvious: `start_utc` and `end_utc` are
+    first rounded, down and up respectively, to the grib source's `period_hours`, and
+    `fc_hrs` is the span *after* that rounding.  So a job starting 20:00 with a 3-hourly
+    NAM source names itself from 18:00, not 20:00.
+
+    Matching the name matters because it is what makes a ForeFire-only fire sit in the
+    same workspace a WRF-SFIRE run of the same job would have used, so every existing
+    tool -- ff_batch_ratio, ff_growth, ff_domain_connectivity -- finds it unchanged.
+    """
+    from utils import round_time_to_hour, utc_to_esmf, timedelta_hours
+    with open(job_path) as f:
+        job = json.load(f)
+    ph = _period_hours(job.get('grib_source'))
+    start = round_time_to_hour(parse_job_time(job['start_utc']).to_pydatetime(),
+                               up=False, period_hours=ph)
+    end = round_time_to_hour(parse_job_time(job['end_utc']).to_pydatetime(),
+                             up=True, period_hours=ph)
+    fc_hrs = timedelta_hours(end - start)
+    code = job.get('grid_code') or osp.splitext(osp.basename(job_path))[0]
+    return 'wfc-%s-%s-%02d' % (code, utc_to_esmf(start), int(fc_hrs))
+
+
+SAFE_DIR_RE = re.compile(r'[^A-Za-z0-9._-]')
+
+
+def safe_dir_name(code):
+    """`grid_code` reduced to characters that are safe as a directory name.
+
+    Measured over 28,695 real job files: **7,821 grid_codes (27%) contain a colon**,
+    from an older convention that wrote the timestamp `18:00:00` where current jobs
+    write `18_00_00`.  A handful carry worse -- spaces (10), '#' (22), parentheses (9),
+    '~' (5), '&' (1).
+
+    Colons matter most because an apptainer bind spec is colon-delimited and cannot
+    carry one, so a directory named from such a code cannot be bound directly.  Spaces
+    and '&' matter because parts of this pipeline still build shell commands by string
+    interpolation.
+
+    Mapping ':' to '_' is not arbitrary -- it is exactly what the newer grid_code
+    convention already does, so old and new jobs converge on the same directory name.
+    Returns (name, changed).
+    """
+    safe = SAFE_DIR_RE.sub('_', code)
+    return safe, safe != code
+
+
+def make_workspace(job_path, root=None, cfg=None):
+    """Create this job's ForeFire directory and return it.
+
+    `<wksp_forefire>/<grid_code>/`, per JH.  Three reasons it is not the wrfxpy `wfc-`
+    workspace:
+
+    - a VIIRS-only fire has no WRF-SFIRE run and so no `wfc-` workspace to sit in;
+    - the `wfc-` name encodes the forecast window, so editing a job's `end_utc` moves
+      the directory -- Bigfoot went from `-15` to `-33` mid-session when its window was
+      extended, scattering the results;
+    - `grid_code` contains no colons, and an apptainer bind spec cannot carry one, so
+      this directory can be bound directly while a `wfc-` name cannot.
+
+    `workspace_name()` is still the way to find the matching WRF-SFIRE workspace when
+    there is one.
+    """
+    if cfg is None:
+        cfg = ff.load_ff_cfg()
+    with open(job_path) as f:
+        job = json.load(f)
+    code = job.get('grid_code') or osp.splitext(osp.basename(job_path))[0]
+    code, changed = safe_dir_name(code)
+    if changed:
+        logging.warning('grid_code contains characters unsafe in a directory name '
+                        '(a colon cannot appear in an apptainer bind); using %r', code)
+    root = root or cfg.get('wksp_forefire', '/data/jhaley/wrfxpy/wksp_forefire')
+    w = osp.join(root, code)
+    if not osp.isdir(w):
+        os.makedirs(w)
+    dest = osp.join(w, 'input.json')
+    if not osp.exists(dest):
+        with open(job_path) as a, open(dest, 'w') as b:
+            b.write(a.read())
+    return w
+
+
 def fit_domain(domain_km, fire_dx):
     """Shrink domain_km until the fire mesh fits under WindNinja's cell ceiling."""
     n = int(round(domain_km * 1000.0 / fire_dx))
@@ -135,7 +239,8 @@ def fit_domain(domain_km, fire_dx):
 
 
 def run_job(job_path, out_dir=None, steps=8, issue_utc=None, grib_dir=None,
-            overwrite=False, cfg=None, domain_km=None, fire_dx=None, params=None):
+            overwrite=False, cfg=None, domain_km=None, fire_dx=None, params=None,
+            wksp_root=None):
     """Build the netcdfs, write the .ff scripts, run ForeFire, collect the outputs."""
     if cfg is None:
         cfg = ff.load_ff_cfg()
@@ -154,8 +259,21 @@ def run_job(job_path, out_dir=None, steps=8, issue_utc=None, grib_dir=None,
             '%s holds no hrrr.* cycle directories. ForeFire winds must come from HRRR: '
             'WindNinja garbles NAM218 without failing.' % grib_dir)
 
-    run_dir = out_dir or osp.join(cfg['run_dir'], 'job_%s' % grid_code)
-    dest_dir = osp.join(run_dir, 'results')
+    #Default into the workspace wrfxpy itself would have used, creating it if this fire
+    #never had a WRF-SFIRE run -- a VIIRS-only detection has no workspace at all.  That
+    #puts the results where every other tool already looks, instead of somewhere only
+    #this script knows about.  --out-dir remains the escape hatch.
+    if out_dir:
+        run_dir = out_dir
+        dest_dir = osp.join(run_dir, 'results')
+    else:
+        wksp = make_workspace(job_path, root=wksp_root, cfg=cfg)
+        logging.info('  workspace %s', wksp)
+        #Run *in* the workspace rather than in a shared staging directory and moving the
+        #results afterwards.  The per-job apptainer bind mounts this at /work, so there
+        #is no longer a single run_dir for every fire to collide in -- which is the
+        #collision run_forecasts' "delete everything on entry" used to cause.
+        run_dir = dest_dir = wksp
     for d in (run_dir, dest_dir):
         if not osp.isdir(d):
             os.makedirs(d)
@@ -206,7 +324,11 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('job', help='a wrfxpy job json, or a workspace input.json')
     p.add_argument('--out-dir', default=None,
-                   help='run directory; default is <run_dir>/job_<grid_code>')
+                   help='put results here instead of in the wrfxpy workspace')
+    p.add_argument('--wksp-root', default=None,
+                   help='root for ForeFire forecast directories; default is '
+                        'wksp_forefire from etc/forefire.json. One directory per job '
+                        'grid_code, created if absent.')
     p.add_argument('--steps', type=int, default=8,
                    help='hourly steps to forecast (default 8, the low-latency target)')
     p.add_argument('--issue-utc', default=None,
@@ -227,7 +349,7 @@ def main():
     try:
         run_job(a.job, out_dir=a.out_dir, steps=a.steps, issue_utc=a.issue_utc,
                 grib_dir=a.grib_dir, overwrite=a.overwrite,
-                domain_km=a.domain_km, fire_dx=a.fire_dx)
+                domain_km=a.domain_km, fire_dx=a.fire_dx, wksp_root=a.wksp_root)
     except (ForeFireJobError, fg.ForeFireGribError) as e:
         raise SystemExit('%s' % e)
 

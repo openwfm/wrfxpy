@@ -53,5 +53,7 @@
  "wind_scale": 1.0,
  "_comment_wind_scale": "Uniform multiplier on the coupled fire-level winds UF/VF when building the FF netcdf. 1.0 leaves WRF untouched. Scaled files are cached under nc_<grid_code>_w<scale>/ so they never mix with unscaled ones. Prefer this over a large windReductionFactor: wRF scales the same midflame wind but crossing 1.0 also switches on the Andrews wind cap, changing two things at once.",
  "hrrr_forecast_cache": "/data/jhaley/wrfxpy/ingest/HRRR",
- "_comment_hrrr_forecast_cache": "HRRR forecast cycles for forefire_forecast.py. The analysis cache (ingest/HRRRA) is all lead 3 and cannot reach past the present."
+ "_comment_hrrr_forecast_cache": "HRRR forecast cycles for forefire_forecast.py. The analysis cache (ingest/HRRRA) is all lead 3 and cannot reach past the present.",
+ "wksp_forefire": "/data/jhaley/wrfxpy/wksp_forefire",
+ "_comment_wksp_forefire": "Where ForeFire-only forecasts live, one directory per job grid_code. Separate from wksp/ because these fires may have no WRF-SFIRE run at all, and keyed on grid_code alone so editing a job does not spawn a new directory the way the wfc- name does. grid_code carries no colons, which matters because an apptainer bind spec cannot contain one."
 }
