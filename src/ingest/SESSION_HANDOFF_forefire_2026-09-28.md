@@ -414,6 +414,29 @@ rather than an eye.
 the denominator was doubled. It flagged Bear_River, COTTON_2 and Huckleberry as truncated
 at "47 of 108" when 47 of 54 is healthy. Now counts only what `track()` reads.
 
+**The other six movers are clean.** Placemark counts in both runs' `_steps.kml` match
+each fire's step count exactly:
+
+| fire | RTMA | HRRR | steps |
+|---|---|---|---|
+| BOON | 53 | 51 | 51 |
+| Menogyn_Piles_RX | 51 | 51 | 51 |
+| HOP-PATTERSON_PILE_RX | 55 | 55 | 55 |
+| D6_RX_Treasured_Landscapes | 50 | 50 | 50 |
+| Little_Blue_Stem_RX | 53 | 53 | 53 |
+| Silver | 51 | 51 | 51 |
+| Merit_Creek | **3** | 53 | 53 |
+
+Merit_Creek is the only degenerate run among them, so the rest of the §7 analysis stands.
+Dropping it, the moisture-ratio relationship still holds **6 of 6 on sign**: ratio below 1
+(HRRR drier) gives more fire -- BOON 0.75/+61%, Menogyn 0.91/+45% -- and above 1 gives
+less -- Little_Blue_Stem 1.33/-49%, Silver 1.35/-37%, D6 1.37/-51%, HOP-PATTERSON
+1.46/-64%.
+
+**Worth making routine.** Comparing a run's placemark or perimeter count against its step
+count is a one-line check that catches a silent failure the ratio cannot. It is now in
+`ff_batch_ratio.py`, but the same check on the KMLs is what settled this by eye.
+
 ## 8. Open items
 
 1. ~~**Piece 4, the pSAF re-check.**~~ **DONE — see §6. Keep 0.337.**
