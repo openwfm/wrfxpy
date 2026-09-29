@@ -466,7 +466,40 @@ count is a one-line check that catches a silent failure the ratio cannot. It is 
    upstream, the false "unknown moisture source" log line, scoring against observations
    rather than only WRF-SFIRE, and the two fires with no overlapping valid time.
 
-## 9. NEXT SESSION
+## 9. WHERE THIS STANDS, AND WHAT COMES NEXT
+
+**JH's conclusion, and it is supported: pSAF 0.337 works for either moisture product.**
+The evidence got stronger as the confounders came out, not weaker. §6 put the implied
+value at 0.326-0.328 on HRRR moisture against 0.337 in use; removing Merit_Creek's failed
+run left it there; the connectivity-flagged fires shift it by 1.5%. Nothing in three
+days of cross-checks moved it outside the noise.
+
+**The pipeline is ready to be used for real forecasting.** Confirmed 2026-09-29:
+
+- `forefire_forecast.py` runs from a job file with no WRF-SFIRE in the loop.
+- The FMDA forecast cron works -- three firings, 32 leads each, and **all three needed
+  the `-w 1200` wait**, acquiring the lock 5-8 minutes late. Under the original
+  `flock -n` every one would have been silently skipped.
+- The HRRR forecast GRIB cache populates on its own, leads out to 33 h.
+
+**Three cautions before the first numbers are treated as verification.**
+
+1. **Always pass `--issue-utc`.** Without it `find_gribs` takes the best file on disk,
+   which for a past fire means cycles issued *after* ignition. Scores come out
+   optimistic and nothing announces it. This is the easiest way to produce a flattering
+   result that does not survive later scrutiny.
+2. **`--steps 27` has never been run.** Everything verified is 6-8 steps. The GRIB cache
+   and the 33 h moisture both span the full WRF-SFIRE duration, but a 28-hour chain has
+   more chances to degenerate than an 8-hour one -- and this session showed a degenerate
+   run scores as a plausible number rather than failing (§7, Merit_Creek). Run one and
+   check the perimeter count against the step count before batching.
+3. **Perimeter scoring has its own calibration, already established.** About 98% of fires
+   are actively fought, so score at containment time rather than at the end; **IoU 0.25
+   is a success** on JH's anchor, not a failure; and NGFS detections can be weeks-old
+   fires, so check perimeter dates first. ForeFire-vs-observation numbers will look poor
+   by naive standards and should not be read that way.
+
+**The remaining open work**, in order:
 
 **Look at the preserved perimeters (§6).** JH's own next step. The old RTMA-moisture
 runs are in `/home/jhaley/tmp/old_<grid_code>_*.kml` and the new HRRR ones in
