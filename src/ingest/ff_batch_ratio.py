@@ -78,6 +78,28 @@ for w in sorted(glob.glob(osp.join(root, 'wfc-*'))):
     if not common:
         skipped.append((osp.basename(w), 'no common valid time')); continue
     t = common[-1]
+    #A truncated ForeFire run still yields a ratio, and it looks entirely normal.  The
+    #scorer picks the latest time BOTH models reach, so a run that died two hours in is
+    #compared against WRF-SFIRE two hours in -- a small fire against a small fire.
+    #Merit_Creek did exactly this under RTMA moisture: 3 usable perimeters out of 53 step
+    #files, scored 0.7 ha against 1.3 ha for a ratio of 0.55 that sat unremarked in the
+    #table, while the same fire run properly reached 207 ha against 195.  Comparing that
+    #0.55 with the healthy run's 1.06 looked like a 93% moisture effect and was nothing
+    #of the kind.
+    ff_h = (ffr[-1][0] - ffr[0][0]).total_seconds() / 3600.0
+    wrf_h = (wr[-1][0] - wr[0][0]).total_seconds() / 3600.0
+    #count only what track() reads: it skips the 'final' geojsons, and a run writes one
+    #of those per step, so globbing *.geojson doubles the denominator.  That mistake made
+    #Bear_River, COTTON_2 and Huckleberry look truncated at "47 of 108" when 47 of 54 is
+    #perfectly healthy.
+    n_steps = len([f for f in glob.glob(osp.join(ffdir, '*.geojson'))
+                   if 'final' not in osp.basename(f)])
+    if wrf_h > 0 and ff_h / wrf_h < 0.5:
+        skipped.append((osp.basename(w), 'truncated: ForeFire covers %.1f h of a %.1f h '
+                        'WRF window' % (ff_h, wrf_h))); continue
+    if n_steps and len(ffr) < 0.5 * n_steps:
+        skipped.append((osp.basename(w), 'truncated: %d perimeters from %d step files'
+                        % (len(ffr), n_steps))); continue
     name = osp.basename(w)[4:].split('_20')[0]
     rows.append((name, t, ffd[t], wrd[t], ffd[t] / wrd[t] if wrd[t] > 0 else float('nan')))
 
