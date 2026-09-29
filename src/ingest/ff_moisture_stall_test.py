@@ -41,6 +41,11 @@ NML = base['moisture']['class_weight_namelist']
 AF = base['moisture']['class_weight_anderson_fuels']
 
 
+#WARNING: this samples a window at the IGNITION, which is not the same as the fuel the
+#fire actually spreads through.  On HOP-PATTERSON it selected fuel 8 (28% of the domain,
+#and the one fuel where RTMA and HRRR agree) while fuel 5 covers 48% and differs by 2.8x,
+#which made a perfectly ordinary fire look like an unexplained anomaly.  Prefer an
+#area-weighted mean over the whole domain; see the 2026-09-28 handoff section 7.
 def dominant_fuels(w, n=3):
     f = sorted(glob.glob(osp.join(w, 'forefire', 'FF_*.nc')))
     if not f:

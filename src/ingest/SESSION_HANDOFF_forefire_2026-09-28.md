@@ -285,6 +285,50 @@ difference in its dominant fuel. Every other fire's magnitude tracks its moistur
 difference; this one does not. Either a non-dominant fuel carries it or something other
 than moisture is involved.
 
+
+### Corrected: area-weight the domain, and use the moisture *ratio* (2026-09-29)
+
+The table above picked each fire's fuel from a 50x50 cell window at the **ignition**.
+That is not the fuel the fire spreads through. On HOP-PATTERSON it selected fuel 8 -- 28%
+of the domain and the one fuel where the two products agree to 0.003 -- while **fuel 5
+covers 48% and differs by 2.8x**. That is the whole of the "unexplained" case.
+
+Area-weighting over the whole domain instead:
+
+| fire | dArea | Md RTMA | Md HRRR | **ratio** | crossings |
+|---|---|---|---|---|---|
+| BOON | +61% | 0.1383 | 0.1032 | **0.75** | 22 |
+| Merit_Creek | +93% | 0.2058 | 0.1661 | **0.81** | 39 |
+| Menogyn_Piles_RX | +45% | 0.1703 | 0.1556 | **0.91** | 10 |
+| Little_Blue_Stem_RX | -49% | 0.1346 | 0.1789 | **1.33** | 40 |
+| Silver | -37% | 0.0961 | 0.1298 | **1.35** | 0 |
+| D6_RX_Treasured_Landscapes | -51% | 0.1034 | 0.1412 | **1.37** | 12 |
+| HOP-PATTERSON_PILE_RX | -64% | 0.0821 | 0.1195 | **1.46** | 0 |
+
+**Sorted by ratio the seven separate perfectly by sign**, and HOP-PATTERSON -- the
+previous anomaly -- is now the extreme point at both ends: largest ratio, largest change.
+
+**Two corrections that matter beyond this table.**
+
+1. **Use the ratio, area-weighted over the domain**, not an absolute difference at the
+   ignition. Md sampled at a point says little about what the fire runs through.
+2. **Threshold crossings are not the main mechanism.** HOP-PATTERSON and Silver have
+   **zero** crossings and still move -64% and -37%. Rothermel's rate sensitivity in dry
+   fuel does the work; crossings are an additional effect on top, not the driver. The
+   earlier "3 of 7 are threshold crossings" was wrong on both counts.
+
+**JH's reading of HOP-PATTERSON holds in substance** -- a moisture difference large
+enough to stop the HRRR fire reaching terrain where it could run uphill -- but the gate
+is spread *rate*, not fuel gaps. `ff_domain_connectivity.py` measures the latter and
+clears this domain: 97.7% burnable, 100% of it reachable from the ignition, fragility
+0.08. It does flag the genuine connectivity cases -- **Mud_Bayou at 47.6% burnable and
+fragility 0.72**, the known bridge crossing, and **Silver at fragility 1.00** -- so it is
+worth running before fitting anything, since those fires change area for reasons that
+have nothing to do with spread rate.
+
+(Its relief column reads 11986 m on Mud_Bayou, which is a fill value in the altitude
+field, not terrain. Do not trust that column without checking.)
+
 ## 8. Open items
 
 1. ~~**Piece 4, the pSAF re-check.**~~ **DONE — see §6. Keep 0.337.**
