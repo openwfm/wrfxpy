@@ -333,6 +333,64 @@ its Md series against each fuel's moisture of extinction -- the §7 method from 
 handoff, already implemented as `ff_moisture_stall_test.py`. Choosing the perturbation
 per fire would give a better-conditioned ensemble than perturbing everything everywhere.
 
+
+## 5f. The pSAF sweep over 20 fires (2026-09-30)
+
+100 variants -- 20 fires x 5 pSAF values -- in **50 minutes**, reusing the winds. Same
+`--fire-dx 50`, `--steps 27` and `--issue-utc` as the batch that built the netcdfs, so
+nothing was rebuilt.
+
+| pSAF at 8 h | n | geo mean | median | within 2x | below 1x |
+|---|---|---|---|---|---|
+| 0.22 | 13 | 0.74 | 0.62 | 62% | 77% |
+| **0.26** | 15 | **0.90** | 0.75 | **93%** | 60% |
+| 0.30 | 17 | 1.31 | 1.14 | 76% | 41% |
+| **0.337** | 18 | 1.40 | **1.30** | 72% | **22%** |
+| 0.41 | 18 | 1.92 | 1.76 | 67% | 11% |
+
+**0.26 is much the most accurate (93% within 2x) and underpredicts 60% of fires;
+0.337 holds underprediction to 22%.** On JH's standing posture 0.337 stays. **0.30 is a
+defensible middle** for a 4-8 h product -- 76% within 2x at 8 h and the best accuracy at
+4 h (94%) -- and the earlier analytic sweep understated it.
+
+### The pSAF^1.54 assumption, tested rather than assumed
+
+Fitted per fire at 8 h: **median 1.59**, range **0.76 to 2.49**.
+
+**2.0 is the theoretical value**, not 1.54: for unimpeded elliptical spread area goes as
+(rate x time)^2, so scaling the rate by k scales area by k^2. A fire coming in **below 2
+is limited** by something -- moisture, a barrier, fuel discontinuity -- and **above 2 is
+accelerating** into better conditions as it grows. So the 1.54 that has been used
+throughout was never a physical constant; it is an empirical average of how limited a
+typical fire is, which is why it travels badly to individual fires.
+
+- **Pulaski_700180, exponent 0.76** -- barely responds, and above 3x at every value.
+  **Per JH this fire should be excluded**: it burned in an industrialised part of Little
+  Rock, Arkansas, where the ground bears no relation to the fuel map. A heavily limited
+  exponent is exactly the signature of modelled fuel not matching reality.
+- **Ice_Box, exponent 2.49** -- growth is smooth and the same shape at every pSAF
+  (4.8->50.8 ha at 0.22, 14.0->304.4 at 0.41), so nothing is pathological. Above 2 means
+  it accelerates; its fuels are heavy, 10:33%, 9:31%, 8:15%.
+
+### Why low pSAF kills some forecasts
+
+It does not kill healthy ones. **18 of 20 fires produce all 28 perimeters at every pSAF.**
+Only Finley_RX (5 of 28 at 0.22) and RX_North_Bank (16 of 28) lose any, and both were
+already marginal -- the two lowest ratios in the batch.
+
+Finley shows the mechanism outright: at pSAF 0.22 its area is **5.4 ha at every step**,
+completely frozen. It is moisture-limited -- Md reaching 0.237 against fuel 2's
+extinction of 0.15, and fuel 2 is 43% of its domain -- so it barely spreads at any pSAF.
+Lowering pSAF pushes the residual spread below what `perimeterResolution=25` can
+represent in a 30-minute step; the front stops advancing and the chain degenerates into
+unreadable perimeters. **This is the Eagle_Springs frozen-front failure (09-28 handoff
+§7) triggered by rate rather than by moisture.**
+
+**Two consequences.** The n in the table above varies 13-18 because of this, so the low
+pSAF rows are computed on a partly survivor-biased population and read slightly better
+than they should. And any pSAF ensemble has a floor: below about 0.26 the marginal fires
+stop producing scorable output rather than producing small fires.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
