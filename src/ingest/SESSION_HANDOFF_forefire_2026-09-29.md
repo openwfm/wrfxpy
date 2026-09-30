@@ -12,6 +12,10 @@ breaks — one of which is a deliberate choice rather than a bug.
   `--issue-utc` honoured. This closes the `--steps 27` unknown.
 - **50 m with rivers masked is the chosen configuration**, per JH: 20 min against 77 at
   25 m, and the `-r max` pass recovers 88% of the 25 m barrier continuity (§5b).
+- **pSAF stays at 0.337.** 0.41 was refuted over 20 forward forecasts (§5d), and 0.337
+  is independently the best value at the 8-hour horizon: 78% within a factor of two.
+- **Skill degrades with lead** -- geo mean 1.51 at 2 h, 1.92 at 8 h, 2.35 at 18 h -- so
+  **pSAF has to be fitted at the horizon the product is issued at**, which 0.337 was not.
 - **But 50 m does not restore barrier continuity.** Longest unbroken non-burnable run is
   5.93 km at 50 m against 16.62 km at 25 m — essentially 100 m's 5.24 km. Area degrades
   smoothly with resolution; **connectivity collapses between 25 m and 50 m and then
@@ -307,56 +311,37 @@ would want 0.284, so 0.337 sits deliberately on the overprediction side.
 
 ## 7. NEXT SESSION
 
-**The task JH set: run the latest WRF-SFIRE forecasts as real forecasts, and test
-pSAF 0.41.**
+**Isolate the mesh.** §5d changed three things at once -- mesh, pSAF and
+forward-vs-analysis -- so nothing in it attributes the shift. Re-run the same 20 fires at
+**50 m with pSAF 0.337 and analysis moisture**: one variable from the 25 m cron baseline
+(geo mean 1.41, median 1.40, 65% within 2x). The fire list is
+`fwd_list.txt` in the session scratchpad; regenerate it from `ff_batch_ratio.py 6` if
+that is gone.
 
-That means driving ForeFire from each fire's own job file with no WRF-SFIRE in the loop
--- `forefire_forecast.py <job.json> --fire-dx 50 --steps 27 --issue-utc <just after
-ignition>` -- and scoring the result against that fire's WRF-SFIRE run. It is the first
-test of the whole pipeline in the configuration it would actually be used in, rather
-than of one piece at a time.
+**Then re-check the 8-hour numbers once FMDA forecast coverage is continuous.** Seven of
+18 fires in §5d ran most of their steps on the base fuel table because forecast cycles
+only start 2026-09-28, and four of those are among the worst ratios. The cron now runs
+four cycles a day, so a week from now that confound is gone.
 
-~~Set `propagationSpeedAdjustmentFactor` to **0.41**~~ **Done and refuted (§5d).** 0.41
-raised 17 of 20 fires by a median 33%; the templates are back at **0.337**, which is also
-the best value at the 8-hour horizon. The value comes from §5b: 50 m + mask
-gives 161.3 ha where the 25 m run pSAF 0.337 was fitted on gave 214.7, so
-`0.337 * (214.7/161.3)^(1/1.54) = 0.41`. It is a prediction, not a measurement -- the
-point of the batch is to find out whether it holds.
+**Score the ensemble members, not only the chained track** (§5, §5b). Still nothing in
+the repo does this, and it is what caught Bigfoot's river crossing.
 
-**Four things that will bite if they are not planned for.**
+**The remaining structural problems, in order of size:**
 
-1. **`--issue-utc` is the whole point.** Without it `find_gribs` takes the best file on
-   disk, which for a past fire means cycles published after ignition, and the scores come
-   out optimistic with nothing to show for it. Set it to roughly an hour after each
-   fire's ignition.
-2. **Only recent fires are eligible.** The forward path needs HRRR *forecast* GRIBs
-   spanning the run, and that cache starts **2026-09-25 12:00** -- it was only switched on
-   this week. Fires ignited before then cannot be run this way at all. Check coverage
-   with `find_gribs` before building a fire list, rather than discovering it per fire.
-3. **Budget the time, or run concurrently.** A 50 m run is about 20 min of netcdf build
-   plus the ForeFire chain -- call it 30 min. A 50-fire batch is 25 hours serially. The
-   per-job binding (§2) removed the shared run directory specifically so fires *can* run
-   at once; that is the payoff to spend here. Watch memory: WindNinja scales with cell
-   count and 384k cells is roughly 14 GB, so concurrency is RAM-bound, not CPU-bound.
-4. **Score the ensemble, not only the chained track** (§5, §5b). `ff_batch_ratio.py` reads
-   the chained progression and would have missed both the river jump and its repair.
-   Report member spread and flag any member more than about 2x its neighbours.
+1. **Highways are erased by design** (§4). `remap_fuel` fills LANDFIRE code 91 with the
+   nearest burnable fuel -- 13,359 cells against 2,443 of river kept in Bigfoot's domain.
+   The `-r max` mask does not touch it. Needs an external roads layer to separate an
+   interstate from a subdivision.
+2. **The small-fire bias is not a lead-time effect** (§5d). Pulaski at 25.6 ha sits above
+   5x at every horizon. `ratio ~ area^-0.2` needs a per-fire correction, which is the
+   standing NGFS detection-field idea (09-24 handoff §9 item 2); run
+   `ff_domain_connectivity.py` first and exclude the flagged fires.
+3. **Error compounds with lead** (§5d), so a single rate multiplier cannot serve both an
+   8-hour product and a 24-hour one. If both are wanted, they need separate values.
 
-**Bigfoot is the natural first case.** WRF-SFIRE is running it (per JH), it has the river
-barrier that motivated §5b, and it has already been run at 25, 50 and 100 m with and
-without the mask, so the ForeFire side is a known quantity.
-
-**Do not rank configurations against each other.** 25 m, 50 m and 50 m + mask differ by
-25% in area; WRF-SFIRE is not truth either (on Dome it ran 0.68x an IR perimeter). Three
-numbers that disagree cannot settle which is right. Observed perimeters are the only
-arbiter, with the standing calibration: score at containment time, IoU 0.25 is a success,
-and check detection dates first.
-
-**Still open from §4, and larger than anything above:** highways are erased by design.
-`remap_fuel` fills LANDFIRE code 91 with the nearest burnable fuel -- 13,359 cells against
-2,443 of river kept in Bigfoot's domain. The `-r max` mask does not touch it, because the
-code is filled before any resampling question arises. Separating an interstate from a
-subdivision needs an external roads layer.
+**Against observed perimeters, not against WRF-SFIRE.** Everything above is model-vs-model
+and WRF-SFIRE is not truth -- on Dome it ran 0.68x an IR perimeter. Score at containment
+time, IoU 0.25 is a success, and check detection dates first.
 
 Commits remain unpushed on `james_ngfs` and `release-fmda-fixes`; JH pushes them manually
 (SSH password).
