@@ -217,6 +217,79 @@ mean 1.46 -> ~1.77, with *fewer* fires inside a factor of two. The 0.41 figure e
 compensate for the area lost at 50 m with the barrier mask, so it is only meaningful
 applied **together with** that configuration, never on its own.
 
+
+## 5d. The forward-forecast batch: pSAF 0.41 refuted, and calibrate at the horizon you issue (2026-09-30)
+
+20 of the 21 overnight fires re-run as **genuine forecasts** -- `forefire_forecast.py`
+from each job file, 50 m with the barrier mask, pSAF 0.41, and `--issue-utc` set an hour
+after each ignition so **both winds and fuel moisture** are restricted to what was
+published by then. Mill_Creek_RX is a 2025 fire and predates the forecast cache.
+
+**`--issue-utc` had to be extended to the moisture first.** It only filtered the GRIBs;
+`read_fmda_hourly` had no issue filter and *prefers analyses over forecasts*, so a
+forecast run silently took moisture that assimilated observations made after the forecast
+was issued -- exactly what the flag exists to prevent. `issue_utc`/`issue_lag_h` now run
+through `read_fmda_hourly` -> `md_series` -> `make_script_set`.
+
+### pSAF 0.41 is refuted
+
+| | n | geo mean | median | within 2x |
+|---|---|---|---|---|
+| forward, 50 m, pSAF 0.41 | 20 | **1.87** | 2.01 | **45%** |
+| cron, 25 m, pSAF 0.337 | 20 | 1.41 | 1.40 | 65% |
+
+**17 of 20 fires rose, median +33%**, against an intended ~0%. The 0.41 came from
+Bigfoot alone -- 50 m + mask gave 161.3 ha where 25 m gave 214.7, a 25% loss -- and that
+single fire's barrier effect does not generalise. **Reverted to 0.337.**
+
+**The batch also changed three things at once** -- mesh, pSAF and forward-vs-analysis --
+so it cannot attribute the shift. The clean follow-up is the same 20 fires at 50 m with
+pSAF 0.337 and analysis moisture: one variable from the cron baseline.
+
+### Skill degrades with lead, so calibrate at the horizon you issue
+
+| lead | n | geo mean | median | within 2x |
+|---|---|---|---|---|
+| 2 h | 15 | **1.51** | 1.38 | **87%** |
+| 4 h | 16 | 1.76 | 1.59 | 62% |
+| **8 h** | 18 | **1.92** | 1.76 | **67%** |
+| 12 h | 18 | 2.27 | 1.99 | 50% |
+| 18 h | 18 | 2.35 | 2.20 | 39% |
+| 24 h | 20 | 1.90 | 1.95 | 45% |
+
+ForeFire's excess spread **compounds** rather than staying proportional -- Twin_Pine_8
+runs 0.91 -> 1.52 -> 2.23, Rx_Angelina 1.79 -> 3.98 -> 4.55. A rate multiplier cannot
+correct an error that grows with lead, so **pSAF must be fitted at the horizon the
+product is issued at**. The 0.337 in use was fitted at the run endpoint, 24-27 h.
+
+### What that means for the 8-hour product
+
+| pSAF at 8 h | geo mean | median | within 2x | below 1x |
+|---|---|---|---|---|
+| 0.41 | 1.92 | 1.76 | 67% | 11% |
+| **0.337** | **1.42** | **1.30** | **78%** | 17% |
+| 0.30 | 1.19 | 1.09 | 72% | 39% |
+| 0.26 | 0.95 | 0.87 | 83% | 67% |
+
+**0.337 is the right value for an 8-hour product** on JH's standing posture: best
+within-2x at 78%, median 1.30, only 17% underpredicting. 0.26 buys 83% within 2x at the
+cost of flipping two thirds of fires to underprediction.
+
+**A reassuring accident:** the 25th-percentile posture that set 0.337 at the 24 h horizon
+wants **0.312** at 8 h -- within 8% of the value already in use. Centring the 8 h *median*
+would want 0.284, so 0.337 sits deliberately on the overprediction side.
+
+### Two caveats on these numbers
+
+- **Seven of 18 fires had degraded moisture** -- usable FMDA for only 4-8 of 30 steps,
+  the rest falling back to the base table at Md=0.1. Four are among the worst ratios
+  (Pulaski 5.26, Rx_Angelina 3.98, Comp_265 2.60, Twin_Pine_8 1.52 at 8 h). FMDA forecast
+  cycles only start 2026-09-28, so early fires had nothing to draw on. True 8 h skill is
+  probably better than shown.
+- **The small-fire bias is not a lead-time effect.** Pulaski (25.6 ha) sits at 5.26 and
+  Paula_Red_South (12.4 ha) at 4.49 at every horizon. No single pSAF addresses
+  `ratio ~ area^-0.2`.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
@@ -243,9 +316,9 @@ ignition>` -- and scoring the result against that fire's WRF-SFIRE run. It is th
 test of the whole pipeline in the configuration it would actually be used in, rather
 than of one piece at a time.
 
-Set `propagationSpeedAdjustmentFactor` to **0.41** in both templates under
-`/home/jhaley/forefire/tests` before starting -- **and only alongside `--fire-dx 50`**,
-never on a 25 m run; see §5c. The value comes from §5b: 50 m + mask
+~~Set `propagationSpeedAdjustmentFactor` to **0.41**~~ **Done and refuted (§5d).** 0.41
+raised 17 of 20 fires by a median 33%; the templates are back at **0.337**, which is also
+the best value at the 8-hour horizon. The value comes from §5b: 50 m + mask
 gives 161.3 ha where the 25 m run pSAF 0.337 was fitted on gave 214.7, so
 `0.337 * (214.7/161.3)^(1/1.54) = 0.41`. It is a prediction, not a measurement -- the
 point of the batch is to find out whether it holds.

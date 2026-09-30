@@ -308,8 +308,11 @@ def run_job(job_path, out_dir=None, steps=8, issue_utc=None, grib_dir=None,
 
     #make_script_set applies the per-step, per-fuel-category moisture itself, via
     #md_series -> write_fuel_table, so the fuel table changes at every step.
+    #issue_utc reaches the moisture too, not just the winds: without it a forecast run
+    #picks up FMDA *analyses* that assimilated observations made after the forecast was
+    #issued, and read_fmda_hourly's preference for analysis over forecast guarantees it
     tt = ff.make_script_set(run_dir, tt, latlon, grid_code, cfg=cfg,
-                            params=dict(params or {}))
+                            params=dict(params or {}), issue_utc=issue_utc)
     tt.to_csv(osp.join(run_dir, 'timing_table.csv'), index=False)
 
     ff.run_timing_table(tt, overwrite=overwrite, cfg=cfg, run_dir=run_dir,

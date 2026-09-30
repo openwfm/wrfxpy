@@ -360,7 +360,7 @@ def _fmda_grid(geo_file):
 
 def read_fmda_hourly(fmda_dir, geo_file, lat, lon, when, radius_km=10,
                      classes=(0, 1, 2), weights=(2000.0, 109.0, 30.0),
-                     per_class=False):
+                     per_class=False, issue_utc=None, issue_lag_h=1.0):
     """Dead fuel moisture at a point and a *time*, from the hourly FMDA cycler output.
 
     With per_class=False this collapses the size classes to one number using `weights`
@@ -393,6 +393,16 @@ def read_fmda_hourly(fmda_dir, geo_file, lat, lon, when, radius_km=10,
     #at all, and its slicing parser assumed name == valid time, so forecast output was
     #invisible -- which is why a forward forecast silently fell back to the default
     #fuel table partway through its own window.
+    #issue_utc makes a forecast run honest on the moisture side too.  find_gribs already
+    #refuses wind cycles published after the forecast was issued; without the same rule
+    #here the run silently takes an *analysis* -- which assimilated observations that did
+    #not exist yet -- and the preference for analysis over forecast guarantees it picks
+    #exactly the file it should not have.  A cycle counts as published issue_lag_h after
+    #its own time, matching find_gribs.
+    if issue_utc is not None:
+        issue_utc = pd.Timestamp(issue_utc)
+        if issue_utc.tzinfo is not None:
+            issue_utc = issue_utc.tz_convert('UTC').tz_localize(None)
     cand = []
     for path in glob.glob(f"{fmda_dir}/*/fmda-*.nc"):
         m = _FMDA_RE.match(os.path.basename(path))
@@ -400,6 +410,8 @@ def read_fmda_hourly(fmda_dir, geo_file, lat, lon, when, radius_km=10,
             continue
         cycle = pd.Timestamp(m.group('date') + 'T' + m.group('hour') + ':00:00')
         lead = int(m.group('lead') or 0)
+        if issue_utc is not None and cycle + pd.Timedelta(hours=issue_lag_h) > issue_utc:
+            continue
         cand.append((cycle + pd.Timedelta(hours=lead), lead, path))
     if not cand:
         return None
@@ -753,7 +765,7 @@ def moisture_params(wksp_dir,ign_latlon,cfg,run_dir=None):
     return {'fuelsTableFile': container_path(ft,cfg,run_dir=run_dir)}
 
 
-def md_series(timing_table, ign_latlon, cfg):
+def md_series(timing_table, ign_latlon, cfg, issue_utc=None):
     """Per-step dead fuel moisture, or None to leave the fuel table alone.
 
     Returns a list aligned with timing_table rows.  A run used to get one Md for its
@@ -793,7 +805,8 @@ def md_series(timing_table, ign_latlon, cfg):
         try:
             md = read_fmda_hourly(fmda_dir, geo_file, ign_latlon[0], ign_latlon[1],
                                   row['UTC_str'], mc.get('radius_km', 10),
-                                  classes, weights, per_class=per_class)
+                                  classes, weights, per_class=per_class,
+                                  issue_utc=issue_utc)
         except Exception as e:
             print(f"hourly FMDA failed at {row['UTC_str']}: {e}")
         #Range-check every class, not the mix, so one bad class is not hidden by two
@@ -1114,7 +1127,7 @@ def make_UTC_string(ign_utc):
      return f'{ign_utc}Z'
 
 def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,params=None,
-                    ignitions=None):
+                    ignitions=None,issue_utc=None):
     #params overrides ForeFire setParameter values, e.g. {'windReductionFactor':0.6}
     #ignitions is a list of detection points; each is emitted in the step whose
     #model-time window contains it, so detections arriving between wrfouts join
@@ -1141,7 +1154,7 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
               f"thinning -> {sum(len(v) for v in schedule.values())} placed across "
               f"{len(schedule)} steps")
     #per-step dead fuel moisture, when configured; None keeps one table for the run
-    md_per_step = md_series(timing_table, ign_latlon, cfg)
+    md_per_step = md_series(timing_table, ign_latlon, cfg, issue_utc=issue_utc)
     md_tables = {}
 
     #time of the last wrfout, ign_seconds
