@@ -456,6 +456,57 @@ threshold.
 `ff_moisture_stall_test.py` plus the WRF `FMC_GC` comparison above. If FMDA's overnight
 over-recovery is systematic, it is a bigger lever on 8-hour skill than any pSAF value.
 
+
+## 5h. The overnight over-recovery is NOT systematic -- but the disagreement is real
+
+Tested across the batch (`ff_moisture_bias.py`), comparing WRF-SFIRE's own `FMC_GC`
+1-hour class against the FMDA series each forecast actually used, at the same valid
+times. 14 fires had enough paired output.
+
+| | for | against |
+|---|---|---|
+| FMDA wetter overall | 7 | 7 |
+| wet-end gap exceeds dry-end gap | 7 | 7 |
+| FMDA diurnal swing larger | 7 | 7 |
+
+**Mean difference +0.0055 -- nothing.** Finley (+0.041) and RX_North_Bank (+0.043) are at
+one extreme, HOLY_ROLLER (-0.029) and Bowie_9066 (-0.016) at the other.
+
+**So Finley's over-recovery is a property of that fire, not of FMDA.** §5g's hypothesis
+was formed from one case and does not generalise. That is the second time this session a
+single-fire result was extrapolated and failed -- pSAF 0.41 from Bigfoot was the first --
+and the lesson is the same one §7 of the 09-28 handoff already recorded about BOON.
+
+### What survives, and matters more
+
+**The disagreement is large and unsigned.** Per-fire mean differences run **-0.029 to
++0.043**, and at the wet end **-0.038 to +0.088**. That is the same order as the FMDA
+against WRF-SFIRE gap on BOON and **3-8x the RTMA/HRRR difference** in §5. Two credible
+moisture products disagree by enough to move the extinction crossing by hours, in either
+direction depending on the fire.
+
+### The case for a moisture-perturbed ensemble (per JH)
+
+JH's point that varying fuel moisture in an ensemble would illuminate forecast
+uncertainty is well supported by the above, and is stronger than the pSAF ensemble on
+three counts:
+
+1. **The perturbation size is measured, not invented.** +/-0.04 is what two reasonable
+   products actually differ by, so the spread means something.
+2. **It expresses the quantity that dominates 8-hour skill.** §5g showed a 0.01 moisture
+   error is about an hour of release timing at the threshold; a moisture ensemble
+   produces a spread in *release time*, which the product currently cannot express at
+   all.
+3. **It reaches the fires pSAF cannot.** Finley is frozen at every pSAF (§5f), so a pSAF
+   ensemble gives it zero spread -- while a moisture ensemble moves it across the
+   extinction threshold and yields real spread on exactly the fire that most needs an
+   uncertainty estimate.
+
+`sweep_job()` already takes arbitrary `setParameter` overrides, but moisture is applied
+through `fuelsTableFile` per step rather than as a parameter, so a moisture ensemble
+needs `md_series` offset by a delta before `write_fuel_table` -- a small addition to
+§5e's machinery, not a new mechanism.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
