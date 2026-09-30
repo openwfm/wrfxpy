@@ -507,6 +507,29 @@ through `fuelsTableFile` per step rather than as a parameter, so a moisture ense
 needs `md_series` offset by a delta before `write_fuel_table` -- a small addition to
 §5e's machinery, not a new mechanism.
 
+### Caveat: 14 fires is not enough to call this settled
+
+A 7/7 split on 14 fires is what a coin flip looks like, but it is also what a real
+signal looks like when the sample is too small to see it -- at n=14 a genuine 60/40
+tendency is entirely consistent with an observed 7/7. The honest statement is **no
+systematic bias was detected**, not that none exists. Three separate limits apply:
+
+- **n=14, not 20.** Six fires had too few paired hours, and the paired counts that did
+  qualify are mostly 26-28 hours from a single fire-day -- so the 14 are not 14
+  independent samples of FMDA behaviour, they are 14 fire-days.
+- **The forecast cycles only start 2026-09-28** (the same confound as §5d). Several of
+  these fires ran much of their window on analysis or base tables, so this is not yet a
+  clean test of the *forecast* product against WRF-SFIRE's fuel model.
+- **One season, one synoptic regime.** Every fire here is late September.
+
+**Repeat it systematically once HRRR FMDA has accumulated forecasts.** The cron runs four
+cycles a day, so coverage grows without further work; `ff_moisture_bias.py` takes no
+arguments and re-runs the whole comparison, so this costs a minute whenever there is a
+larger batch to run it over. Target 40+ fires spanning more than one weather regime
+before either accepting no-bias or fitting a correction. Until then the §5h conclusion
+should be quoted as provisional, and the ensemble case above -- which rests on the
+*spread*, not on the mean -- is the part that does not depend on resolving it.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
@@ -517,7 +540,11 @@ needs `md_series` offset by a delta before `write_fuel_table` -- a small additio
 3. **Pick a default mesh and mask, then re-derive pSAF** (§3, §5b). 50 m + mask is the
    candidate, implying pSAF ~0.41. Settle it against observed perimeters: three
    configurations that differ by 25% in area cannot be ranked against each other.
-4. Carried from 09-28: `--issue-utc` on every forecast run; perimeter scoring has its own
+4. **Re-run the moisture-bias test on a larger batch** (§5h). 14 fires, one season,
+   forecast cycles only from 2026-09-28 -- enough to refute the Finley generalisation,
+   not enough to rule out a real bias. `ff_moisture_bias.py`, no arguments, when the
+   HRRR FMDA forecast archive supports 40+ fires across more than one regime.
+5. Carried from 09-28: `--issue-utc` on every forecast run; perimeter scoring has its own
    calibration (score at containment, IoU 0.25 is a success, check detection dates);
    `ff_domain_connectivity.py` before any per-fire fit; re-run `fmda_fcst_skill.py` once
    the cron has accumulated cycles.
@@ -531,7 +558,8 @@ forward-vs-analysis -- so nothing in it attributes the shift. Re-run the same 20
 `fwd_list.txt` in the session scratchpad; regenerate it from `ff_batch_ratio.py 6` if
 that is gone.
 
-**Then re-check the 8-hour numbers once FMDA forecast coverage is continuous.** Seven of
+**Then re-check the 8-hour numbers, and the moisture bias (§5h), once FMDA forecast
+coverage is continuous.** Seven of
 18 fires in §5d ran most of their steps on the base fuel table because forecast cycles
 only start 2026-09-28, and four of those are among the worst ratios. The cron now runs
 four cycles a day, so a week from now that confound is gone.
