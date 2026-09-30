@@ -185,6 +185,38 @@ mask gives 161.3 ha where 25 m gave 214.7, implying roughly
 choice, and the honest way to settle it is against observed perimeters rather than
 against each other.
 
+
+## 5c. The overnight cron runs: identical parameters, size-dependent skill (2026-09-30)
+
+JH asked what the ~13 well-matching cron runs had in common. **Nothing in their
+parameters** -- all 21 scored runs are identical:
+
+    fire mesh 25 m, domain 30 km, pSAF 0.337, windReductionFactor 0.4,
+    perimeterResolution 25, and 25-28 per-step moisture tables each
+
+So the spread from 0.18x to 4.71x is entirely fire-to-fire. What separates them is
+**size**:
+
+| WRF-SFIRE size | n | geo mean | median |
+|---|---|---|---|
+| <100 ha | 6 | **2.37** | 2.60 |
+| **100-500 ha** | 10 | **1.10** | 1.27 |
+| >500 ha | 5 | 1.43 | 1.34 |
+
+`ratio ~ area^-0.155`, log-log r=-0.356 -- consistent with the -0.198 on the larger
+batch. Five of the six worst are under 156 ha, four under 100. Overall n=21, geo mean
+1.46, median 1.41, **13 of 21 within a factor of two**, which is JH's 13.
+
+**pSAF 0.337 is well tuned for 100-500 ha and overpredicts small fires by ~2.4x.** That
+is the clearest statement yet of why a single constant cannot serve the whole range, and
+it is the case for the per-fire pSAF work (09-24 handoff §9 item 2).
+
+**A correction to the plan in §7.** Because every run already shares one parameter set,
+testing pSAF 0.41 on these 25 m runs would simply scale all 21 ratios by ~1.21x -- geo
+mean 1.46 -> ~1.77, with *fewer* fires inside a factor of two. The 0.41 figure exists to
+compensate for the area lost at 50 m with the barrier mask, so it is only meaningful
+applied **together with** that configuration, never on its own.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
@@ -212,7 +244,8 @@ test of the whole pipeline in the configuration it would actually be used in, ra
 than of one piece at a time.
 
 Set `propagationSpeedAdjustmentFactor` to **0.41** in both templates under
-`/home/jhaley/forefire/tests` before starting. The value comes from §5b: 50 m + mask
+`/home/jhaley/forefire/tests` before starting -- **and only alongside `--fire-dx 50`**,
+never on a 25 m run; see §5c. The value comes from §5b: 50 m + mask
 gives 161.3 ha where the 25 m run pSAF 0.337 was fitted on gave 214.7, so
 `0.337 * (214.7/161.3)^(1/1.54) = 0.41`. It is a prediction, not a measurement -- the
 point of the batch is to find out whether it holds.
