@@ -391,6 +391,71 @@ pSAF rows are computed on a partly survivor-biased population and read slightly 
 than they should. And any pSAF ensemble has a floor: below about 0.26 the marginal fires
 stop producing scorable output rather than producing small fires.
 
+
+## 5g. Finley_RX: the extinction threshold turns a moisture offset into a 6-hour timing error
+
+JH noticed Finley jumping hugely at the end of the window at higher pSAF, and that
+WRF-SFIRE did the same -- a near-complete stall for ~12 h then a fast run. Both halves
+check out, and chasing it produced the clearest statement yet of where the 8-hour error
+actually comes from.
+
+**Both models stall and release.** WRF sits at 0.4-0.9 ha/h from 02:00 to 13:00 local,
+then runs 14 -> 34 ha/h. ForeFire sits at 0.2 ha/h over the same window and then jumps
+**31.6 -> 95.4 ha in its final step** -- 67% of its growth in one hour, which is JH's
+observation.
+
+**But the release is ~6 hours late, and the early burn is 5x too slow.** WRF reaches
+59.8 ha in the first 7 hours; ForeFire manages 11.9. Then both stall. Then WRF releases
+at 14:00 local while ForeFire waits until ~20:00.
+
+**The cause is the extinction threshold, not the spread rate.** Fuel 2 -- 43% of the
+domain -- sits above its 0.15 extinction in FMDA from 22:00 local until 17:00 the next
+afternoon, an 18-hour block. ForeFire physically cannot spread through it, whatever pSAF
+is set to.
+
+### FMDA against WRF-SFIRE's own moisture, same location and hours
+
+| local | WRF 1-h | FMDA 1-h | FMDA - WRF |
+|---|---|---|---|
+| 18:00 | 0.1054 | 0.1257 | +0.020 |
+| 23:00 | 0.1366 | 0.1820 | +0.045 |
+| **10:00** | **0.1712** | **0.2368** | **+0.066** |
+| 15:00 | 0.1316 | 0.1482 | +0.017 |
+| 19:00 | 0.0951 | 0.1040 | +0.009 |
+
+**FMDA is wetter at every hour, and the two curves peak within an hour of each other.**
+So the **phase is right and the amplitude is not**: FMDA over-recovers overnight, peaking
+38% above WRF's scheme, and the gap nearly closes when dry.
+
+That explains the lag quantitatively. +0.066 in the 1-hour class becomes about +0.038 in
+fuel 2's CAWFE-weighted Md; the curve falls at roughly 0.012/hour through the afternoon,
+so a 0.038 offset delays the extinction crossing by ~3 hours, with the remainder spent
+rebuilding perimeter after an 18-hour freeze.
+
+**Per JH**, WRF-SFIRE computes fuel moisture at each timestep from its own evolving model
+state while FMDA works from HRRR forecasts, and missed frontal timing in a weather
+product has produced this class of shift before. For *this* fire the evidence points to
+amplitude rather than a timing miss -- both products see the same diurnal turning points
+-- but the underlying divergence is exactly as described, and it bites hardest at the
+threshold.
+
+### Why this matters more than pSAF for the 8-hour product
+
+1. **A small moisture error becomes a large timing error at the threshold.** Fuel 2
+   crosses 0.15 gradually -- 0.152 at 16:00, 0.142 at 17:00 -- so 0.01 of moisture moves
+   the release an hour and the ~0.03-0.07 offsets measured here and on BOON move it
+   several. For an 8-hour forecast that dominates spread-rate error.
+2. **Finley should not inform the pSAF choice.** At 8 hours it is deep in the stall where
+   pSAF has no leverage, which is why its ratio barely moves between 0.337 and 0.41. It
+   is one of the fires distorting the low-pSAF rows in §5f.
+3. **The 5x shortfall in the first 7 hours is the separate, real rate error**, and it
+   happens before any threshold is crossed -- in the window where pSAF does have
+   leverage. That is the part worth chasing.
+
+**Open:** does the late-release signature appear on the other fires? The reconstruction is
+`ff_moisture_stall_test.py` plus the WRF `FMC_GC` comparison above. If FMDA's overnight
+over-recovery is systematic, it is a bigger lever on 8-hour skill than any pSAF value.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
