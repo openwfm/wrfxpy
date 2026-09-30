@@ -294,6 +294,45 @@ would want 0.284, so 0.337 sits deliberately on the overprediction side.
   Paula_Red_South (12.4 ha) at 4.49 at every horizon. No single pSAF addresses
   `ratio ~ area^-0.2`.
 
+
+## 5e. Parameter sweeps are ~30x cheaper than full runs (`0278a20`)
+
+Per JH, most of the CPU is WindNinja. Measured over all 21 forward runs it is
+**82-98% of the wall clock, median 95%** -- 19 to 46 minutes of netcdf building against
+**1 to 6 minutes of ForeFire**. The netcdfs carry winds, fuels and terrain, none of which
+depend on the tuning parameters.
+
+`sweep_job()` in `forefire_forecast.py` builds them once and varies only the `.ff`
+settings. **Measured on Finley_RX: three pSAF values in 3.1 minutes, against 34 minutes
+for its original single run.** A 20-fire by 5-value sweep is therefore about 3 hours, not
+two days.
+
+Each variant runs in its own subdirectory with the netcdfs symlinked in, because the
+restart template chains through `include[sim_<grid>_<step>.ff]` and two variants sharing
+a directory would read each other's perimeters. `run_timing_table` gained `bind_dir` to
+make that work under the per-job bind: the links are relative and resolve only if the
+**parent** is the mount, so `bind_dir` is the base directory while `--pwd` selects the
+variant.
+
+### A caution before building a pSAF ensemble
+
+Finley_RX gives **96.2 ha at pSAF 0.337 and 95.4 at 0.41** -- indistinguishable across a
+22% change -- then collapses to **6.8 ha at 0.26**, with only 13 of 28 perimeters.
+
+Its moisture runs 0.103-0.237 against fuel 2's extinction of 0.15, so it is
+**moisture-limited, not rate-limited**. pSAF has almost no leverage until it drops far
+enough to extinguish the fire outright. An ensemble built by perturbing pSAF would
+produce near-zero spread on exactly the fires that are hardest to forecast, and a cliff
+rather than a gradient when it does respond.
+
+**So a useful ensemble has to perturb what each fire is actually sensitive to.** Per JH
+the candidates are pSAF, ignition location, fuel moisture and other inputs. On this
+evidence **moisture is the stronger lever on moisture-limited fires** and pSAF on
+rate-limited ones, and which regime a fire is in can be read off in advance by comparing
+its Md series against each fuel's moisture of extinction -- the §7 method from the 09-28
+handoff, already implemented as `ff_moisture_stall_test.py`. Choosing the perturbation
+per fire would give a better-conditioned ensemble than perturbing everything everywhere.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
@@ -325,6 +364,11 @@ four cycles a day, so a week from now that confound is gone.
 
 **Score the ensemble members, not only the chained track** (§5, §5b). Still nothing in
 the repo does this, and it is what caught Bigfoot's river crossing.
+
+**Build the perturbed ensemble** (§5e). `sweep_job()` makes it cheap -- about a minute a
+variant. Choose the perturbation per fire rather than uniformly: moisture for
+moisture-limited fires, pSAF for rate-limited ones, with `ff_moisture_stall_test.py`
+deciding which is which. Ignition location is the third candidate and is untested.
 
 **The remaining structural problems, in order of size:**
 
