@@ -322,6 +322,83 @@ def run_job(job_path, out_dir=None, steps=8, issue_utc=None, grib_dir=None,
     return dest_dir
 
 
+def sweep_job(job_path, param_sets, tags=None, steps=8, issue_utc=None,
+              grib_dir=None, cfg=None, domain_km=None, fire_dx=None,
+              wksp_root=None, overwrite=False):
+    """Run one fire several times with different ForeFire parameters, reusing the winds.
+
+    Measured over the 21 forward runs, **WindNinja is 82-98% of the wall clock** (median
+    95%): 19-46 minutes of netcdf against 1-6 minutes of ForeFire.  The netcdfs carry
+    winds, fuels and terrain, none of which depend on the tuning parameters, so a sweep
+    that builds them once and varies only the `.ff` settings costs about two minutes per
+    variant instead of thirty -- roughly 16x.  That is what makes a 20-fire by 5-value
+    sweep a three-hour job rather than a two-day one.
+
+    Each variant runs in its own subdirectory with the netcdfs symlinked in, because the
+    restart template chains through `include[sim_<grid>_<step>.ff]` and two variants
+    sharing a directory would read each other's perimeters.  The **parent** is what gets
+    bound into the container, so those relative links resolve; `--pwd` selects the
+    variant.
+
+    Returns {tag: results_dir}.
+    """
+    if cfg is None:
+        cfg = ff.load_ff_cfg()
+    if tags is None:
+        tags = ['_'.join('%s%g' % (k[:6], v) for k, v in sorted(p.items())) or 'base'
+                for p in param_sets]
+    if len(tags) != len(param_sets):
+        raise ForeFireJobError('%d tags for %d parameter sets'
+                               % (len(tags), len(param_sets)))
+
+    latlon, ign_utc, grid_code, job_km, job_dx, _ = read_job(job_path)
+    domain_km = fit_domain(domain_km or job_km, fire_dx or job_dx)
+    fire_dx = fire_dx or job_dx
+    grib_dir = grib_dir or cfg.get('hrrr_forecast_cache', HRRR_FORECAST_CACHE)
+    base = make_workspace(job_path, root=wksp_root, cfg=cfg)
+
+    #overwrite=False so existing netcdfs are kept: this is the whole point
+    tt = fg.build_step_ncs(latlon[0], latlon[1], ign_utc, base, grid_code, steps=steps,
+                           domain_km=domain_km, fire_dx=fire_dx, grib_dir=grib_dir,
+                           issue_utc=issue_utc, overwrite=False)
+    if tt is None or not len(tt):
+        raise ForeFireJobError('no GRIB valid times cover this ignition')
+    tt['wrfout'] = tt['grib']
+
+    out = {}
+    for params, tag in zip(param_sets, tags):
+        run_dir = osp.join(base, tag)
+        if not osp.isdir(run_dir):
+            os.makedirs(run_dir)
+        for name in sorted(os.listdir(base)):
+            if not name.endswith('.nc'):
+                continue
+            link = osp.join(run_dir, name)
+            want = osp.relpath(osp.join(base, name), run_dir)
+            if osp.islink(link):
+                if os.readlink(link) == want:
+                    continue
+                os.unlink(link)
+            elif osp.exists(link):
+                continue
+            os.symlink(want, link)
+
+        logging.info('=== %s : %s', tag, params)
+        t = ff.make_script_set(run_dir, tt.copy(), latlon, grid_code, cfg=cfg,
+                               params=dict(params), issue_utc=issue_utc)
+        t.to_csv(osp.join(run_dir, 'timing_table.csv'), index=False)
+        ff.run_timing_table(t, overwrite=overwrite, cfg=cfg, run_dir=run_dir,
+                            dest_dir=run_dir, bind_dir=base)
+        #drop the links before finalising, or they dangle in the results
+        for name in os.listdir(run_dir):
+            l = osp.join(run_dir, name)
+            if osp.islink(l) and name.endswith('.nc'):
+                os.unlink(l)
+        ff.finalize_ff_outputs(run_dir, grid_code, cfg=cfg, suffix=tag)
+        out[tag] = run_dir
+    return out
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)

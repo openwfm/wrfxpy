@@ -1685,7 +1685,8 @@ def run_ff_set(ff_set):
     #runs all the forefire scripts in the list of dataframe that contains the indivdual ff files and nc files
     pass
 
-def run_timing_table(df,overwrite=False,cfg=None,run_dir=None,dest_dir=None):
+def run_timing_table(df,overwrite=False,cfg=None,run_dir=None,dest_dir=None,
+                     bind_dir=None):
     #run_dir is where the scripts and netcdf files were written; it defaults to
     #the configured run_dir and must match what make_script_set was given
     #dest_dir is where finished results live, and decides which steps count as
@@ -1704,11 +1705,15 @@ def run_timing_table(df,overwrite=False,cfg=None,run_dir=None,dest_dir=None):
     if cfg is None:
         cfg = load_ff_cfg()
     HOST_BIND_DIR = run_dir if run_dir else cfg['run_dir']
-    #the run directory is mounted at /work in its own right, so it can live anywhere --
-    #including straight inside <wksp>/forefire, which is where the results are wanted
-    CONTAINER_PWD = container_path(HOST_BIND_DIR,cfg,run_dir=HOST_BIND_DIR)
+    #What gets BOUND and where the working directory sits are two different things.
+    #A parameter sweep runs each variant in a subdirectory and symlinks the shared
+    #netcdfs from the parent -- relative links, which only resolve if the PARENT is the
+    #mount.  So bind_dir may be an ancestor of run_dir; --pwd still points at the
+    #variant.  Default keeps them the same, which is the single-run case.
+    BIND_DIR = bind_dir or HOST_BIND_DIR
+    CONTAINER_PWD = container_path(HOST_BIND_DIR,cfg,run_dir=BIND_DIR)
     SIF_IMAGE = cfg['apptainer']['sif_image']
-    BIND_FLAGS = bind_flags(cfg,run_dir=HOST_BIND_DIR)
+    BIND_FLAGS = bind_flags(cfg,run_dir=BIND_DIR)
     timeout_s = cfg['apptainer'].get('timeout_s',240)
 
     # Load your dataframe (replace with your actual data source)
