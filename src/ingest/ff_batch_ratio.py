@@ -18,7 +18,7 @@ from the chained step geojsons.
 from __future__ import print_function
 import glob, os.path as osp, sys, math, time
 sys.path[:0] = ['src', 'src/ingest']
-from ff_growth import track, wrf_track
+from ff_growth import track, wrf_track, shrink_events
 
 #Only score workspaces re-run in THIS batch.  Every wksp keeps its last ForeFire
 #output forever, so scanning them all silently mixes the new runs with older output at
@@ -45,8 +45,17 @@ except ValueError:
 print('scoring ForeFire output written after %s (%s)\n'
       % (time.strftime('%Y-%m-%d %H:%M', time.localtime(SINCE)), osp.basename(BATCH)))
 
+#A fire cannot shrink, so a falling track means the perimeter was mis-measured or the
+#run lost a front.  This is the check that was missing when ff_growth.track() was
+#subtracting ForeFire's fronts: SAN_FRANCISCO_2 lost 44% of its area in one step and
+#was scored as a 0.19 ratio with nothing to mark it.  Below SHRINK_SKIP a run is
+#reported and still scored -- a chained restart re-meshes and gives up a percent or two
+#-- and above it the run is disqualified.
+SHRINK_WARN = 0.01
+SHRINK_SKIP = 0.10
+
 root = '/data/jhaley/wrfxpy/wksp'
-rows, skipped = [], []
+rows, skipped, warned = [], [], []
 for w in sorted(glob.glob(osp.join(root, 'wfc-*'))):
     #Cotton 2 and Hot Spring 226 are being rewritten with per-fuel moisture right now;
     #their pSAF-0.175 scalar-Md output was copied aside first, so read that instead of
@@ -100,6 +109,16 @@ for w in sorted(glob.glob(osp.join(root, 'wfc-*'))):
     if n_steps and len(ffr) < 0.5 * n_steps:
         skipped.append((osp.basename(w), 'truncated: %d perimeters from %d step files'
                         % (len(ffr), n_steps))); continue
+    shrink = shrink_events(ffr, tol=SHRINK_WARN)
+    worst = max(shrink, key=lambda x: x[4]) if shrink else None
+    if worst and worst[4] >= SHRINK_SKIP:
+        skipped.append((osp.basename(w), 'shrinks %.0f%% at step %d, %.1f -> %.1f ha -- a '
+                        'fire cannot shrink, so the perimeter is mis-measured or a front '
+                        'was lost' % (100*worst[4], worst[0], worst[2], worst[3]))); continue
+    if worst:
+        warned.append((osp.basename(w), 'shrinks %.1f%% at step %d, %.1f -> %.1f ha'
+                       % (100*worst[4], worst[0], worst[2], worst[3])))
+
     name = osp.basename(w)[4:].split('_20')[0]
     rows.append((name, t, ffd[t], wrd[t], ffd[t] / wrd[t] if wrd[t] > 0 else float('nan')))
 
@@ -119,6 +138,10 @@ if good:
           % (len(good), gm, med, s[0], s[-1]))
     print('below 1.0x (underpredict): %d of %d (%.0f%%)' % (under, len(good), 100.0*under/len(good)))
     print('within a factor of 2:      %d of %d (%.0f%%)' % (within2, len(good), 100.0*within2/len(good)))
+if warned:
+    print('\nscored, but the perimeter falls somewhere -- a fire cannot shrink:')
+    for n, why in warned:
+        print('  %-52s %s' % (n[:52], why))
 if skipped:
     print('\nskipped %d:' % len(skipped))
     for n, why in skipped:

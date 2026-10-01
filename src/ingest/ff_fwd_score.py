@@ -21,10 +21,17 @@ from __future__ import print_function
 import argparse, glob, math, os, os.path as osp, sys
 from datetime import timedelta
 sys.path[:0] = ['src', 'src/ingest']
-from ff_growth import track, wrf_track
+from ff_growth import track, wrf_track, shrink_events
 
 WKSP = '/data/jhaley/wrfxpy/wksp'
 FWD = '/data/jhaley/wrfxpy/wksp_forefire'
+
+#A fire cannot shrink, so a falling track means the perimeter was mis-measured or the
+#run lost a front.  Below SHRINK_SKIP it is reported and still scored -- a chained
+#restart re-meshes and gives up a little -- and above it the run is disqualified, because
+#that is the size of the defect that put a 0.19 ratio into a batch mean unremarked.
+SHRINK_WARN = 0.01
+SHRINK_SKIP = 0.10
 
 
 def _geom_mean(xs):
@@ -43,7 +50,11 @@ def _at(ffd, wrd, t):
 
 
 def score(grid_code, hours=8.0, tol_min=30):
-    """(full_row, window_row, note) for one forward run, either row None if unscorable."""
+    """(full_row, window_row, note, why) for one forward run.
+
+    `why` is set when the run cannot be scored at all and both rows are None; `note` is
+    a warning about a run that was scored anyway.
+    """
     ffdir = osp.join(FWD, grid_code)
     #run_job writes the perimeters into the workspace root; --out-dir puts them in
     #results/.  Take whichever holds geojsons so both layouts score.
@@ -51,14 +62,14 @@ def score(grid_code, hours=8.0, tol_min=30):
         ffdir = osp.join(ffdir, 'results')
     ffr, _ = track(ffdir)
     if not ffr:
-        return None, None, 'no ForeFire perimeters'
+        return None, None, None, 'no ForeFire perimeters'
     #the WRF-SFIRE workspace carries the grid_code plus its own start time and length
     cand = sorted(glob.glob(osp.join(WKSP, 'wfc-%s-*' % grid_code)))
     if not cand:
-        return None, None, 'no WRF-SFIRE workspace'
+        return None, None, None, 'no WRF-SFIRE workspace'
     wr = wrf_track(cand[-1])
     if not wr:
-        return None, None, 'no TIGN_G'
+        return None, None, None, 'no TIGN_G'
     #Snap ForeFire to the hour before intersecting.  track() rounds to the minute,
     #which is right for a cron run -- those are driven to WRF-SFIRE's own output times
     #and land on them exactly.  A forward run steps hourly from the issue hour, but
@@ -78,7 +89,7 @@ def score(grid_code, hours=8.0, tol_min=30):
     wrd = dict(wr)
     common = sorted(set(ffd) & set(wrd))
     if not common:
-        return None, None, 'no common valid time'
+        return None, None, None, 'no common valid time'
 
     #same truncation guard as ff_batch_ratio: a run that died two hours in still yields
     #a ratio, and it looks entirely normal because both sides are read at the same
@@ -86,8 +97,14 @@ def score(grid_code, hours=8.0, tol_min=30):
     n_steps = len([f for f in glob.glob(osp.join(ffdir, '*.geojson'))
                    if 'final' not in osp.basename(f)])
     if n_steps and len(ffr) < 0.5 * n_steps:
-        return None, None, ('truncated: %d perimeters from %d step files'
-                            % (len(ffr), n_steps))
+        return None, None, None, ('truncated: %d perimeters from %d step files'
+                                  % (len(ffr), n_steps))
+
+    shrink = shrink_events(ffr, tol=SHRINK_WARN)
+    worst = max(shrink, key=lambda x: x[4]) if shrink else None
+    if worst and worst[4] >= SHRINK_SKIP:
+        return None, None, None, ('shrinks %.0f%% at step %d, %.1f -> %.1f ha'
+                                  % (100 * worst[4], worst[0], worst[2], worst[3]))
 
     full = _at(ffd, wrd, common[-1]) + (common[-1],)
     #the window is measured from ForeFire's own first perimeter, which is the ignition
@@ -100,7 +117,11 @@ def score(grid_code, hours=8.0, tol_min=30):
     if near:
         t = min(near, key=lambda x: abs((x - want).total_seconds()))
         win = _at(ffd, wrd, t) + (t,)
-    return full, win, None
+    note = None
+    if worst:
+        note = ('shrinks %.1f%% at step %d, %.1f -> %.1f ha'
+                % (100 * worst[4], worst[0], worst[2], worst[3]))
+    return full, win, note, None
 
 
 def main():
@@ -115,18 +136,20 @@ def main():
     if a.names:
         codes = [c for c in codes if any(n in c for n in a.names)]
 
-    rows, skipped = [], []
+    rows, skipped, warned = [], [], []
     for c in codes:
         if not osp.isdir(osp.join(FWD, c)):
             continue
         try:
-            full, win, why = score(c, hours=a.hours)
+            full, win, note, why = score(c, hours=a.hours)
         except Exception as e:
             skipped.append((c, '%s: %s' % (type(e).__name__, e)))
             continue
         if why:
             skipped.append((c, why))
             continue
+        if note:
+            warned.append((c, note))
         rows.append((c.split('_20')[0], full, win))
 
     rows.sort(key=lambda r: r[1][2])
@@ -154,6 +177,10 @@ def main():
                  100.0 * sum(1 for x in good if x < 1.0) / len(good),
                  sum(1 for x in good if 0.5 <= x <= 2.0), len(good),
                  100.0 * sum(1 for x in good if 0.5 <= x <= 2.0) / len(good)))
+    if warned:
+        print('\nscored, but the perimeter falls somewhere -- a fire cannot shrink:')
+        for n, why in warned:
+            print('  %-50s %s' % (n[:50], why))
     if skipped:
         print('\nskipped %d:' % len(skipped))
         for n, why in skipped:

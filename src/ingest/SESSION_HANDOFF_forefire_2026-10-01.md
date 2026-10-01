@@ -297,9 +297,15 @@ ungrib/metgrid run.
 The full list stays in `SESSION_HANDOFF_forefire_2026-09-29.md` §6 and §7, which this
 file does not duplicate. Today added three items to it:
 
-1. **Add a monotonicity check to both scorers.** A fire cannot shrink. One line would
-   have caught §5j's defect on the step it happened, instead of after a 65-fire pSAF
-   calibration, three handoffs and two scoring tools.
+1. ~~**Add a monotonicity check to both scorers.**~~ **DONE.** `ff_growth.shrink_events`
+   finds every step where the burned area falls, and both `ff_batch_ratio.py` and
+   `ff_fwd_score.py` now call it: below 10% the run is reported and still scored, at or
+   above 10% it is disqualified and named. Regression-checked against the pre-fix
+   measurement of SAN_FRANCISCO_2, which it flags at **-43% on step 19** and would have
+   skipped; the fixed measurement raises nothing. The thresholds are measured rather
+   than picked -- over 57 runs the only real losses left after the ring fix are
+   Hatch_Grande at 1.75% and Lauderdale at 1.41%, both from a chained restart re-meshing
+   the perimeter it was handed, so 1% warns and 10% disqualifies.
 2. **Score time-to-area beside area-at-time** (§5j). LAC-352011's cron run reaches
    WRF-SFIRE's final area 13 h early while tracing what JH reports is nearly its final
    outline. That is a rate error on an agreed path, and the current metric cannot

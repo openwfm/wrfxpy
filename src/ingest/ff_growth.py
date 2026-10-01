@@ -97,6 +97,30 @@ def _perimeter(path, dup_frac=0.5):
     return None if g.is_empty else g
 
 
+def shrink_events(rows, tol=0.01):
+    """Steps where the burned area fell, as [(step, when, before, after, frac)].
+
+    **A fire cannot shrink.**  That makes a falling track the one check on a ForeFire
+    area that needs no reference data, and it is the check that was missing: the ring
+    subtraction fixed in `_perimeter` ran through a 65-fire pSAF calibration, three
+    handoffs and two scoring tools before anyone noticed, because an under-measured
+    fire looks exactly like a fire that did not spread.  SAN_FRANCISCO_2 lost 44% of
+    its area in one step and was scored as a 0.19 ratio without comment.
+
+    `tol` is a fraction of the preceding area.  Real runs do lose a little at a chained
+    restart, where ForeFire re-meshes the perimeter it was handed -- measured over 57
+    runs the only survivors of the ring fix were Hatch_Grande at 1.75% and
+    Lauderdale at 1.41%, both healthy.  So small losses are reported and large ones
+    disqualify the run; see SHRINK_SKIP in the scorers.
+    """
+    out = []
+    for i in range(1, len(rows)):
+        prev, cur = rows[i - 1][1], rows[i][1]
+        if prev > 0 and cur < prev * (1.0 - tol):
+            out.append((i + 1, rows[i][0], prev, cur, 1.0 - cur / prev))
+    return out
+
+
 def track(model_dir, pattern='*.geojson'):
     """{valid_at: area_ha} for a run's chained step perimeters, in a UTM zone
     chosen from the first perimeter seen."""
