@@ -155,7 +155,7 @@ class RNNMoistureModel(TimeWarpedFuelClassPredictors):
             logging.info("fmda.rnn_moisture_model.to_geogrid: geogrid updated="+str(index))
 
         FMC_GC = np.zeros((xsize, ysize, n+2))
-        FMC_GC[:,:,:] = preds
+        FMC_GC[:,:,:-2] = preds
         if test_latslons:
             logging.info("fmda.rnn_moisture_model.to_geogrid: storing lons lats to FMC_GC(:,:,-2:) to test in WRF against XLONG and XLAT")
             FMC_GC[:,:,-2] = lons

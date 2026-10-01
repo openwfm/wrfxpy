@@ -63,7 +63,8 @@ states1 = rnn.get_states()
 preds_grid = p1.reshape(ny, nx, p1.shape[1], p1.shape[2])
 rnn_states_grid = rnn.states_to_grid((ny, nx))
 
-# Test writing out with one time slice, then reading
+# Test netCDF4 
+# writing out with one time slice, then reading
 pred_slice = preds_grid[:,:,0,:].squeeze()
 rnn.to_netcdf(
     path=f"{test_path}.nc",
@@ -87,5 +88,25 @@ p1 = rnn.predict_cycle(X, reset_states=False)
 p2 = rnn2.predict_cycle(X, reset_states=False)
 
 np.testing.assert_allclose(p1, p2, rtol=1e-6, atol=1e-6)
+
+# Test to_geogrid
+# created var_wisdom for RNN_STATES, TODO: confirm nearest_neighbors alone is ok
+
+
+index = {
+        "projection": "lambert",
+        "dx" : 3000.0,
+        "dy" : -3000.0,
+        "truelat1" : 38.5,
+        "truelat2" : 38.5,
+        "stdlon" : 262.5,
+        "radius" : 6370000.0
+    }
+rnn.to_geogrid(
+    preds = pred_slice,
+    path = f"{test_path}.geo",
+    index = index
+        )
+
 
 breakpoint()

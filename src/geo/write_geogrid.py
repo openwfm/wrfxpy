@@ -204,7 +204,7 @@ def write_geogrid(path,array,index,bits=32,scale=None,uscale=None):
     data_path = osp.join(path,data_file)
     a.flatten().tofile(data_path)
     # write index
-    index.update({'scale_factor': scale,
+    index.update({'scale_factor': float(scale),
                  'wordsize': bits // 8,
                  'tile_x': xsize,
                  'tile_y': ysize,

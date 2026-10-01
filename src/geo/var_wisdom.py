@@ -245,6 +245,14 @@ _var_wisdom = {
         'signed': 'yes',
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt'
     },
+    'RNN_STATES' : {
+        'name': 'RNN_STATES',
+        'units': '1',
+        'description': 'rnn recurrent states. For lstm order is (hidden, cell)',
+        'type': 'continuous',
+        'signed': 'yes',
+        'interp_option': 'default:nearest_neighbor'
+    },
     'XLONG' : {
         'name': 'XLONG',
         'units': 'degrees',
