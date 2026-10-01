@@ -242,8 +242,15 @@ def fit_domain(domain_km, fire_dx):
 
 def run_job(job_path, out_dir=None, steps=8, issue_utc=None, grib_dir=None,
             overwrite=False, cfg=None, domain_km=None, fire_dx=None, params=None,
-            wksp_root=None):
-    """Build the netcdfs, write the .ff scripts, run ForeFire, collect the outputs."""
+            wksp_root=None, suffix='fwd'):
+    """Build the netcdfs, write the .ff scripts, run ForeFire, collect the outputs.
+
+    `suffix` tags every geojson and kml name.  It defaults to 'fwd' because the kml
+    lands in the shared `perim_copy_dir` alongside the cron output under the identical
+    name `<grid_code>_steps.kml`, so an untagged forward run and the analysis-driven
+    run of the same fire silently overwrite each other there.  Pass '' or None for the
+    old untagged names.
+    """
     if cfg is None:
         cfg = ff.load_ff_cfg()
     latlon, ign_utc, grid_code, job_km, job_dx, grib_source = read_job(job_path)
@@ -319,7 +326,8 @@ def run_job(job_path, out_dir=None, steps=8, issue_utc=None, grib_dir=None,
 
     ff.run_timing_table(tt, overwrite=overwrite, cfg=cfg, run_dir=run_dir,
                         dest_dir=dest_dir)
-    ff.cleanup_ff_run(run_dir, None, grid_code, cfg=cfg, dest_dir=dest_dir)
+    ff.cleanup_ff_run(run_dir, None, grid_code, cfg=cfg, dest_dir=dest_dir,
+                      suffix=suffix or None)
     logging.info('done -> %s', dest_dir)
     return dest_dir
 
@@ -422,6 +430,10 @@ def main():
                    help='override the domain size the job implies')
     p.add_argument('--fire-dx', type=float, default=None,
                    help='override the fire mesh the job implies')
+    p.add_argument('--tag', default='fwd',
+                   help="tag appended to every geojson and kml name (default 'fwd', "
+                        "which keeps a forward run from overwriting the cron run of "
+                        "the same fire in perim_copy_dir). Pass '' for no tag.")
     p.add_argument('--overwrite', action='store_true')
     p.add_argument('--verbose', action='store_true')
     a = p.parse_args()
@@ -431,7 +443,8 @@ def main():
     try:
         run_job(a.job, out_dir=a.out_dir, steps=a.steps, issue_utc=a.issue_utc,
                 grib_dir=a.grib_dir, overwrite=a.overwrite,
-                domain_km=a.domain_km, fire_dx=a.fire_dx, wksp_root=a.wksp_root)
+                domain_km=a.domain_km, fire_dx=a.fire_dx, wksp_root=a.wksp_root,
+                suffix=a.tag)
     except (ForeFireJobError, fg.ForeFireGribError) as e:
         raise SystemExit('%s' % e)
 
