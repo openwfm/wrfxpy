@@ -40,6 +40,63 @@ from shapely.ops import unary_union
 from ff_score_perim import _to_utm, _utm_proj, _valid_at
 
 
+def _perimeter(path, dup_frac=0.5):
+    """One step's burned area as a geometry, with ForeFire's rings read correctly.
+
+    `shape()` on the raw geometry is WRONG and silently so.  ForeFire's
+    dumpMode=geojson packs every separate front as a RING of one polygon, and the
+    GeoJSON convention makes ring 0 the shell and the rest holes -- so a second ring is
+    SUBTRACTED from the first.  The step where one appears reads as a sudden shrink,
+    and every step after it is wrong too.  On the cron run of SAN_FRANCISCO_2 the track
+    read 64.2 ha, then 36.3, and ended at 132.4 against a true 1621.8.  Ten of the
+    other twelve runs in that batch were unaffected, which is what makes it dangerous:
+    it does not look like a bug, it looks like a fire that did not spread.
+
+    `forefire.read_ff_geojson` classifies rings by nesting depth under the even-odd
+    rule -- even is burning, odd is an unburned island.  That is right for the KML and
+    not quite enough for an area, because **not every nested ring is an island**.  Over
+    all 822 step perimeters of the 2026-10-01 batch the ratio of the largest nested
+    ring to its container is sharply bimodal, with nothing in between:
+
+        no nested ring                720
+        ratio < 0.2  (real islands)    70
+        ratio 0.2-0.8                   0
+        ratio > 0.8  (duplicates)      32
+
+    The high group is a front dumped as a thin band rather than a filled region -- on
+    SAN_FRANCISCO_2's last step the two rings are 1621.8 and 1607.4 ha, a mean width of
+    7.25 m against a 25 m fire mesh, so the "island" cannot be unburned ground.
+    Subtracting it gives an area that falls while the fire grows; keeping it gives a
+    monotone track that matches what the kml draws and what JH read off it.
+
+    So islands are differenced out only below `dup_frac` of the burning area, and the
+    empty middle of that distribution is what makes the threshold safe rather than
+    tuned.  A burning pocket inside a real island (depth 2) would still be dropped;
+    that has not been seen and is second order against a 12x error.
+    """
+    import forefire as _ff
+    gdf = _ff.read_ff_geojson(path)
+    if len(gdf) == 0:
+        return None
+    burn = [g for g in gdf[gdf['burning']].geometry if g is not None and not g.is_empty]
+    if not burn:
+        return None
+    g = unary_union(burn)
+    if not g.is_valid:
+        g = g.buffer(0)
+    big = max(x.area for x in burn)
+    isl = [x for x in gdf[~gdf['burning']].geometry
+           if x is not None and not x.is_empty and x.area < dup_frac * big]
+    if isl:
+        h = unary_union(isl)
+        if not h.is_valid:
+            h = h.buffer(0)
+        g = g.difference(h)
+        if not g.is_valid:
+            g = g.buffer(0)
+    return None if g.is_empty else g
+
+
 def track(model_dir, pattern='*.geojson'):
     """{valid_at: area_ha} for a run's chained step perimeters, in a UTM zone
     chosen from the first perimeter seen."""
@@ -50,13 +107,9 @@ def track(model_dir, pattern='*.geojson'):
         if 'final' in base:
             continue
         fc = json.load(open(f))
-        geoms = [shape(x['geometry']) for x in fc.get('features', []) if x.get('geometry')]
-        geoms = [g for g in geoms if not g.is_empty]
-        if not geoms:
+        g = _perimeter(f)
+        if g is None:
             continue
-        g = unary_union(geoms)
-        if not g.is_valid:
-            g = g.buffer(0)
         t = _valid_at(fc)
         if t is None:
             continue

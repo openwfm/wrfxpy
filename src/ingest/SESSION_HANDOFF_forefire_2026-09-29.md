@@ -621,6 +621,89 @@ slow one. The timing disagreement is **not one-signed**, which matches §5h.
   cron run into the shared `perim_copy_dir` and silently replaced it. The 13 runs of this
   batch were retagged after the fact and their untagged duplicates removed, per JH.
 
+## 5j. `track()` was subtracting fronts, and JH caught it by eye (2026-10-01)
+
+JH compared the forward runs against the cron runs of the same fires and read the gap
+as "a bit random". Measured, it is not random -- it is tight agreement with outliers:
+
+| | fwd/cron |
+|---|---|
+| the 8 that agree | geo mean **0.90**, geo sd **1.14**, range 0.68-1.07 |
+| SAN_FRANCISCO_2 | 11.94 |
+| LAC-352011 | 0.21 |
+
+Adding those two takes the scatter from 1.14 to 2.56. JH then said the SAN_FRANCISCO_2
+gap was **not visible in the kml** and was worth re-checking. It was not visible because
+it was not there.
+
+### The bug
+
+`ff_growth.track()` measured each perimeter with plain `shape()` + `unary_union`.
+ForeFire's `dumpMode=geojson` packs every separate front as a **ring of one polygon**,
+and the GeoJSON convention makes ring 0 the shell and the rest holes -- so the second
+ring is **subtracted**. `forefire.read_ff_geojson` exists for exactly this (its
+docstring records a 106,869 ha step collapsing to 5,857) and `track()` never used it.
+
+On SAN_FRANCISCO_2's cron run a second ring opens at 09-30 17:30:
+
+| step | valid | measured | true |
+|---|---|---|---|
+| 18 | 09-30 17:00 | 64.2 | 64.2 |
+| 19 | 09-30 17:30 | **36.3** | 102.1 |
+| 53 | 10-01 09:00 | **132.4** | 1621.8 |
+
+**Under by 12.3x.** A fire cannot shrink, so the track was physically impossible from
+step 19 on, and nothing checked that.
+
+### Not every nested ring is an island
+
+The naive repair -- difference the islands out -- is also wrong, and gave 146.9 ha. Over
+all 822 step perimeters of this batch the ratio of the largest nested ring to its
+container is **sharply bimodal with an empty middle**:
+
+| ratio | steps |
+|---|---|
+| no nested ring | 720 |
+| < 0.2, real islands | 70 |
+| 0.2 - 0.8 | **0** |
+| > 0.8, duplicates | 32 |
+
+The high group is a front dumped as a thin band: on the last step the two rings are
+1621.8 and 1607.4 ha, a mean width of **7.25 m against a 25 m fire mesh**, so it cannot
+be unburned ground. `_perimeter()` now differences out only rings below half the burning
+area. The empty middle is what makes that threshold evidence rather than tuning.
+
+### What the rescore moves
+
+- **Forward batch: nothing.** All 13 forward runs were unaffected at their scored times,
+  so §5i's numbers stand exactly as recorded.
+- **Cron batch: one fire in 19.** SAN_FRANCISCO_2 132.4 -> 1621.8 ha, ratio 0.19 -> 2.38.
+  Batch geo mean **1.35 -> 1.54**; median 1.81 and within-2x 9 of 19 both unchanged.
+- **SAN_FRANCISCO_2 is no longer an outlier.** fwd/cron is **1.10**, in the pack with the
+  other eight. The 11.94 was measurement, and the "threshold sensitivity" explanation
+  offered for it was wrong.
+- **The historical calibration is safe.** A duplicate ring appears in **1 of the 120 most
+  recent cron runs**. One fire in 65 moves a geometric mean by a few percent, well inside
+  noise, so pSAF 0.337 does not need refitting. (An earlier guess in this session that
+  pSAF might be calibrated high followed from assuming the bug was common. It is not.)
+
+### LAC-352011 survives, and suggests a second metric
+
+0.23 after the fix, so that one is real. Per JH it sits in odd terrain near Edwards AFB
+with ponds constraining growth in places. The cron run reaches WRF-SFIRE's **final** area
+13 h early (step 24) and ends at 268 ha against 124, yet JH reports its **step-33
+perimeter is extremely close to WRF-SFIRE's final perimeter**. That is a rate error on a
+path both models agree about, and area-at-a-fixed-time cannot distinguish it from a fire
+spreading the wrong way. **Time-to-area belongs beside area-at-time** in the scorer.
+
+### The lesson worth keeping
+
+Every area number in this project rests on `track()`, and the defect survived a pSAF
+calibration over 65 fires, three handoffs and two scoring tools, because an
+under-measured fire looks exactly like a fire that did not spread. It was caught by
+someone looking at the map. **A monotonicity check is one line and would have caught it
+on the step it happened** -- worth adding to the scorers.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
