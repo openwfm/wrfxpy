@@ -704,6 +704,91 @@ under-measured fire looks exactly like a fire that did not spread. It was caught
 someone looking at the map. **A monotonicity check is one line and would have caught it
 on the step it happened** -- worth adding to the scorers.
 
+## 5k. RAP and RRFS: what a port would cost, and what is not yet verified (2026-10-01)
+
+**Status: assessed, not done.** JH wants to discuss RAP vs RRFS with others before
+committing. Nothing here has been merged or run; this is what that discussion needs.
+
+`RAP.py` and `RRFS.py` live in `/data/jhaley/clean_wrfxpy/wrfxpy/src/ingest` on
+**`origin/release`**, not on master, and are absent from `james_ngfs`. They matter
+because **NAM is being retired** and ForeFire currently has HRRR as its only validated
+wind source.
+
+### Do not merge the branch
+
+`james_ngfs` against `origin/release`: merge base **2023-10-09**, 97 files, +5,079 /
+-27,210 lines, ~19 files changed on both sides. That is three years of unrelated
+divergence to obtain two modules. **Port the files instead.**
+
+### The port is four copies and two edits
+
+| | |
+|---|---|
+| copy | `src/ingest/RAP.py`, `src/ingest/RRFS.py` |
+| copy | `etc/vtables/{Vtable,METGRID.TBL}.{RAP,RRFS}` -- **absent** from james_ngfs |
+| edit | `src/forecast.py` -- dispatch branches |
+| edit | `src/ingest/retrieve_gribs.py` -- imports, elif chain, usage string |
+
+Nothing else: james_ngfs has no `available_grib_sources` list and no
+`create_job_json.py`.
+
+**The base class already fits.** `grib_forecast.py` in james_ngfs expects exactly the
+attributes these set -- `cycle_hours`, `period_hours`, `hours_behind_real_time`,
+`grib_forecast_hours_periods`, `remote_url`, `browse_aws` -- the same contract
+`HRRR.py` satisfies, and `grib_source.py` already handles `s3://`. Neither module needs
+editing to run.
+
+### Verified live against the buckets (2026-10-01)
+
+| path | result |
+|---|---|
+| `noaa-rap-pds/rap.20260930/rap.t12z.wrfprsf01.grib2` | 200, 226 MB |
+| `noaa-rrfs-ops-pds/rrfs.20260930/12/rrfs.t12z.prslev.3km.f001.conus.grib2` | 200, 563 MB |
+| `noaa-rrfs-ops-pds/.../rrfs.t12z.2dfld.3km.f001.conus.grib2` | 200, 339 MB |
+
+**Both filename templates are correct.** That is the part most likely to be wrong in an
+unused module, and it is not.
+
+### Three defects or unknowns, in order of how early they bite
+
+1. **RAP's cycle/lead pairing is wrong.** `cycle_hours = 1` with
+   `grib_forecast_hours_periods = [{'hours': 51}]`, but only the **03/09/15/21Z** cycles
+   reach FH51. Measured: `t15z/f51` 200, `t14z/f51` 404, `t14z/f21` 200, `t14z/f22` and
+   `f23` 404. So three cycles in four would request files that do not exist. `HRRR.py`
+   already solves this exact problem -- `cycle_hours = 6`, "only the 00/06/12/18Z cycles
+   reach f48". **Fix to `cycle_hours = 6` for 51 h runs, or `hours: 21` for hourly
+   cycles, before any test.**
+2. **All four vtables are byte-identical copies of the HRRR ones.** `cmp` confirms
+   `Vtable.RAP`, `Vtable.RRFS`, `METGRID.TBL.RAP`, `METGRID.TBL.RRFS` all match
+   `Vtable.HRRR` / `METGRID.TBL.HRRR`. `RRFS.py`'s docstring says so and gives the
+   `strings` / `ncdump` checks; `RAP.py`'s docstring does not. **Neither is validated.**
+3. **The metgrid level counts are guesses.** RAP's docstring says 38 levels while its
+   code returns 41; RRFS returns 46 marked "confirm from met_em files after the first
+   successful metgrid run". A wrong value fails in **real.exe**, not in ingest, so it
+   surfaces late.
+
+### Volume
+
+RAP ~226 MB per forecast hour; RRFS ~902 MB (both products). An 84 h RRFS cycle is
+**~75 GB**. `/data` has 61 TB free and `ingest/` already holds 5.3 TB, so a few cycles a
+day adds roughly a terabyte a fortnight on top of the HRRR and NAM caches. Affordable,
+not free.
+
+### For ForeFire specifically
+
+**RRFS 3 km is the natural NAM replacement** and should feed WindNinja as well as HRRR
+does; **RAP at 13 km is coarser than what we already have**, so it is a Canada/backup
+option rather than an upgrade. One catch: `forefire_grib.find_gribs` parses
+`hrrr.tHHz.wrfprsfNN.grib2` filenames, so ForeFire use needs a parser change beyond the
+port. **The WRF-SFIRE path needs nothing extra.**
+
+### Suggested order if it goes ahead
+
+Copy the six files, fix RAP's `cycle_hours`, wire both dispatch points, then pull a
+single RAP file end to end through `retrieve_gribs.sh` to prove the plumbing **before
+anything touches WPS**. Vtable validation is a separate and slower job needing a real
+ungrib/metgrid run.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
@@ -714,11 +799,14 @@ on the step it happened** -- worth adding to the scorers.
 3. **Pick a default mesh and mask, then re-derive pSAF** (§3, §5b). 50 m + mask is the
    candidate, implying pSAF ~0.41. Settle it against observed perimeters: three
    configurations that differ by 25% in area cannot be ranked against each other.
-4. **Re-run the moisture-bias test on a larger batch** (§5h). 14 fires, one season,
+4. **RAP / RRFS port** (§5k). Assessed, not done -- JH is discussing the choice with
+   others first. If it goes ahead, fix RAP's `cycle_hours` and validate the vtables,
+   which are copies of HRRR's.
+5. **Re-run the moisture-bias test on a larger batch** (§5h). 14 fires, one season,
    forecast cycles only from 2026-09-28 -- enough to refute the Finley generalisation,
    not enough to rule out a real bias. `ff_moisture_bias.py`, no arguments, when the
    HRRR FMDA forecast archive supports 40+ fires across more than one regime.
-5. Carried from 09-28: `--issue-utc` on every forecast run; perimeter scoring has its own
+6. Carried from 09-28: `--issue-utc` on every forecast run; perimeter scoring has its own
    calibration (score at containment, IoU 0.25 is a success, check detection dates);
    `ff_domain_connectivity.py` before any per-fire fit; re-run `fmda_fcst_skill.py` once
    the cron has accumulated cycles.
