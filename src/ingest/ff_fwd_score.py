@@ -59,7 +59,23 @@ def score(grid_code, hours=8.0, tol_min=30):
     wr = wrf_track(cand[-1])
     if not wr:
         return None, None, 'no TIGN_G'
-    ffd, wrd = dict(ffr), dict(wr)
+    #Snap ForeFire to the hour before intersecting.  track() rounds to the minute,
+    #which is right for a cron run -- those are driven to WRF-SFIRE's own output times
+    #and land on them exactly.  A forward run steps hourly from the issue hour, but
+    #ForeFire stamps each perimeter at the second the front step actually landed on, so
+    #the times drift to :01 or :02 and an exact intersection throws those hours away.
+    #It is not a small loss: SOUTH_PARK_RX matched 10 hours of 28 and had no 8 h point
+    #at all, LAC-352011 17 and STARR_33 19, while fires whose steps happened to land on
+    #:00 matched 26.  Which hours survive is then an artefact of rounding, not of the
+    #forecast.
+    ffd = {}
+    for t, a in ffr:
+        h = (t + timedelta(minutes=30)).replace(minute=0, second=0, microsecond=0)
+        #keep the perimeter nearest the hour if two round onto it
+        if h not in ffd or abs((t - h).total_seconds()) < abs((ffd[h][1] - h).total_seconds()):
+            ffd[h] = (a, t)
+    ffd = dict((h, v[0]) for h, v in ffd.items())
+    wrd = dict(wr)
     common = sorted(set(ffd) & set(wrd))
     if not common:
         return None, None, 'no common valid time'
@@ -77,7 +93,8 @@ def score(grid_code, hours=8.0, tol_min=30):
     #the window is measured from ForeFire's own first perimeter, which is the ignition
     #it was given, not from WRF-SFIRE's start_utc -- those differ by about an hour and
     #an hour is a sixth of the horizon being reported
-    want = ffr[0][0] + timedelta(hours=hours)
+    want = ((ffr[0][0] + timedelta(minutes=30)).replace(minute=0, second=0, microsecond=0)
+            + timedelta(hours=hours))
     near = [t for t in common if abs((t - want).total_seconds()) <= tol_min * 60]
     win = None
     if near:
