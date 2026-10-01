@@ -91,7 +91,7 @@ np.testing.assert_allclose(p1, p2, rtol=1e-6, atol=1e-6)
 
 # Test to_geogrid
 # created var_wisdom for RNN_STATES, TODO: confirm nearest_neighbors alone is ok
-
+# Read geogrids back and check for approximate equality
 
 index = {
         "projection": "lambert",
@@ -108,5 +108,14 @@ rnn.to_geogrid(
     index = index
         )
 
+geo_fmc = read_geogrid(osp.join(f"{test_path}.geo", "FMC_GC"))
+geo_rnn = read_geogrid(osp.join(f"{test_path}.geo", "RNN_STATES"))
 
-breakpoint()
+np.testing.assert_allclose(geo_fmc[0][..., :4],pred_slice)
+
+rnn_states = rnn.states_to_grid((ny, nx))
+ny, nx, k, n_rnn_vars, nunits = rnn_states.shape
+rnn_states = rnn_states.reshape(ny, nx, k * n_rnn_vars * nunits)
+
+# Check RNN states are close
+np.testing.assert_allclose(geo_rnn[0], rnn_states, rtol=1e-6, atol=geo_rnn[1]["scale_factor"] / 2)
