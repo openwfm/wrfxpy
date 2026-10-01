@@ -530,6 +530,97 @@ before either accepting no-bias or fitting a correction. Until then the §5h con
 should be quoted as provisional, and the ensemble case above -- which rests on the
 *spread*, not on the mean -- is the part that does not depend on resolving it.
 
+## 5i. Second forward batch, 13 fresh fires, pSAF 0.337 (2026-10-01)
+
+Every WRF-SFIRE run that finished after the 09-30 batch was built, re-run as a genuine
+forecast: `forefire_forecast.py` from the job file, 50 m with the barrier mask, pSAF
+0.337, `--steps 27`, winds from the HRRR forecast cache and moisture from `CONUS_HRRR`,
+both cut off at `--issue-utc` = the first whole hour after ignition. No overlap with the
+20 fires of §5d/§5f, so this is **out of sample**.
+
+**The FMDA confound of §5d is gone.** The forecast cycler has filled in -- four cycles a
+day (01/07/13/19), leads to f32, continuous from 09-28 -- and every fire here ignites on
+09-29 or later, so all 13 ran on genuine forecast moisture for their whole window.
+
+| fire | full valid | FF ha | WRF ha | ratio | 8 h | FF ha | WRF ha | ratio |
+|---|---|---|---|---|---|---|---|---|
+| IA_2 | 10-01 21:00 | 2981.7 | 6570.8 | 0.45 | 10-01 05:00 | 445.3 | 1006.9 | 0.44 |
+| LAC-352011 | 10-01 18:00 | 57.3 | 124.1 | 0.46 | 10-01 02:00 | 15.8 | 49.2 | 0.32 |
+| Wayne_-_Davis_Road | 10-01 21:00 | 105.2 | 92.6 | 1.14 | 10-01 03:00 | 13.6 | 12.2 | 1.11 |
+| STARR_33_RX | 10-01 21:00 | 77.3 | 51.9 | 1.49 | 10-01 05:00 | 12.1 | 17.5 | 0.69 |
+| Alcorn-_Blue_Room_Rd | 09-30 09:00 | 337.1 | 203.5 | 1.66 | 09-29 16:00 | 51.2 | 27.4 | 1.87 |
+| SOUTH_PARK_RX | 10-02 00:00 | 31.1 | 17.1 | 1.82 | 10-01 05:00 | 6.2 | 3.1 | 2.01 |
+| SAN_FRANCISCO_2 | 10-01 09:00 | 1580.5 | 682.9 | 2.31 | 09-30 17:00 | 180.0 | 18.2 | 9.90 |
+| IRIS | 10-02 00:00 | 19814.2 | 7684.1 | 2.58 | 10-01 07:00 | 2208.4 | 910.9 | 2.42 |
+| Dorran_Road | 10-01 00:00 | 1321.8 | 414.9 | 3.19 | 09-30 07:00 | 416.2 | 222.0 | 1.87 |
+| Hatch_Grande | 10-01 00:00 | 1483.8 | 456.8 | 3.25 | 09-30 07:00 | 485.0 | 173.1 | 2.80 |
+| GRAPEVINE | 10-02 06:00 | 3292.7 | 686.8 | 4.79 | 10-01 11:00 | 278.2 | 65.4 | 4.25 |
+
+| | n | geo mean | median | below 1x | within 2x |
+|---|---|---|---|---|---|
+| full window | 11 | 1.69 | 1.82 | 18% | **36%** |
+| 8 h | 11 | 1.63 | 1.87 | 27% | **36%** |
+
+### §5d's 8-hour prediction does not hold out of sample
+
+§5d rescaled its pSAF 0.41 batch to 0.337 and predicted geo mean 1.42, median 1.30,
+**78% within 2x**, 17% below 1x at the 8 h horizon. Measured on fresh fires: 1.63, 1.87,
+**36%**, 27%. The central tendency survives; **the fraction landing within a factor of
+two does not** -- it is less than half the predicted value.
+
+**And §5d's hopeful caveat is refuted.** It argued that seven fires with degraded
+moisture were dragging the numbers down and "true 8 h skill is probably better than
+shown". Coverage is now continuous and skill is **not** better. Degraded FMDA was not
+what was holding those numbers down.
+
+What limits the product is the same thing §5h found: **per-fire spread**. The 8 h ratios
+run 0.32 to 9.90. No global multiplier reaches that, and this is now the third
+independent line -- §5f's sweep, §5h's moisture comparison, and this batch -- pointing at
+per-fire treatment rather than a better global constant.
+
+### Two fires extinguished, and FMDA says they should have
+
+`Walker_Hill_Piles_RX` and `Walker_Hill_2_Piles_RX` produced 28 step files of which 26
+hold no front at all: ForeFire reached ~0.96 ha and the fire went out. The truncation
+guard flagged both, correctly, but the cause is physical rather than a failure. These are
+high-elevation Colorado pile burns (terrain 1834-3836 m) and **every fuel sat above its
+moisture of extinction** for the whole window:
+
+| fuel | Md used | `me` |
+|---|---|---|
+| 2 | 0.246-0.270 | 0.15 |
+| 5 | 0.212-0.238 | 0.20 |
+| 8 | 0.336-0.354 | 0.30 |
+| 10 | 0.336-0.354 | 0.25 |
+
+with the 100-h class clamped at the 0.5 ceiling for hours. WRF-SFIRE still burned 2.5 and
+11.6 ha. **Both models are arguably right**: a pile burns because it is a pile, not
+because the surrounding fuel carries fire, and ForeFire has no pile -- it is being asked
+to spread a surface fire through fuel the moisture model says will not carry one. Worth
+remembering before treating a prescribed pile burn as a forecast verification case at
+all.
+
+### SAN_FRANCISCO_2 is Finley with the sign reversed
+
+9.90 at 8 h against 2.31 at the full window: WRF-SFIRE holds 18.2 ha eight hours in and
+reaches 682.9 by the end. §5g's Finley had ForeFire late and WRF early; here WRF is the
+slow one. The timing disagreement is **not one-signed**, which matches §5h.
+
+### Two tooling fixes this batch needed
+
+- **`ff_fwd_score.py` (`faef20b`, `3f1a37b`).** Nothing in the repo could score a forward
+  run: `ff_batch_ratio.py` reads `<wksp>/forefire`, these land in
+  `wksp_forefire/<grid_code>`. It reports both horizons from one run and carries the
+  truncation guard. The first version matched timestamps exactly, which is right for a
+  cron run but wrong here -- ForeFire stamps a forward perimeter at the second its front
+  step landed, so times drift to :01 and those hours were discarded. SOUTH_PARK_RX
+  matched 10 hours of 28 and had **no 8 h point at all**. Fixed by snapping to the hour;
+  the ratios barely moved (1.68 -> 1.69 full), so the loss was sparse rather than biased.
+- **Forward kml names are tagged (`9107510`).** `run_job` now passes `suffix='fwd'`, so a
+  forward run writes `<grid_code>_steps_fwd.kml`. Untagged, it wrote the same name as the
+  cron run into the shared `perim_copy_dir` and silently replaced it. The 13 runs of this
+  batch were retagged after the fact and their untagged duplicates removed, per JH.
+
 ## 6. Open items
 
 1. ~~**Barrier preservation** -- the `-r max` mask~~ **DONE (§5b), for rivers.** Still
