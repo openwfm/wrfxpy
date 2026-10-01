@@ -27,9 +27,11 @@ This is the orchestration that was missing.  `build_step_ncs` built the netcdfs 
 hand-written scratch script per fire.
 
 **Scope note.** WindNinja reads HRRR correctly and *silently garbles* NAM218 -- it
-exits 0, prints a plausible valid time, and emits speeds up to 45,632 m/s.  A job whose
-`grib_source` is NAM is rejected here rather than run, because the failure does not
-announce itself.
+exits 0, prints a plausible valid time, and emits speeds up to 45,632 m/s.  What is
+checked is therefore the **grib directory**, which must hold HRRR cycles; the job's own
+`grib_source` is only logged, because it describes the WRF-SFIRE run the job was written
+for and says nothing about where these winds come from.  Nearly every job in the archive
+reads `NAM`, and all of them run here on HRRR.
 """
 
 from __future__ import absolute_import
