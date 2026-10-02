@@ -54,7 +54,8 @@ from ingest.NARR import NARR
 from ingest.GFSA import GFSA
 from ingest.GFSF import GFSF_P, GFSF_S
 from ingest.RAP import RAP
-from ingest.RRFS import RRFS_CONUS_P, RRFS_CONUS_S, RRFS_NA_P, RRFS_NA_S
+from ingest.RRFS import (RRFS_CONUS_P, RRFS_CONUS_S, RRFS_NA_P, RRFS_NA_S,
+                         RRFS_AK_P, RRFS_AK_S, RRFS_HI_P, RRFS_HI_S)
 
 from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP
@@ -171,6 +172,10 @@ class JobState(Dict):
             return [RRFS_CONUS_P(js),RRFS_CONUS_S(js)]
         elif gs_name == 'RRFSNA':
             return [RRFS_NA_P(js),RRFS_NA_S(js)]
+        elif gs_name == 'RRFSAK':
+            return [RRFS_AK_P(js),RRFS_AK_S(js)]
+        elif gs_name == 'RRFSHI':
+            return [RRFS_HI_P(js),RRFS_HI_S(js)]
         else:
             sat_only = js.get('sat_only',False)
             if not sat_only:

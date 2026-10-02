@@ -178,6 +178,130 @@ class RRFS_CONUS_S(RRFS_CONUS):
     prefix = "COLMET_S"
 
 
+class RRFS_AK(RRFS):
+    """
+    RRFSv1 Alaska container, on the 3-km Alaska grid:
+
+        rrfs.tCCz.prslev.3km.fFFF.ak.grib2
+        rrfs.tCCz.2dfld.3km.fFFF.ak.grib2
+
+    The counterpart to HRRR_AK, which is the only other Alaska source here.
+    """
+
+    def __init__(self, arg):
+        super(RRFS_AK, self).__init__(arg)
+
+    id = "RRFS_AK"
+    domain = "ak"
+    grid = "3km"
+    info_text = "NOAA RRFSv1 Alaska 3-km Forecast"
+    #same cycle rule as CONUS, measured on 2026-10-01: a cycle every 3 hours, but only
+    #00/06/12/18 reach f084 while 03/09/15/21 stop at f018 (t15z f018 is 200, f019 is
+    #404).  6 keeps the selector on the cycles that can serve the declared lead.
+    cycle_hours = 6
+    period_hours = 1
+    hours_behind_real_time = 1
+    grib_forecast_hours_periods = [{'hours': 84, 'period': 1}]
+
+
+class RRFS_AK_P(RRFS_AK):
+    """RRFSv1 Alaska pressure-level product."""
+
+    def __init__(self, arg):
+        super(RRFS_AK_P, self).__init__(arg)
+
+    def namelist_wps_keys(self):
+        return {
+            'ungrib': {'prefix': 'COLMET_P'},
+            'metgrid': {'fg_name': ['COLMET_S', 'COLMET_P']},
+        }
+
+    id = "RRFS_AK_P"
+    product = "prslev"
+    prefix = "COLMET_P"
+
+
+class RRFS_AK_S(RRFS_AK):
+    """RRFSv1 Alaska 2D/surface product."""
+
+    def __init__(self, arg):
+        super(RRFS_AK_S, self).__init__(arg)
+
+    def namelist_wps_keys(self):
+        return {
+            'ungrib': {'prefix': 'COLMET_S'},
+            'metgrid': {'fg_name': ['COLMET_S', 'COLMET_P']},
+        }
+
+    id = "RRFS_AK_S"
+    product = "2dfld"
+    prefix = "COLMET_S"
+
+
+class RRFS_HI(RRFS):
+    """
+    RRFSv1 Hawaii container, on the 2.5-km Hawaii grid:
+
+        rrfs.tCCz.prslev.2p5km.fFFF.hi.grib2
+        rrfs.tCCz.2dfld.2p5km.fFFF.hi.grib2
+
+    Note the grid token is `2p5km`, not a decimal point -- the same spelling the bucket
+    uses.  Puerto Rico (`pr`) is the identical product on the same grid and would be one
+    more pair of subclasses if it is ever wanted.
+
+    These files are small next to the rest of RRFS: 20 MB prslev and 10 MB 2dfld per
+    lead against 529/295 MB for Alaska, because the domain is tiny.
+    """
+
+    def __init__(self, arg):
+        super(RRFS_HI, self).__init__(arg)
+
+    id = "RRFS_HI"
+    domain = "hi"
+    grid = "2p5km"
+    info_text = "NOAA RRFSv1 Hawaii 2.5-km Forecast"
+    #measured identical to CONUS and AK on 2026-10-01: 3-hourly cycles, only the
+    #6-hourly ones reach f084
+    cycle_hours = 6
+    period_hours = 1
+    hours_behind_real_time = 1
+    grib_forecast_hours_periods = [{'hours': 84, 'period': 1}]
+
+
+class RRFS_HI_P(RRFS_HI):
+    """RRFSv1 Hawaii pressure-level product."""
+
+    def __init__(self, arg):
+        super(RRFS_HI_P, self).__init__(arg)
+
+    def namelist_wps_keys(self):
+        return {
+            'ungrib': {'prefix': 'COLMET_P'},
+            'metgrid': {'fg_name': ['COLMET_S', 'COLMET_P']},
+        }
+
+    id = "RRFS_HI_P"
+    product = "prslev"
+    prefix = "COLMET_P"
+
+
+class RRFS_HI_S(RRFS_HI):
+    """RRFSv1 Hawaii 2D/surface product."""
+
+    def __init__(self, arg):
+        super(RRFS_HI_S, self).__init__(arg)
+
+    def namelist_wps_keys(self):
+        return {
+            'ungrib': {'prefix': 'COLMET_S'},
+            'metgrid': {'fg_name': ['COLMET_S', 'COLMET_P']},
+        }
+
+    id = "RRFS_HI_S"
+    product = "2dfld"
+    prefix = "COLMET_S"
+
+
 class RRFS_NA(RRFS):
     """
     RRFSv1 North America container.
