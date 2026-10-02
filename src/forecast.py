@@ -38,8 +38,10 @@ from clamp2mesh import get_subgrid_coordinates, fill_subgrid
 try: 
     import fire_init
     _fire_init_plugin = True
+    print('Import of fire_init a success')
 except:
     _fire_init_plugin = False
+    print('Import of fire_init a failure')
 
 from ingest.NAM218 import NAM218
 from ingest.HRRR import HRRR
@@ -51,6 +53,8 @@ from ingest.CFSR import CFSR_P, CFSR_S
 from ingest.NARR import NARR
 from ingest.GFSA import GFSA
 from ingest.GFSF import GFSF_P, GFSF_S
+from ingest.RAP import RAP
+from ingest.RRFS import RRFS_CONUS_P, RRFS_CONUS_S, RRFS_NA_P, RRFS_NA_S
 
 from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP
@@ -65,6 +69,7 @@ from datetime import timedelta
 import time, re, json, sys, logging
 import os.path as osp
 import os
+import shutil
 import stat
 from multiprocessing import Process, Queue
 from subprocess import check_call
@@ -157,6 +162,15 @@ class JobState(Dict):
             return [GFSA(js)]
         elif gs_name == 'GFSF':
             return [GFSF_P(js),GFSF_S(js)]
+        #RRFS needs BOTH products: prslev carries the 3D pressure fields and 2dfld the
+        #surface/soil fields, and metgrid wants them together (fg_name COLMET_S,
+        #COLMET_P).  Asking for one alone gets through ungrib and fails in metgrid.
+        elif gs_name == 'RAP':
+            return [RAP(js)]
+        elif gs_name == 'RRFS':
+            return [RRFS_CONUS_P(js),RRFS_CONUS_S(js)]
+        elif gs_name == 'RRFSNA':
+            return [RRFS_NA_P(js),RRFS_NA_S(js)]
         else:
             sat_only = js.get('sat_only',False)
             if not sat_only:
@@ -578,7 +592,21 @@ def ensure_abs_path(path,js,max_char=20):
         js.geo_cache = geo_path
         make_dir(geo_path)
         new_path = osp.join(geo_path,osp.basename(path))
-        symlink_unless_exists(path,new_path)
+        # The cache directory is keyed on job_id alone, so re-running a job against a
+        # different dataset lands on the same path. symlink_unless_exists left the old
+        # link in place, silently feeding geogrid the previous run's data - and a
+        # 3-class FMDA dataset reaching a 4-class namelist initialises FMC_GC to zero
+        # with nothing raised anywhere. Always re-point rather than skipping.
+        if osp.lexists(new_path):
+            if osp.realpath(new_path) != osp.realpath(path):
+                logging.warning('ensure_abs_path - stale cache entry %s pointed at %s, re-pointing to %s'
+                                % (new_path, osp.realpath(new_path), path))
+            if osp.islink(new_path) or osp.isfile(new_path):
+                os.remove(new_path)
+            else:
+                shutil.rmtree(new_path, ignore_errors=True)
+        logging.info('Linking %s -> %s' % (new_path, path))
+        os.symlink(path, new_path)
         return new_path
     else:
         return path
@@ -681,6 +709,7 @@ def fmda_add_to_geogrid(js):
     except:
         logging.error('fmda_add_to_geogrid - cannot open %s' % index_path)
         raise Exception('fmda_add_to_geogrid - failed opening index file {}'.format(index_path))
+    '''
     geo_path = osp.dirname(osp.dirname(fmda_geogrid_path))+'-geo.nc'
     logging.info('fmda_add_to_geogrid - reading longitudes and latitudes from NetCDF file %s' % geo_path )
     with nc4.Dataset(geo_path,'r') as d:
@@ -694,6 +723,7 @@ def fmda_add_to_geogrid(js):
     if i<=1 or j<=1 or i >= lats.shape[0]-2 or j >= lats.shape[1]-2:
         logging.error('fmda_add_to_geogrid - WRF domain center %s %s at %i %i is outside or near FMDA boundary' % (lat,lon,i,j) )
         raise OSError('fmda_add_to_geogrid - {} is not correct geolocated compared to WRF domain'.format(fmda_geogrid_path))
+    '''
     # update geogrid table
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
@@ -741,10 +771,12 @@ def execute(args,job_args):
         make_clean_dir(js.jobdir)
 
     if not _fire_init_plugin:
+        logging.info('fire_init package not loaded')
         if js.use_realtime:
             logging.warning('requested using real-time data, but fire_init package missing')
         js.use_realtime = False
     else:
+        logging.info('fire_init package was loaded')
         if js.use_realtime:
             logging.info('using real-time data requested, ignoring specified ignitions')
             js.fire_init_dir = osp.abspath(osp.join(js.jobdir, 'fire_init'))

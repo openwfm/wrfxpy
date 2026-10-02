@@ -31,6 +31,11 @@ from ingest.NAM196 import NAM196
 from ingest.CFSR import CFSR_P, CFSR_S
 from ingest.GFSA import GFSA
 from ingest.GFSF import GFSF_P, GFSF_S
+from ingest.RAP import RAP
+from ingest.RRFS import (
+    RRFS_CONUS_P, RRFS_CONUS_S,
+    RRFS_NA_P, RRFS_NA_S
+)
 from utils import esmf_to_utc, load_sys_cfg
 
 import logging
@@ -41,7 +46,7 @@ import os.path as osp
 if __name__ == '__main__':
     if len(sys.argv) not in (5, 6):
         print(('Usage: %s <grib_source_name> <esmf_from_utc> <esmf_to_utc> <target_directory> [esmf_cycle_start]' % sys.argv[0]))
-        print('       supported GRIB sources: HRRR, HRRR_AK, NAM, NAM227, NAM196, NAM198, CFSR_P, CFSR_S, NARR, GFSA, GFSF_P, GFSF_S')
+        print('       supported GRIB sources: HRRR, HRRR_AK, NAM, NAM227, NAM196, NAM198, CFSR_P, CFSR_S, NARR, GFSA, GFSF_P, GFSF_S, RAP, RRFS_CONUS_P, RRFS_CONUS_S, RRFS_NA_P, RRFS_NA_S')
         print('       cycle_start pins which forecast cycle is used instead of letting')
         print('       the source pick the most recent one.  Needed for HRRR, whose')
         print('       cycle_hours is 1: without it a caller asking for the 00/06/12/18')
@@ -93,6 +98,18 @@ if __name__ == '__main__':
         grib_src = GFSF_P(js)
     elif grib_src_name == 'GFSF_S':
         grib_src = GFSF_S(js)
+    #named per product here, unlike forecast.py: this script downloads ONE source, so
+    #there is no 'RRFS' that means both halves
+    elif grib_src_name == 'RAP':
+        grib_src = RAP(js)
+    elif grib_src_name == 'RRFS_CONUS_P':
+        grib_src = RRFS_CONUS_P(js)
+    elif grib_src_name == 'RRFS_CONUS_S':
+        grib_src = RRFS_CONUS_S(js)
+    elif grib_src_name == 'RRFS_NA_P':
+        grib_src = RRFS_NA_P(js)
+    elif grib_src_name == 'RRFS_NA_S':
+        grib_src = RRFS_NA_S(js)
     else:
         raise ValueError('Invalid GRIB source %s' % grib_src_name)
 
