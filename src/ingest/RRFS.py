@@ -123,7 +123,13 @@ class RRFS_CONUS(RRFS):
     domain = "conus"
     grid = "3km"
     info_text = "NOAA RRFSv1 CONUS 3-km Forecast"
-    cycle_hours = 3
+    #cycle_hours = 6, not the 3 this class was written with, for the same reason RAP
+    #uses 6 with an offset: RRFS runs a CONUS cycle every 3 hours, but only the
+    #**6-hourly** ones reach f084.  Measured on 2026-10-01: t12z and t18z serve f003,
+    #f018 and f084, while t15z serves f003 and f018 and 404s from f019 on.  With
+    #cycle_hours = 3 every other cycle would have been asked for leads it does not
+    #have.  Drop to 3 only together with grib_forecast_hours_periods hours = 18.
+    cycle_hours = 6
     period_hours = 1
     hours_behind_real_time = 1
     grib_forecast_hours_periods = [{'hours': 84, 'period': 1}]
