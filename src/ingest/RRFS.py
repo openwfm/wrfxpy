@@ -31,7 +31,13 @@ class RRFS(GribForecast):
         prslev + 2dfld follows a similar WRF-oriented split between pressure
         fields and 2D/surface fields.
 
-        This should be validated with:
+        **It works.**  Vtable.RRFS and METGRID.TBL.RRFS are byte-identical copies of
+        the HRRR pair, and on 2026-10-02 metgrid produced PRES, GHT, RH, UU, VV and TT
+        on 46 levels plus the soil fields from 2dfld, and real.exe accepted the result.
+        What that does NOT establish is that the fields are physically right -- only a
+        comparison against the HRRR or NAM run of the same fire shows that.
+
+        Originally validated with:
             strings COLMET_P:YYYY-MM-DD_HH | grep -Ei "TT|UU|VV|RH|HGT"
             strings COLMET_S:YYYY-MM-DD_HH | grep -Ei "SOILT|SOILM|PSFC|SKINTEMP"
             ncdump -h met_em.d01.YYYY-MM-DD_HH:00:00.nc | grep -E "NUM_METGRID|BOTTOM-TOP"
@@ -46,8 +52,11 @@ class RRFS(GribForecast):
         """
         Returns namelist.input keys for RRFS.
 
-        The values below assume HRRR-like pressure-level output and 9 soil levels.
-        Confirm from met_em files after the first successful metgrid run.
+        **Confirmed** for RRFS CONUS on 2026-10-02: metgrid run on the PIUTE fire wrote
+        `num_metgrid_levels = 46` and `NUM_METGRID_SOIL_LEVELS = 9` into met_em and
+        real.exe accepted them, so the values below are measured rather than assumed.
+        Not yet confirmed for the NA, AK, HI and PR domains, which have their own
+        vertical structures.
         """
         return {
             'domains': {

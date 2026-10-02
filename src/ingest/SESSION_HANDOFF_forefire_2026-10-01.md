@@ -329,6 +329,83 @@ single RAP file end to end through `retrieve_gribs.sh` to prove the plumbing **b
 anything touches WPS**. Vtable validation is a separate and slower job needing a real
 ungrib/metgrid run.
 
+## 5l. RAP and RRFS ported, and verified through real.exe (2026-10-02)
+
+Per JH, brought across from `origin/release` into `james_ngfs` as a **port, not a merge**
+-- merge base 2023-10-09, 97 files, ~19 conflicts for two modules. Commits `f018aab`,
+`c0918e0`, `aa0358c`, `713bb66`, `f7e4221`.
+
+### What is in
+
+| source | job name | products | grid |
+|---|---|---|---|
+| RAP | `RAP` | wrfprs | 13 km CONUS/NA |
+| RRFS CONUS | `RRFS` | prslev + 2dfld | 3 km |
+| RRFS NA | `RRFSNA` | prslev + 2dfld | 13 km |
+| RRFS Alaska | `RRFSAK` | prslev + 2dfld | 3 km |
+| RRFS Hawaii | `RRFSHI` | prslev + 2dfld | 2.5 km |
+| RRFS Puerto Rico | `RRFSPR` | prslev + 2dfld | 2.5 km |
+
+`_P` and `_S` are **halves of one input**, not alternatives: metgrid's `fg_name` lists
+both, so fetching only `_P` passes ungrib and fails in metgrid. AK was added because
+`HRRR_AK` was the only other Alaska source; PR because those fires currently run off
+GFS and 2.5 km convection-allowing output should beat it.
+
+### Three defects found, all the same defect
+
+Every one was a cycle paired with a lead that cycle does not serve, and each would have
+404'd silently on most cycles:
+
+| | written as | measured | fixed to |
+|---|---|---|---|
+| RAP | `cycle_hours=1`, 51 h | only 03/09/15/21 reach f51; standard cycles stop at f21 | `cycle_hours=6`, `cycle_offset=3` |
+| RRFS CONUS | `cycle_hours=3`, 84 h | only 00/06/12/18 reach f084; t15z stops at f018 | `cycle_hours=6` |
+| RRFS AK/HI/PR | -- | same rule, checked per domain before writing the classes | `cycle_hours=6` |
+
+The first fix was itself wrong and a live run caught it: `cycle_hours=6` selects
+multiples of 6, i.e. **00/06/12/18** -- precisely RAP's non-extended cycles. The
+selector had no way to express a cycle grid that is offset from midnight, so
+`grib_forecast.py` gained **`cycle_offset`** (default 0, every existing source
+untouched) and subtracts a timedelta rather than replacing `.hour`, so 01z rolls back
+to the previous day's 21z instead of going negative.
+
+### The one that actually blocked JH
+
+`forecast.py` carries a **second** list of grib sources at job validation (line ~1495),
+separate from `resolve_grib_source`. Every source above was fully implemented and still
+rejected before it could run. I had grepped for `available_grib_sources` -- the name it
+has on the release branch -- found nothing, and concluded no such list existed. It is
+now a named `valid_grib_sources` that the error message formats from, cross-checked to
+carry the same 17 entries as the dispatch.
+
+### Verified end to end on the PIUTE fire
+
+Run in `/data/jhaley/new_wrfxpy/wrfxpy`, which shares this tree through
+`/home/jhaley/work -> /data/jhaley`, so its `forecast.py` and `retrieve_gribs.py`
+symlinks already resolved here. Both variants reached `wrf.exe`:
+
+| | ungrib -> metgrid | levels declared | **levels in met_em** | real.exe |
+|---|---|---|---|---|
+| RRFS | 07:22 -> 07:49 | 46 | **46** | pass, wrfinput 116.4 MB |
+| RAP | 08:15 -> 08:37 | 41 | **41** | pass, wrfinput 116.4 MB |
+
+**So the HRRR-copied vtables work for both**, which was the port's stated risk, and
+both level counts were right -- `RAP.py`'s docstring claiming 38 was the thing that was
+wrong, now corrected. RAP reaches WRF in 23 minutes against RRFS's 41, being one
+product per lead rather than two.
+
+**What this does NOT establish** is that the fields are physically sensible. A wrong
+vtable entry can map a plausible-looking field to the wrong variable and still satisfy
+metgrid and real. Only comparing the WRF output against the HRRR or NAM run of the same
+fire shows that, which is what the PIUTE variants are staged for.
+
+### Two notes for whoever runs these next
+
+- **Volume.** RAP ~230 MB per lead; RRFS CONUS ~900 MB for both products, so an 84 h
+  cycle is ~75 GB. Hawaii and Puerto Rico are ~30 MB per lead -- the domains are tiny.
+- **The staged RRFS job had the RAP `grid_code`**, so both variants would have written
+  to one workspace. Worth checking when cloning a job to change only `grib_source`.
+
 ## 6. What today added to the open list
 
 The full list stays in `SESSION_HANDOFF_forefire_2026-09-29.md` §6 and §7, which this

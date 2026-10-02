@@ -25,8 +25,12 @@ class RAP(GribForecast):
         """
         Returns the namelist keys that must be modified in namelist.input with RAP.
 
-        RAP wrfprs is a pressure-level WRF-oriented product with 38 metgrid levels and
-        9 soil levels.
+        RAP wrfprs is a pressure-level WRF-oriented product with **41** metgrid levels
+        and 9 soil levels.  This docstring said 38 while the code returned 41, and the
+        code was right: metgrid run on RAP for the PIUTE fire (2026-10-02) wrote
+        `num_metgrid_levels = 41` and `NUM_METGRID_SOIL_LEVELS = 9` into met_em, and
+        real.exe accepted the pair.  A wrong value here does not fail in ingest or in
+        metgrid -- it fails in real.exe, which is why it went unnoticed.
         """
         return {'domains': {'num_metgrid_levels': 41, 'num_metgrid_soil_levels': 9}}
 
