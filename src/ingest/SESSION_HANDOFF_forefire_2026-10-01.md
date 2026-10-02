@@ -536,6 +536,41 @@ batch pSAF 0.337 was fitted on, which is dominated by flat, continuous prescribe
 in the southeast. It is a good diagnostic case and a bad calibration case -- the same
 judgement §5f recorded for Pulaski, for a different reason.
 
+### `ff_domain_connectivity.py` confirms it, and PIUTE is at the ceiling
+
+Run against all 391 retained domains, and against the RAP/RRFS pair separately.
+
+| | PIUTE | min | 10th | median | 90th | max |
+|---|---|---|---|---|---|---|
+| burnable | **62.4%** | 0.347 | 0.880 | 0.982 | 0.998 | 1.000 |
+| reach | **79.8%** | 0.000 | 0.787 | 0.999 | 1.000 | 1.000 |
+| fragility | **1.00** | 0.008 | 0.015 | 0.053 | 0.350 | **1.000** |
+
+**Fragility 1.00 is the maximum the measure can take**: eroding the burnable mask by two
+cells collapses the reachable area completely, against a batch median of 0.053. PIUTE is
+not in the tail, it is at the ceiling, and it trips all three tests when only 73 of 391
+domains trip any. RAP and RRFS give 62.9% / 81.3% / 1.00, identical as expected on a
+shared fuel map.
+
+That is the mechanism. Where removing two cells of fuel severs the domain, spread is
+decided by whether the front threads a neck rather than how fast it travels along one --
+exactly where front tracking at `perimeterResolution 25` and a level set on identical
+cells diverge -- and it explains the reordering across drivers, since a small
+wind-direction change decides **which** necks open.
+
+**Independent corroboration from LAC-352011.** It is flagged too, at 56.4% burnable,
+**0.6% reach**, fragility 1.00 -- almost none of its burnable ground connects to the
+ignition. That is the fire whose `fwd/cron` ratio of 0.21 survived the `track()` fix at
+0.23 and which JH identified as odd terrain with ponds near Edwards AFB. Three
+independent routes -- JH's read of the terrain, the area outlier, and this measure --
+reach the same conclusion without reference to each other.
+
+**This sharpens the per-fire pSAF item** (09-24 handoff §9 item 2). **73 of 391 domains
+should be excluded from any rate calibration**, because their area response to a
+parameter change is binary rather than proportional: the answer is "did it get through
+the gap", and no exponent absorbs that. Fitting on them adds noise that looks like
+unexplained variance.
+
 ## 6. What today added to the open list
 
 The full list stays in `SESSION_HANDOFF_forefire_2026-09-29.md` §6 and §7, which this
@@ -561,9 +596,27 @@ file does not duplicate. Today added three items to it:
    NA, AK, HI and PR domains, which have their own vertical structures and have only
    been checked as far as filename and cycle correctness.
 
-4. **Run `ff_domain_connectivity.py` on PIUTE** (§5l). A domain 37% blocked by granite
-   is the strongest connectivity case seen so far, and the tool has been open since
-   09-28 without a fire that clearly justified it.
+4. ~~**Run `ff_domain_connectivity.py` on PIUTE**~~ **DONE (§5l).** Flagged on all three
+   measures, fragility at the ceiling.
+5. **Exclude the 73 connectivity-flagged domains before any per-fire pSAF fit**
+   (§5l, 09-24 handoff §9 item 2). Their area response to a parameter change is binary,
+   not proportional, so they add noise a rate exponent cannot absorb. This is now a
+   precondition for that fit rather than a caveat on it.
+
+## 7. NEXT SESSION
+
+**Try the RRFS_NA forecast of PIUTE.** Per JH. The CONUS 3 km run is done (§5l); `RRFSNA`
+is the 13 km North America product, so it tests the one RRFS domain whose vertical
+structure has not been through metgrid -- `num_metgrid_levels` is still the module's
+guess for NA, as it is for AK, HI and PR, and a wrong value fails in `real.exe` rather
+than in ingest. It also gives a resolution pair on an identical fire: 3 km against 13 km
+with everything else held, which is the cleanest read available on how much the extra
+resolution is worth. Note `RRFS_NA` runs `period_hours = 3` while the bucket carries
+hourly files, so its boundary updates are 3-hourly by choice, not by availability.
+
+The job is `jobs/PIUTE_..._RRFS.json` in `/data/jhaley/new_wrfxpy/wrfxpy` with
+`grib_source` changed to `RRFSNA` -- and **change `grid_code` too**, or it overwrites the
+CONUS workspace, which is the trap the staged RRFS job already fell into once.
 
 Still open from 09-29 and untouched today: scoring the ensemble members rather than
 only the chained track, isolating the mesh at 50 m with analysis moisture, the roads
