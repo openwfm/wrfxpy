@@ -1,16 +1,18 @@
 import sys
 sys.path.insert(0, "src")
 import os.path as osp
+import os
 from ml_fmda.utils import read_yml, Dict
 from ml_fmda.moisture_rnn import TimeWarpedFuelClassPredictors
 import json
 from fmda.fuel_moisture_rnn import RNNMoistureModel
+from geo.write_geogrid import read_geogrid
 import pandas as pd
 import joblib
 import numpy as np
 
 test_path = "wksp/test_rnn_output"
-
+os.makedirs(test_path, exist_ok=True)
 rnn_cfg = Dict(json.load(open("etc/rnn_cycler.json")))
 
 params = Dict(read_yml(osp.join(rnn_cfg.rnn_model_path, "params.yaml")))
@@ -45,6 +47,18 @@ rnn.get_states()
 
 # Predict, then get states, should still be None since not set with vanilla predict
 ny = nx = 10
+index = {
+        "projection": "lambert",
+        "dx" : 3000.0,
+        "dy" : -3000.0,
+        "truelat1" : 38.5,
+        "truelat2" : 38.5,
+        "stdlon" : 262.5,
+        "radius" : 6370000.0
+    }
+lats = np.linspace(38.5, 38.5 - 0.27 * (ny - 1), ny)[:, None] * np.ones((1, nx))
+lons = np.ones((ny, 1)) * np.linspace(262.5, 262.5 + 0.35 * (nx - 1), nx)[None, :]
+
 X = np.zeros((ny*nx, 24, len(params.features_list)))
 p0 = rnn0.predict(X)
 p1 = rnn.predict(X)
@@ -67,13 +81,15 @@ rnn_states_grid = rnn.states_to_grid((ny, nx))
 # writing out with one time slice, then reading
 pred_slice = preds_grid[:,:,0,:].squeeze()
 rnn.to_netcdf(
-    path=f"{test_path}.nc",
+    path=osp.join(test_path, "test_rnn_output.nc"),
     preds=pred_slice,
     grid_shape=(ny, nx),
     data_vars=None
 )
 
-rnn2 = RNNMoistureModel.from_netcdf(f"{test_path}.nc", fm10_weights_path) 
+rnn2 = RNNMoistureModel.from_netcdf(
+        osp.join(test_path, "test_rnn_output.nc"),
+        fm10_weights_path) 
 
 states1 = rnn.get_states()
 states2 = rnn2.get_states()
@@ -93,23 +109,20 @@ np.testing.assert_allclose(p1, p2, rtol=1e-6, atol=1e-6)
 # created var_wisdom for RNN_STATES, TODO: confirm nearest_neighbors alone is ok
 # Read geogrids back and check for approximate equality
 
-index = {
-        "projection": "lambert",
-        "dx" : 3000.0,
-        "dy" : -3000.0,
-        "truelat1" : 38.5,
-        "truelat2" : 38.5,
-        "stdlon" : 262.5,
-        "radius" : 6370000.0
-    }
 rnn.to_geogrid(
     preds = pred_slice,
-    path = f"{test_path}.geo",
-    index = index
+    path = osp.join(test_path, "test_rnn_output.geo"),
+    index = index,
+    lats=lats,
+    lons=lons,
         )
 
-geo_fmc = read_geogrid(osp.join(f"{test_path}.geo", "FMC_GC"))
-geo_rnn = read_geogrid(osp.join(f"{test_path}.geo", "RNN_STATES"))
+geo_fmc = read_geogrid(
+        osp.join(test_path, f"test_rnn_output.geo", "FMC_GC")
+        )
+geo_rnn = read_geogrid(
+        osp.join(test_path, f"test_rnn_output.geo", "RNN_STATES")
+        )
 
 np.testing.assert_allclose(geo_fmc[0][..., :4],pred_slice)
 
@@ -117,5 +130,21 @@ rnn_states = rnn.states_to_grid((ny, nx))
 ny, nx, k, n_rnn_vars, nunits = rnn_states.shape
 rnn_states = rnn_states.reshape(ny, nx, k * n_rnn_vars * nunits)
 
-# Check RNN states are close
 np.testing.assert_allclose(geo_rnn[0], rnn_states, rtol=1e-6, atol=geo_rnn[1]["scale_factor"] / 2)
+
+
+# Test WPS format
+
+rnn.to_wps_format(
+    preds=pred_slice,
+    path=test_path,
+    index=index, 
+    lats=lats, 
+    lons=lons, 
+    time_tag="00:00",
+)
+
+
+
+
+

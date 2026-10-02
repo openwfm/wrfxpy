@@ -172,10 +172,17 @@ class RNNMoistureModel(TimeWarpedFuelClassPredictors):
         write_geogrid_var(path,'RNN_STATES',RNN_STATES,index,bits=32)
 
 
-    def _make_rnn_state_labels():
+    def _make_rnn_state_labels(self, k, n_rnn_vars, n_units):
 
         """
         Given internal recurrent state, create list of field names for use within params in to_wps_format
+
+        Input dimensions are partially validated against internal model architecture
+
+        :param k: Number of fuel classes represented in the recurrent state.
+        :param n_rnn_vars: Number of recurrent state variables per LSTM (hidden, cell).
+        :param n_units: Number of units in the LSTM recurrent layer.
+
 
         Returns: list with naming convention, (N units)
 
@@ -187,10 +194,14 @@ class RNNMoistureModel(TimeWarpedFuelClassPredictors):
         TODO: decide on count from 0 or from 1, fortran vs python
         """
 
-        states = self.get_states()
-        
+        # Get number of fuel classes, double check it matches
+        if k != len(self.FUEL_CLASSES):
+            raise ValueError(
+                f"State fuel classes ({k}) do not match model fuel classes "
+                f"({len(self.FUEL_CLASSES)})."
+            )
+
         # Get number of units, double check it makes sense
-        n_units = states.size // (len(self.FUEL_CLASSES) * 2)
         lstm_idx = self.params["hidden_layers"].index("lstm")
         lstm_units = self.params["hidden_units"][lstm_idx]
         if n_units != lstm_units:
@@ -204,7 +215,7 @@ class RNNMoistureModel(TimeWarpedFuelClassPredictors):
         ]
         return labels        
 
-    def _make_rnn_state_descriptions():
+    def _make_rnn_descriptions(self, k, n_rnn_vars, n_units):
 
         """
         Given internal recurrent state, create list of descriptive names for use
@@ -213,62 +224,67 @@ class RNNMoistureModel(TimeWarpedFuelClassPredictors):
         Returns descriptions ordered by fuel class, state type, then unit.
 
         """
-
-        states = self.get_states()
-        n_units = states.size // (len(self.FUEL_CLASSES) * 2)
-
-        lstm_idx = self.params["hidden_layers"].index("lstm")
-        lstm_units = self.params["hidden_units"][lstm_idx]
-        if n_units != lstm_units:
-            raise ValueError(
-                f"State units ({n_units}) do not match LSTM units ({lstm_units})."
-            )
-
-        return [
+        descrs= [
             f"{fuel_class.upper()} Fuel Moisture {state_name} State, Unit {unit}"
             for fuel_class in self.FUEL_CLASSES
             for state_name in ("Hidden", "Cell")
             for unit in range(1, n_units + 1)
         ]
 
+        return descrs
+
     def to_wps_format(self, preds, path, index, lats, lons, time_tag):
         """
-        Store model to wps format files
+        Store RNN to wps format files
         """
         test_latslons=True
-
         logging.info("fmda.rnn_moisture_model.to_wps_format path=%s lats %s lons %s" % (path, inq(lats), inq(lons)))
         logging.info("fmda.rnn_moisture_model.to_wps_format: index="+str(index))
         ny, nx, n = preds.shape
-
-        rnn_states = states_to_grid(grid_shape=(ny, nx)) 
-
-        m = n + 2 + len(states)
+        
+        # Write recurrent states, flatten to (ny, nx, k*n_rnn_vars*n_units)
+        rnn_states = self.states_to_grid(grid_shape=(ny, nx))
+        rny, rnx, k, n_rnn_vars, n_units = rnn_states.shape
+        assert (rny, rnx) == (ny, nx)
+        n_states = k * n_rnn_vars * n_units # number of RNN recurrent state variables per grid cell
+        rnn_states = rnn_states.reshape(ny, nx, n_states)
+        
+        m = n + 2 + n_states 
         var = np.zeros((ny, nx, m))
         var[:,:,:n] = preds
         var[:,:,n] = lons
         var[:,:,n+1] = lats
-        #var[:,:,-len(states)] = states
-        #var[:,:,n:] = self.m_ext[:,:,n-2:]
+        var[:,:,-n_states:] = rnn_states
         arrs = [var[:,:,k].swapaxes(0,1) for k in range(m)]
         startloc = "SWCORNER"
         startlat = lats[0,0]
         startlon = lons[0,0]
-        fm_fields = ["{}H".format(10**i) for i in range(n-2)]
-        fm_descrs = ["{}h Fuel Moisture Content".format(10**i) for i in range(n-2)]
+        
+        # Define Parameters per array variable
+        fm_fields = ["{}H".format(10**i) for i in range(n)]
+        fm_descrs = ["{}h Fuel Moisture Content".format(10**i) for i in range(n)]
+        fm_units  = ["1" for _ in range(n)]
+        
+        coord_fields = ["FMXLON", "FMXLAT"]
+        coord_descrs = ["Longitude for testing", "Latitude for testing"]
+        coord_units  = ["degrees", "degrees"]
+        
+        r_fields   = self._make_rnn_state_labels(k, n_rnn_vars, n_units)
+        r_descrs   = self._make_rnn_descriptions(k, n_rnn_vars, n_units)
+        r_units    = ["1" for _ in range(n_states)]
+        
         params = {
             'ifv': 5, 'hdate': "{}:00:00".format(time_tag), 'xfcst': 0.,
             'map_source': "WRF-SFIRE Wildland Fire Information and Forecasting System",
-            'field': fm_fields + ["FMXLON", "FMXLAT", "FMEP0", "FMEP1"],
-            'units': ["1" for _ in range(n-2)] + ["degrees", "degrees", "1", "1"],
-            'desc': fm_descrs + ["Longitude for testing", "Latitude for testing",
-                    "Drying/Wetting Equilibrium Adjustment", "Rain Equilibrium Adjustment"],
+            'field': fm_fields + coord_fields + r_fields,
+            'units': fm_units + coord_units + r_units,
+            'desc': fm_descrs + coord_descrs + r_descrs,
             'xlvl': 200100., 'nx': nx, 'ny': ny, 'iproj': 3, 'startloc': startloc,
             'startlat': startlat, 'startlon': startlon, 'dx': index['dx'], 'dy': index['dy'],
             'xlonc': index['stdlon'], 'truelat1': index['truelat1'], 'truelat2': index['truelat2'],
             'earth_radius': index['radius'], 'is_wind_earth_rel': 0, 'slab': arrs
         }
-        WPSFormat.from_params(**params).to_file(osp.join(path,'FMDA:{}'.format(time_tag)))
+        WPSFormat.from_params(**params).to_file(osp.join(path,'RNN:{}'.format(time_tag)))
 
 
     @classmethod
