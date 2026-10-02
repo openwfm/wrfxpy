@@ -406,6 +406,62 @@ fire shows that, which is what the PIUTE variants are staged for.
 - **The staged RRFS job had the RAP `grid_code`**, so both variants would have written
   to one workspace. Worth checking when cloning a job to change only `grib_source`.
 
+### The physical check: RAWS says NAM was wrong and the new sources are right
+
+Passing `real.exe` showed only that the vtables are structurally sound. The open worry
+was that a mis-mapped field could look plausible and still satisfy metgrid and real.
+The PIUTE runs answer it.
+
+**Burned area**, same fire, same 26 h window, TIGN_G:
+
+| | final ha | vs NAM |
+|---|---|---|
+| NAM | 62.9 | -- |
+| RAP | 82.8 | **+32%** |
+| RRFS | 82.2 | **+31%** |
+
+RAP and RRFS land **within 0.7% of each other** on different native grids (13 km vs
+3 km) with different file structures, which already argues against a field being
+mis-read.
+
+**Why**, from the near-surface fields: NAM is far wetter. Checked against the 14 RAWS
+within 40 miles and 1000 m of the fire's ~2300 m elevation (Synoptic, network 2):
+
+| valid UTC | local | RAWS | NAM | RAP | RRFS |
+|---|---|---|---|---|---|
+| 10-02 00:00 | 17:00 | 18% | 42% (+24) | 23% (+6) | 27% (+10) |
+| 10-02 03:00 | 20:00 | 26% | 53% (+28) | 30% (+4) | 36% (+10) |
+| 10-02 06:00 | 23:00 | 28% | 58% (+30) | 24% (-4) | 34% (+7) |
+| 10-02 09:00 | 02:00 | 28% | 61% (+32) | 23% (-6) | 32% (+3) |
+| 10-02 12:00 | 05:00 | 26% | 61% (+36) | 30% (+4) | 34% (+9) |
+| 10-02 15:00 | 08:00 | 24% | 52% (+28) | 30% (+6) | 30% (+6) |
+
+| | mean bias | RMSE |
+|---|---|---|
+| NAM | **+29.6 pts** | 29.9 |
+| RAP | **+1.8 pts** | 5.1 |
+| RRFS | +7.5 pts | 7.9 |
+
+**NAM sits outside the entire station spread at every hour** -- above the wettest of the
+14, not merely above the median -- holding RH near 60% overnight in the Sierra in
+October while every nearby gauge read 20-28%. RAP is effectively unbiased; RRFS is
+modestly wet.
+
+**So the 32% larger fire is in the direction the observations support**, and a
+mis-mapped humidity field would not land within 2 points of 14 independent gauges. If
+anything a 30-point RH error should cost more than 32% in area, so the burned-area gap
+probably *understates* how much NAM was damping this fire.
+
+Three limits worth keeping with the result:
+
+- RAP and RRFS share the same HRRR-derived vtable, so this validates **that vtable**,
+  not each source independently.
+- The 14 stations span 40 miles and 1500 m of elevation; the median carries real spatial
+  uncertainty, though NAM's error is far outside it.
+- The fire is PDT and these runs were scored the morning of 10-02, so the observations
+  cover **10-01 afternoon through 10-02 morning**. The local afternoon of 10-02 was not
+  yet observed; `10-02 00:00Z` is the one true afternoon point.
+
 ## 6. What today added to the open list
 
 The full list stays in `SESSION_HANDOFF_forefire_2026-09-29.md` §6 and §7, which this
@@ -424,7 +480,12 @@ file does not duplicate. Today added three items to it:
    WRF-SFIRE's final area 13 h early while tracing what JH reports is nearly its final
    outline. That is a rate error on an agreed path, and the current metric cannot
    distinguish it from a fire spreading the wrong way.
-3. **The RAP/RRFS decision** (§5k), pending JH's discussion with others.
+3. ~~**The RAP/RRFS decision**~~ -- **ported and validated** (§5l). What remains:
+   re-check against the 10-02 **local afternoon** RAWS once those observations land,
+   since the runs were scored before that window; chase RRFS's **+7.5 point wet bias**,
+   which is small but one-signed across all six hours; and validate the vtables for the
+   NA, AK, HI and PR domains, which have their own vertical structures and have only
+   been checked as far as filename and cycle correctness.
 
 Still open from 09-29 and untouched today: scoring the ensemble members rather than
 only the chained track, isolating the mesh at 50 m with analysis moisture, the roads
