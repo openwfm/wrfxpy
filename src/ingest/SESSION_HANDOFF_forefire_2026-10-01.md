@@ -462,6 +462,80 @@ Three limits worth keeping with the result:
   cover **10-01 afternoon through 10-02 morning**. The local afternoon of 10-02 was not
   yet observed; `10-02 00:00Z` is the one true afternoon point.
 
+### ForeFire on the same three runs: an exceptional fire, and not for the reason expected
+
+With three WRF-SFIRE runs of one fire differing only in driving weather, ForeFire was
+run on each by the analysis path (`run_forecasts`, chained to each run's own wrfout
+winds, pSAF 0.337). NAM's was already on disk from the 10-02 cron, so only RAP and RRFS
+needed running. All three are clean -- 50 perimeters each, **zero shrink events**, which
+is also the first independent exercise of §5j's monotonicity guard on fresh output.
+
+| source | ForeFire ha | WRF-SFIRE ha | ratio |
+|---|---|---|---|
+| NAM | 183.9 | 62.9 | **2.92** |
+| RAP | 167.6 | 82.8 | **2.02** |
+| RRFS | 290.5 | 82.2 | **3.53** |
+
+For scale, the 25-fire cron batch the same morning had a geometric mean of 1.54 and a
+max of 4.55, so PIUTE sits at the top of the range under every driver.
+
+**ForeFire does not amplify the driver spread -- it reorders it.**
+
+| | NAM | RAP | RRFS |
+|---|---|---|---|
+| WRF-SFIRE | 62.9 | 82.8 (**+32%**) | 82.2 (**+31%**) |
+| ForeFire | 183.9 | 167.6 (**-9%**) | 290.5 (**+58%**) |
+
+In WRF-SFIRE, RAP and RRFS agree to within 1% and both beat NAM by about a third. Given
+the same three winds, ForeFire puts NAM in the middle and splits RAP and RRFS by 73
+points. **An earlier reading of this as "ForeFire roughly doubles the sensitivity to the
+driver" was made on the first two points and is wrong**; the third removes the pattern.
+
+### It is not the fuel map, which is what JH's granite observation predicted testing
+
+Per JH, PIUTE "mainly burns in forested areas surrounded by granite" -- an exceptional
+case. If ForeFire were spreading across rock that WRF-SFIRE respects, that alone would
+explain everything. It is not:
+
+| | non-burnable (cat 14) | cat 5 | cat 8 | cat 10 |
+|---|---|---|---|---|
+| ForeFire | **37.07%** | 26.24% | 22.39% | 11.93% |
+| WRF-SFIRE | **37.26%** | 25.59% | 22.78% | 12.14% |
+
+The same map to within 0.2 points. **37% of the domain is bare rock in both models**, so
+ForeFire is over-spreading *within* the forest pockets rather than crossing the granite.
+That also weakens the terrain explanation, since both see identical elevation and fuel
+on the same 25 m mesh -- for the record the fire mesh is far steeper than d01 suggests
+(mean slope 16.4°, 90th percentile 30.7°, 32% of cells over 20°, against 5.1° mean at
+1 km), but WRF-SFIRE integrates that same terrain.
+
+Moisture is ruled out too, and points the wrong way as it did in §5h and §5j: FMDA gave
+ForeFire 1-h 0.020-0.059 while WRF-SFIRE's own `FMC_GC` ran 0.006-0.049, mean 0.030.
+**WRF-SFIRE burns a third as much on drier fine fuel.**
+
+### What is left is connectivity
+
+With 37% of the domain blocked in scattered granite, the burnable ground is a maze of
+narrow necks, and spread becomes a question of whether the front threads a gap -- which
+is exactly where `perimeterResolution 25` and ForeFire's front tracking differ most from
+WRF-SFIRE's level set on identical cells. One neck taken that should not be compounds
+for the rest of the run. It also explains the volatility across drivers: with a third of
+the domain blocked, small wind-direction differences decide **which** necks open, so
+±1 m/s reorders the outcome instead of scaling it. `ff_domain_connectivity.py` has been
+open since 09-28 for this, and PIUTE is the case that justifies running it.
+
+**At 8 hours the spread is much tighter** -- 2.93 / 2.19 / 2.07, a range of 0.86 against
+1.51 at the endpoint -- so the low-latency product is less exposed to this than the
+full-duration one.
+
+### Scope limit, per JH
+
+**PIUTE is exceptional and must not be allowed to pull a recalibration.** 37%
+non-burnable with the burnable fraction in disconnected pockets is nothing like the
+batch pSAF 0.337 was fitted on, which is dominated by flat, continuous prescribed burns
+in the southeast. It is a good diagnostic case and a bad calibration case -- the same
+judgement §5f recorded for Pulaski, for a different reason.
+
 ## 6. What today added to the open list
 
 The full list stays in `SESSION_HANDOFF_forefire_2026-09-29.md` §6 and §7, which this
@@ -486,6 +560,10 @@ file does not duplicate. Today added three items to it:
    which is small but one-signed across all six hours; and validate the vtables for the
    NA, AK, HI and PR domains, which have their own vertical structures and have only
    been checked as far as filename and cycle correctness.
+
+4. **Run `ff_domain_connectivity.py` on PIUTE** (§5l). A domain 37% blocked by granite
+   is the strongest connectivity case seen so far, and the tool has been open since
+   09-28 without a fire that clearly justified it.
 
 Still open from 09-29 and untouched today: scoring the ensemble members rather than
 only the chained track, isolating the mesh at 50 m with analysis moisture, the roads
