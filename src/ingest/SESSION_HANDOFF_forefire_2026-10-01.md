@@ -158,7 +158,44 @@ On SAN_FRANCISCO_2's cron run a second ring opens at 09-30 17:30:
 **Under by 12.3x.** A fire cannot shrink, so the track was physically impossible from
 step 19 on, and nothing checked that.
 
-### Not every nested ring is an island
+### A second front read as a hole (2026-10-02, per JH)
+
+JH found two contours at steps 27 and 28 of Hatch_Grande in both the cron and forward
+kml, "almost like a second front was ignited partially within the first", and asked
+whether subtracting fronts inside the outer perimeter explained the shrink. It did.
+
+| step | rings | |
+|---|---|---|
+| 26 | 3 | 1493.3 BURNING, 5.95 + 3.56 islands inside |
+| 27 | 5 | **1601.1 BURNING** (grew), **147.7 "island"** overlapping the outer ring, 57.5 BURNING, 5.95 + 2.03 islands |
+
+The outer ring grew by 108 ha and the measured area **fell** 1483.8 -> 1457.8, because
+the second front's 147.7 ha boundary was differenced out. It cannot be a hole: most of
+that ground was already enclosed at step 26, and **burned ground does not become
+unburned**.
+
+### The discriminator is containment, not area
+
+A hole lies entirely inside the ring it punctures. `read_ff_geojson` decides containment
+from a representative point, so a ring that merely overlaps is taken for a hole.
+Measured on both artefacts and the genuine islands beside them:
+
+| ring | % of its area outside the burn |
+|---|---|
+| genuine islands (5.95, 5.39, 2.03 ha) | **0.000** |
+| Hatch second front (147.7 ha) | 8.37 |
+| SAN_FRANCISCO thin band (1607.4 ha) | 8.24 |
+
+So a nested ring is differenced out only when enclosed, and unioned in otherwise. **This
+replaced the area-ratio threshold below**, which caught the thin-band case and not the
+second-front case; containment is an invariant rather than a tuned constant and covers
+both. Shrink events across 63 runs fell from 2 to 1, and the survivor
+(Lauderdale, -1.41%) carries no ring artefact and is the restart re-mesh loss the
+warning threshold exists for. Final areas move where the artefact was:
+SAN_FRANCISCO_2 cron 1621.8 -> 1754.3 ha, Hatch_Grande cron 1387.5 -> 1488.8. The
+forward batch's scored times precede both artefacts, so §5i is unchanged again.
+
+### Superseded: the area-ratio threshold
 
 The naive repair -- difference the islands out -- is also wrong, and gave 146.9 ha. Over
 all 822 step perimeters of this batch the ratio of the largest nested ring to its

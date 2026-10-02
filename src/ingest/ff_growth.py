@@ -40,60 +40,67 @@ from shapely.ops import unary_union
 from ff_score_perim import _to_utm, _utm_proj, _valid_at
 
 
-def _perimeter(path, dup_frac=0.5):
+def _perimeter(path, out_tol=0.01):
     """One step's burned area as a geometry, with ForeFire's rings read correctly.
 
     `shape()` on the raw geometry is WRONG and silently so.  ForeFire's
     dumpMode=geojson packs every separate front as a RING of one polygon, and the
-    GeoJSON convention makes ring 0 the shell and the rest holes -- so a second ring is
-    SUBTRACTED from the first.  The step where one appears reads as a sudden shrink,
-    and every step after it is wrong too.  On the cron run of SAN_FRANCISCO_2 the track
-    read 64.2 ha, then 36.3, and ended at 132.4 against a true 1621.8.  Ten of the
-    other twelve runs in that batch were unaffected, which is what makes it dangerous:
-    it does not look like a bug, it looks like a fire that did not spread.
+    GeoJSON convention makes ring 0 the shell and the rest holes -- so a second front
+    is SUBTRACTED from the first.  The step where one appears reads as a sudden shrink
+    and every step after it is wrong too: the cron run of SAN_FRANCISCO_2 read 64.2 ha,
+    then 36.3, and ended at 132.4 against a true 1621.8.
 
     `forefire.read_ff_geojson` classifies rings by nesting depth under the even-odd
     rule -- even is burning, odd is an unburned island.  That is right for the KML and
-    not quite enough for an area, because **not every nested ring is an island**.  Over
-    all 822 step perimeters of the 2026-10-01 batch the ratio of the largest nested
-    ring to its container is sharply bimodal, with nothing in between:
+    not enough for an area, because **not every nested ring is a hole**.  It decides
+    containment from a representative point, so a ring that merely overlaps the
+    perimeter is taken for a hole inside it.  Two different artefacts land in that trap:
 
-        no nested ring                720
-        ratio < 0.2  (real islands)    70
-        ratio 0.2-0.8                   0
-        ratio > 0.8  (duplicates)      32
+      - a front dumped as a thin band, where the inner edge reads as an island nearly
+        as large as the burn (1621.8 against 1607.4 ha on SAN_FRANCISCO_2, a mean width
+        of 7.25 m on a 25 m mesh);
+      - a **second front ignited partly within the first**, whose boundary reads as a
+        hole.  Hatch_Grande step 27 grew its outer ring from 1493.3 to 1601.1 ha and
+        gained a 147.7 ha "island", so the measured area FELL from 1483.8 to 1457.8.
+        Most of that 147.7 ha was ground the perimeter already enclosed one step
+        earlier, and burned ground does not become unburned.
 
-    The high group is a front dumped as a thin band rather than a filled region -- on
-    SAN_FRANCISCO_2's last step the two rings are 1621.8 and 1607.4 ha, a mean width of
-    7.25 m against a 25 m fire mesh, so the "island" cannot be unburned ground.
-    Subtracting it gives an area that falls while the fire grows; keeping it gives a
-    monotone track that matches what the kml draws and what JH read off it.
+    The discriminator is geometric: **a hole lies entirely inside the ring it
+    punctures.**  Measured on both artefacts and on the genuine islands beside them,
+    real holes sit at 0.000% of their area outside the burn while both artefacts poke
+    out by over 8%.  So a nested ring is differenced out only when it is enclosed, and
+    unioned in otherwise.  `out_tol` is slack for reprojection slivers, far below the
+    8% the artefacts show.
 
-    So islands are differenced out only below `dup_frac` of the burning area, and the
-    empty middle of that distribution is what makes the threshold safe rather than
-    tuned.  A burning pocket inside a real island (depth 2) would still be dropped;
-    that has not been seen and is second order against a 12x error.
+    This replaces an area-ratio threshold used briefly on 2026-10-01, which caught the
+    thin-band case and not the second-front case.  Containment is an invariant rather
+    than a tuned constant and covers both.
     """
     import forefire as _ff
     gdf = _ff.read_ff_geojson(path)
     if len(gdf) == 0:
         return None
-    burn = [g for g in gdf[gdf['burning']].geometry if g is not None and not g.is_empty]
-    if not burn:
+    def _clean(g):
+        return g if g.is_valid else g.buffer(0)
+    burn = [_clean(g) for g in gdf[gdf['burning']].geometry
+            if g is not None and not g.is_empty]
+    nest = [_clean(g) for g in gdf[~gdf['burning']].geometry
+            if g is not None and not g.is_empty]
+    if not burn and not nest:
         return None
-    g = unary_union(burn)
-    if not g.is_valid:
-        g = g.buffer(0)
-    big = max(x.area for x in burn)
-    isl = [x for x in gdf[~gdf['burning']].geometry
-           if x is not None and not x.is_empty and x.area < dup_frac * big]
-    if isl:
-        h = unary_union(isl)
-        if not h.is_valid:
-            h = h.buffer(0)
-        g = g.difference(h)
-        if not g.is_valid:
-            g = g.buffer(0)
+
+    g = _clean(unary_union(burn)) if burn else None
+    #a ring that is not enclosed by the burn is not a hole in it -- it is another front
+    holes, fronts = [], []
+    for x in nest:
+        inside = x.intersection(g).area if g is not None else 0.0
+        (holes if x.area > 0 and 1.0 - inside / x.area <= out_tol else fronts).append(x)
+    if fronts:
+        g = _clean(unary_union(([g] if g is not None else []) + fronts))
+    if g is None:
+        return None
+    if holes:
+        g = _clean(g.difference(_clean(unary_union(holes))))
     return None if g.is_empty else g
 
 
