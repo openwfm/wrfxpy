@@ -55,7 +55,8 @@ from ingest.GFSA import GFSA
 from ingest.GFSF import GFSF_P, GFSF_S
 from ingest.RAP import RAP
 from ingest.RRFS import (RRFS_CONUS_P, RRFS_CONUS_S, RRFS_NA_P, RRFS_NA_S,
-                         RRFS_AK_P, RRFS_AK_S, RRFS_HI_P, RRFS_HI_S)
+                         RRFS_AK_P, RRFS_AK_S, RRFS_HI_P, RRFS_HI_S,
+                         RRFS_PR_P, RRFS_PR_S)
 
 from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP
@@ -176,6 +177,8 @@ class JobState(Dict):
             return [RRFS_AK_P(js),RRFS_AK_S(js)]
         elif gs_name == 'RRFSHI':
             return [RRFS_HI_P(js),RRFS_HI_S(js)]
+        elif gs_name == 'RRFSPR':
+            return [RRFS_PR_P(js),RRFS_PR_S(js)]
         else:
             sat_only = js.get('sat_only',False)
             if not sat_only:
@@ -1492,8 +1495,14 @@ def verify_inputs(args,sys_cfg):
 
     # check for valid grib source
     if 'grib_source' in args:
-        if args['grib_source'] not in ['HRRR', 'HRRR_AK', 'NAM','NAM218', 'NAM227','NAM196', 'NAM198', 'NARR','CFSR','GFSA','GFSF']:
-            raise ValueError('Invalid grib source %s, must be one of HRRR, HRRR_AK, NAM, NAM227, NAM196, NAM198, NARR, CFSR, GFSA, GFSF' % args['grib_source'])
+        #kept in step with resolve_grib_source above -- these two lists disagreeing is
+        #how a source can be fully implemented and still rejected at job validation
+        valid_grib_sources = ['HRRR', 'HRRR_AK', 'NAM', 'NAM218', 'NAM227', 'NAM196',
+                              'NAM198', 'NARR', 'CFSR', 'GFSA', 'GFSF',
+                              'RAP', 'RRFS', 'RRFSNA', 'RRFSAK', 'RRFSHI', 'RRFSPR']
+        if args['grib_source'] not in valid_grib_sources:
+            raise ValueError('Invalid grib source %s, must be one of %s'
+                             % (args['grib_source'], ', '.join(valid_grib_sources)))
 
     # check for valid satellite source
     if 'satellite_source' in args:

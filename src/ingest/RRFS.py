@@ -246,8 +246,7 @@ class RRFS_HI(RRFS):
         rrfs.tCCz.2dfld.2p5km.fFFF.hi.grib2
 
     Note the grid token is `2p5km`, not a decimal point -- the same spelling the bucket
-    uses.  Puerto Rico (`pr`) is the identical product on the same grid and would be one
-    more pair of subclasses if it is ever wanted.
+    uses.  Puerto Rico (`pr`) is the identical product on the same grid; see RRFS_PR.
 
     These files are small next to the rest of RRFS: 20 MB prslev and 10 MB 2dfld per
     lead against 529/295 MB for Alaska, because the domain is tiny.
@@ -298,6 +297,67 @@ class RRFS_HI_S(RRFS_HI):
         }
 
     id = "RRFS_HI_S"
+    product = "2dfld"
+    prefix = "COLMET_S"
+
+
+class RRFS_PR(RRFS):
+    """
+    RRFSv1 Puerto Rico container, on the 2.5-km grid:
+
+        rrfs.tCCz.prslev.2p5km.fFFF.pr.grib2
+        rrfs.tCCz.2dfld.2p5km.fFFF.pr.grib2
+
+    The same product and grid as Hawaii, differing only in `domain`.  Worth having
+    because Puerto Rico fires are currently run off GFS, which is global and coarse;
+    2.5 km convection-allowing output should be a real improvement there.
+    """
+
+    def __init__(self, arg):
+        super(RRFS_PR, self).__init__(arg)
+
+    id = "RRFS_PR"
+    domain = "pr"
+    grid = "2p5km"
+    info_text = "NOAA RRFSv1 Puerto Rico 2.5-km Forecast"
+    #the cycle rule measured across every RRFS domain on 2026-10-01: a cycle every 3
+    #hours, only 00/06/12/18 reach f084, 03/09/15/21 stop at f018
+    cycle_hours = 6
+    period_hours = 1
+    hours_behind_real_time = 1
+    grib_forecast_hours_periods = [{'hours': 84, 'period': 1}]
+
+
+class RRFS_PR_P(RRFS_PR):
+    """RRFSv1 Puerto Rico pressure-level product."""
+
+    def __init__(self, arg):
+        super(RRFS_PR_P, self).__init__(arg)
+
+    def namelist_wps_keys(self):
+        return {
+            'ungrib': {'prefix': 'COLMET_P'},
+            'metgrid': {'fg_name': ['COLMET_S', 'COLMET_P']},
+        }
+
+    id = "RRFS_PR_P"
+    product = "prslev"
+    prefix = "COLMET_P"
+
+
+class RRFS_PR_S(RRFS_PR):
+    """RRFSv1 Puerto Rico 2D/surface product."""
+
+    def __init__(self, arg):
+        super(RRFS_PR_S, self).__init__(arg)
+
+    def namelist_wps_keys(self):
+        return {
+            'ungrib': {'prefix': 'COLMET_S'},
+            'metgrid': {'fg_name': ['COLMET_S', 'COLMET_P']},
+        }
+
+    id = "RRFS_PR_S"
     product = "2dfld"
     prefix = "COLMET_S"
 
