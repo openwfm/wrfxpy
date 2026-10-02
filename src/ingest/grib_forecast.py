@@ -62,7 +62,16 @@ class GribForecast(GribSource):
                 ref_utc_2 = ref_utc - timedelta(hours=self.hours_behind_real_time)
                 ref_utc_2 = ref_utc_2.replace(minute=0,second=0,microsecond=0)
                 cycle_start = min(from_utc, ref_utc_2)
-                cycle_start = cycle_start.replace(hour = cycle_start.hour - cycle_start.hour % self.cycle_hours)
+                #cycle_offset shifts the grid of cycles off midnight.  Without it the
+                #selector can only land on multiples of cycle_hours, which is right for
+                #HRRR (00/06/12/18 reach f48) and wrong for RAP, whose extended cycles
+                #are 03/09/15/21 -- cycle_hours = 6 there would pick precisely the four
+                #cycles that stop at f21.  Default 0 leaves every existing source alone.
+                #Subtracting a timedelta rather than replacing .hour so an offset that
+                #reaches back past midnight rolls the date instead of going negative.
+                offset = getattr(self, 'cycle_offset', 0)
+                cycle_start -= timedelta(
+                    hours=(cycle_start.hour - offset) % self.cycle_hours)
                 cycle_start -= timedelta(hours=self.cycle_hours*cycle_shift)
                 logging.info('forecast cycle start selected as %s' % cycle_start)
 

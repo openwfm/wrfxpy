@@ -65,9 +65,14 @@ class RAP(GribForecast):
     #retriever would pick any hour and then request f22..f51 from it -- verified
     #against the bucket on 2026-10-01: rap.t15z.wrfprsf51 is 200, rap.t14z.wrfprsf51 is
     #404, and t14z serves f21 but 404s at f22.  Three cycles in four would have failed.
-    #6 keeps the cycle selector on 03/09/15/21 relative to those; drop to 1 only
-    #together with grib_forecast_hours_periods hours = 21.
+    #cycle_hours = 6 alone is NOT enough: the selector lands on multiples of
+    #cycle_hours, i.e. 00/06/12/18, which are exactly the four that stop at f21.
+    #Measured across a full day (2026-10-01), f22 and f51 are 200 on 03/09/15/21 and
+    #404 on 00/06/12/18.  cycle_offset = 3 moves the grid onto the extended cycles.
+    #Drop both to cycle_hours = 1, cycle_offset = 0 only together with
+    #grib_forecast_hours_periods hours = 21.
     cycle_hours = 6
+    cycle_offset = 3
     period_hours = 1
     hours_behind_real_time = 1
 
