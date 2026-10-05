@@ -49,7 +49,15 @@ class HRRR_AK(GribForecast):
     info = "The High-Resolution Rapid Refresh (HRRR)"
     remote_url = ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"]
     #browse_aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/index.html"
-    cycle_hours = 1
+    #cycle_hours = 6, not 1, and for two reasons measured against the bucket on
+    #2026-10-05.  HRRR Alaska does not run hourly -- it runs every 3 h, so t01z is a 404
+    #outright -- and of those, only 00/06/12/18 reach the f48 declared below, while
+    #03/09/15/21 stop at f18 (f18 is 200, f20 is 404).  With cycle_hours = 1 the selector
+    #asked for cycles that do not exist two hours in three, and for leads the remaining
+    #ones do not carry.  Same defect as RAP and RRFS_CONUS, fixed the same way; HRRR
+    #CONUS already uses 6 for the f48 half of it.  Drop to 3 only together with
+    #grib_forecast_hours_periods hours = 18.
+    cycle_hours = 6
     period_hours = 1
     hours_behind_real_time = 1     # choose forecast cycle at least one hour behind
     # HRRR provides hourly GRIB2 files up to hour 48.
