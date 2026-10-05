@@ -155,6 +155,63 @@ Cache the GRIBs that back any published comparison, rather than relying on the h
 `ingest/` tree already holds 5.3 TB and nothing distinguishes files that back a result
 from files that were merely downloaded once.
 
+### S3 enabled on the three NOMADS-only sources (`45f1a17`)
+
+JH's instinct was that the lines had been commented for a reason, so this was checked
+before changing anything.
+
+**Availability was not the reason.** All three products were on S3 on **2024-05-26**, the
+exact day `835a893` commented them out, and on 2024-05-20. Lead coverage is complete
+today: f00-f60 for both NAM nests, f00-f48 for HRRR Alaska.
+
+**The likely reason is a code coupling.** `grib_source` tests `s3://` availability through
+`browse_aws`, and that line is commented out in the same three classes. A `remote_url`
+added on its own dereferences a missing attribute, so the pair was probably switched off
+together rather than shipped half-wired. Both lines are therefore restored together,
+matching what `HRRR` and `NAM218` already do.
+
+**Verified by retrieval, twice.** First with the attributes overridden at runtime for all
+three, then with the change as shipped for `NAM196` -- each for a date **30 days back**,
+where NOMADS holds nothing, so the files can only have come from S3.
+
+```
+HRRR_AK  with s3 -> OK, 3 files for 2026-09-05   hrrr.t00z.wrfprsf01.ak.grib2
+NAM196   with s3 -> OK, 3 files for 2026-09-05   nam.t00z.hawaiinest.hiresf01.tm00.grib2
+NAM198   with s3 -> OK, 3 files for 2026-09-05   nam.t00z.alaskanest.hiresf01.tm00.grib2
+```
+
+**Not verified:** S3-sourced files have not been through ungrib. The paths are identical
+to NOMADS so the content should be, but that is an inference, not a measurement. Sizes
+differ sharply by product -- 233 MB per lead for HRRR Alaska, 19 MB for hawaiinest,
+**775 MB** for alaskanest, which is worth knowing before turning deep-archive access on
+for it.
+
+## 5o. Hawaii and Puerto Rico verified through real.exe (2026-10-05)
+
+Using JH's staged fires, re-dated to 2026-10-03 because both sit outside RRFS's 56-day
+window (§5n) -- Bike_Trail is 2026-07-09, SADDLE_ROAD 2026-08-11, one day short. These
+are **plumbing tests, not forecasts**: the weather no longer matches the fire, so they
+prove the WPS chain and nothing about skill.
+
+| | ungrib -> metgrid | levels declared | levels in met_em | real.exe |
+|---|---|---|---|---|
+| RRFS_PR, Bike Trail | 05:26 -> 05:32 | 46 | **46** | pass, wrfinput 116.4 MB |
+| RRFS_HI, Saddle Road | 05:34 -> 05:40 | 46 | **46** | pass, wrfinput 116.4 MB |
+
+Both submitted to the queue and integrated. **So the inherited 46 metgrid levels are
+right on the 2.5 km Mercator domains as well as 3 km Lambert, and the HRRR-copied vtable
+reads both.** Every domain in the §5m table now has a verified replacement path, and the
+Hawaii row -- the only one with a real retirement deadline -- is closed.
+
+**One failure worth recording, because it was mine.** Saddle Road first died with
+`Unsatisfiable: RRFS_HI_P forecast is only available for 84 hours`. The job carries a
+`cycle_start_utc` pinning the GRIB cycle, and when re-dating the window I shifted
+`start_utc`, `end_utc` and the ignition times but not that, so it asked for a 2026-08-11
+cycle to serve a 2026-10-04 forecast -- 53 days of lead from an 84-hour product. Bike
+Trail has no `cycle_start_utc`, which is why it sailed through. **Re-dating a job means
+shifting `cycle_start_utc` too**, and the guard caught it immediately rather than
+downloading nothing for an hour.
+
 ## 6. Open items
 
 Carried from `SESSION_HANDOFF_forefire_2026-10-01.md` §6, unchanged, plus:
@@ -162,6 +219,9 @@ Carried from `SESSION_HANDOFF_forefire_2026-10-01.md` §6, unchanged, plus:
 1. **Build wgrib2 with IPOLATES** if the regrid path is wanted, to a local prefix.
    Then the one-file test above is the proof: regrid, `wgrib2 -grid` to confirm
    template 0, and run ungrib on the result.
-2. **Validate AK, HI and PR through metgrid.** Their grids are supported, but their
-   `num_metgrid_levels` are still the module's guesses, as NA's was. §5l confirmed 46
-   for CONUS only.
+2. ~~**Validate HI and PR through metgrid**~~ **DONE (§5o)** -- both pass, and 46 levels
+   is right for them. Still open for **RRFS_AK**: it downloads and its polar stereographic
+   grid is supported, but it has never been run, so its `num_metgrid_levels` remains the
+   module's inherited guess. Given that 46 now holds on 3 km Lambert, 2.5 km Mercator and
+   both island domains, it will probably hold for Alaska too -- but NA is the reminder that
+   a domain can differ.
