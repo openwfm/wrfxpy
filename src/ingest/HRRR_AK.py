@@ -47,8 +47,17 @@ class HRRR_AK(GribForecast):
     info_aws = "https://registry.opendata.aws/noaa-hrrr-pds/"
     info_text = "NOAA HRRR Alaska 3-km CONUS High-Resolution Rapid Refresh Forecast"
     info = "The High-Resolution Rapid Refresh (HRRR)"
-    remote_url = ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"]
-    #browse_aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/index.html"
+    #S3 first, NOMADS as fallback -- the pattern HRRR and NAM218 already use.  Both
+    #lines were commented out together in 835a893 (2024-05-26), the commit that added
+    #this source, and the reason was almost certainly the coupling rather than an S3
+    #outage: grib_source tests s3:// availability through browse_aws, so a remote_url
+    #added without it dereferences a missing attribute.  The data was on S3 that very
+    #day.  NOMADS alone retains about 1 day for HRRR Alaska, which made anything older irreproducible;
+    #verified 2026-10-05 by retrieving 233 MB per lead through this code path for a date 30 days
+    #back, where NOMADS has nothing.
+    remote_url = ["s3://noaa-hrrr-bdp-pds/",
+                  "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"]
+    browse_aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/index.html"
     #cycle_hours = 6, not 1, and for two reasons measured against the bucket on
     #2026-10-05.  HRRR Alaska does not run hourly -- it runs every 3 h, so t01z is a 404
     #outright -- and of those, only 00/06/12/18 reach the f48 declared below, while
