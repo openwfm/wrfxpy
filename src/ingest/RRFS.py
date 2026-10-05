@@ -128,6 +128,8 @@ class RRFS_CONUS(RRFS):
     def __init__(self, arg):
         super(RRFS_CONUS, self).__init__(arg)
 
+    #GRIB2 grid: Lambert Conformal (template 30), which ungrib supports -- verified
+    #through metgrid and real.exe on 2026-10-02
     id = "RRFS_CONUS"
     domain = "conus"
     grid = "3km"
@@ -200,6 +202,8 @@ class RRFS_AK(RRFS):
     def __init__(self, arg):
         super(RRFS_AK, self).__init__(arg)
 
+    #GRIB2 grid: polar stereographic (template 20), which ungrib supports.  Not yet run
+    #through metgrid, so num_metgrid_levels is still inherited and unconfirmed.
     id = "RRFS_AK"
     domain = "ak"
     grid = "3km"
@@ -264,6 +268,8 @@ class RRFS_HI(RRFS):
     def __init__(self, arg):
         super(RRFS_HI, self).__init__(arg)
 
+    #GRIB2 grid: Mercator (template 10), which ungrib supports.  Not yet run through
+    #metgrid, so num_metgrid_levels is still inherited and unconfirmed.
     id = "RRFS_HI"
     domain = "hi"
     grid = "2p5km"
@@ -325,6 +331,9 @@ class RRFS_PR(RRFS):
     def __init__(self, arg):
         super(RRFS_PR, self).__init__(arg)
 
+    #GRIB2 grid: Mercator (template 10), which ungrib supports -- so the plan to move
+    #Puerto Rico fires off GFS is not blocked the way NA is.  Not yet run through
+    #metgrid, so num_metgrid_levels is still inherited and unconfirmed.
     id = "RRFS_PR"
     domain = "pr"
     grid = "2p5km"
@@ -379,6 +388,12 @@ class RRFS_NA(RRFS):
     def __init__(self, arg):
         super(RRFS_NA, self).__init__(arg)
 
+    #GRIB2 grid: **rotated lat-lon (template 1)**, which WPS 4.4's ungrib does NOT
+    #implement -- "GRIB2 Unknown Projection: 1 ... ungrib understands projections 0, 10,
+    #20, 30, and 40".  A run dies in ungrib before metgrid, so **this domain is unusable
+    #without regridding first**; see the 2026-10-05 handoff section 5m.  Note also that
+    #the header's lat/lon are ROTATED coordinates (south pole lat=-35 lon=247); the real
+    #extent is lon 135.9-358.1, lat -1.6-41.5, and the winds are grid-relative.
     id = "RRFS_NA"
     domain = "na"
     grid = "13km"
