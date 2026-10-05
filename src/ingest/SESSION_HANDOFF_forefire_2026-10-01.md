@@ -66,6 +66,11 @@ day (01/07/13/19), leads to f32, continuous from 09-28 -- and every fire here ig
 
 ### §5d's 8-hour prediction does not hold out of sample
 
+> **Corrected 2026-10-05.** On 31 fires at pSAF 0.337 the 8 h measurement is 1.40 / 1.36
+> / 58%, against §5d's predicted 1.42 / 1.30 / 78%. The centre was predicted almost
+> exactly; only the spread was over-optimistic. The 11-fire reading below was too small.
+> See `SESSION_HANDOFF_forefire_2026-10-05.md` §5p.
+
 §5d rescaled its pSAF 0.41 batch to 0.337 and predicted geo mean 1.42, median 1.30,
 **78% within 2x**, 17% below 1x at the 8 h horizon. Measured on fresh fires: 1.63, 1.87,
 **36%**, 27%. The central tendency survives; **the fraction landing within a factor of

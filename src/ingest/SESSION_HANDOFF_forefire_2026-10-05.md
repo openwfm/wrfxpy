@@ -236,6 +236,93 @@ Wall clock to `wrf.exe`, which scales with domain size and product count rather 
 anything interesting: Puerto Rico 6 min, Hawaii 7, Alaska 16 (61x61 km domain, ~825 MB
 per lead), CONUS 41.
 
+## 5p. The forward batch at one pSAF: 31 fires, and a correction to §5i
+
+The 20 forward runs still at pSAF 0.41 were re-run at 0.337, so the forward set is one
+batch. **20 of 20 succeeded in 9 min 35 s**, 1.3-4.3 min a fire at 4 concurrent, against
+~36 min for a full run -- about **19x cheaper**, because clearing the perimeters while
+keeping the wind netcdfs makes it ForeFire-only. Script:
+`scratchpad/rerun_psaf337.sh`, unattended, with the 0.41 output preserved in
+`psaf410/` inside each fire directory.
+
+### The baseline, now worth quoting
+
+| batch | n | geo mean | median | within 2x |
+|---|---|---|---|---|
+| 09-30, pSAF 0.41 (§5d) | 20 | 1.87 | 2.01 | 45% |
+| 10-01, pSAF 0.337 (§5i) | 11 | 1.69 | 1.82 | 36% |
+| **one batch, pSAF 0.337, full window** | **31** | **1.42** | **1.49** | **58%** |
+| **one batch, pSAF 0.337, 8 hours** | **31** | **1.40** | **1.36** | **58%** |
+
+Reverting 0.41 to 0.337 did what §5d intended: 1.87 to 1.42, within-2x from 45% to 58%.
+
+### Correction to §5i
+
+§5i reported that §5d's 8-hour prediction for 0.337 -- geo mean 1.42, median 1.30, **78%
+within 2x** -- "does not hold out of sample", on the strength of 11 fires giving 1.63 /
+1.87 / 36%. On 31 fires at the same setting the measurement is **1.40 / 1.36 / 58%**.
+
+**§5d predicted the centre almost exactly and the spread badly.** That is a different and
+milder conclusion than §5i's. The 11-fire batch was too small and happened to hold
+several extremes; the lesson is the one §5h already recorded about n=14, applied again
+and ignored once.
+
+### Three fires worth watching
+
+- **Finley_RX collapsed to 0.06** (12.5 ha against 203.8). At 0.41 it was moisture-limited
+  and barely moved; at 0.337 it dies almost entirely. §5g's extinction threshold, now on
+  the wrong side -- and the clearest case yet that pSAF and moisture are not independent
+  knobs on a moisture-limited fire.
+- **Pulaski 6.57**, still the worst, as §5f expected: industrial Little Rock, fuel maps
+  unlike the ground. Excluded from calibration by JH.
+- **Lauderdale tripped the shrink guard** at 4.2% on step 26 -- above the 1% warning,
+  below the 10% skip, so it scored and was flagged. First time §5j's guard has fired on
+  genuinely new output rather than on a regression test.
+
+### Timing, measured, for sizing an ensemble
+
+Split by file mtimes over runs whose mtimes are intact (the retagged ones are useless for
+this -- their geojson times are the retag):
+
+| | total | WindNinja + netcdf | ForeFire | per step |
+|---|---|---|---|---|
+| alone (Bigfoot) | **19.4 min** | 18.5 (96%) | 0.9 (4%) | 0.69 min |
+| 4 concurrent (n=20) | 35.7 min | 32.7 (92%) | 2.4 (7%) | 1.27 min |
+
+28 steps, 27 h, 50 m, 31 km domain, GRIBs and FMDA already cached. **A full-duration
+forecast is about 20 minutes and WindNinja is essentially all of it**; an 8-hour forecast
+is about 6, since cost scales linearly with steps.
+
+### What that means for a perturbed ensemble
+
+Moisture, ignition location and pSAF **leave the wind field untouched**, so the netcdfs
+are built once and shared. Measured resource use per ForeFire member: **32 MB RSS and
+3-28% of one core** on a machine with 240 GB free and 32 cores, so 50 members is ~1.6 GB
+and nowhere near saturating the ~25 cores JH expects to have.
+
+| | 27 h | 8 h |
+|---|---|---|
+| netcdf + WindNinja, once | 18.5 min | ~5.5 min |
+| 50 members, ForeFire only, serial | ~25 min | ~7 min |
+| 50 members at 25-way | ~1 min | ~0.3 min |
+| **total at 25-way** | **~20 min** | **~6 min** |
+
+**A 50-member ensemble costs about what one deterministic forecast costs**, provided the
+expensive part is shared. Three conditions, none of them yet met:
+
+1. **The domain must be fixed, not recentred per member.** `forefire_grib` sizes the
+   domain around the ignition; if each member recentres on its perturbed ignition, every
+   member needs its own WindNinja pass and the cost becomes ~15 hours. One design choice,
+   40x.
+2. **Moisture is not a `setParameter`.** `sweep_job` perturbs anything that is; moisture
+   reaches ForeFire through the per-step `fuelsTableFile`, so it needs `md_series` offset
+   before `write_fuel_table` (§5h). Ignition location is likewise in the `.ff` script.
+3. **`sweep_job` is serial.** Members are independent, so this is where the remaining
+   gain is -- and the 25-way figure above is an **estimate, not a measurement**. Container
+   launch and filesystem contention over 28 steps x 50 members is 1,400 apptainer
+   invocations, and nothing has tested whether that stays linear. One fire, 50 variants,
+   timed, would settle it.
+
 ## 6. Open items
 
 Carried from `SESSION_HANDOFF_forefire_2026-10-01.md` §6, unchanged, plus:
