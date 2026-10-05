@@ -90,6 +90,71 @@ template 1 is unlikely and should not be waited on.
 The reason to build wgrib2 with IPOLATES anyway is **general capability** -- it unlocks
 any future source on an unsupported grid, not just this one.
 
+## 5n. GRIB retention windows, measured
+
+Per JH: retention governs what can be re-tested and reproduced, so it belongs in the
+record rather than in anyone's head. Measured 2026-10-05 by HEAD request against each
+host the source classes actually use.
+
+| source | host the class uses | retention | reproducible back to |
+|---|---|---|---|
+| HRRR | S3 `noaa-hrrr-bdp-pds`, NOMADS fallback | **years** | 730 d verified, archive goes further |
+| **HRRR_AK** | **NOMADS only** | **~1 day** | **yesterday** |
+| RAP | S3 `noaa-rap-pds` | **years** | 730 d verified |
+| **RRFS** (all domains) | S3 `noaa-rrfs-ops-pds` | **56 days** | **2026-08-12** |
+| NAM218, NAM227 | S3 `noaa-nam-pds` | **years** | 730 d verified |
+| **NAM196, NAM198** | **NOMADS only** | **~7 days** | 7 d |
+| GFS | S3 `noaa-gfs-bdp-pds` | **years** | 730 d verified |
+
+Lookback probes, HTTP status by days back:
+
+```
+                   2    7   30   60  120  365  730
+HRRR_s3           200  200  200  200  200  200  200
+HRRR_AK_s3        200  200  200  200  200  200  200
+RAP_s3            200  200  200  200  200  200  200
+RRFS_s3           200  200  200  404  404  404  404
+NAM227_s3         200  200  200  200  200  200  200
+GFS_s3            200  200  200  200  200  200  200
+
+NOMADS             1    2    4    7   10   14
+HRRR_AK           200  404  404  404  404  403
+NAM196 hawaii     200  200  200  200  404  403
+NAM198 alaska     200  200  200  200  404  403
+```
+
+### Two consequences
+
+**RRFS is the binding constraint, at 56 days.** Every RRFS result has an expiry after
+which it cannot be reproduced from the source data. **The PIUTE comparison of §5l rests
+on 2026-10-01 cycles and becomes irreproducible around 2026-11-26.** Anything to be re-run
+against those GRIBs must be re-run before then, or the files kept deliberately -- they
+are in `new_wrfxpy/wrfxpy/ingest/RRFS_CONUS_[PS]` and `ingest/RAP` now, and nothing
+protects them from a cleanup. This is also why the two Puerto Rico and Hawaii test fires
+JH staged could not be run at their own dates: Bike_Trail is 2026-07-09 and SADDLE_ROAD
+2026-08-11, one day before the window opens.
+
+**Three sources are needlessly limited, and it looks like an oversight.** `HRRR_AK`,
+`NAM196` and `NAM198` list only NOMADS, where retention is about **1 day** for HRRR
+Alaska and **7 days** for the NAM nests. Their S3 equivalents exist and carry the same
+paths -- `nam.<date>/nam.t00z.hawaiinest.hiresf00.tm00.grib2`,
+`nam.<date>/nam.t00z.alaskanest...`, `hrrr.<date>/alaska/hrrr.t00z.wrfprsf00.ak.grib2`
+all return 200 at 30 days back, and HRRR Alaska at 730. In each class the `browse_aws`
+line is present but **commented out**, and `git log -S` puts that in `835a893`
+(2024-05-26), the commit that first added Hawaii and Alaska ingest. So it was never
+enabled rather than switched off after a problem.
+
+**HRRR_AK at one day is effectively non-reproducible**, which matters now that it is the
+Alaska replacement for NAM198 (§5m table). Adding `"s3://noaa-hrrr-bdp-pds/"` ahead of
+the NOMADS url, and uncommenting `browse_aws`, is a three-line change per class -- left
+for JH to decide, since it changes an operational path.
+
+### Practice this suggests
+
+Cache the GRIBs that back any published comparison, rather than relying on the host. The
+`ingest/` tree already holds 5.3 TB and nothing distinguishes files that back a result
+from files that were merely downloaded once.
+
 ## 6. Open items
 
 Carried from `SESSION_HANDOFF_forefire_2026-10-01.md` §6, unchanged, plus:
