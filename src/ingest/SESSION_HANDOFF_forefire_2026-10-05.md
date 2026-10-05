@@ -327,8 +327,59 @@ expensive part is shared. Three conditions, none of them yet met:
 
 Carried from `SESSION_HANDOFF_forefire_2026-10-01.md` §6, unchanged, plus:
 
-1. **Build wgrib2 with IPOLATES** if the regrid path is wanted, to a local prefix.
-   Then the one-file test above is the proof: regrid, `wgrib2 -grid` to confirm
-   template 0, and run ungrib on the result.
-2. ~~**Validate AK, HI and PR through metgrid**~~ **DONE.** All four runnable RRFS
+1. ~~**Validate AK, HI and PR through metgrid**~~ **DONE (§5o).** All four runnable RRFS
    domains pass `real.exe` with 46 metgrid levels confirmed on each.
+2. **Build wgrib2 with IPOLATES** only if the regrid path is ever wanted, to a local
+   prefix. Per JH, RRFS_NA is being skipped, so this is optional and general-capability
+   rather than needed. The one-file test in §5m is the proof if it is built.
+3. **Cache the GRIBs behind published comparisons** (§5n). RRFS keeps 56 days; the PIUTE
+   result ages out around **2026-11-26** and nothing in `ingest/` marks which files back
+   a result.
+4. **S3-sourced NAM nest files have not been through ungrib** (§5n). The paths match
+   NOMADS so the content should, but that is an inference.
+
+## 7. NEXT SESSION
+
+Three, in the order they unblock each other.
+
+**1. Time a real ensemble: one fire, 50 variants, measured.** §5p puts a 50-member
+ensemble at about the cost of one deterministic forecast -- but the 25-way figure is an
+**estimate**. 28 steps x 50 members is 1,400 apptainer invocations and nothing has tested
+whether container launch and filesystem contention stay linear. The work needed to
+measure it is the work needed to build it: member-level parallelism in `sweep_job`, which
+is serial today. Do this first, because the answer sizes everything else.
+
+Two conditions come with it, from §5p:
+
+- **Fix the domain; do not recentre per member.** `forefire_grib` sizes the domain around
+  the ignition. If each perturbed ignition recentres it, every member needs its own
+  WindNinja pass and ~20 minutes becomes ~15 hours. One flag, 40x.
+- **Moisture is not a `setParameter`.** It reaches ForeFire through the per-step
+  `fuelsTableFile`, so a moisture ensemble needs `md_series` offset before
+  `write_fuel_table` (§5h). Ignition location is likewise in the `.ff` script.
+
+**2. Finley_RX at 0.06 is a signal, not an outlier.** At pSAF 0.41 it was moisture-limited
+and barely moved; at 0.337 it dies almost entirely, 12.5 ha against WRF-SFIRE's 203.8.
+The batch now contains a fire the global pSAF kills outright, which says plainly that
+**pSAF and moisture are not independent knobs** on a moisture-limited fire. §5g has the
+mechanism -- fuel 2 above extinction for 18 h -- and §5f showed pSAF has no leverage
+there. This is the strongest argument yet for the moisture-perturbed ensemble of §5h,
+since it is the one axis that moves such a fire at all.
+
+**3. Isolate the mesh.** Open since the 09-29 handoff §7 and now the **only** uncontrolled
+variable between the two ForeFire modes: the forward set runs at 50 m, the cron set at
+25 m. Until that is separated, the forward-vs-cron ratio mixes forecast-vs-analysis with
+mesh. Re-run the forward set at 25 m, or the cron set at 50 m, and the comparison in the
+last session's three-way table becomes attributable.
+
+### The forward baseline to quote
+
+```
+forward mode, pSAF 0.337, 31 fires, 50 m + barrier mask
+  full window   geo mean 1.42   median 1.49   58% within 2x   19% below 1x
+  8 hours       geo mean 1.40   median 1.36   58% within 2x   26% below 1x
+```
+
+34 forward runs exist on disk; 31 score. Bigfoot has no WRF-SFIRE workspace, being the
+VIIRS-only fire the forward path exists for, and the two Walker Hill pile burns
+extinguished (§5i).
