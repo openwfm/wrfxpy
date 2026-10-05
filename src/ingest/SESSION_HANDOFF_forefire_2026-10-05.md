@@ -212,6 +212,30 @@ Trail has no `cycle_start_utc`, which is why it sailed through. **Re-dating a jo
 shifting `cycle_start_utc` too**, and the guard caught it immediately rather than
 downloading nothing for an hour.
 
+### RRFS_AK closes the set (2026-10-05)
+
+JH's Kopshesut fire, 67.07 N 157.91 W, above the Arctic Circle, re-dated to 2026-10-03
+like the others. `cycle_start_utc` **was** present in this job and was shifted with the
+rest -- the §5o lesson applied.
+
+| | ungrib -> metgrid | levels in met_em | real.exe |
+|---|---|---|---|
+| RRFS_AK, Kopshesut | 06:02 -> 06:18 | **46** | pass, wrfinput 451.3 MB |
+
+**All four runnable RRFS domains are now verified through `real.exe`**, and 46 metgrid
+levels held on every one: 3 km Lambert (CONUS), 3 km polar stereographic (AK), 2.5 km
+Mercator (HI, PR). Only NA, on the unsupported rotated lat-lon grid, cannot run.
+
+**A check worth keeping: the obvious coverage test would have said no.** The AK grid's
+corners read 40.5 N and 64.0 N, which looks like it excludes a fire at 67.07 N. On a
+polar stereographic grid the corners do not bound the domain -- the top edge reaches
+**75.4 N** at centre, and `wgrib2 -lon` put the fire on a real cell. Checking corner
+latitudes on a projected grid is a trap.
+
+Wall clock to `wrf.exe`, which scales with domain size and product count rather than
+anything interesting: Puerto Rico 6 min, Hawaii 7, Alaska 16 (61x61 km domain, ~825 MB
+per lead), CONUS 41.
+
 ## 6. Open items
 
 Carried from `SESSION_HANDOFF_forefire_2026-10-01.md` §6, unchanged, plus:
@@ -219,9 +243,5 @@ Carried from `SESSION_HANDOFF_forefire_2026-10-01.md` §6, unchanged, plus:
 1. **Build wgrib2 with IPOLATES** if the regrid path is wanted, to a local prefix.
    Then the one-file test above is the proof: regrid, `wgrib2 -grid` to confirm
    template 0, and run ungrib on the result.
-2. ~~**Validate HI and PR through metgrid**~~ **DONE (§5o)** -- both pass, and 46 levels
-   is right for them. Still open for **RRFS_AK**: it downloads and its polar stereographic
-   grid is supported, but it has never been run, so its `num_metgrid_levels` remains the
-   module's inherited guess. Given that 46 now holds on 3 km Lambert, 2.5 km Mercator and
-   both island domains, it will probably hold for Alaska too -- but NA is the reminder that
-   a domain can differ.
+2. ~~**Validate AK, HI and PR through metgrid**~~ **DONE.** All four runnable RRFS
+   domains pass `real.exe` with 46 metgrid levels confirmed on each.
