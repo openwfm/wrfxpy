@@ -605,7 +605,10 @@ file does not duplicate. Today added three items to it:
 
 ## 7. NEXT SESSION
 
-**Try the RRFS_NA forecast of PIUTE.** Per JH. The CONUS 3 km run is done (§5l); `RRFSNA`
+**Try the RRFS_NA forecast of PIUTE.** Per JH. **DONE 2026-10-05 and it cannot be run** --
+RRFS NA is on a rotated lat-lon grid that WPS 4.4's ungrib does not support, so it fails
+before metgrid. See `SESSION_HANDOFF_forefire_2026-10-05.md` §5m. The original reasoning
+follows. The CONUS 3 km run is done (§5l); `RRFSNA`
 is the 13 km North America product, so it tests the one RRFS domain whose vertical
 structure has not been through metgrid -- `num_metgrid_levels` is still the module's
 guess for NA, as it is for AK, HI and PR, and a wrong value fails in `real.exe` rather
