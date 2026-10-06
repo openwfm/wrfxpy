@@ -334,7 +334,7 @@ def run_job(job_path, out_dir=None, steps=8, issue_utc=None, grib_dir=None,
 
 def sweep_job(job_path, param_sets, tags=None, steps=8, issue_utc=None,
               grib_dir=None, cfg=None, domain_km=None, fire_dx=None,
-              wksp_root=None, overwrite=False):
+              wksp_root=None, overwrite=False, workers=1):
     """Run one fire several times with different ForeFire parameters, reusing the winds.
 
     Measured over the 21 forward runs, **WindNinja is 82-98% of the wall clock** (median
@@ -375,8 +375,22 @@ def sweep_job(job_path, param_sets, tags=None, steps=8, issue_utc=None,
         raise ForeFireJobError('no GRIB valid times cover this ignition')
     tt['wrfout'] = tt['grib']
 
-    out = {}
-    for params, tag in zip(param_sets, tags):
+    #`workers` > 1 runs members concurrently with threads, not processes.  Threads are
+    #the right tool precisely because the work is already out of process: every ForeFire
+    #step is an `apptainer exec` subprocess, and Python releases the GIL for its whole
+    #duration, so N threads really do give N containers in flight.  Processes would cost
+    #a fresh interpreter plus pandas/netCDF4/geopandas import per member -- seconds each,
+    #minutes over a 49-member ensemble -- to buy isolation that is not needed here.
+    #
+    #Safe to thread, checked rather than assumed: nothing in this path calls os.chdir,
+    #every write target is the per-member run_dir, and the two module caches in
+    #forefire.py (_FMC_GW, _FMDA_GRID) are check-then-set with fully built values, so a
+    #reader never sees a half-filled entry.
+    #
+    #Resource-wise one member is ~32 MB and a fraction of a core, so the ceiling is not
+    #memory or CPU; expect it to be apptainer startup and filesystem contention, which
+    #is why `workers` is a parameter to be measured rather than a constant.
+    def _member(params, tag):
         run_dir = osp.join(base, tag)
         if not osp.isdir(run_dir):
             os.makedirs(run_dir)
@@ -393,9 +407,17 @@ def sweep_job(job_path, param_sets, tags=None, steps=8, issue_utc=None,
                 continue
             os.symlink(want, link)
 
-        logging.info('=== %s : %s', tag, params)
+        #A member may perturb moisture as well as ForeFire parameters.  Moisture is not a
+        #setParameter -- it reaches ForeFire through the per-step fuelsTableFile -- so it
+        #travels as the reserved key '_md_offset', popped here and handed to
+        #make_script_set rather than written into the .ff script.
+        p = dict(params)
+        md_off = float(p.pop('_md_offset', 0.0))
+        logging.info('=== %s : %s%s', tag, p,
+                     '' if not md_off else '  md_offset=%+.4f' % md_off)
         t = ff.make_script_set(run_dir, tt.copy(), latlon, grid_code, cfg=cfg,
-                               params=dict(params), issue_utc=issue_utc)
+                               params=p, issue_utc=issue_utc, md_offset=md_off,
+                               bind_dir=base)
         t.to_csv(osp.join(run_dir, 'timing_table.csv'), index=False)
         ff.run_timing_table(t, overwrite=overwrite, cfg=cfg, run_dir=run_dir,
                             dest_dir=run_dir, bind_dir=base)
@@ -405,7 +427,21 @@ def sweep_job(job_path, param_sets, tags=None, steps=8, issue_utc=None,
             if osp.islink(l) and name.endswith('.nc'):
                 os.unlink(l)
         ff.finalize_ff_outputs(run_dir, grid_code, cfg=cfg, suffix=tag)
-        out[tag] = run_dir
+        return tag, run_dir
+
+    out = {}
+    if workers and workers > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        logging.info('sweeping %d members %d at a time', len(tags), workers)
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = [ex.submit(_member, p, t) for p, t in zip(param_sets, tags)]
+            for f in futs:
+                tag, run_dir = f.result()
+                out[tag] = run_dir
+    else:
+        for p, t in zip(param_sets, tags):
+            tag, run_dir = _member(p, t)
+            out[tag] = run_dir
     return out
 
 

@@ -765,7 +765,7 @@ def moisture_params(wksp_dir,ign_latlon,cfg,run_dir=None):
     return {'fuelsTableFile': container_path(ft,cfg,run_dir=run_dir)}
 
 
-def md_series(timing_table, ign_latlon, cfg, issue_utc=None):
+def md_series(timing_table, ign_latlon, cfg, issue_utc=None, md_offset=0.0):
     """Per-step dead fuel moisture, or None to leave the fuel table alone.
 
     Returns a list aligned with timing_table rows.  A run used to get one Md for its
@@ -829,6 +829,16 @@ def md_series(timing_table, ign_latlon, cfg, issue_utc=None):
         #Clamping keeps the physical ordering 1-h <= 10-h <= 100-h and never invents a
         #fuel wetter than any class actually reported.  Here it gives Md 0.0837, which
         #burns, against the correct 0.0787.
+        #Ensemble perturbation, applied to every dead class BEFORE the range check so a
+        #wet or dry member cannot be pushed outside the physical range -- a -0.04 member
+        #on an already-dry fire stops at the 0.02 floor rather than going negative.
+        #Additive, not multiplicative, because what section 5h measured is an additive
+        #disagreement: FMDA against WRF-SFIRE's own FMC_GC ran -0.029 to +0.043 per fire
+        #in points of moisture content, with no consistent sign.  That is where the
+        #+/-0.04 default range comes from; it is observed, not chosen.
+        if md_offset and md is not None:
+            md = (tuple((None if m is None else m + md_offset) for m in md)
+                  if per_class else md + md_offset)
         clamp = lambda m: min(max(m, lo), hi)
         if md is not None and per_class:
             fixed = []
@@ -1127,7 +1137,7 @@ def make_UTC_string(ign_utc):
      return f'{ign_utc}Z'
 
 def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,params=None,
-                    ignitions=None,issue_utc=None):
+                    ignitions=None,issue_utc=None,md_offset=0.0,bind_dir=None):
     #params overrides ForeFire setParameter values, e.g. {'windReductionFactor':0.6}
     #ignitions is a list of detection points; each is emitted in the step whose
     #model-time window contains it, so detections arriving between wrfouts join
@@ -1154,7 +1164,7 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
               f"thinning -> {sum(len(v) for v in schedule.values())} placed across "
               f"{len(schedule)} steps")
     #per-step dead fuel moisture, when configured; None keeps one table for the run
-    md_per_step = md_series(timing_table, ign_latlon, cfg, issue_utc=issue_utc)
+    md_per_step = md_series(timing_table, ign_latlon, cfg, issue_utc=issue_utc, md_offset=md_offset)
     md_tables = {}
 
     #time of the last wrfout, ign_seconds
@@ -1251,7 +1261,23 @@ def make_script_set(forefire_dir,timing_table,ign_latlon,grid_code,cfg=None,para
                     if key not in md_tables:
                         ft = write_fuel_table(key, cfg,
                                               out_dir=forefire_dir + '/fueltables')
-                        md_tables[key] = container_path(ft, cfg, run_dir=forefire_dir)
+                        #Resolve against the BIND directory, not the run directory.
+                        #They are the same for an ordinary run and differ for a sweep,
+                        #where each member runs in base/<tag> while `base` is what gets
+                        #bound -- so that the netcdf symlinks pointing back into base can
+                        #be followed.  Using forefire_dir here wrote
+                        #/work/fueltables/<name> when the file really sat at
+                        #/work/<tag>/fueltables/<name>, and ForeFire answered
+                        #"could not load file for fuel properties", ran with no fuel
+                        #properties at all, and the fire died after two steps.
+                        #
+                        #It hid for as long as it did because a sweep that varies only
+                        #setParameter values leaves Md untouched, so the filenames match
+                        #tables the baseline run already left in base/fueltables and the
+                        #wrong path happens to resolve.  The first sweep to perturb
+                        #moisture changed the filenames and 42 of 49 members died.
+                        md_tables[key] = container_path(ft, cfg,
+                                                        run_dir=bind_dir or forefire_dir)
                     step_params['fuelsTableFile'] = md_tables[key]
                 if step_params:
                     file_content = apply_ff_params(file_content,step_params)
