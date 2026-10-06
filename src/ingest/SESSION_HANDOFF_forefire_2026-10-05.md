@@ -460,6 +460,81 @@ So part of Dallas's 6x overprediction is **geometric**, and no pSAF or moisture 
 can reproduce a boundary the fuel map does not contain. Worth keeping as the clearest
 statement of what a parameter ensemble can and cannot diagnose.
 
+## 5r. Everything validated so far is a known incident (2026-10-06)
+
+Checked across the forward set and the whole archive: **0 of 34 forward-run fires, and
+none of 10,345 workspaces, came from an unassociated hotspot.** Every one carries an
+IRWIN GUID.
+
+The reason is a switch, not an accident. `etc/ngfs.json`:
+
+```
+unknown:  run False        wfo_list ['KBOI']        red_flags False
+          unknown_cfg_file jobs/base_ngfs_cfg_short.json   (exists)
+```
+
+`ngfs_start.py:1539` enters the unknown-fire branch only on `'unknown'` in argv or
+`ngfs_cfg['unknown']['run']`. It is off, and scoped to one office, so the nightly cron
+has only ever processed fires that already had an incident record.
+
+**Correction to a test used here:** a `grid_code` is never missing an id string -- per JH,
+an artificial one is constructed from the `feature_tracking_id` for hotspots with no
+incident. So "has a GUID" does not by itself prove a fire was known; the config above is
+the evidence that stands.
+
+### Why this matters more than it sounds
+
+A fire with an incident record is a fire with crews, control lines and burnout
+operations. That is the same fact that showed up geometrically in §5q:
+
+| | straight runs >100 m, as a share of boundary |
+|---|---|
+| Dallas | **48%** |
+| ORCHARD_ROAD | **71%** |
+
+Free-burning fire does not make straight lines. So the validation targets are compromised
+**because of the selection**, not by bad luck -- and the two fires are biased in opposite
+directions, Dallas's road holding the fire below free spread while ORCHARD_ROAD's burnout
+adds area the fire never spread into. Neither is a test of spread physics.
+
+**Consequence for §5p.** The 31-fire forward baseline -- geo mean 1.42, 58% within 2x --
+is calibrated on managed fires against WRF-SFIRE. As model-vs-model that is sound. Its
+transfer to unassociated hotspots is **untested**, and those are typically smaller and
+earlier, where the `area^-0.198` size dependence bites hardest.
+
+### The target population, and why the switch stays off for now
+
+GOES-19 alone, last 24 h: **22,080 detections, 18 known incidents, 13,359 possible
+wildland fires.** Per JH it is a good bet **99.99% of those are not wildland fires at
+all**, and deciding which deserve a forecast is an open problem. NGFS already accounts for
+FRP and signal persistence, so the useful additions are elsewhere:
+
+- proximity to **populated areas**
+- hotspots during **fire weather watches and warnings**
+- **lightning detection** data, when available, to indicate probable ignition sources
+
+Per JH the sequence is deliberate: **get the low-latency pipeline working, then turn the
+switch on.** Turning it on first would only queue forecasts for things that are not fires.
+
+That also explains why the 8-hour product matters for exactly the fires the switch would
+admit -- new hotspots, no incident, no crews yet. For a known incident with resources
+already dispatched, a forecast is far less decisive. ORCHARD_ROAD is the illustration:
+resources were dispatched at 22:14 UTC, **32 minutes before** the satellite-estimated
+ignition of 22:46.
+
+### Also recorded: do not use retrospective incident fields operationally
+
+`attr_FireDiscoveryDateTime` (100% populated) and `attr_DiscoveryAcres` (87%, median
+0.40 ha, 38% already over 1 ha) are tempting as a better ignition time and a non-point
+initial state. **They are not available for the use case** -- they exist only once a fire
+has an incident record, which is exactly what the target hotspots lack. The operational
+analogues at detection time are `frp`, `feature_frp`, `pixel_area`, `confidence` and
+`feature_tracking_id`. Noted because the fields look useful and are not.
+
+Per JH, newer NGFS versions carry a **platform-independent tracking id**, so GOES and
+VIIRS detections will share one reference per incident -- which is what would let a
+feature be followed across satellites rather than per-platform.
+
 ## 6. Open items
 
 Carried from `SESSION_HANDOFF_forefire_2026-10-01.md` §6, unchanged, plus:
