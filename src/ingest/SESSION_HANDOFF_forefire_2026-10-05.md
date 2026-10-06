@@ -323,6 +323,143 @@ expensive part is shared. Three conditions, none of them yet met:
    invocations, and nothing has tested whether that stays linear. One fire, 50 variants,
    timed, would settle it.
 
+## 5q. The ensemble work: one real bug, and the container is the bottleneck (2026-10-06)
+
+Per JH: a 49-member ensemble, 7 pSAF x 7 fuel-moisture offsets, scored against an
+observed perimeter. The ensembles themselves still need re-running; what came out of the
+attempt is more useful than the attempt.
+
+### The moisture axis had to be built, and it is the stronger one
+
+Moisture is not a `setParameter` -- it reaches ForeFire through the per-step
+`fuelsTableFile` -- so `md_series` and `make_script_set` gained `md_offset`, applied to
+every dead class **before** the range check so a dry member clamps at the 0.02 floor
+rather than going negative. In `sweep_job` it travels as the reserved key `_md_offset`.
+
+Measured on Dallas, over the ranges chosen:
+
+| axis | range | final area |
+|---|---|---|
+| moisture | -0.040 to +0.040 | 4031.3 -> 388.0 ha, **10.4x** |
+| pSAF | 0.221 to 0.513 | 125.4 -> 626.9 ha, **5.0x** |
+
+**Moisture has twice the leverage of pSAF**, which inverts the weighting a 7x7 grid
+implies. §5h argued for moisture because it reaches moisture-limited fires that pSAF
+cannot; it turns out to be the dominant axis generally.
+
+### The bug: sweep members got a fuel table path the container could not resolve
+
+42 of 49 members died after two steps, in **both** moisture directions identically, with
+no crash. A drier fire burning less is not physics, and that symmetry is what gave it
+away. ForeFire's own log had it:
+
+```
+WARNING: could not load file for fuel properties /work/fueltables/fuels_Md_cawfe_0.0480_...csv
+```
+
+It ran with **no fuel properties at all** and the fire went out.
+
+A sweep runs each member in `base/<tag>` while binding `base` as `/work`, because the
+netcdf symlinks point back into base and must be followable. `make_script_set` resolved
+the fuel table against the *member* directory, writing `/work/fueltables/<name>` for a
+file at `/work/<tag>/fueltables/<name>`.
+
+**Why it hid:** a sweep that varies only `setParameter` values leaves Md untouched, so
+the filenames match tables the baseline run already left in `base/fueltables`, and the
+wrong path happens to resolve. The zero-offset members were not working -- they were
+silently reading the **baseline's** tables. The first sweep ever to perturb moisture
+changed the filenames and everything failed. **§5f's pSAF sweep is unaffected** for the
+same reason it hid.
+
+Fixed in `b8e89c9`: `make_script_set` takes `bind_dir` and resolves against it, falling
+back to `forefire_dir` so ordinary runs are unchanged. Verified -- offsets 0.000, +0.001,
+-0.040, +0.040 all complete 28 steps, giving 1997.9 / 1963.8 / 4031.3 / 388.0 ha,
+monotonic in moisture.
+
+**This is also why a 0.001 offset was the right test.** A thousandth of a point of
+moisture cannot extinguish a fire, so when it failed exactly like -0.040 the fault had to
+be the code path rather than the perturbation.
+
+### Member concurrency: `sweep_job` now takes `workers`
+
+Threads, not processes: every ForeFire step is already an `apptainer exec` subprocess and
+Python releases the GIL for its duration, so N threads put N containers in flight.
+Checked rather than assumed -- no `os.chdir` in the path, every write target is the
+per-member `run_dir`, and `_FMC_GW`/`_FMDA_GRID` are check-then-set with fully built
+values.
+
+8 members per level, pSAF only so `workers` is the single variable:
+
+| workers | wall min | min/member | complete | speedup |
+|---|---|---|---|---|
+| 1 | 14.8 | 1.86 | 8/8 | 1.0x |
+| 4 | 8.2 | 1.02 | 8/8 | 1.8x |
+| 8 | 8.4 | 1.04 | 8/8 | 1.8x |
+| 12 | 5.8 | 0.72 | 8/8 | 2.6x |
+| 16 | 3.9 | 0.49 | 8/8 | 3.8x |
+
+**Zero container failures at every level.** The 14 `exit code 255` failures seen earlier
+at 25-way were on the broken code -- members dying for the fuel-table reason -- and were
+wrongly attributed here to concurrency. 16x the workers buys only 3.8x, and 4 and 8 are
+indistinguishable, which is a shared-resource plateau rather than CPU saturation.
+
+### The shared resource is the container image, and it is cheap to fix
+
+`squashfuse` is not installed, so apptainer cannot loopback-mount the 298 MB SIF and
+**extracts it to a temporary sandbox on every invocation**:
+
+| | SIF | pre-built sandbox |
+|---|---|---|
+| one `exec` | 1.45 s | **0.18 s** |
+| 8 at once | 5.4 s | **0.2 s** |
+| one real 28-step member | 102.1 s | **63.5 s** (identical result, 2564.2 ha) |
+
+Building the sandbox once takes **0.89 s and 871 MB**. The 8-at-once figure is the
+important one: the SIF path serialises, which is exactly the 4-to-8 plateau above.
+
+**What it takes:** `apptainer build --sandbox <dir> forefire.sif`, then point
+`apptainer.sif_image` at the directory. No code change -- `exec` takes a sandbox wherever
+it takes a SIF. Better still would be installing `squashfuse`, which needs admin but
+needs no duplicate on disk and fixes every apptainer user on the machine.
+
+At 28 steps a member and 49 members an ensemble that is **1,372 extractions of a 298 MB
+image**, about 30 minutes of pure overhead per ensemble. It also helps every other run in
+the project -- the cron, the forward batch, the single deterministic forecast -- which
+matters for the 8-hour latency target.
+
+`etc/forefire.json` has **not** been changed; the sandbox built for the test is in the
+session scratchpad and is temporary.
+
+### Perimeter quality: trust vertex spacing, not metadata
+
+Per JH, `poly_MapMethod` is unreliable; dense vertices mean IR, sparse means hand-drawn.
+Measured over the five perimeters matching forward runs:
+
+| fire | verts | median gap | metadata says | vertex test |
+|---|---|---|---|---|
+| ORCHARD_ROAD | 877 | **4.0 m** | Auto-generated | **IR** |
+| Dallas | 173 | **13.9 m** | Mixed Methods | **IR** |
+| Bowie_9066 | 14 | 28.0 m | Mixed Methods | too small to judge |
+| Ice_Box | 28 | 114.2 m | Auto-generated | sparse (and `GISAcres` contradicts its own polygon) |
+| Hatch_Grande | 226 | **164.8 m** | **IR Image Interpretation** | **hand-drawn** |
+
+**The metadata is exactly backwards on the two extremes.** Hatch_Grande, the only one
+labelled IR, is the sparsest; ORCHARD_ROAD, labelled auto-generated, is the densest by
+40x. Hatch_Grande is unusable anyway -- 3650 ha two hours into a forecast started from a
+point ignition, so it measures a pre-existing fire, not spread.
+
+### Dallas: the missing road, and what an ensemble cannot fix
+
+Per JH, a road appears to have stopped northward spread, the direction most growth took.
+The perimeter carries a **323 m run straight to within 3.6 m**, north of the centroid --
+a linear feature, not fire behaviour. Sampled in ForeFire's own fuel field, **100% of it
+is burnable** (fuel 2 and 5), and the domain is only 0.9% non-burnable overall. That is
+§4's "highways are deleted on purpose": `remap_fuel` fills LANDFIRE code 91.
+
+So part of Dallas's 6x overprediction is **geometric**, and no pSAF or moisture member
+can reproduce a boundary the fuel map does not contain. Worth keeping as the clearest
+statement of what a parameter ensemble can and cannot diagnose.
+
 ## 6. Open items
 
 Carried from `SESSION_HANDOFF_forefire_2026-10-01.md` §6, unchanged, plus:
