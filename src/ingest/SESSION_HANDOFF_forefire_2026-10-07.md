@@ -103,6 +103,103 @@ reduction -- a general loss of burnable area would separate them from the first 
 fire reached a road around 22:00 and stopped against it; by 01:00 the road has removed
 46% of the burned area and the gap is still widening.
 
+### CORRECTION: the first PICO ForeFire result was a defect of mine
+
+An earlier draft of this section reported ForeFire removing **19%** of PICO's burned area
+against WRF-SFIRE's 83%, and explained it as the two models handling barriers differently
+-- front tracking against a level set. **That explanation was wrong and the number
+measured a bug.**
+
+`BARRIER_CODES` was `(92, 94, 95, 96, 97, 98, 99)`. The remapped raster writes old code 91
+as **14**, which was not in that tuple, so the `-r max` continuity pass -- the whole
+mechanism §5b built to stop barriers being sampled into dashes -- never applied to the new
+road barriers. The `near` warp sampled most of them away, the roads came out dotted, and
+the fire walked through the gaps. geogrid does not go through `remap_fuel`, so only the
+ForeFire side carried the defect: there was no model disagreement to explain.
+
+Fixed in `5c853c1` by adding 14 to `BARRIER_CODES`; 14 never occurs in stock FBFM13, so it
+is inert on the unmodified raster.
+
+### What the three configurations actually show
+
+| configuration | orig ha | no_burn ha | removed |
+|---|---|---|---|
+| WRF-SFIRE (25 m) | 1722.4 | 288.3 | **83%** |
+| ForeFire 50 m, broken mask | 2863.2 | 2330.7 | 19% |
+| ForeFire 25 m, broken mask | 2909.9 | 381.6 | **87%** |
+| ForeFire 50 m, **fixed mask** | 2063.7 | 266.9 | **87%** |
+
+**The models agree.** With the mask working ForeFire removes 87% against WRF-SFIRE's 83%,
+landing at 266.9 ha against 288.3 -- within 8% on a fire that burns 1700-2900 ha without
+roads. Two models, different front representations and meshes, converging once they see
+the same barriers.
+
+**Resolution was not the issue either.** 25 m with the broken mask also recovers 87%,
+because finer sampling catches the roads directly without needing the max pass. So the
+mask fix buys the right answer at 50 m, which is a quarter of the WindNinja cost: **25 m
+is not required for road barriers if the mask is right.**
+
+JH's prediction, made before the runs, was 320 ha for WRF-SFIRE and ForeFire larger but
+under 400. WRF-SFIRE came in at **288.3** and fixed ForeFire at **266.9**, both within
+about 20%; the ordering claim held for the 25 m run (381.6) but the fixed 50 m run landed
+slightly below WRF-SFIRE rather than above.
+
+## 5t. The remap is right except under fire weather
+
+### Against observed outcomes, not model-vs-model
+
+| fire | conditions | observed | original fuels | remapped | correct |
+|---|---|---|---|---|---|
+| **Pulaski** (Sep) | normal | **3 acres / 1.2 ha** | 25.6 ha WRF, 168 ha FF | **~3 acres WRF, 0 ha FF** | remapped |
+| **PICO** | normal | -- | 1722 / 2863 ha | **267 / 288 ha**, models agree | remapped |
+| **Palisades** (2025-01-07) | **red flag, Santa Ana** | **9,490 ha** | **5,023.8 ha (0.53x)** | 587.5 ha (**0.06x**) | **original** |
+
+Per JH's rerun, **Pulaski with the remapped fuels came in at about 3 acres against a
+reported 3 acres.** That is the fire that was 6.57x too large in ForeFire and 20x too
+large in WRF-SFIRE, now essentially exact -- and it is why "ForeFire gives 0 ha" is the
+best of the three estimates in absolute error, not an over-correction as recorded earlier
+in this session.
+
+**Palisades is the counter-case and it is severe.** The remap removes 88% there -- the
+same fraction as PICO's 87%, so the fuel change behaves identically -- but the original
+run was already low at 0.53x and the remap makes it **9x worse**. Per JH the no_burn
+variant did constrain the fire along roads and through housing developments; the fire
+simply did not respect them.
+
+### The rule, per JH
+
+**Use the fuel map with urban areas unburnable, unless the NWS has issued a red flag
+warning.** There are plenty of cases where urban development created no barrier at all.
+
+### The switch already exists, and had a bug
+
+`ngfs_incident.NGFS_red_flag()` reads **`nws_fire_wx_code`** from the NGFS detection data
+-- per JH, the detection metadata carries a weather code telling whether fire weather
+conditions exist -- and sets `self.red_flag` during incident setup, before the job json is
+written. Codes **3 or 4** mean fire weather. The file already carries a comment that this
+should replace the NWS zone lookup (`red_flag_incident`), which is commented out.
+
+The condition read `(int(c) == 3 or int(c)) == 4`, which for code 3 evaluates `True == 4`
+-- **false**. Code 3 never registered; code 4 worked only because `False or 4` is 4.
+Fixed in `0099132`. Code 3 is 1.1% of detections in the file sampled against 98.9% for
+code 4.
+
+This is operationally the right source: it is per-detection and available **at detection
+time**, which §5r established is the binding constraint, unlike the retrospective incident
+fields.
+
+### Two cautions before wiring it up
+
+1. **Red flag is a coarse proxy.** Palisades burned through housing on ~100 mph winds and
+   single-digit humidity; a red flag warning is issued at far lower thresholds and covers
+   large zones for long periods, so it will be true for many fires that behave like
+   Pulaski. Too permissive a switch reverts to burnable roads on ordinary fires -- the
+   6.57x failure. A wind-speed or spread-component threshold may separate the two better,
+   and the gridded winds are in hand at forecast time.
+2. **It rests on one red-flag case.** Palisades is among the most extreme WUI fires on
+   record. Two or three more extreme-wind comparisons would show whether the rule
+   generalises.
+
 ### In flight
 
 - JH's WRF-SFIRE `PICO_..._no_burn` run (job 18191), `geo_vars.json_mosaic_noburn91`.
