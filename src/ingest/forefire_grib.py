@@ -499,7 +499,7 @@ def grib_timing_table(ign_utc, gribs):
 def build_step_ncs(lat, lon, ign_utc, out_dir, grid_code, steps=8, domain_km=30.0,
                    fire_dx=30.0, grib_dir=None, time_zone='America/Denver',
                    wn_mesh=None, windrf=None, work_dir=None, overwrite=False,
-                   issue_utc=None):
+                   issue_utc=None, fuel_tif=None):
     """Build the per-step ForeFire netcdfs for one fire.
 
     Returns the timing table.  Writes `FF_<step>_<grid_code>_<UTC>.nc` into
@@ -539,9 +539,15 @@ def build_step_ncs(lat, lon, ign_utc, out_dir, grid_code, steps=8, domain_km=30.
     dem_tif = _warp(ELEV_TIF, osp.join(work_dir, 'dem.tif'), domain, 'bilinear', fmt='GTiff')
     dem_asc = _warp(dem_tif, osp.join(work_dir, 'dem.asc'), domain, 'near')
     altitude = read_asc(dem_asc)
-    fuel_asc = _warp(FUEL_TIF, osp.join(work_dir, 'fuel.asc'), domain, 'near')
+    #`fuel_tif` lets a run use an alternative fuel raster without editing this module --
+    #specifically the copy with LANDFIRE code 91 (urban/developed) remapped to 14, so that
+    #interstates and parking lots stop fires instead of taking a burnable neighbour's
+    #value.  Defaults to FUEL_TIF, so nothing changes unless a caller asks.
+    src_tif = fuel_tif or FUEL_TIF
+    logging.info('fuel raster %s', src_tif)
+    fuel_asc = _warp(src_tif, osp.join(work_dir, 'fuel.asc'), domain, 'near')
     #second pass with max, so a barrier narrower than a cell is not sampled away
-    fuel_max_asc = _warp(FUEL_TIF, osp.join(work_dir, 'fuel_max.asc'), domain, 'max')
+    fuel_max_asc = _warp(src_tif, osp.join(work_dir, 'fuel_max.asc'), domain, 'max')
     fuel = remap_fuel(read_asc(fuel_asc), read_asc(fuel_max_asc))
     logging.info('fuels: %d of %d cells burnable; terrain %.0f-%.0f m',
                  int(((fuel >= 1) & (fuel <= 13)).sum()), fuel.size,

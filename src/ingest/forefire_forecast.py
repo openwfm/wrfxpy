@@ -306,7 +306,7 @@ def run_job(job_path, out_dir=None, steps=8, issue_utc=None, grib_dir=None,
     tt = fg.build_step_ncs(latlon[0], latlon[1], ign_utc, run_dir, grid_code,
                            steps=steps, domain_km=domain_km, fire_dx=fire_dx,
                            grib_dir=grib_dir, issue_utc=issue_utc,
-                           overwrite=overwrite)
+                           overwrite=overwrite, fuel_tif=cfg.get('fuel_tif'))
     if tt is None or not len(tt):
         raise ForeFireJobError('no GRIB valid times cover this ignition')
 
@@ -370,7 +370,8 @@ def sweep_job(job_path, param_sets, tags=None, steps=8, issue_utc=None,
     #overwrite=False so existing netcdfs are kept: this is the whole point
     tt = fg.build_step_ncs(latlon[0], latlon[1], ign_utc, base, grid_code, steps=steps,
                            domain_km=domain_km, fire_dx=fire_dx, grib_dir=grib_dir,
-                           issue_utc=issue_utc, overwrite=False)
+                           issue_utc=issue_utc, overwrite=False,
+                           fuel_tif=cfg.get('fuel_tif'))
     if tt is None or not len(tt):
         raise ForeFireJobError('no GRIB valid times cover this ignition')
     tt['wrfout'] = tt['grib']
