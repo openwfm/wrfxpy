@@ -72,7 +72,15 @@ NO_FUEL_CAT = 14
 #falls inside the target cell, and cannot be outvoted by surrounding fuel.  The one
 #exception is snow/ice at 92, which 93 outranks -- rare in fire season and not worth a
 #second pass.
-BARRIER_CODES = (92, 94, 95, 96, 97, 98, 99)
+#14 is here because the remapped fuel raster (LFmosaic_FBFM13_CONUS_noburn91) writes old
+#code 91 -- urban and developed -- as 14, and without it the `-r max` continuity pass
+#below never applies to those cells.  The `near` warp then samples most roads away: at
+#50 m over PICO the ignition's connected component stayed at 62.4% of burnable ground,
+#the roads came out dotted, and the fire walked through the gaps, removing only 19% of
+#the burned area where WRF-SFIRE -- which does not go through this function -- removed
+#83%.  With 14 included the component falls to 0.4%.  14 never occurs in stock FBFM13,
+#so this is safe on the unmodified raster too.
+BARRIER_CODES = (14, 92, 94, 95, 96, 97, 98, 99)
 #category 14 cannot burn and its 1e-7 is a sentinel, not a reduction.  Applying it
 #would punch near-zero wind holes into the field, so non-burnable cells take the
 #modal burnable factor instead, keeping the field continuous across them.
