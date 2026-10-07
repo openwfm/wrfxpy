@@ -814,7 +814,12 @@ class ngfs_incident():
         if k in df.keys():
             codes = df[k].unique()
             for c in codes:
-                if (int(c) == 3 or int(c)) == 4:
+                #the parenthesis used to sit after the `or`, making this
+                #`(int(c) == 3 or int(c)) == 4`.  For code 3 that is `True == 4`, i.e.
+                #False, so **code 3 never registered as fire weather**; code 4 worked
+                #only by accident, `False or 4` being 4.  It matters because
+                #self.red_flag is what selects behaviour downstream.
+                if int(c) == 3 or int(c) == 4:
                     print('\tDetections indicate fire weather')
                     return True
     return False
