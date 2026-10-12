@@ -87,7 +87,7 @@ def get_fmda_path(cfg):                                                         
    if 'cawfe' in cfg['fire_namelist_path']:
       base_folder = '/data/WRFXPY/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
    elif behave:
-      base_folder = '/data/jhaley/wrfxpy/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
+      base_folder = '/data/jhaley/clean_wrfxpy/wrfxpy/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
    else:
       return 'ngfs'
 
