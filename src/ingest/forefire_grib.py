@@ -285,14 +285,29 @@ def windninja_uv(grib, dem_tif, domain, work_dir, time_zone, mesh_m=None,
 
 
 def _check_wind(vel, grib):
-    """Reject the silent-garbage failure mode.
+    """Reject the two silent failure modes.
 
-    WindNinja exits 0 on a raw NAM218 file and produces speeds of 25.8 to 45,632
-    m/s, so the exit code proves nothing and the values must be checked.
+    WindNinja exits 0 on inputs it cannot actually read, so the exit code proves
+    nothing and the values must be checked.  On a raw NAM218 file it produces
+    speeds of 25.8 to 45,632 m/s; on a GFS sflux GRIB2 it produces zero everywhere.
     """
     finite = vel[np.isfinite(vel)]
     if finite.size == 0:
         raise ForeFireGribError('WindNinja produced no finite speeds for {}'.format(grib))
+
+    #The second silent mode, found on a GFS sflux GRIB2: WindNinja parses the valid
+    #time, fails the coordinate transform ("Point outside of projection domain"),
+    #skips the solver entirely (solver time 0.000000 s) and writes an all-zero field
+    #with exit code 0.  Zero everywhere is not a calm -- the mass-conserving solver
+    #cannot return an identically flat field over real terrain -- so it is rejected
+    #outright rather than by a threshold.
+    if float(np.nanmax(finite)) <= 0.0:
+        raise ForeFireGribError(
+            'WindNinja produced an all-zero wind field for {} -- it exits 0 after '
+            'skipping the solver when it cannot georeference the input. Only HRRR '
+            'wrfprs GRIB is known to work; GFS sflux GRIB2 fails this way.'
+            .format(grib))
+
     hi = float(np.nanmax(finite))
     if hi > 100.0:
         raise ForeFireGribError(
