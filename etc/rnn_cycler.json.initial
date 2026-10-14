@@ -1,0 +1,5 @@
+{
+    "rnn_model_path": "/path/to/fm10_source_model",
+    "transfer_path": "/path/to/fm_target_models"
+}
+
