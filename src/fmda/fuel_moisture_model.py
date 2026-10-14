@@ -417,7 +417,7 @@ class FuelMoistureModel:
         write_geogrid_var(path,'FMC_GC',FMC_GC,index,bits=32)
         write_geogrid_var(path,'FMEP',FMEP,index,bits=32)
         
-    def to_wps_format(self, path, index, lats, lons, time_tag):
+    def to_wps_format(self, path, index, lats, lons, time_tag, name_prefix="FMDA"):
         """
         Store model to wps format files
         """
@@ -451,7 +451,7 @@ class FuelMoistureModel:
             'xlonc': index['stdlon'], 'truelat1': index['truelat1'], 'truelat2': index['truelat2'], 
             'earth_radius': index['radius'], 'is_wind_earth_rel': 0, 'slab': arrs
         }
-        WPSFormat.from_params(**params).to_file(osp.join(path,'FMDA:{}'.format(time_tag)))
+        WPSFormat.from_params(**params).to_file(osp.join(path,f'{name_prefix}:{time_tag}'))
 
     @classmethod
     def from_netcdf(cls, path):
@@ -482,4 +482,117 @@ class FuelMoistureModel:
         logging.info('fuel_moisture_model.from_netcdf: extended state fmc %d fields + 2 parameters' % (k - 2))
 
         return fm
+       
+
+# Blend Model Class
+## Combines the time lag with another set of model predictions, the RNN predictions are what is intended
+## 4 fuel moisture states are blended, starting with simple average but it could be a model in the future
+## Extended States from time lag, Equilibrium bias correction and Saturation correction, are kept so it can be evolved forward as before
+## TODO: comfirm that shifting the initial states but retaining the same extended correction terms is credible
+class BlendMoistureModel:
+    def __init__(self, m_ext, rnn_preds, Tk=None):
+        """
+        Initialize a blended fuel moisture model. 
+        Uses composition with FuelMoistureModel class. 
+            Modifies the init to blend the 2 input predictions, and not create the Kalman related terms
+            Copies the exact to_geogrid, to_wps_format methods. They should be identical
+            Modifies to_netcdf to ignore the covariance terms
+
+        Parameters
+        ----------
+        m_ext : ndarray, shape (ny, nx, 6)
+            Time-lag model state, including four fuel moisture states
+            and two bias-correction states.
+        rnn_preds : ndarray, shape (ny, nx, 4)
+            RNN predictions for FM1, FM10, FM100, and FM1000.
+        Tk : array-like, optional
+            Drying/wetting time constants for the four fuel classes.
         
+        TODO: 
+            check if we need other fields from FuelMoistureModel, like rlag, m_i, other 
+            implement from_netcdf ?, probably don't need to
+            implement to_pickle ?, doesn't seem to be used ever
+            implement to_netcdf()
+        """
+        logging.info('BlendMoistureModel.__init__ m_ext %s, rnn_preds %s, Tk  %s' % (inq(m_ext),inq(rnn_preds), inq(Tk)))
+        self.Tk = np.array([1.0, 10.0, 100.0, 1000.0]) * 3600   # time lags, NOTE adding FM1000 as default
+        self.r0 = 0.05                                          # threshold rainfall [mm/h]
+        self.rk = 8.0                                           # saturation rain intensity [mm/h]
+        self.Trk = 14.0 * 3600                                  # time constant for wetting model [s]
+        self.S = 2.5                                            # saturation intensity [dimensionless]
+
+        s0, s1, dim = m_ext.shape
+        k = dim-2
+        if Tk is not None:
+            self.Tk = np.asarray(Tk)
+        assert k == len(self.Tk)
+        assert dim == len(self.Tk) + 2
+        assert rnn_preds.shape == (s0, s1, len(self.Tk))
+        
+        self.m_ext = np.zeros((s0, s1, dim))
+        # Blend fuel class predictions
+        self.m_ext[:, :, :k] = self._blend_fmc(m_ext[:,:,:k], rnn_preds) 
+        # Retain extended state corrections
+        self.m_ext[:, :, k:] = m_ext[:,:,k:]
+
+        # Get a FeulMoistureModel object to copy the shared methods
+        self._formatter = FuelMoistureModel.__new__(FuelMoistureModel)
+        self._formatter.m_ext = self.m_ext
+
+    def _blend_fmc(self, m0, m1):
+        """
+        Construct blend of moisture predictions. 
+
+        Starting with simple average, could be extended in the future
+        """
+
+        if m0.shape != m1.shape:
+            raise ValueError(
+                f"Cannot blend fuel moisture predictions with shapes "
+                f"{m0.shape} and {m1.shape}"
+            )        
+
+        self.blend_weights = (0.5, 0.5)
+        return (m0 + m1)/2
+        
+    def to_geogrid(self, *args, **kwargs):
+        return self._formatter.to_geogrid(*args, **kwargs)
+
+    def to_wps_format(self, *args, **kwargs):
+        return self._formatter.to_wps_format(*args, **kwargs, name_prefix="BLEND")
+
+    def to_netcdf(self, path, data_vars=None):
+        """
+        Store the model in a netCDF file that attempts to be displayable
+        using standard tools and loosely follows the WRF 'standard'.
+        
+        :param path: the path where to store the model
+        :param data_vars: dictionary of additional variables to store for visualization
+        """
+        import netCDF4
+        d = netCDF4.Dataset(path, 'w', format='NETCDF4')
+        
+        d0, d1, k = self.m_ext.shape
+
+        d.createDimension('fuel_moisture_classes_stag', k)
+        d.createDimension('south_north', d0)
+        d.createDimension('west_east', d1)
+        ncfmc = d.createVariable('FMC_GC', 'f4', ('south_north', 'west_east','fuel_moisture_classes_stag'))
+        ncfmc[:,:,:] = self.m_ext
+        logging.info('blend_moisture_model.to_netcdf: writing extended state as FMC_GC %s ' % (inq(self.m_ext)))
+        if data_vars is not None:
+            for v in data_vars:
+                d.createVariable(v, 'f4', ('south_north', 'west_east'))[:,:]=data_vars[v]
+       
+        
+        d.close()
+
+
+
+
+
+
+
+
+
+

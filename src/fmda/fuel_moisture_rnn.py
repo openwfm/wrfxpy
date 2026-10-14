@@ -321,6 +321,7 @@ class RNNMoistureModel(TimeWarpedFuelClassPredictors):
             states_i_list = [states_i[:, j, :] for j in range(n_rnn_vars)]
             rnn_states[fuel_class] = states_i_list
 
+        ds.close()
 
         #Construct RNN objects with stored states
         model = cls(params, weights_path, warps)
@@ -329,46 +330,35 @@ class RNNMoistureModel(TimeWarpedFuelClassPredictors):
         return model
         
 
+# Read Recurrent States
+# from netcdf file, don't build object just read and set
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Helper functions
+def read_states_from_netcdf(path):
+    import netCDF4
+
+    # Read and simple checks
+    logging.info("reading from netCDF file " + path)
+    ds = netCDF4.Dataset(path)
+    FUEL_CLASSES = json.loads(ds.FUEL_CLASSES)
+    
+    # Extract needed saved info
+    rnn_states_grid = ds.variables["RNN_STATES"][:]
+    d0, d1, k, n_rnn_vars, n_rnn_units = rnn_states_grid.shape
+    rnn_states = {}
+    for i, fuel_class in enumerate(FUEL_CLASSES):
+        states_i = rnn_states_grid[:, :, i, :, :].reshape(
+            (d0 * d1, n_rnn_vars, n_rnn_units)
+        )
+        states_i_list = [states_i[:, j, :] for j in range(n_rnn_vars)]
+        rnn_states[fuel_class] = states_i_list
+    ds.close()
+    return rnn_states
+
+# Misc Helper functions
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def convert_feature_names(features, name_map=RNN_FEATURE_TO_WRFXPY):
     """Convert feature names using name_map; leave unmapped names unchanged."""
     return [name_map.get(feature, feature) for feature in features]
 
 
-def to_netcdf(path, arr, valid_times, fuel_vars=("FM1", "FM10")):
-    """
-    Standalone version of the model.to_netcdf from the FMDA object class. 
-    The RNN class doesn't lend itself as cleanly to saving predictions as the model object,
-    so making a standalone
-    """
-    import netCDF4
-    d = netCDF4.Dataset(path, "w", format="NETCDF4")
-
-    arr = np.asarray(arr)
-    ny, nx, nt, nfuel = arr.shape
-    if len(fuel_vars) != nfuel: raise ValueError( f"len(fuel_vars)={len(fuel_vars)} must match last dim nfuel={nfuel}" )
-
-
-    d.createDimension("south_north", ny)
-    d.createDimension("west_east", nx)
-    d.createDimension("time", nt)
-
-    time = d.createVariable("time", "f8", ("time",))
-    time.units = "hours since 1970-01-01 00:00:00 UTC"
-    time.calendar = "standard"
-    time[:] = netCDF4.date2num(
-        valid_times.astype("datetime64[ms]").astype(object),
-        units=time.units,
-        calendar=time.calendar,
-    )
-    for i, var_name in enumerate(fuel_vars):
-        v = d.createVariable( var_name, "f4", ("south_north", "west_east", "time"), zlib=True, complevel=4, )
-        v.long_name = f"{var_name} fuel moisture prediction"
-        v.coordinates = "time"
-        v[:] = arr[..., i]
-
-    d.Conventions = "CF-1.8"
-
-    d.close()

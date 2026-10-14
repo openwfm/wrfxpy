@@ -5,7 +5,7 @@ import os
 from ml_fmda.utils import read_yml, Dict
 from ml_fmda.moisture_rnn import TimeWarpedFuelClassPredictors
 import json
-from fmda.fuel_moisture_rnn import RNNMoistureModel
+from fmda.fuel_moisture_rnn import RNNMoistureModel, read_states_from_netcdf
 from geo.write_geogrid import read_geogrid
 import pandas as pd
 import joblib
@@ -34,16 +34,11 @@ rnn0 = TimeWarpedFuelClassPredictors(
     warps=warps
 )
 
-
 rnn = RNNMoistureModel(
     params=params,
     weights_path=fm10_weights_path,
     warps=warps
 ) 
-
-# Get states, should be None (TODO: switch to zeros?)
-rnn0.get_states()
-rnn.get_states()
 
 # Predict, then get states, should still be None since not set with vanilla predict
 ny = nx = 10
@@ -60,91 +55,141 @@ lats = np.linspace(38.5, 38.5 - 0.27 * (ny - 1), ny)[:, None] * np.ones((1, nx))
 lons = np.ones((ny, 1)) * np.linspace(262.5, 262.5 + 0.35 * (nx - 1), nx)[None, :]
 
 X = np.zeros((ny*nx, 24, len(params.features_list)))
-p0 = rnn0.predict(X)
-p1 = rnn.predict(X)
-assert np.allclose(p0, p1)
+def test_initial_predictions_match():
+
+    p0 = rnn0.predict(X)
+    p1 = rnn.predict(X)
+
+    assert np.allclose(p0, p1, equal_nan=False)
+
+def test_predict_cycle_matches():
+    p0 = rnn0.predict_cycle(X, reset_states=True)
+    p1 = rnn.predict_cycle(X, reset_states=True)
+    assert np.allclose(p0, p1, equal_nan=False)
+
+def test_predict_cycle_states_match():
+    rnn0.predict_cycle(X, reset_states=True)
+    rnn.predict_cycle(X, reset_states=True)
+
+    states0 = rnn0.get_states()
+    states1 = rnn.get_states()
+
+    assert states0.keys() == states1.keys()
+
+    for fuel_class in states0:
+        assert len(states0[fuel_class]) == len(states1[fuel_class])
+        for s0, s1 in zip(states0[fuel_class], states1[fuel_class]):
+            assert np.allclose(s0, s1, equal_nan=False)
+
+def test_netcdf_roundtrip(tmp_path):
+    preds = rnn.predict_cycle(X, reset_states=True)
+
+    preds_grid = preds.reshape(ny, nx, preds.shape[1], preds.shape[2])
+    pred_slice = preds_grid[:, :, 0, :].squeeze()
+
+    path = tmp_path / "test_rnn_output.nc"
+    rnn.to_netcdf(
+        path=str(path),
+        preds=pred_slice,
+        grid_shape=(ny, nx),
+        data_vars=None,
+    )
+
+    rnn2 = RNNMoistureModel.from_netcdf(str(path), fm10_weights_path)
+
+    states1 = rnn.get_states()
+    states2 = rnn2.get_states()
+
+    assert states1.keys() == states2.keys()
+    for fuel_class in rnn.FUEL_CLASSES:
+        for state1, state2 in zip(states1[fuel_class], states2[fuel_class]):
+            np.testing.assert_array_equal(state1, state2)
+
+    p1 = rnn.predict_cycle(X, reset_states=False)
+    p2 = rnn2.predict_cycle(X, reset_states=False)
+
+    np.testing.assert_allclose(p1, p2, rtol=1e-6, atol=1e-6)
+
+def test_netcdf_state_restoration(tmp_path):
+    p1 = rnn.predict_cycle(X, reset_states=True)
+
+    preds_grid = p1.reshape(ny, nx, p1.shape[1], p1.shape[2])
+    pred_slice = preds_grid[:, :, 0, :].squeeze()
+
+    path = tmp_path / "test_rnn_output.nc"
+    rnn.to_netcdf(
+        path=str(path),
+        preds=pred_slice,
+        grid_shape=(ny, nx),
+        data_vars=None,
+    )
+
+    X2 = X + 0.5
+    p2 = rnn.predict_cycle(X2, reset_states=False)
+
+    rnn_states = read_states_from_netcdf(path=str(path))
+    rnn2 = RNNMoistureModel(
+        params=params,
+        weights_path=fm10_weights_path,
+        warps=warps,
+    )
+    rnn2.set_states(rnn_states)
+
+    p3 = rnn2.predict_cycle(X2, reset_states=False)
+
+    np.testing.assert_allclose(p2, p3, rtol=1e-6, atol=1e-6)
 
 
+def test_to_geogrid_roundtrip(tmp_path):
+    preds = rnn.predict_cycle(X, reset_states=True)
 
-# Predict cycle, then get states, should be valid list of states
-p0 = rnn0.predict_cycle(X)
-p1 = rnn.predict_cycle(X)
-assert np.allclose(p0, p1)
+    preds_grid = preds.reshape(ny, nx, preds.shape[1], preds.shape[2])
+    pred_slice = preds_grid[:, :, 0, :]
 
-states0 = rnn0.get_states()
-states1 = rnn.get_states()
+    path = tmp_path / "test_rnn_output.geo"
+    rnn.to_geogrid(
+        preds=pred_slice,
+        path=str(path),
+        index=index,
+        lats=lats,
+        lons=lons,
+    )
 
-preds_grid = p1.reshape(ny, nx, p1.shape[1], p1.shape[2])
-rnn_states_grid = rnn.states_to_grid((ny, nx))
+    geo_fmc = read_geogrid(osp.join(str(path), "FMC_GC"))
+    geo_rnn = read_geogrid(osp.join(str(path), "RNN_STATES"))
 
-# Test netCDF4 
-# writing out with one time slice, then reading
-pred_slice = preds_grid[:,:,0,:].squeeze()
-rnn.to_netcdf(
-    path=osp.join(test_path, "test_rnn_output.nc"),
-    preds=pred_slice,
-    grid_shape=(ny, nx),
-    data_vars=None
-)
+    np.testing.assert_allclose(geo_fmc[0][..., :4], pred_slice)
 
-rnn2 = RNNMoistureModel.from_netcdf(
-        osp.join(test_path, "test_rnn_output.nc"),
-        fm10_weights_path) 
+    rnn_states = rnn.states_to_grid((ny, nx))
+    _, _, k, n_rnn_vars, nunits = rnn_states.shape
+    rnn_states = rnn_states.reshape(ny, nx, k * n_rnn_vars * nunits)
 
-states1 = rnn.get_states()
-states2 = rnn2.get_states()
-
-for fuel_class in rnn.FUEL_CLASSES:
-    for state1, state2 in zip(states1[fuel_class], states2[fuel_class]):
-        np.testing.assert_array_equal(state1, state2)
-
-assert states1.keys() == states2.keys()
-
-p1 = rnn.predict_cycle(X, reset_states=False)
-p2 = rnn2.predict_cycle(X, reset_states=False)
-
-np.testing.assert_allclose(p1, p2, rtol=1e-6, atol=1e-6)
-
-# Test to_geogrid
-# created var_wisdom for RNN_STATES, TODO: confirm nearest_neighbors alone is ok
-# Read geogrids back and check for approximate equality
-
-rnn.to_geogrid(
-    preds = pred_slice,
-    path = osp.join(test_path, "test_rnn_output.geo"),
-    index = index,
-    lats=lats,
-    lons=lons,
-        )
-
-geo_fmc = read_geogrid(
-        osp.join(test_path, f"test_rnn_output.geo", "FMC_GC")
-        )
-geo_rnn = read_geogrid(
-        osp.join(test_path, f"test_rnn_output.geo", "RNN_STATES")
-        )
-
-np.testing.assert_allclose(geo_fmc[0][..., :4],pred_slice)
-
-rnn_states = rnn.states_to_grid((ny, nx))
-ny, nx, k, n_rnn_vars, nunits = rnn_states.shape
-rnn_states = rnn_states.reshape(ny, nx, k * n_rnn_vars * nunits)
-
-np.testing.assert_allclose(geo_rnn[0], rnn_states, rtol=1e-6, atol=geo_rnn[1]["scale_factor"] / 2)
+    np.testing.assert_allclose(
+        geo_rnn[0],
+        rnn_states,
+        rtol=1e-6,
+        atol=geo_rnn[1]["scale_factor"] / 2,
+    )
 
 
 # Test WPS format
 
-rnn.to_wps_format(
-    preds=pred_slice,
-    path=test_path,
-    index=index, 
-    lats=lats, 
-    lons=lons, 
-    time_tag="00:00",
-)
+def test_to_wps_format(tmp_path):
+    preds = rnn.predict_cycle(X, reset_states=True)
 
+    preds_grid = preds.reshape(ny, nx, preds.shape[1], preds.shape[2])
+    pred_slice = preds_grid[:, :, 0, :]
 
+    rnn.to_wps_format(
+        preds=pred_slice,
+        path=str(tmp_path),
+        index=index,
+        lats=lats,
+        lons=lons,
+        time_tag="00:00",
+    )
 
-
+    # TODO: Verify the generated WPS output by reading it back and checking
+    # variable names, dimensions, and values against the expected predictions
+    # and recurrent states.
 
