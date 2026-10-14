@@ -1,0 +1,6 @@
+{
+    "run_postprocessing": true,
+    "rnn_model_path": "/storage/math/NSF1/hirschij/FMDA/models/_OPERATIONAL_MODEL_/fm_transfer/fm10_source_model",
+    "transfer_path": "/storage/math/NSF1/hirschij/FMDA/models/_OPERATIONAL_MODEL_/fm_transfer/fm_target_models"
+}
+
