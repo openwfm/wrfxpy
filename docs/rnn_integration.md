@@ -1,6 +1,5 @@
 # Integrating Recurrent Neural Networks for Fuel Moisture Prediction into FMDA
 
-
 ## Clone the RNN Compatible Branch 
 
 ```python
@@ -75,7 +74,7 @@ pytest src/tests/test_rnn.py
 
 ## Get the Pretrained RNN Model Weights
 
-Integration into `wrfxpy` assumed pretrained RNN model weights. The pretrained model weights and associated scalers/configuration are distributed separately from the source package as a ZIP archive. The archive includes a README and the models from the training and transfer-learning workflows. Two main directories store the model weights, parameter files for building the model architecture, and information about how they were trained. 
+Integration into `wrfxpy` assumed pretrained RNN model weights. A set of pretrained model weights and associated scalers/configuration are distributed separately from the source package as a ZIP archive: `fm_transfer.zip`. The archive includes a README and the models from the training and transfer-learning workflows. Two main directories store the model weights, parameter files for building the model architecture, and information about how they were trained. 
 
 ```text
 fm_transfer/
