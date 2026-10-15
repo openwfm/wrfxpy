@@ -1026,14 +1026,14 @@ if __name__ == "__main__":
                   "bbox" : parse_bbox(sys.argv[2:6])
              }
         }
-        #try:
-        #    os.remove(osp.join(cfg.workspace_path,code+"-geo.nc"))
-        #except Exception as e:
-        #    logging.warning(e)
-        #try:
-        #    delete(osp.join(cfg.workspace_path,code))
-        #except Exception as e:
-        #    logging.warning(e)
+        try:
+            os.remove(osp.join(cfg.workspace_path,code+"-geo.nc"))
+        except Exception as e:
+            logging.warning(e)
+        try:
+            delete(osp.join(cfg.workspace_path,code))
+        except Exception as e:
+            logging.warning(e)
 
     if mode is None or len(cfg.regions) < 1:
         print("Usage: to use domains configured in etc/fmda_cycler.json")
@@ -1051,8 +1051,7 @@ if __name__ == "__main__":
     mode_name = "analysis" if mode == "a" else "forecast"
     # current time
     now = datetime.now(timezone.utc)
-    #now = datetime(2026, 8, 4, 18, 0, 0, 0, tzinfo=timezone.utc)
-    #now = datetime(2026, 9, 21, 7, 0, 0, 0, tzinfo=timezone.utc)
+    #now = datetime(2026, 10, 14, 0, 0, 0, 0, tzinfo=timezone.utc)
     cycle = (now - timedelta(minutes=59)).replace(minute=0, second=0, microsecond=0, tzinfo=None)
     # print statements
     logging.info(
@@ -1086,7 +1085,7 @@ if __name__ == "__main__":
         weights_path=rnn_cfg.fm10_weights_path,
         warps=rnn_cfg.warps
     )
-
+    
     ### REAL-TIME SECTION
     # Get HRRR real-time data
     try:
