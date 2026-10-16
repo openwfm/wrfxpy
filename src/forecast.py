@@ -587,7 +587,7 @@ def make_job_file(js):
 
 def add_to_catalog(js):
     job_id = js.get('job_id', '')
-    catalog_id = js.get('wrfxweb_catalog_id', 'public')
+    catalog_id = js.get('wrfxweb_catalog_id', 0)
     args = f'{job_id} {catalog_id}'
     cmd = osp.join(js.get('wrfxweb_path', 'wrfxweb'), 'process_simulation.sh ')
     ssh_command(cmd + args)

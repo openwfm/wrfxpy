@@ -123,6 +123,15 @@ _discrete_wisdom = {
 }
 
 _var_wisdom = {
+    'QCLOUD': {
+        'name' : 'Cloud water mixing ratio',
+        'native_unit': 'kg/kg',
+        'colorbar' : 'kg/kg',
+        'colormap' : 'gray_r',
+        'scale' : 'original',
+        'retrieve_as' : lambda d,t: np.sum(d['QCLOUD'][t,:,:,:], axis=1),
+        'grid' : lambda d: (d.variables['XLAT'][0,:,:], d.variables['XLONG'][0,:,:])
+    },
     'PBLH': {
         'name' : 'PBL height',
         'native_unit': 'm',

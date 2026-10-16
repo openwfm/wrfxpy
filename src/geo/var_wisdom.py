@@ -13,7 +13,7 @@ _var_wisdom = {
         'fill_missing': 0,       
         'fill' : Dict({
             14: 0, range(15,91): 0, 92: 0, range(94,100): 0,
-            -9999: 0, (91,93): 'nearest'
+            -9999: 0, 91: 0, 93: 0
         }),
         'scale': 1., # scale the array to be integer (default: depending on bits, not really good option for int array)
         'signed': 'yes',
@@ -147,6 +147,8 @@ _var_wisdom = {
         'units': 'meters',
         'description': 'Forest Canopy Height from LANDFIRE',
         'type': 'continuous',
+        'missing_value': -9999,
+        'fill_missing': 0,
         'signed': 'yes',
         'scale': 0.1,
         'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
@@ -159,6 +161,8 @@ _var_wisdom = {
         'units': 'meters',
         'description': 'Forest Canopy Base Height from LANDFIRE',
         'type': 'continuous',
+        'missing_value': -9999,
+        'fill_missing': 0,
         'signed': 'yes',
         'scale': 0.1,
         'unit_scale': 0.1, # scale the array to be in meters (original data is in decimeters)
@@ -171,9 +175,11 @@ _var_wisdom = {
         'units': 'kg m-3',
         'description': 'Forest Canopy Bulk Density from LANDFIRE',
         'type': 'continuous',
+        'missing_value': -9999,
+        'fill_missing': 0,
         'signed': 'yes',
         'scale': 0.01,
-        'unit_scale': 0.01, # scale the array to be in kg/m3 (original data is multiplied by 100)
+        'unit_scale': 0.01,
         'bits': 32,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',
@@ -183,8 +189,11 @@ _var_wisdom = {
         'units': '%',
         'description': 'Forest Canopy Cover from LANDFIRE (%)',
         'type': 'continuous',
+        'missing_value': -9999,
+        'fill_missing': 0,
         'signed': 'yes',
         'scale': 1.,
+        'unit_scale': 1.,
         'bits': 16,
         'interp_option': 'default:average_gcell(4.0)+four_pt+average_4pt',
         'subgrid': 'yes',

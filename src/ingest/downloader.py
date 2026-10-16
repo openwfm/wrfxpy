@@ -136,7 +136,11 @@ def download_url(url, local_path, max_retries=max_retries_def, sleep_seconds=sle
     logging.info(' '.join(command))
     subprocess.call(' '.join(command),shell=True)
 
-    file_size = osp.getsize(local_path)
+    # retrieve the file size again after download, in case it changed during the download
+    if osp.exists(local_path):
+        file_size = osp.getsize(local_path)
+    else:
+        file_size = 0
 
     # content size may have changed during download
     content_size = request_url(url, token)
