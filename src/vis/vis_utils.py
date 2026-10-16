@@ -56,9 +56,9 @@ def interpolate2height(var,height,level):
         for j in range(0, var.shape[2]):
             k = ix[i,j]
             t = tx[i,j]
-            if k==0 or k>maxlayer:
-                #r[i,j] = np.nan
-                r[i,j] = 0
+            if k<0 or k>maxlayer:
+                r[i,j] = np.nan
+                #r[i,j] = 0
             else:
                 #r[i,j]=var[k,i,j]+(var[::k+1,i,j]-var[k,i,j])*tx[i,j] 
                 r[i,j] = var[k,i,j]*(1.0-t) + var[k+1,i,j]*t 
