@@ -1,0 +1,137 @@
+Alderaan RNN validation, October 19, 2026
+
+Scope and authorization
+The user authorized unattended execution of the testing outline and supplied
+Jonathon's operational model paths. The final changes contain tests and
+documentation only. The temporary two-line weights_path workaround was removed
+after the upstream package supplied the fix. No pushes, scheduled jobs, or
+CONUS runs were made during validation.
+
+Locations and revisions
+Local main checkout: /Users/jmandel/Projects/wrfxpy-dev_fmda_JH
+Remote main checkout: /data002/projects/dshield/wrfxpy-dev_fmda_JH
+Tests ran on branch dev_fmda_JH at
+07a1677f7d2ba8495129ccf8b858c5f9ab2bd5a8. The local checkout subsequently
+received the separate README/configuration-template commit f8e6075.
+The remote checkout is a separate clone; existing release and shell-refactoring
+checkouts were preserved. The two new test files have identical local and
+remote contents. Documentation and this note are local review changes.
+Package checkout: /data002/projects/dshield/ml_fmda
+Package branch main, initial tests: 89220acddc0ede55a237f59b4ebd629865290e16
+Package branch main, final tests: 2cc294657b635676b4efc295561795433d7bc559
+Host/access: math-alderaan-c30 through ssh c30.
+Visible sessions: codex-ml-output:rnn-tests and codex-ml-output:rnn-inspect.
+
+Environment and inputs
+Conda environment: /home/dshield/miniforge3/envs/wrfx_ml_test
+Python 3.12.15; TensorFlow 2.21.0, CPU build; pytest 9.1.1.
+The unpinned recipe initially selected scikit-learn 1.9.1. It was changed to
+1.7.1 in this isolated environment to match the supplied scaler's saved version.
+Added xgboost and pytables for the documented import check. Installed ml_fmda
+editable, plus python-cmr and shapely. Package source files were unchanged;
+editable installation generated src/ml_fmda.egg-info in the package checkout.
+Model root supplied by the user:
+/storage/math/NSF1/hirschij/FMDA/models/_OPERATIONAL_MODEL_/fm_transfer
+Configured rnn_model_path as its fm10_source_model directory and transfer_path
+as its fm_target_models directory. median_seed.csv selects seed 18.
+Weights, scaler, parameters, and transfer table were read without modification.
+Asset checksums and exact environment records are in the logs listed below.
+The remote etc/conf.json contains {} for isolated tests, without shuttle setup.
+
+Final results
+With ml_fmda 2cc2946 and the temporary wrapper workaround removed, the expanded
+suite collected 16 tests: 14 passed, 2 failed, 6 warnings in 20.08 seconds.
+Pytest exited with status 1; both pytest and its timeout process exited.
+Both repositories had zero tracked changed lines during this final run. The
+wrfxpy checkout also had 283 untracked test lines and a four-line local RNN
+configuration. Generated data and logs were ignored by Git.
+
+The remaining failures are:
+1. test_rectangular_rnn_outputs[wps]: the nine-character WPS field slot
+   truncates FM1000_H10 to FM1000_H1, colliding with the name for unit 1.
+2. test_incomplete_cycle_is_not_complete: is_cycle_computed returns True
+   when only the time-lag NetCDF path exists and RNN/blend outputs are absent.
+
+NetCDF save/load, recurrent-state restoration, nonsquare NetCDF output, and
+synthetic analysis/forecast/restart now pass. The synthetic sequence advances
+two analysis hours and a forecast, then repeats that forecast after changing
+the in-memory states to check restoration from the saved analysis.
+The package update supplies weights_path and set_states in the parent class;
+the wrapper requires no local workaround.
+
+Initial results with ml_fmda 89220ac
+Package import check: passed.
+ml_fmda: python -m pytest -v tests/test_rnn.py collected zero tests, exit 5.
+ml_fmda: python tests/test_rnn.py passed its two-epoch synthetic smoke test.
+Unchanged wrfxpy test file: 5 passed, 2 failed in 11.24 seconds.
+Expanded wrfxpy suite with matching scaler version: 10 passed, 6 failed in
+14.44 seconds. It collected 16 tests from test_rnn.py, test_rnn_integration.py,
+and test_rnn_cycler.py. The six failures represent three underlying findings:
+
+1. RNNMoistureModel.to_netcdf accesses self.weights_path, which neither its
+   constructor nor the initial parent constructor stored. Four tests failed here:
+   both supplied NetCDF tests, nonsquare NetCDF output, and the synthetic
+   cycler. The latter stopped at its first analysis hour, before forecast restart.
+2. RNN WPS labels for FM1000 units 10-32 exceed the current serializer's
+   nine-character field slot. Readback changes FM1000_H10 to FM1000_H1,
+   colliding with unit 1. The existing write-only WPS test does not detect this.
+3. is_cycle_computed checks only the time-lag NetCDF path. The regression test
+   supplies that path with RNN and blend files absent and gets True.
+
+Passed additional checks: nonsquare geogrid values and recurrent-state order;
+full versus split sequence prediction with batches of 4 and 64 for 15 cells;
+blend arithmetic, correction fields, and NetCDF/geogrid/WPS output; operational
+feature order, equilibrium percent conversion, scaling, and input preservation.
+The synthetic cold start also produced warnings from shared geogrid writing
+when all correction values were zero. These warnings need separate assessment.
+Source inspection also found a forecast retrieval exception path whose continue
+precedes forecast-hour advancement. This was not exercised by these tests.
+
+Terrain preparation
+The terrain archive linked by the FMDA wiki returned HTTP 404. A separately
+posted experimental static NetCDF had different coordinates and elevations
+from operational HRRR and was not installed as the cycler's terrain input.
+Instead, the HGT:surface record and its coordinates were extracted from:
+https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261018/conus/hrrr.t00z.wrfsfcf00.grib2
+Record 63, byte range 30781680-32935374. Record SHA256:
+32170d6b68e1221f909309ce2b9930094d17a14d7207993e562822a3d8370beb
+The generated file is in the remote checkout at static/hrrr.terrainh.nc.
+It contains HGT_M, XLAT_M, and XLONG_M with shape (1, 1059, 1799), preserving
+the decoded values and grid order without interpolation. All three arrays
+passed exact readback comparisons. Generated NetCDF SHA256:
+bc84af076ed3a7c868b4a9e50386ef352911f893e4935e9b7a9a90861bd8d6db
+This file is generated input data and is not included in the source commit.
+
+Execution limits and remaining work
+Test processes used CPU affinity 0,1, bounded TensorFlow/BLAS threads, and a
+180-second timeout with a 10-second kill grace. Process inspection afterward
+found no remaining test, timeout, or baseline-driver processes.
+No active Slurm job was present. No substantial run was launched.
+The terrain prerequisite is now present. No observation retrieval, publication,
+or real-data analysis/forecast run occurred. The synthetic cycler test supplies
+weather arrays, returns no observations, and disables rendering.
+Real-data ingestion, assimilation, rendered products, missing-GRIB
+recovery, baseline time-lag comparisons, and CONUS resource measurements remain.
+
+Review artifacts and rerun
+Both the local and remote wrfxpy checkout contain:
+logs/rnn-validation-20261019/
+  run-baseline.sh, provenance.txt, conda-create.log, pip-install.log,
+  imports.log, ml-fmda-pytest.log, ml-fmda-script.log, wrfxpy-baseline.log,
+  wrfxpy-expanded.log, scaler-version-install.log, conda-explicit-final.txt,
+  pip-freeze-final.txt, and initial environment snapshots.
+The final result is in expanded-2cc2946-clean-wrapper.log, present locally and
+remotely. Intermediate checks are in netcdf-fix.log and
+ml-fmda-2cc2946-retest.log. The remote terrain-extraction.log records the input
+and output checksums and exact-value checks. These generated logs are ignored
+by Git; the final expanded log records both revisions and local line counts.
+
+To repeat the expanded suite in the remote checkout after activating wrfx_ml_test:
+export PYTHONPATH=src OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=2
+export TF_NUM_INTRAOP_THREADS=2 TF_NUM_INTEROP_THREADS=1 CUDA_VISIBLE_DEVICES=-1
+export PYTHONHASHSEED=0 MPLBACKEND=Agg
+timeout --kill-after=10s 180s taskset -c 0,1 python -m pytest -v \
+  src/tests/test_rnn.py src/tests/test_rnn_integration.py src/tests/test_rnn_cycler.py
+
+Keep the failures visible until their causes are reviewed; no expected-failure
+markers or production workarounds were added to make this validation pass.

@@ -44,6 +44,14 @@ conda install -c conda-forge pyarrow
 conda install pytest
 ```
 
+The import check below also requires `xgboost` and `pytables`:
+```bash
+conda install -c conda-forge xgboost pytables
+```
+Use the scikit-learn version recorded in the pretrained scaler. The supplied
+operational scaler used in the October 19, 2026 validation was saved with
+scikit-learn 1.7.1.
+
 Then, navigate to the project root for `ml_fmda` and build the local package
 ```bash
 cd ml_fmda
@@ -56,20 +64,18 @@ python -c "import numpy, pandas, sklearn, xgboost, tables, tensorflow; print('nu
 ```
 
 
-### 3. Confirm Installation with PyTest
+### 3. Confirm the Package Installation
 
-To confirm the `ml_fmda` install, from the `ml_fmda` project root run the tests 
+From the `ml_fmda` project root, run its small training and prediction script:
 
 ```bash
 cd /path/to/ml_fmda
-pytest tests/test_rnn.py
+python tests/test_rnn.py
 ```
 
-To confirm the integration into `wrfxpy`, from the `wrfxpy` project root run the tests
-```bash
-cd /path/to/wrfxpy
-pytest src/tests/test_rnn.py
-```
+At `ml_fmda` revision `89220ac`, this file places its assertions inside
+`if __name__ == '__main__'`. Invoking pytest on it collects no tests and exits
+with code 5. Run the wrfxpy tests after configuring the model assets below.
 
 
 ## Get the Pretrained RNN Model Weights
@@ -98,6 +104,29 @@ Update the paths
     "rnn_model_path": "/path/to/fm10_source_model",
     "transfer_path": "/path/to/fm_target_models"
 ```
+
+### Test the wrfxpy Integration
+
+`src/tests/test_rnn.py` reads `etc/rnn_cycler.json`, model parameters, the scaler,
+weights, and transfer table during test collection. These inputs must exist
+before invoking pytest, even though package installation does not need them.
+
+From the wrfxpy project root:
+```bash
+python -m pytest -v src/tests/test_rnn.py
+python -m pytest -v src/tests/test_rnn.py src/tests/test_rnn_integration.py src/tests/test_rnn_cycler.py
+```
+
+The additional tests check nonsquare grids, WPS readback, blending, feature
+scaling, prediction batching, and synthetic cycler continuation. They also
+check that incomplete output is not treated as a completed cycle. They require
+`etc/conf.json`; an empty JSON object `{}` is sufficient in an isolated test
+checkout. Keep an operational checkout's existing configuration.
+
+The synthetic cycler test supplies weather arrays, returns no observations,
+and disables rendering. It does not validate HRRR ingestion, assimilation,
+forecast accuracy, or rendered products. See `notes/rnn-validation-20261019.txt`
+for the observed failures and remaining real-data checks.
  
 ## Run FMDA with RNN integration
 
