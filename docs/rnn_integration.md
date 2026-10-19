@@ -2,10 +2,20 @@
 
 ## Clone the RNN Compatible Branch 
 
-```python
+```bash
 git clone https://github.com/openwfm/wrfxpy
 cd wrfxpy
 git switch dev_fmda_JH
+```
+
+## Get static data
+Acquire the elevation static data from here:
+
+```bash
+mkdir static
+cd static
+wget https://demo.openwfm.org/web/wrfx/ds.terrainh.bin
+tar xvfj hrrr_terrain.tbz
 ```
 
 ## Install Necessary Packages
@@ -52,7 +62,7 @@ pip install -e .
 
 Confirm instillation at this point 
 ```bash
-python -c "import numpy, pandas, sklearn, xgboost, tables, tensorflow; print('numpy', numpy.__version__); print('tensorflow', tensorflow.__version__)"
+python -c "import numpy, pandas, sklearn,  tensorflow; print('numpy', numpy.__version__); print('tensorflow', tensorflow.__version__)"
 ```
 
 
