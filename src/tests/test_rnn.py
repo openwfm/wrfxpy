@@ -10,6 +10,7 @@ from geo.write_geogrid import read_geogrid
 import pandas as pd
 import joblib
 import numpy as np
+import warnings
 
 test_path = "wksp/test_rnn_output"
 os.makedirs(test_path, exist_ok=True)
@@ -28,17 +29,37 @@ warps = {
     "fm100": (row["bi_100"], row["bf_100"]),
     "fm1000": (row["bi_1000"], row["bf_1000"]),
 }
-rnn0 = TimeWarpedFuelClassPredictors(
-    params=params,
-    weights_path=fm10_weights_path,
-    warps=warps
-)
 
-rnn = RNNMoistureModel(
-    params=params,
-    weights_path=fm10_weights_path,
-    warps=warps
-) 
+# Building a model will raise a warning if parameters related to training are provided,
+# since the model class does not support training. The `timesteps` parameter raises a 
+# warning, since it fixes sequence length during training.
+# We turn this off and raise an informative warning.
+# In practice, we copy the params dictionary from the training m
+# model to create the prediction model, so the warning gets raised. This is intended, so in this test we capture the warning
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore",
+        message="timesteps should be None for flexible prediction",
+        category=UserWarning,
+    )
+    rnn0 = TimeWarpedFuelClassPredictors(
+        params=params,
+        weights_path=fm10_weights_path,
+        warps=warps
+    )
+
+
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore",
+        message="timesteps should be None for flexible prediction",
+        category=UserWarning,
+    )
+    rnn = RNNMoistureModel(
+        params=params,
+        weights_path=fm10_weights_path,
+        warps=warps
+    ) 
 
 # Predict, then get states, should still be None since not set with vanilla predict
 ny = nx = 10
@@ -95,7 +116,13 @@ def test_netcdf_roundtrip(tmp_path):
         data_vars=None,
     )
 
-    rnn2 = RNNMoistureModel.from_netcdf(str(path), fm10_weights_path)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="timesteps should be None for flexible prediction",
+            category=UserWarning,
+        )
+        rnn2 = RNNMoistureModel.from_netcdf(str(path), fm10_weights_path)
 
     states1 = rnn.get_states()
     states2 = rnn2.get_states()
@@ -128,11 +155,18 @@ def test_netcdf_state_restoration(tmp_path):
     p2 = rnn.predict_cycle(X2, reset_states=False)
 
     rnn_states = read_states_from_netcdf(path=str(path))
-    rnn2 = RNNMoistureModel(
-        params=params,
-        weights_path=fm10_weights_path,
-        warps=warps,
-    )
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="timesteps should be None for flexible prediction",
+            category=UserWarning,
+        )
+        rnn2 = RNNMoistureModel(
+            params=params,
+            weights_path=fm10_weights_path,
+            warps=warps,
+        )
+
     rnn2.set_states(rnn_states)
 
     p3 = rnn2.predict_cycle(X2, reset_states=False)
