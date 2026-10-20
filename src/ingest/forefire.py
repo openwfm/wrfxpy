@@ -1905,27 +1905,51 @@ def finalize_ff_outputs(dest_dir,grid_code,cfg=None,suffix=None):
     final_file = f"{dest_dir}/{grid_code}_final{tag}.kml"
     merge_geojson_to_kml(dest_dir,final_file,final = True,cfg = cfg,grid_code = grid_code)
 
-def prob_forecast(json_directory):
+def prob_forecast(json_dirs, out_dir=None, tol_minutes=5, raster_res=None):
+    """Burn-probability bands from the lagged *final* perimeters of one or more runs.
+
+    json_dirs is one directory or a list (e.g. one per pSAF member).  Each *final*
+    geojson is one equally weighted member.  Members are read with ff_growth._perimeter
+    (gpd.read_file subtracts a second front as a hole -- see read_ff_geojson) and only
+    those valid within tol_minutes of the latest member are kept, so every member
+    describes the same instant.  The bands are the fraction of members covering a place,
+    NOT a calibrated probability: against WRF-SFIRE a 0.7-0.8 cell burned ~45% of the
+    time (2026-10-19 handoff, 5aa).
+
+    Writes probabilistic_wildfire_map.{geojson,kml} to out_dir (default: the first
+    json dir, as before), and with raster_res (metres) also a GeoTIFF of the member
+    fraction on a regular UTM grid.
+    """
     import glob
     import geopandas as gpd
     import pandas as pd
     from shapely.ops import polygonize
+    from ff_growth import _perimeter
+    from ff_score_perim import _valid_at
 
+    if isinstance(json_dirs, str):
+        json_dirs = [json_dirs]
+    out_dir = out_dir or json_dirs[0]
 
-
-    # 1. Load and combine all 50 GeoJSON files
-    geojson_files = glob.glob(f"{json_directory}/*final*.geojson")
-    n_ensembles = len(geojson_files)
-
-    gdf_list = []
-    for file in geojson_files:
-        temp_gdf = gpd.read_file(file)
-        gdf_list.append(temp_gdf)
-
-    gdf = pd.concat(gdf_list, ignore_index=True)
+    # 1. Load every member valid at the common end time
+    found = []
+    for d in json_dirs:
+        for file in sorted(glob.glob(f"{d}/*final*.geojson")):
+            t = _valid_at(json.load(open(file)))
+            g = _perimeter(file)
+            if t is not None and g is not None and not g.is_empty:
+                found.append((t, g))
+    if not found:
+        print(f"prob_forecast: no *final* perimeters in {json_dirs}")
+        return None
+    end = max(t for t, _ in found)
+    geoms = [g for t, g in found if abs((t - end).total_seconds()) <= tol_minutes * 60]
+    n_ensembles = len(geoms)
+    print(f"prob_forecast: {n_ensembles} members valid at {end:%Y-%m-%d %H:%M} UTC, "
+          f"{len(found) - n_ensembles} dropped as valid at other times")
 
     # 2. Explicitly define the input CRS for v0.6.1
-    gdf.crs = {'init': 'epsg:4326'}
+    gdf = gpd.GeoDataFrame(geometry=geoms, crs={'init': 'epsg:4326'})
 
     # 3. Project to a planar coordinate system for accurate simplification
     # Using EPSG:3857 (Web Mercator) as a generic backup, or replace with your local UTM projection
@@ -2009,8 +2033,10 @@ def prob_forecast(json_directory):
 
     # 12. Convert back to EPSG:4326 before saving to GeoJSON
     prob_map = prob_map.to_crs({'init': 'epsg:4326'})
+    prob_map["members"] = n_ensembles
+    prob_map["valid_utc"] = end.strftime('%Y-%m-%dT%H:%M:%SZ')
     # Save final probabilistic contour map
-    prob_file = f"{json_directory}/probabilistic_wildfire_map.geojson"
+    prob_file = f"{out_dir}/probabilistic_wildfire_map.geojson"
     prob_map.to_file(prob_file, driver="GeoJSON")
 
     # --- STEP 13: STYLING FOR KML EXPORT ---
@@ -2024,7 +2050,8 @@ def prob_forecast(json_directory):
 
     # Add a name column (Google Earth uses the 'Name' or 'description' field for labels)
     prob_map["Name"] = prob_map["risk_zone"]
-    prob_map["description"] = prob_map["risk_zone"]
+    prob_map["description"] = (prob_map["risk_zone"] + f": fraction of {n_ensembles} ensemble "
+                               f"members, uncalibrated; valid {end:%Y-%m-%d %H:%M} UTC")
 
     # Inject standard SimpleStyle properties that many modern KML/GeoJSON viewers read
     prob_map["fill"] = prob_map["risk_zone"].map(color_mapping)
@@ -2051,6 +2078,39 @@ def prob_forecast(json_directory):
         print(f"Successfully saved styled KML using {kml_driver} driver.")
     except Exception as e:
         print(f"KML Driver failed: {e}. Falling back to styled GeoJSON.")
+
+    # 14. Optional GeoTIFF: member fraction on a regular UTM grid, from the unsimplified
+    # members, for GIS raster work
+    if raster_res:
+        import rasterio
+        from rasterio.features import rasterize
+        from rasterio.transform import from_origin
+        from ff_score_perim import _to_utm, _utm_proj
+        c = gpd.GeoSeries(geoms).unary_union.centroid
+        proj, epsg = _utm_proj(c.x, c.y)
+        utm = [_to_utm(g, proj) for g in geoms]
+        x0, y0 = min(g.bounds[0] for g in utm), min(g.bounds[1] for g in utm)
+        x1, y1 = max(g.bounds[2] for g in utm), max(g.bounds[3] for g in utm)
+        pad = 10 * raster_res
+        x0, y1 = math.floor((x0 - pad) / raster_res) * raster_res, math.ceil((y1 + pad) / raster_res) * raster_res
+        width = int(math.ceil((x1 + pad - x0) / raster_res))
+        height = int(math.ceil((y1 - (y0 - pad)) / raster_res))
+        transform = from_origin(x0, y1, raster_res, raster_res)
+        frac = np.zeros((height, width), dtype=np.float32)
+        for g in utm:
+            frac += rasterize([(g, 1)], out_shape=(height, width), transform=transform,
+                              fill=0, dtype='uint8')
+        frac /= n_ensembles
+        tif_file = prob_file.replace('.geojson', '.tif')
+        with rasterio.open(tif_file, 'w', driver='GTiff', height=height, width=width, count=1,
+                           dtype='float32', crs=f'EPSG:{epsg}', transform=transform,
+                           compress='deflate') as dst:
+            dst.write(frac, 1)
+            dst.update_tags(1, quantity='fraction of ensemble members burned (uncalibrated)',
+                            members=str(n_ensembles), valid_utc=end.strftime('%Y-%m-%dT%H:%M:%SZ'))
+        print(f"Saved member-fraction GeoTIFF {tif_file} ({width}x{height} at {raster_res} m, EPSG:{epsg})")
+
+    return prob_map
 
 
 
