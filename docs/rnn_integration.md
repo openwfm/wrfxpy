@@ -1,5 +1,8 @@
 # Integrating Recurrent Neural Networks for Fuel Moisture Prediction into FMDA
 
+Primary author and contact: Jonathon Hirschi
+jonathon.hirschi@ucdenver.edu
+
 ## Clone the RNN Compatible Branch 
 
 ```bash
@@ -7,6 +10,29 @@ git clone https://github.com/openwfm/wrfxpy
 cd wrfxpy
 git switch dev_fmda_JH
 ```
+
+### Update Config files in wrfxpy
+
+Update the tokens and credentials configuration file:
+```bash
+cp etc/tokens.json.initial etc/tokens.json
+```
+
+Update the field `mesowest` with your token from Synoptic, or create one at [Synoptic Data API: Getting Started](https://docs.synopticdata.com/services/welcome-to-synoptic-data-s-web-services).
+
+Update the global config file:
+```bash
+cp etc/conf.json.initial etc/conf.json
+```
+
+Configure the queuing system, system directories, WPS/WRF-SFIRE locations, and workspace locations by editing the following keys in etc/conf.json:
+```
+"qsys": "key from clusters.json",
+"sys_install_path": "/path/to/wrfxpy"
+"wget" : /path/to/wget"
+```
+
+
 
 ## Get static data
 Acquire the elevation static data from here:
@@ -71,21 +97,23 @@ python -c "import numpy, pandas, sklearn,  tensorflow; print('numpy', numpy.__ve
 
 ### 3. Confirm the Package Installation
 
-From the `ml_fmda` project root, run its small training and prediction script:
+From the `ml_fmda` project root, run the test script inside the package.:
 
 ```bash
-cd /path/to/ml_fmda
-python tests/test_rnn.py
+cd /path/to/ml_fmda/
+pytest src/ml_fmda/tests/test_rnn.py
 ```
-
-At `ml_fmda` revision `89220ac`, this file places its assertions inside
-`if __name__ == '__main__'`. Invoking pytest on it collects no tests and exits
-with code 5. Run the wrfxpy tests after configuring the model assets below.
-
 
 ## Get the Pretrained RNN Model Weights
 
-Integration into `wrfxpy` assumed pretrained RNN model weights. A set of pretrained model weights and associated scalers/configuration are distributed separately from the source package as a ZIP archive: `fm_transfer.zip`. The archive includes a README and the models from the training and transfer-learning workflows. Two main directories store the model weights, parameter files for building the model architecture, and information about how they were trained. 
+Integration into `wrfxpy` assumed pretrained RNN model weights. A set of pretrained model weights and associated scalers/configuration are distributed separately from the source package as a ZIP archive: `fm_transfer.zip`. 
+
+You can retrieve it online if you have password access, or contact corresponding author for model weights.
+```bash
+wget --user='USERNAME' --password='PASS' 'https://demo.openwfm.org/web/nas/fmda/_OPERATIONAL_MODEL_/fm_transfer.zip'
+```
+
+The archive includes a README and the models from the training and transfer-learning workflows. Two main directories store the model weights, parameter files for building the model architecture, and information about how they were trained. 
 
 ```text
 fm_transfer/
@@ -93,13 +121,12 @@ fm_transfer/
 |-- fm_target_models/
 |-- fm10_source_model/
 ```
-
 After obtaining the archive, extract it to a local directory:
 ```bash
 unzip fm_transfer.zip
 ```
 
-Once the pretrained model weights are extracted, update a configuration file that tells `wrfxpy` where to find model weights
+Once the pretrained model weights are extracted, update a configuration file that tells `wrfxpy` where to find model weights. From the `wrfxpy` project root, 
 ```bash
 cp etc/rnn_cycler.json.initial etc/rnn_cycler.json
 ```
@@ -119,7 +146,7 @@ before invoking pytest, even though package installation does not need them.
 From the wrfxpy project root:
 ```bash
 python -m pytest -v src/tests/test_rnn.py
-python -m pytest -v src/tests/test_rnn.py src/tests/test_rnn_integration.py src/tests/test_rnn_cycler.py
+python -m pytest -v src/tests/test_rnn_integration.py src/tests/test_rnn_cycler.py
 ```
 
 The additional tests check nonsquare grids, WPS readback, blending, feature
