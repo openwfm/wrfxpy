@@ -35,6 +35,17 @@ from ff_growth import track, wrf_track, shrink_events
 #matched a stray script named `1` sitting in the repo root, so `ff_batch_ratio.py 1`
 #silently took that file's mtime -- 2025-12-04 -- and scored the entire wksp archive,
 #125 fires at three different pSAF values, reported as if it were the last hour.
+#
+#`--subdir NAME` scores <wksp>/forefire/NAME instead of the cron output -- where
+#forefire.sweep_ff_params writes each member -- under the same common-time, truncation
+#and shrink rules.  The window still comes from argv[1] and is applied to that subdir.
+SUBDIR = None
+if '--subdir' in sys.argv:
+    i = sys.argv.index('--subdir')
+    if i + 1 >= len(sys.argv):
+        raise SystemExit('--subdir needs a directory name')
+    SUBDIR = sys.argv[i + 1]
+    del sys.argv[i:i + 2]
 ARG = sys.argv[1] if len(sys.argv) > 1 else '6'
 try:
     SINCE, BATCH = time.time() - float(ARG) * 3600, 'last %s h' % ARG
@@ -42,8 +53,9 @@ except ValueError:
     if not osp.exists(ARG):
         raise SystemExit('%r is neither a number of hours nor an existing path' % ARG)
     SINCE, BATCH = osp.getmtime(ARG), osp.basename(ARG)
-print('scoring ForeFire output written after %s (%s)\n'
-      % (time.strftime('%Y-%m-%d %H:%M', time.localtime(SINCE)), osp.basename(BATCH)))
+print('scoring ForeFire output%s written after %s (%s)\n'
+      % (' in forefire/%s' % SUBDIR if SUBDIR else '',
+         time.strftime('%Y-%m-%d %H:%M', time.localtime(SINCE)), osp.basename(BATCH)))
 
 #A fire cannot shrink, so a falling track means the perimeter was mis-measured or the
 #run lost a front.  This is the check that was missing when ff_growth.track() was
@@ -60,9 +72,12 @@ for w in sorted(glob.glob(osp.join(root, 'wfc-*'))):
     #Cotton 2 and Hot Spring 226 are being rewritten with per-fuel moisture right now;
     #their pSAF-0.175 scalar-Md output was copied aside first, so read that instead of
     #a directory mid-write
-    ffdir = osp.join(w, 'forefire_psaf175_scalarmd')
-    if not osp.isdir(ffdir):
-        ffdir = osp.join(w, 'forefire')
+    if SUBDIR:
+        ffdir = osp.join(w, 'forefire', SUBDIR)
+    else:
+        ffdir = osp.join(w, 'forefire_psaf175_scalarmd')
+        if not osp.isdir(ffdir):
+            ffdir = osp.join(w, 'forefire')
     if not osp.isdir(ffdir):
         continue
     gj = glob.glob(osp.join(ffdir, '*.geojson'))
