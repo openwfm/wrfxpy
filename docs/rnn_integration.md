@@ -14,7 +14,7 @@ Acquire the elevation static data from here:
 ```bash
 mkdir static
 cd static
-wget https://demo.openwfm.org/web/wrfx/ds.terrainh.bin
+wget https://demo.openwfm.org/web/data/fmda/hrrr_terrain.tbz 
 tar xvfj hrrr_terrain.tbz
 ```
 
@@ -52,11 +52,6 @@ conda install -c conda-forge scikit-learn pyyaml joblib tensorflow
 pip install python-cmr shapely
 conda install -c conda-forge pyarrow
 conda install pytest
-```
-
-The import check below also requires `xgboost` and `pytables`:
-```bash
-conda install -c conda-forge xgboost pytables
 ```
 Use the scikit-learn version recorded in the pretrained scaler. The supplied
 operational scaler used in the October 19, 2026 validation was saved with
