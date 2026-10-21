@@ -25,7 +25,7 @@ Update the global config file:
 cp etc/conf.json.initial etc/conf.json
 ```
 
-Configure the queuing system, system directories, WPS/WRF-SFIRE locations, and workspace locations by editing the following keys in etc/conf.json:
+Configure the queuing system, system directories, and workspace locations by editing the following keys in etc/conf.json:
 ```
 "qsys": "key from clusters.json",
 "sys_install_path": "/path/to/wrfxpy"
@@ -66,18 +66,20 @@ It is strongly recommended you build this environment from scratch, rather than 
 TODO: test a more elegant build recipe, but this works as of Oct 14 2026 so I don't want to touch it
 
 ```bash
-conda create -n wrfx_ml python=3.12
+conda create -n wrfx_ml --override-channels -c conda-forge python=3.12
 conda activate wrfx_ml
+conda config --env --set channel_priority strict
 
-conda install -c conda-forge gdal
-conda install -c conda-forge netcdf4 h5py pyhdf pygrib simplekml
-conda install -c conda-forge f90nml lxml pytz pandas scipy
-conda install -c conda-forge basemap paramiko dill psutil flask wgrib2
-conda install -c conda-forge toml synopticpy==2024.9.0
-conda install -c conda-forge scikit-learn pyyaml joblib tensorflow
-pip install python-cmr shapely
-conda install -c conda-forge pyarrow
-conda install pytest
+# Scientific, geospatial, and meteorological dependencies
+conda install -c conda-forge \
+    gdal netcdf4 h5py pyhdf pygrib simplekml \
+    f90nml lxml pytz pandas scipy numpy \
+    basemap paramiko dill psutil flask wgrib2 \
+    toml "synopticpy=2024.9.0" \
+    scikit-learn pyyaml joblib pyarrow shapely pytest
+
+conda install -c conda-forge "tensorflow=2.21"
+python -m pip install python-cmr
 ```
 Use the scikit-learn version recorded in the pretrained scaler. The supplied
 operational scaler used in the October 19, 2026 validation was saved with
