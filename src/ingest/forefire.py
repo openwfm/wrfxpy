@@ -1905,19 +1905,26 @@ def finalize_ff_outputs(dest_dir,grid_code,cfg=None,suffix=None):
     final_file = f"{dest_dir}/{grid_code}_final{tag}.kml"
     merge_geojson_to_kml(dest_dir,final_file,final = True,cfg = cfg,grid_code = grid_code)
 
-def prob_forecast(json_dirs, out_dir=None, tol_minutes=5, raster_res=None):
+def prob_forecast(json_dirs, out_dir=None, tol_minutes=5, raster_res=None,
+                  calibration=None):
     """Burn-probability bands from the lagged *final* perimeters of one or more runs.
 
     json_dirs is one directory or a list (e.g. one per pSAF member).  Each *final*
     geojson is one equally weighted member.  Members are read with ff_growth._perimeter
     (gpd.read_file subtracts a second front as a hole -- see read_ff_geojson) and only
     those valid within tol_minutes of the latest member are kept, so every member
-    describes the same instant.  The bands are the fraction of members covering a place,
-    NOT a calibrated probability: against WRF-SFIRE a 0.7-0.8 cell burned ~45% of the
-    time (2026-10-19 handoff, 5aa).
+    describes the same instant.  Without calibration the bands are the fraction of
+    members covering a place, NOT a calibrated probability: against WRF-SFIRE a 0.7-0.8
+    cell burned ~45% of the time (2026-10-19 handoff, 5aa).
+
+    calibration is {'edges': [...], 'values': [...]} (the prob_calibration entry in
+    etc/forefire.json): a fraction in [edges[k], edges[k+1]) is relabelled values[k],
+    and 0 stays 0.  It re-labels, never re-orders, so the bands keep their meaning as
+    nested areas; with a WRF-SFIRE-fitted table they become burn frequencies, and a band
+    no relabelled value reaches is simply absent.
 
     Writes probabilistic_wildfire_map.{geojson,kml} to out_dir (default: the first
-    json dir, as before), and with raster_res (metres) also a GeoTIFF of the member
+    json dir, as before), and with raster_res (metres) also a GeoTIFF of the (relabelled)
     fraction on a regular UTM grid.
     """
     import glob
@@ -1930,6 +1937,17 @@ def prob_forecast(json_dirs, out_dir=None, tol_minutes=5, raster_res=None):
     if isinstance(json_dirs, str):
         json_dirs = [json_dirs]
     out_dir = out_dir or json_dirs[0]
+
+    def relabel(p):
+        """Member fraction -> calibrated value; identity without a calibration table."""
+        p = np.asarray(p, dtype=float)
+        if calibration is None:
+            return p
+        edges = np.asarray(calibration['edges'], dtype=float)
+        values = np.asarray(calibration['values'], dtype=float)
+        k = np.clip(np.searchsorted(edges, p, side='right') - 1, 0, len(values) - 1)
+        return np.where(p <= 0, 0.0, values[k])
+    kind = 'calibrated to WRF-SFIRE burn frequency' if calibration is not None else 'uncalibrated'
 
     # 1. Load every member valid at the common end time
     found = []
@@ -2007,7 +2025,7 @@ def prob_forecast(json_dirs, out_dir=None, tol_minutes=5, raster_res=None):
     # 10. Map counts back to fragments and calculate final probability
     counts = joined.index.value_counts()
     fragments_gdf["count"] = fragments_gdf.index.map(counts).fillna(0)
-    fragments_gdf["probability"] = fragments_gdf["count"] / n_ensembles
+    fragments_gdf["probability"] = relabel(fragments_gdf["count"] / n_ensembles)
 
     # Clean up temporary point geometry column
     fragments_gdf = fragments_gdf.drop(columns=["sample_point"])
@@ -2025,6 +2043,9 @@ def prob_forecast(json_dirs, out_dir=None, tol_minutes=5, raster_res=None):
 
     # Clean up and reorder columns for clarity
     prob_map = prob_map[["risk_zone", "geometry"]]
+    # dissolve on a categorical keeps every category, so a band no area falls in comes
+    # back as an empty geometry -- an empty placemark in the KML.  Drop it.
+    prob_map = prob_map[prob_map.geometry.notna() & ~prob_map.geometry.is_empty]
 
     # --- FIX: Convert Pandas Category to String for Fiona compatibility ---
     prob_map["risk_zone"] = prob_map["risk_zone"].astype(str)
@@ -2035,6 +2056,8 @@ def prob_forecast(json_dirs, out_dir=None, tol_minutes=5, raster_res=None):
     prob_map = prob_map.to_crs({'init': 'epsg:4326'})
     prob_map["members"] = n_ensembles
     prob_map["valid_utc"] = end.strftime('%Y-%m-%dT%H:%M:%SZ')
+    if calibration is not None:
+        prob_map["calibrated"] = kind
     # Save final probabilistic contour map
     prob_file = f"{out_dir}/probabilistic_wildfire_map.geojson"
     prob_map.to_file(prob_file, driver="GeoJSON")
@@ -2051,7 +2074,7 @@ def prob_forecast(json_dirs, out_dir=None, tol_minutes=5, raster_res=None):
     # Add a name column (Google Earth uses the 'Name' or 'description' field for labels)
     prob_map["Name"] = prob_map["risk_zone"]
     prob_map["description"] = (prob_map["risk_zone"] + f": fraction of {n_ensembles} ensemble "
-                               f"members, uncalibrated; valid {end:%Y-%m-%d %H:%M} UTC")
+                               f"members, {kind}; valid {end:%Y-%m-%d %H:%M} UTC")
 
     # Inject standard SimpleStyle properties that many modern KML/GeoJSON viewers read
     prob_map["fill"] = prob_map["risk_zone"].map(color_mapping)
@@ -2101,12 +2124,13 @@ def prob_forecast(json_dirs, out_dir=None, tol_minutes=5, raster_res=None):
             frac += rasterize([(g, 1)], out_shape=(height, width), transform=transform,
                               fill=0, dtype='uint8')
         frac /= n_ensembles
+        frac = relabel(frac).astype(np.float32)
         tif_file = prob_file.replace('.geojson', '.tif')
         with rasterio.open(tif_file, 'w', driver='GTiff', height=height, width=width, count=1,
                            dtype='float32', crs=f'EPSG:{epsg}', transform=transform,
                            compress='deflate') as dst:
             dst.write(frac, 1)
-            dst.update_tags(1, quantity='fraction of ensemble members burned (uncalibrated)',
+            dst.update_tags(1, quantity=f'fraction of ensemble members burned ({kind})',
                             members=str(n_ensembles), valid_utc=end.strftime('%Y-%m-%dT%H:%M:%SZ'))
         print(f"Saved member-fraction GeoTIFF {tif_file} ({width}x{height} at {raster_res} m, EPSG:{epsg})")
 
