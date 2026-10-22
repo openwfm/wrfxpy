@@ -35,64 +35,48 @@ except:
    print('pyroj Transformer is not available')
 
 
-def current_nifc():
+WFIGS_LOCATIONS_QUERY = ("https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/"
+                         "WFIGS_Incident_Locations_Current/FeatureServer/0/query")
+NIFC_LOCS_CSV = '/data/jhaley/wrfxpy/ngfs/perims/WFIGS_Incident_Locations_Current_-8500334455305135272.csv'
 
-    # The complete URL containing all SAS token parameters
-    url = ("https://stg-arcgisazurecdataprod3.az.arcgis.com/exportfiles-2532-182237/WFIGS_Incident_Locations_Current_-8500334455305135272.csv?"
-        "sv=2025-05-05&st=2026-08-24T11%3A15%3A10Z&se=2026-08-24T12%3A20%3A10Z&sr=b&sp=r&sig=JLl%2B1cAFiR7yIHIhRavv7VBtxuCur5j%2F9SIZki9MXc0%3D")
 
-    # HTTP headers from your curl command
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:136.0) Gecko/20100101 Firefox/136.0',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br, zstd',
-        'Referer': 'https://data-nifc.opendata.arcgis.com/',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'same-site',
-        'Sec-Fetch-User': '?1',
-        'Priority': 'u=0, i'
-    }
-
-    # Cookie data included in your curl request
-    cookies = {
-        'mbox': 'PC#b13e0eba0dff409096354136d77a326d.35_0#1850401438|session#8ebf919a9806485d9f3b12c8c760e3ef#1787158498',
-        'OptanonConsent': 'isGpcEnabled=0&datestamp=Wed+Aug+19+2026+10%3A23%3A58+GMT-0600+(Mountain+Daylight+Time)&version=202605.1.0&isIABGlobal=false&hosts=&consentId=ed41683d-2f99-47be-ac0d-2fd5bb403c31&interactionCount=6&landingPath=NotLandingPage&groups=1%3A1%2C4%3A0%2C2%3A1%2C3%3A1&AwaitingReconsent=false&geolocation=US%3BCO&browserGpcFlag=0&isAnonUser=1&isDntEnabled=1&prevHadToken=0&crTime=1783950092973',
-        'AMCV_ED8D65E655FAC7797F000101@AdobeOrg': '179643557|MCIDTS|20593|MCMID|38351715925472910283663038632625124206|MCAID|NONE|MCOPTOUT-1779212530s|NONE|MCAAMLH-1750947629|7|MCAAMB-1779205329|j8Odv6LonN4r3an7LhD3WZrU1bUpAkFkkiY1ncBR96t2PTI|MCSYNCSOP|411-19636|vVersion|5.5.0',
-        'at_check': 'true',
-        'AMCVS_ED8D65E655FAC7797F000101@AdobeOrg': '1',
-        's_cc': 'true',
-        's_sq': '[[B]]',
-        's_ppv': 'developers.arcgis.com%253A%2520python%253A%2520api-reference,32,2,13356',
-        's_tp': '41450',
-        'esri_locale': 'en'
-    }
-
-    output_filename = '/data/jhaley/wrfxpy/ngfs/perims/WFIGS_Incident_Locations_Current_-8500334455305135272.csv'
-
+def current_nifc(output_filename=NIFC_LOCS_CSV):
+    #Refresh the local copy of WFIGS Incident Locations (Current) that nifc_locs reads.
+    #This used to replay a browser download -- a signed ArcGIS export URL plus copied
+    #cookies -- which is valid for about an hour, so it expired (2026-08-24) and every
+    #call since returned 403 while nifc_locs kept reading the August file.  The public
+    #feature-service query below needs no token and does not expire.  It writes the same
+    #CSV: the layer's attributes plus x, y (lon/lat, EPSG:4326) from the point geometry.
+    #Dates come as epoch milliseconds rather than the export's text; nothing here reads
+    #them, and the per-incident REST fallback in get_nifc_incident returns that form too.
+    #Written to a temporary file and renamed, so a failed refresh keeps the previous copy.
+    rows, offset = [], 0
     try:
-        # Send GET request with headers and cookies, streaming the response
-        response = requests.get(url, headers=headers, cookies=cookies, stream=True)
-        
-        # Raise error if response is not 200 OK
-        response.raise_for_status()
-        
-        # Write chunks to file to safely manage memory
-        with open(output_filename, 'wb') as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    file.write(chunk)
-                    
-        print(f"File successfully downloaded and saved as '{output_filename}'")
-
-    except requests.exceptions.HTTPError as http_err:
-        print(f"HTTP error occurred: {http_err}")
+        while True:
+            r = requests.get(WFIGS_LOCATIONS_QUERY, timeout=120,
+                             params={'where': '1=1', 'outFields': '*', 'outSR': 4326, 'f': 'json',
+                                     'resultOffset': offset, 'resultRecordCount': 2000})
+            r.raise_for_status()
+            page = r.json()
+            if 'error' in page:
+                raise RuntimeError(page['error'])
+            for f in page.get('features', []):
+                row = dict(f['attributes'])
+                g = f.get('geometry') or {}
+                row['x'], row['y'] = g.get('x'), g.get('y')
+                rows.append(row)
+            if not page.get('exceededTransferLimit'):
+                break
+            offset += len(page.get('features', []))
+        if not rows:
+            raise RuntimeError('the query returned no incidents')
+        tmp = output_filename + '.tmp'
+        pd.DataFrame(rows).to_csv(tmp, index=False)
+        os.replace(tmp, output_filename)
+        print(f"WFIGS incident locations: {len(rows)} written to '{output_filename}'")
     except Exception as err:
-        print(f"An error occurred: {err}")
+        print(f"WFIGS incident locations not refreshed ({WFIGS_LOCATIONS_QUERY}): {err}; "
+              f"keeping the previous copy")
 
 
 
@@ -111,7 +95,7 @@ def nifc_locs():    ### remove this, put in nifc.py module
     )
 
 
-    f = '/data/jhaley/wrfxpy/ngfs/perims/WFIGS_Incident_Locations_Current_-8500334455305135272.csv'
+    f = NIFC_LOCS_CSV
     if not os.path.exists(f):
         current_nifc()
     file_time = os.path.getmtime(f)
