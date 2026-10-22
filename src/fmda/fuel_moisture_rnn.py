@@ -183,17 +183,20 @@ class RNNMoistureModel(TimeWarpedFuelClassPredictors):
         :param n_rnn_vars: Number of recurrent state variables per LSTM (hidden, cell).
         :param n_units: Number of units in the LSTM recurrent layer.
 
+        RNN state labels use a compact naming convention constrained to 9
+        characters by the WPS binary format. 
+            The first character identifies the fuel class: (1 = FM1, 2 = FM10, 3 = FM100, 4 = FM1000), 
+            The second character identifies the recurrent state type (H = hidden, C = cell),
+            The remaining characters specify the unit index.
 
-        Returns: list with naming convention, (N units)
-
-        [FM1_H1, ..., FM1_HN, FM1_C1, ..., FM1_CN,
-         FM10_H1, ..., FM10_HN, FM10_C1, ..., FM10_CN,
-         FM100_H1, ..., FM100_HN, FM100_C1, ..., FM100_CN,
-         FM1000_H1, ..., FM1000_HN, FM1000_C1, ..., FM1000_CN]
+        Example:
+        [1H1, ..., 1HN, 1C1, ..., 1CN,
+         2H1, ..., 2HN, 2C1, ..., 2CN,
+         3H1, ..., 3HN, 3C1, ..., 3CN,
+         4H1, ..., 4HN, 4C1, ..., 4CN]
 
         TODO: decide on count from 0 or from 1, fortran vs python
         """
-
         # Get number of fuel classes, double check it matches
         if k != len(self.FUEL_CLASSES):
             raise ValueError(
@@ -206,14 +209,15 @@ class RNNMoistureModel(TimeWarpedFuelClassPredictors):
         lstm_units = self.params["hidden_units"][lstm_idx]
         if n_units != lstm_units:
             raise ValueError(f"State units ({n_units}) do not match LSTM units ({lstm_units}).")
-        
+
         labels = [
-            f"{fuel_class.upper()}_{state}{unit}"
-            for fuel_class in self.FUEL_CLASSES
+            f"{fuel_idx}{state}{unit}"
+            for fuel_idx, _ in enumerate(self.FUEL_CLASSES, start=1)
             for state in ("H", "C")
             for unit in range(1, n_units + 1)
         ]
-        return labels        
+        return labels
+
 
     def _make_rnn_descriptions(self, k, n_rnn_vars, n_units):
 
