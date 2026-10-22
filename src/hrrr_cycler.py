@@ -944,16 +944,20 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     
 def is_cycle_computed(cycle, cfg, wksp_path, fcst_hour=0):
     """
-    Check if the fuel model file exists (has been computed) for the
-    cycle <cycle> and region configuration <cfg>.
-    
+    Check if all three fuel model output files exist for the cycle <cycle>
+    and region configuration <cfg>: the time-lag model, RNN model, and
+    blended model.
+
     :param cycle: the cycle datetime in UTC
     :param cfg: the region configuration wrapped in a Dict for convenience
     :param wksp_path: the workspace path for the cycler
-    :return: True if the model file has been found, False otherwise
-    """
-    path = compute_model_path(cycle, cfg.code, wksp_path, fcst_hour=fcst_hour)
-    return osp.isfile(path)
+    :return: True if all three model output files exist, False otherwise
+    """    
+    model_path = compute_model_path(cycle, cfg.code, wksp_path, fcst_hour=fcst_hour)
+    rnn_path = compute_rnn_path(cycle, cfg.code, wksp_path, fcst_hour=fcst_hour)
+    blend_path = compute_blend_path(cycle, cfg.code, wksp_path, fcst_hour=fcst_hour)    
+    
+    return osp.isfile(model_path) and osp.isfile(rnn_path) and osp.isfile(blend_path)
 
 
 def fmda_cycle_interval(start_cycle, end_cycle):
