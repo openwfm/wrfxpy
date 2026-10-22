@@ -402,6 +402,51 @@ class ngfs_incident():
       #os.system(f'(sleep {sleep_time}; {self.json_start_code})')   ### <<<-----------------------------bad? remove ?
       print(f'Starting job after {sleep_time} delay: {self.json_start_code}')
       self.started = True
+      self.start_forefire(sleep_time)
+
+   def start_forefire(self, sleep_time=0):
+      #Submit this incident's ForeFire forecast to SLURM, from the same job file the
+      #WRF-SFIRE run would use.  Configured by ngfs.json's forefire_cfg; does nothing
+      #unless run_forefire is set, and with dry_run only prints the sbatch command.
+      #The run happens in install_dir (the wrfxpy holding the ForeFire code and
+      #etc/forefire.json) with this process's own python, so the compute node sees the
+      #same environment; forefire_forecast writes to wksp_forefire/<grid_code>.  Any
+      #failure is reported and swallowed: a ForeFire problem must not stop the cron.
+      import shlex
+      ff = (self.ngfs_cfg or {}).get('forefire_cfg', {})
+      if not ff.get('run_forefire'):
+         return
+      try:
+         #steps 'job': cover the job's own window.  forefire_forecast starts the hour
+         #before the ignition's hour and runs one hourly step past each, so
+         #ceil((end_utc - ignition)/1 h) steps end at or after the job's end_utc --
+         #the run follows whatever length base_ngfs_cfg gives the WRF-SFIRE job.
+         steps = ff.get('steps', 8)
+         if steps == 'job':
+            end = pd.Timestamp(self.cfg['end_utc'].replace('_', ' '))
+            ign = pd.Timestamp(self.cfg['ignitions']['1'][0]['time_utc'].replace('_', ' '))
+            steps = max(1, int(np.ceil((end - ign).total_seconds() / 3600.0)))
+         job = os.path.abspath(self.job_filename)
+         log = os.path.abspath(self.log_filename)[:-len('.log')] + '_forefire.log'
+         python = sys.executable
+         wrap = (f"cd {shlex.quote(ff['install_dir'])} && "
+                 f"PROJ_LIB={shlex.quote(os.path.join(sys.prefix, 'share', 'proj'))} "
+                 f"PYTHONPATH=src:src/ingest {shlex.quote(python)} -u src/ingest/forefire_forecast.py "
+                 f"{shlex.quote(job)} --steps {int(steps)} --fire-dx {float(ff.get('fire_dx', 50))}")
+         cmd = ['sbatch', '--partition', ff.get('partition', 'compute'), '--ntasks', '1',
+                '--cpus-per-task', str(ff.get('cpus', 8)), '--time', ff.get('time_limit', '01:00:00'),
+                '--job-name', 'ff_' + self.cfg['grid_code'][:40], '--output', log]
+         if sleep_time and sleep_time > 0:
+            cmd += ['--begin', f'now+{int(sleep_time)}']
+         cmd += ['--wrap', wrap]
+         if ff.get('dry_run'):
+            print('\tForeFire (dry run): ' + ' '.join(shlex.quote(c) for c in cmd))
+            return
+         out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              universal_newlines=True, timeout=60)
+         print(f'\tForeFire submitted: {out.stdout.strip()}  log {log}')
+      except Exception as e:
+         print(f'\tForeFire submission failed for {self.job_filename}: {e!r}')
 
    
    # These attributes are set when viirs data finds detection pixels within the goes ignition pixel

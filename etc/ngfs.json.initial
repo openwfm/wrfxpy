@@ -25,6 +25,17 @@
    "fmda_dir" : "/path/to/wrfxpy/wksp_fmda/",
    "fmda_region" : "CONUS_HRRR"
    },
+"forefire_cfg_comment" : "ForeFire forecasts submitted to SLURM by ngfs_incident.start_forefire for every incident the cron starts (initial forecasts included), from the same job file WRF-SFIRE would use. run_forefire turns it on; dry_run only prints the sbatch command. install_dir is the wrfxpy holding the ForeFire code and etc/forefire.json (which must set apptainer.config_file for the compute nodes); results go to its wksp_forefire/<grid_code>, the log next to the job's log as <job>_forefire.log. steps is forefire_forecast.py's --steps: a number of hourly steps, or \"job\" to cover each job's own window (ceil((end_utc - ignition) / 1 h), so ForeFire ends at the WRF-SFIRE job's end_utc whatever length base_ngfs_cfg sets); fire_dx is --fire-dx (50 m matches the validated forward batch). partition, cpus and time_limit are the sbatch request; the cron's stagger becomes sbatch --begin.",
+"forefire_cfg" : {
+   "run_forefire" : false,
+   "dry_run" : true,
+   "install_dir" : "/path/to/wrfxpy",
+   "steps" : "job",
+   "fire_dx" : 50,
+   "partition" : "compute",
+   "cpus" : 8,
+   "time_limit" : "01:00:00"
+   },
 "fuels_comment" : "CONUS fuels are NOT selected here. They come from geo_vars_path in base_cfg, which should point at a LANDFIRE mosaic built by src/ingest/landfire_mosaic.py. LANDFIRE updates its releases by region and those regions cut across state lines, so no state list can select the right release. region_cfg below is only for areas that need their own fuels, elevation AND grib source.",
 "region_comment" : "Include any regions where the default landfire or grib sources will not be used",
 "region_cfg" : {
