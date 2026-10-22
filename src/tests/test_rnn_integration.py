@@ -81,10 +81,12 @@ def test_rectangular_rnn_outputs(tmp_path, output_format):
     for fuel_index, hours in enumerate((1, 10, 100, 1000)):
         expected[f"{hours}H"] = moisture[..., fuel_index]
     expected.update(FMXLON=lons, FMXLAT=lats)
-    for fuel_index, hours in enumerate((1, 10, 100, 1000)):
+    # RNN state labels modified due to WPS 9 character length restriction
+    # Fuel class codes: 1=FM1, 2=FM10, 3=FM100, 4=FM1000
+    for fuel_index, fuel_code in enumerate((1, 2, 3, 4)):
         for state_index, state_name in enumerate(("H", "C")):
             for unit in range(states.shape[-1]):
-                expected[f"FM{hours}_{state_name}{unit + 1}"] = states[
+                expected[f"{fuel_code}{state_name}{unit + 1}"] = states[
                     :, :, fuel_index, state_index, unit
                 ]
     assert_wps_fields(tmp_path / f"RNN:{time_tag}", expected)
