@@ -1741,6 +1741,15 @@ def run_timing_table(df,overwrite=False,cfg=None,run_dir=None,dest_dir=None,
     SIF_IMAGE = cfg['apptainer']['sif_image']
     BIND_FLAGS = bind_flags(cfg,run_dir=BIND_DIR)
     timeout_s = cfg['apptainer'].get('timeout_s',240)
+    #apptainer builds a writable session layer for every container (home, cwd and
+    #/etc files the image lacks) with an overlay.  This host can (fuse-overlayfs);
+    #the SLURM compute nodes cannot, so the container fails there.  A config_file
+    #with 'enable overlay = no' makes apptainer use its underlay instead, which works
+    #on both.  --writable-tmpfs needs the overlay, so it goes with it; the sandbox
+    #does not need it.  Verified 2026-10-22: identical perimeters on node001 and here.
+    APPTAINER_CFG = cfg['apptainer'].get('config_file')
+    APPTAINER_CMD = (["apptainer", "--config", APPTAINER_CFG, "exec"] if APPTAINER_CFG
+                     else ["apptainer", "exec", "--writable-tmpfs"])
 
     # Load your dataframe (replace with your actual data source)
     # df = pd.read_csv("your_data.csv")
@@ -1773,10 +1782,8 @@ def run_timing_table(df,overwrite=False,cfg=None,run_dir=None,dest_dir=None,
             continue
             
         # Construct the exact Apptainer command array
-        cmd = [
-            "apptainer", "exec",
+        cmd = APPTAINER_CMD + [
             "--pwd", CONTAINER_PWD,
-            "--writable-tmpfs",
         ] + BIND_FLAGS + [
             SIF_IMAGE,
             "forefire", "-i", script_name
