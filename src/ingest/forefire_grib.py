@@ -571,10 +571,27 @@ def build_step_ncs(lat, lon, ign_utc, out_dir, grid_code, steps=8, domain_km=30.
     fuel_asc = _warp(src_tif, osp.join(work_dir, 'fuel.asc'), domain, 'near')
     #second pass with max, so a barrier narrower than a cell is not sampled away
     fuel_max_asc = _warp(src_tif, osp.join(work_dir, 'fuel_max.asc'), domain, 'max')
-    fuel = remap_fuel(read_asc(fuel_asc), read_asc(fuel_max_asc))
+    fuel_raw = read_asc(fuel_asc)
+    fuel = remap_fuel(fuel_raw, read_asc(fuel_max_asc))
     logging.info('fuels: %d of %d cells burnable; terrain %.0f-%.0f m',
                  int(((fuel >= 1) & (fuel <= 13)).sum()), fuel.size,
                  float(np.nanmin(altitude)), float(np.nanmax(altitude)))
+    #A cut with no plausible terrain or no LANDFIRE fuel code anywhere is a failed read,
+    #not a place: on 2026-10-22 two cron runs on a compute node got terrain 32767
+    #everywhere and 0 burnable cells, and WindNinja then failed with "The grid does not
+    #contain any values"; the same jobs resubmitted minutes later read correctly.  Stop
+    #here with that said, rather than downstream with a message about grids.  Only an
+    #entirely invalid cut stops a run -- a domain partly over the sea or past the border
+    #still has valid cells.
+    terrain_ok = int(((altitude > -500) & (altitude < 9000)).sum())
+    fuel_ok = int(((fuel_raw >= 1) & (fuel_raw <= 99)).sum())
+    if terrain_ok == 0 or fuel_ok == 0:
+        raise ForeFireGribError(
+            'terrain/fuel read as all no-data for the %d x %d domain at %.5f, %.5f (EPSG:%d): '
+            '%d valid terrain cells from %s, %d LANDFIRE fuel cells from %s.  Seen once as a '
+            'transient read failure (2026-10-22); resubmitting the job may succeed.'
+            % (domain['nx'], domain['ny'], lat, lon, domain['epsg'],
+               terrain_ok, ELEV_TIF, fuel_ok, src_tif))
 
     built = []
     for i, row in tt.iterrows():
