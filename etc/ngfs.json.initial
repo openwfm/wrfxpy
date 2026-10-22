@@ -19,12 +19,11 @@
 "perims_cfg" : {
    "perim_dir" : "ngfs/perims/"
    },
-"fmda_cfg_comment" : "Fuel moisture data assimilation. Set use_fmda false to run with equilibrium fuel moisture instead. fmda_path and second_path are absolute and must be edited for your system.",
+"fmda_cfg_comment" : "Fuel moisture data assimilation for WRF-SFIRE forecasts, for every fire model. Set use_fmda false to run with equilibrium fuel moisture instead. fmda_dir is the FMDA cycler's wksp_fmda (absolute; edit for your system); fmda_region is its region code -- CONUS_HRRR (HRRR cycler, 3 km) or CONUS (RTMA cycler, 2.5 km). Each forecast uses the analysis tile <fmda_dir>/<fmda_region>/<YYYYMM>/fmda-<fmda_region>-<YYYYMMDD>-<HH>.geo at its start hour; if that tile is missing the run proceeds with equilibrium moisture. The tiles have 6 layers, matching moisture_classes = 6 in the behave namelists.",
 "fmda_cfg" : {
    "use_fmda" : false,
-   "fmda_path": "/path/to/WRFXPY/wksp_fmda/",
-   "second_path" : "/path/to/your/wrfxpy/wksp_fmda/",
-   "fmda_regions" : ["CONUS"]
+   "fmda_dir" : "/path/to/wrfxpy/wksp_fmda/",
+   "fmda_region" : "CONUS_HRRR"
    },
 "fuels_comment" : "CONUS fuels are NOT selected here. They come from geo_vars_path in base_cfg, which should point at a LANDFIRE mosaic built by src/ingest/landfire_mosaic.py. LANDFIRE updates its releases by region and those regions cut across state lines, so no state list can select the right release. region_cfg below is only for areas that need their own fuels, elevation AND grib source.",
 "region_comment" : "Include any regions where the default landfire or grib sources will not be used",

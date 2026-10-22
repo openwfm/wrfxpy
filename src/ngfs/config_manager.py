@@ -101,7 +101,7 @@ def make_base_configuration(force,ngfs_cfg):
          #on ngfs_incident's heavy imports, and so no import cycle can form; the
          #same deferred-import pattern is used by persistence.get_old_incidents
          from ngfs.ngfs_incident import get_fmda_path
-         temp_cfg['fmda_geogrid_path'] = get_fmda_path(temp_cfg)#base_folder + date_folder
+         temp_cfg['fmda_geogrid_path'] = get_fmda_path(temp_cfg, ngfs_cfg['fmda_cfg'])
 
       if force:
          print('Using base configuration')

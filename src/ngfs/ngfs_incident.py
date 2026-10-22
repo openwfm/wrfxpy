@@ -77,29 +77,34 @@ except:
    from pyproj import Proj, transform # Transformer
 from ingest.NWS_warnings import set_red_flags, red_flag_incident, subset_red_flag_data, subset_wfo_data
 
-def get_fmda_path(cfg):                                                                #<<--------------move elsewhere
+def get_fmda_path(cfg, fmda_cfg=None):                                                 #<<--------------move elsewhere
+   #The FMDA geogrid tile for a WRF-SFIRE forecast, whatever its fire model: the
+   #analysis tile at the start hour from the cycler output that ngfs.json's fmda_cfg
+   #names (fmda_dir, fmda_region, e.g. CONUS_HRRR).  Without fmda_cfg it is the RTMA
+   #cycler output.  Forecast tiles carry a -fNN suffix and are not used here.
+   #The tiles hold 4 moisture classes + 2 lon/lat test layers = 6 layers, matching
+   #moisture_classes = 6 in the behave namelists; the cawfe namelist declares 5 (no
+   #cawfe runs since 2026-09) -- check that before running cawfe with FMDA.
+   #The same function lives in src/ngfs_start.py -- keep the two in step.
    fmda_year = cfg['start_utc'][:4]
    fmda_month = cfg['start_utc'][5:7]
    fmda_day = cfg['start_utc'][8:10]
    fmda_hour = cfg['start_utc'][11:13]
 
-   behave = 'behave' in cfg['fire_namelist_path']
-   if 'cawfe' in cfg['fire_namelist_path']:
-      base_folder = '/data/WRFXPY/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
-   elif behave:
-      base_folder = '/data/jhaley/clean_wrfxpy/wrfxpy/wksp_fmda/CONUS/' + fmda_year + fmda_month + '/'
-   else:
-      return 'ngfs'
+   fmda_cfg = fmda_cfg or {}
+   fmda_dir = fmda_cfg.get('fmda_dir', '/data/jhaley/clean_wrfxpy/wrfxpy/wksp_fmda/')
+   region = fmda_cfg.get('fmda_region', 'CONUS')
+   fmda_geo_folder = os.path.join(fmda_dir, region, fmda_year + fmda_month,
+                                  'fmda-'+region+'-'+fmda_year+fmda_month+fmda_day+'-'+fmda_hour+'.geo')
 
-   date_folder = 'fmda-CONUS-'+fmda_year+fmda_month+fmda_day+'-'+fmda_hour+'.geo'
-
-   fmda_geo_folder = base_folder + date_folder
-
-   #only the behave path needs converting. The cawfe path points at the running
-   #FMDA instance, which writes the older-style files that path already reads, so
-   #generating a folder there would shadow it with a conversion nothing asked for.
-   if behave and not os.path.exists(fmda_geo_folder):
-      make_geo_folder(fmda_geo_folder)
+   #make_geo_folder converts an RTMA-era netcdf, so it only applies to region CONUS;
+   #for any other region a missing tile is reported and forecast.py then runs with
+   #equilibrium moisture.
+   if not os.path.exists(fmda_geo_folder):
+      if region == 'CONUS':
+         make_geo_folder(fmda_geo_folder)
+      else:
+         print(f'\tWARNING: no FMDA tile {fmda_geo_folder}; the run will use equilibrium FMC')
 
    return fmda_geo_folder
 
@@ -656,7 +661,7 @@ class ngfs_incident():
          # /data/WRFXPY/wksp_fmda/CONUS/202307/
          if self.state not in non_conus: #'fmda_geogrid_path' in cfg:
             print('\tWill use FMDA for fuel moisture')
-            cfg['fmda_geogrid_path'] = get_fmda_path(cfg)# base_folder + date_folder
+            cfg['fmda_geogrid_path'] = get_fmda_path(cfg, self.ngfs_cfg['fmda_cfg'])
          else:
             print('\tNon-CONUS fire, will use eqilibrium FMC')
             #removes the key from dictionary
