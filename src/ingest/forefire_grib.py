@@ -167,12 +167,18 @@ def build_domain(lat, lon, domain_km=30.0, fire_dx=30.0):
 
 def _warp(src, dst, domain, resample, fmt='AAIGrid', extra=''):
     """Cut and reproject a raster onto the exact fire grid."""
-    _bash('gdalwarp -q -overwrite -t_srs EPSG:{epsg} -te {x0} {y0} {x1} {y1} '
-          '-ts {nx} {ny} -r {r} -of {fmt} {extra} "{src}" "{dst}"'.format(
-              epsg=domain['epsg'], x0=domain['x0'], y0=domain['y0'],
-              x1=domain['x1'], y1=domain['y1'], nx=domain['nx'], ny=domain['ny'],
-              r=resample, fmt=fmt, extra=extra, src=src, dst=dst),
-          'gdalwarp of {}'.format(osp.basename(src)))
+    out = _bash('gdalwarp -q -overwrite -t_srs EPSG:{epsg} -te {x0} {y0} {x1} {y1} '
+                '-ts {nx} {ny} -r {r} -of {fmt} {extra} "{src}" "{dst}"'.format(
+                    epsg=domain['epsg'], x0=domain['x0'], y0=domain['y0'],
+                    x1=domain['x1'], y1=domain['y1'], nx=domain['nx'], ny=domain['ny'],
+                    r=resample, fmt=fmt, extra=extra, src=src, dst=dst),
+                'gdalwarp of {}'.format(osp.basename(src)))
+    #With -q gdalwarp prints only warnings and errors, and it can print them and still
+    #exit 0 -- e.g. a coordinate operation it could not build -- leaving a cut of
+    #no-data.  Keep what it said: the all-no-data guard in build_step_ncs fails the run
+    #without it, and this is the only record of why (2026-10-22/23 transient failures).
+    if out.strip():
+        logging.warning('gdalwarp of %s said:\n%s', osp.basename(src), out.strip()[-4000:])
     return dst
 
 
@@ -589,7 +595,8 @@ def build_step_ncs(lat, lon, ign_utc, out_dir, grid_code, steps=8, domain_km=30.
         raise ForeFireGribError(
             'terrain/fuel read as all no-data for the %d x %d domain at %.5f, %.5f (EPSG:%d): '
             '%d valid terrain cells from %s, %d LANDFIRE fuel cells from %s.  Seen once as a '
-            'transient read failure (2026-10-22); resubmitting the job may succeed.'
+            'transient read failure (2026-10-22); resubmitting the job may succeed.  Any '
+            'gdalwarp messages are logged above.'
             % (domain['nx'], domain['ny'], lat, lon, domain['epsg'],
                terrain_ok, ELEV_TIF, fuel_ok, src_tif))
 
