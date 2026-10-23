@@ -412,8 +412,13 @@ class FuelMoistureModel:
             logging.info("fmda.fuel_moisture_model.to_geogrid: storing lons lats to FMC_GC(:,:,-2:) to test in WRF against XLONG and XLAT")
             FMC_GC[:,:,-2] = lons
             FMC_GC[:,:,-1] = lats
+        # the two equilibrium parameters are always the LAST two slices of m_ext,
+        # however many moisture classes sit ahead of them. The old n != 5 branch
+        # took [-3:-1], which is correct only for an m_ext padded as
+        # [.., dEd, dEw, 0]; with the padding in its proper place -- a zero 1000h
+        # slot ahead of the parameters -- that branch selected [0, dEd] instead.
+        # Identical to the old n == 5 branch, so width-5 callers are unaffected.
         FMEP = self.m_ext[:,:,-2:]
-        
         write_geogrid_var(path,'FMC_GC',FMC_GC,index,bits=32)
         write_geogrid_var(path,'FMEP',FMEP,index,bits=32)
         
