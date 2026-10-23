@@ -100,7 +100,14 @@ class ForeFireGribError(Exception):
 
 def _bash(script, what):
     """Run a bash snippet with the windninja env activated; return stdout."""
-    cmd = '. {} && conda activate {} && {}'.format(CONDA_SH, WINDNINJA_ENV, script)
+    #Activating the windninja env sets PROJ_NETWORK=ON, letting PROJ fetch NAD83->WGS84
+    #datum grids from cdn.proj.org on demand.  The SLURM compute nodes have no internet,
+    #so there gdalwarp failed to transform every point and wrote all-no-data cuts (exit 0)
+    #whenever a grid piece was missing or stale in ~/.local/share/proj/cache.db.  Off,
+    #PROJ uses its built-in NAD83->WGS84 (~4 m); tested 2026-10-23: terrain within 1 m,
+    #0.15-0.7% of fuel cells flipped at pixel edges, forecast areas within 2%, IoU >= 0.967.
+    cmd = '. {} && conda activate {} && export PROJ_NETWORK=OFF && {}'.format(
+        CONDA_SH, WINDNINJA_ENV, script)
     proc = subprocess.Popen(['bash', '-lc', cmd],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     out, _ = proc.communicate()
