@@ -397,6 +397,10 @@ class ngfs_incident():
 
    def start_forecast(self,sleep_time = 1):
       print('Starting forecast')
+      #the job file is written here, and only here, so jobs/ holds only forecasts that
+      #were started -- writing it every cycle left a stale file behind whenever VIIRS
+      #moved the ignition hour and so renamed the grid code (Franklin_234, 2026-10-22)
+      json.dump(self.cfg, open(self.job_filename, 'w'), indent=4, separators=(',', ': '))
       cmd = f'sleep {sleep_time}; {self.json_start_code}'
       #subprocess.Popen(cmd,shell=True)
       #os.system(f'(sleep {sleep_time}; {self.json_start_code})')   ### <<<-----------------------------bad? remove ?
@@ -725,8 +729,7 @@ class ngfs_incident():
       #see if buffer contains the bounding box, increas the size of the domain if not
       self.expand_domain_size()
       self.set_json_start_code()
-      json.dump(self.cfg, open(self.job_filename, 'w'), indent=4, separators=(',', ': '))
-      
+
       del cfg
 
       #viewprint(cfg)
@@ -1156,8 +1159,7 @@ class ngfs_incident():
          print('Setting new ignition point')
          self.cfg['ignitions']['1'][0]['latlon'] = nifc_ign_latlon
 
-      #save the job file
-      json.dump(self.cfg, open(self.job_filename, 'w'), indent=4, separators=(',', ': '))
+      #the job file is written by start_forecast, which follows
 
       '''
       cfg['ignitions'] = { '1' : [ { 'time_utc' : utils.utc_to_esmf(t_utc),
