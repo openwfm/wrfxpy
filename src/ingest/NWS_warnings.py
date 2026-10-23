@@ -17,10 +17,16 @@ def subset_wfo_data(full_data, data, wfo_list):
    Finds possible wildfire detections in a NWS WFO region withouth NIFC designation and assigns 
    incident_id_string and incident_name derived fron the feature_tracking_id
    """
-   temp_data = full_data[full_data.type_description == 'Possible Wildland Fire']
+   try:
+        temp_data = full_data[full_data.type_description == 'Possible Wildland Fire']
+   except:
+        temp_data = full_data[full_data.type == 0]
    
    # Filter data by wfo_list and concatenate results
-   wfo_data = pd.concat([temp_data[temp_data.wfo_code == w] for w in wfo_list], ignore_index=True)
+   try:
+        wfo_data = pd.concat([temp_data[temp_data.wfo_code == w] for w in wfo_list], ignore_index=True)
+   except:
+        wfo_data = pd.concat([temp_data[temp_data.nws_wfo_code == w] for w in wfo_list], ignore_index=True)
    print(f"Found {len(wfo_data)} possible wildfire detections in {', '.join(wfo_list)}")
 
    # Remove detections already associated with known incidents
@@ -30,7 +36,10 @@ def subset_wfo_data(full_data, data, wfo_list):
    # Assign incident_id_string and incident_name
    def generate_incident_info(row):
       fid = row.feature_tracking_id.replace(':', '').replace('-', '').replace('_', '')
-      wfo_code = row.wfo_code
+      try:
+        wfo_code = row.wfo_code
+      except:
+        wfo_code = row.nws_wfo_code
       row.incident_id_string = f'{{{wfo_code}{fid[-4:]}-{fid[2:6]}-{fid[6:10]}-{fid[11:15]}-{fid[-12:]}}}'
       row.incident_name = f"{wfo_code}_{fid[2:6]}_{fid[6:10]}_{fid[-12:]}"
       return row
@@ -121,7 +130,6 @@ def set_red_flags(date_str):
                 r_ends.append(ends[k])
         effective = r_effective
         ends = r_ends
-
     #try:
     red_flag_zones = pd.DataFrame(rf_zones)
     red_flag_zones['effective'] = effective
@@ -132,28 +140,47 @@ def set_red_flags(date_str):
 
     return red_flag_warnings, red_flag_zones.dropna()
 
+def NGFS_red_flag(df):
+    #looks through a DataFrame with NGFS detection data fro NWS fire weather data
+    #df is data associated with an incident
+    keys = ['nws_fire_wx_code', 'event_type']
+    for k in keys:
+        if k in df.keys():
+            codes = df[k].unique()
+            for c in codes:
+                if int(c) == 3 or int(c) == 4:
+                    print('\tDetections indicate fire weather')
+                    return True
+    return False
 
-def red_flag_incident(lon, lat, ign_utc, red_flag_zones):
+
+def red_flag_incident(lon, lat, ign_utc, red_flag_zones, data = None):
     """
     Returns a boolean indicating whether the point (lon, lat) is inside a red flag warning area 
     during the time for which the warning is in effect.
+    
+    data can be the dataframe associated with an event that contains NGFS fire weather information
     """
-    end_utc = ign_utc + timedelta(hours=24)
-    point = Point(lon, lat)
     if len(red_flag_zones):
+        end_utc = ign_utc + timedelta(hours=24)
+        point = Point(lon, lat)
         for _, rfz in red_flag_zones.iterrows():
             if not (end_utc < rfz['effective'] or ign_utc > rfz['ends']) and point.within(rfz['geometry']):
                 return True
         return False
+    elif (not data is None) and (len(data) > 0):
+        return NGFS_red_flag(data)
     else:
-        return None
+        return False
 
 def subset_red_flag_data(full_data, data, rf_zones):
     if len(rf_zones) == 0:
         print('No red flag warnings issued')
         return pd.DataFrame()
-
-    temp_data = full_data[full_data.type_description == 'Possible Wildland Fire']
+    try:
+        temp_data = full_data[full_data.type_description == 'Possible Wildland Fire']
+    except:
+        temp_data = full_data[full_data.type == 0]
     
     # Get states with active red flag zones and subset data by these states
     rf_states = rf_zones['properties'].apply(lambda x: x['STATE']).unique()
