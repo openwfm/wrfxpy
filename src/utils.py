@@ -439,6 +439,7 @@ def render_ignitions(js, max_dom):
         return dvals
 
     # extract the original ignition specs and the original start time
+    dom_specs = js.domains
     ign_specs = js.ignitions
     orig_start_time = js.orig_start_utc
 
@@ -451,13 +452,16 @@ def render_ignitions(js, max_dom):
                  'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom,
                  'fmoist_run' : [False] * max_dom, 'fmoist_interp' : [False] * max_dom,
                  'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
-                 'fire_viscosity' : [0] * max_dom }
+                 'fire_viscosity' : [0] * max_dom, 'fire_wind_log_interp': [0] * max_dom,
+                 'fire_use_windrf': [0] * max_dom }
     
     if js.use_realtime:
         fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
         nml_fire.update({'fire_perimeter_time': [0] * max_dom})
         nml_fire['fire_perimeter_time'][max_dom-1] = fire_perimeter_time
-        ign_specs = {k: [] for k in ign_specs.keys()}
+        nml_fire.update({'fire_boundary_guard': [0] * max_dom})
+        nml_fire['fire_boundary_guard'][max_dom-1] = -1
+        ign_specs = {str(max_dom): []}
     elif js.use_tign_ignition:
         ign_times = [
             (
@@ -470,12 +474,14 @@ def render_ignitions(js, max_dom):
             fire_tign_in_time = max([int((ign_time - js.start_utc).total_seconds())+ign_dur for ign_time,ign_dur in ign_times])
             nml_fire.update({'fire_tign_in_time': [0] * max_dom})
             nml_fire['fire_tign_in_time'][max_dom-1] = fire_tign_in_time
-        ign_specs = {k: [] for k in ign_specs.keys()}
+        ign_specs = {str(max_dom): []}
     
     for dom_str, dom_igns in ign_specs.items():
         dom_id = int(dom_str)
         # ensure fire model is switched on in every domain with ignitions
-        nml_fire['ifire'][dom_id-1] = 1
+        nml_fire['ifire'][dom_id-1] = 1 # run SFIRE fire model
+        nml_fire['fire_wind_log_interp'][dom_id-1] = 1 # fz0/fwh from fuel categories
+        nml_fire['fire_use_windrf'][dom_id-1] = 2 # set fwh from windrf 
         if not (js.use_tign_ignition or js.use_realtime):
             nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
         nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
@@ -488,11 +494,9 @@ def render_ignitions(js, max_dom):
         for ndx,ign in enumerate(dom_igns):
             start_time = timespec_to_utc(ign['time_utc'], orig_start_time)
             start = int((start_time - js.start_utc).total_seconds())
-
-            dur = ign.get('duration_s',1200)
-            radius = ign.get('radius',50)
-            ros = ign.get('ros',1)
-
+            dur = ign.get('duration_s', duration_default)
+            radius = ign.get('radius', radius_default)
+            ros = ign.get('ros', ros_default)
             if 'latlon' in ign.keys():
                 lat,lon = ign['latlon']
                 nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
@@ -505,6 +509,19 @@ def render_ignitions(js, max_dom):
                 vals = [ slat, elat, slon, elon, start, start+dur, radius, ros]
             kv = dict(list(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals])))
             nml_fire.update(kv)
+
+    # activate fire at domains with subgrid ratio specified
+    for dom_str, dom_spec in dom_specs.items():
+        dom_id = int(dom_str)
+        if any([sr > 0 for sr in dom_spec['subgrid_ratio']]):
+            nml_fire['ifire'][dom_id-1] = 1 # switch on fire model
+            nml_fire['fire_wind_log_interp'][dom_id-1] = 1 # fz0/fwh from fuel categories 
+            nml_fire['fire_use_windrf'][dom_id-1] = 2 # set fwh from windrf
+            nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
+            nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
+            nml_fire['fmoist_run'][dom_id-1] = True # use the fuel moisture model
+            nml_fire['fmoist_interp'][dom_id-1] = True # interpolate fm onto fire mesh
+            nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
 
     return { 'fire' : nml_fire }
 
@@ -576,12 +593,14 @@ def process_ignitions(js):
                 }
                 fire_data['points'].append(point_data)
         TIGN_G = fire_init.process_ignitions_to_tign(wrf_path, fire_data)   
-    if js.burn_plot_boundary is not None:
+    if js.burn_plot_boundary is not None and len(js.burn_plot_boundary):
         coords = [c[::-1] for c in js.burn_plot_boundary]
         if coords[0] != coords[-1]:
             coords.append(coords[0])
         wrf_path = osp.join(js.wrf_dir, 'wrfinput_d%02d' % js.max_dom)
-        FUEL_MASK = fire_init.process_burn_plot_boundary(wrf_path, [[coords]])  
+        FUEL_MASK = fire_init.process_burn_plot_boundary(wrf_path, [[coords]], buffer_dist=100.)
+    else:
+        FUEL_MASK = np.zeros(fxlon.shape).astype(bool)
     fire_init.integrate_init(wrf_path, TIGN_G, FUEL_MASK, no_fuel_cat=js.fire_nml['fuel_scalars']['no_fuel_cat'])
 
 def timespec_to_utc(ts_str, from_time = None):
