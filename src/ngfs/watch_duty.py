@@ -97,7 +97,7 @@ def find_watchduty_incident(info,geojson=None):
         return None
     found_wd = None
     for f in geojson['features']:
-        if f['properties']['external_id'] == irwin_id:
+        if f['properties']['external_id'] and irwin_id in f['properties']['external_id']:
              found_wd = f
              break
              #loc.get('feautures') and len(loc['features']) >0
