@@ -6,7 +6,7 @@ import sys, logging
 sys.path.insert(1, '.')
 sys.path.insert(1, '../ingest')
 sys.path.insert(1, '/data/jhaley/work/wrfxpy/src/ingest/')
-
+import glob
 import time
 import numpy as np
 import pandas as pd
@@ -19,6 +19,9 @@ import re
 #from ingest.downloader import download_url as du
 from shapely.geometry import Polygon, Point, box
 from datetime import timedelta, datetime
+from ftplib import FTP
+from pathlib import Path
+
 
 
 #from downloader import download_url
@@ -72,7 +75,8 @@ def extract_placemark(data):
                 # Convert to date and time
                 date_str, time_str = match.groups()
                 date_obj = datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M')
-                extracted_data['acq_date'] = pd.Timestamp(date_obj,tz='UTC') #.strftime('%Y-%m-%d')
+                ts = pd.Timestamp(date_obj,tz='UTC')
+                extracted_data['acq_date'] = ts #.strftime('%Y-%m-%d')
                 extracted_data['acq_time'] = date_obj.strftime('%H%M')
             elif key == 'sensor':
                 # Extract sensor as satellite
@@ -96,6 +100,8 @@ def extract_placemark(data):
     'scan': extracted_data.get('scan', ''),
     'track': extracted_data.get('track', ''),
     'acq_date': extracted_data.get('acq_date', ''),
+    'acq_date_time': extracted_data.get('acq_date', ''),
+    'pixel_date_time': extracted_data.get('acq_date', ''),
     'acq_time': extracted_data.get('acq_time', ''),
     'satellite': extracted_data.get('satellite', ''),
     'confidence': extracted_data.get('confidence', ''),
@@ -114,19 +120,29 @@ class polar_data():
     # get the csv files above 
     # combine into large pandas data frame
     #should pass in ngfs_cfg['firms_cfg'] dictionary for initialization
-    def __init__(self,csv_timestamp):
+    def __init__(self,csv_timestamp,cfg = None):
         self.data = pd.DataFrame()
         self.timestamp = csv_timestamp
         self.csv_date_str = str(csv_timestamp.year)+'_'+str(csv_timestamp.month)+'_'+str(csv_timestamp)
-        self.firms_path = 'ingest/FIRMS/'
-        self.satlist = ['noaa_20','noaa_21','suomi','modis','landsat','noaa_20_Alaska','noaa_21_Alaska','suomi_Alaska']
+        if cfg is None:
+            self.firms_path = 'ingest/FIRMS/'
+            self.satlist = ['noaa_20','noaa_21','suomi','modis','landsat','noaa_20_Alaska','noaa_21_Alaska','suomi_Alaska']
+            self.ngfs_viirs_path = 'ingest/NGFS/VIIRS'
+            self.ngfs_viirs_satslist = ["NOAA-20","NOAA-21","SNPP"]
+        else:
+            self.firms_path = cfg['firms_cfg']['ingest_directory']
+            self.satlist = cfg['firms_cfg']['sats']
+            self.ngfs_viirs_path = cfg['viirs_cfg']['ingest_directory']
+            self.ngfs_viirs_satslist = cfg['viirs_cfg']['sats']
+
     
     #add nrt data, filter out low confidence detections
     def sort_data_bytime(self):
-        self.data = self.data.sort_values(by='acq_time')
-
+        try:
+            self.data = self.data.sort_values(by='acq_date_time')
+        except:
+            self.data = self.data.sort_values(by='acq_time')
     def download_url(self,url,local_path,token=False):
-        
         if token:
             print('Trying with tokens')
             str1 = 'wget -e robots=off -m -np -R .html,.tmp -nd '
@@ -134,12 +150,11 @@ class polar_data():
 
             ts = ' --header "Authorization: Bearer {}" '
             token_string = ts.format(tokens['nrt'])
-            local_str = ' -P ' + local_path
+            local_str = ' -O ' + local_path
 
             cmd = str1 + url + token_string + local_str
         else:
-            cmd = 'wget  -P ' +local_path + ' ' + url
-
+            cmd = 'wget  -O ' +local_path + ' ' + url
         os.system(cmd)
 
     def filter_low_confidence(self,data_read,sat):
@@ -161,7 +176,6 @@ class polar_data():
             'noaa_20': ('usa_contiguous_and_hawaii', 'noaa-20-viirs-c2'),
             'noaa_21': ('usa_contiguous_and_hawaii', 'noaa-21-viirs-c2'),
             'suomi': ('usa_contiguous_and_hawaii', 'suomi-npp-viirs-c2'),
-            'modis': ('usa_contiguous_and_hawaii', 'c6.1'),
             'landsat': ('usa_contiguous_and_hawaii', 'landsat'),
             'noaa_20_Alaska': ('alaska', 'noaa-20-viirs-c2'),
             'noaa_21_Alaska': ('alaska', 'noaa-21-viirs-c2'),
@@ -201,7 +215,7 @@ class polar_data():
                 #self.download_url(kmz_url,kmz_local)
 
 
-        print('Extracing the kmz to a kml file')
+        print('Extracting the kmz to a kml file')
         #extract the kmz file to a kml which can be read
         kmzip = zipfile.ZipFile(kmz_local,'r')
         kml_filename = kmzip.infolist()[0].filename
@@ -258,14 +272,13 @@ class polar_data():
             self.data = data_read
 
 
-    def add_firms_24(self,sat,csv_timestamp):
+    def add_firms_24(self,sat,csv_timestamp=None):
     
         # Dictionary mapping satellite names to directory and file names
         satellite_info = {
             'noaa_20': ('noaa-20-viirs-c2/csv/', 'J1_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'),
             'noaa_21': ('noaa-21-viirs-c2/csv/', 'J2_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'),
             'suomi': ('suomi-npp-viirs-c2/csv/', 'SUOMI_VIIRS_C2_USA_contiguous_and_Hawaii_48h.csv'),
-            'modis': ('modis-c6.1/csv/', 'MODIS_C6_1_USA_contiguous_and_Hawaii_48h.csv'),
             'landsat': ('landsat/csv/', 'LANDSAT_USA_contiguous_and_Hawaii_48h.csv'),
             'noaa_20_Alaska': ('noaa-20-viirs-c2/csv/', 'J1_VIIRS_C2_Alaska_48h.csv'),
             'noaa_21_Alaska': ('noaa-21-viirs-c2/csv/', 'J2_VIIRS_C2_Alaska_48h.csv'),
@@ -283,7 +296,7 @@ class polar_data():
 
         #download if the csv file doesn't exist or is older than 600 seconds = 10 minutes
         if not os.path.exists(csv_local):
-                self.download_url(csv_url,self.firms_path)
+                self.download_url(csv_url,csv_local)
         else:
             if (time.time()- os.path.getmtime(csv_local)) > 600:
                 #copy older file and download again
@@ -291,7 +304,7 @@ class polar_data():
                 os.system(cp_str)
                 del_str = 'rm ' + csv_local
                 os.system(del_str)
-                self.download_url(csv_url,self.firms_path)
+                self.download_url(csv_url,csv_local)    
 
         #read the csv file
         data_read = pd.read_csv(csv_local)
@@ -425,6 +438,87 @@ class polar_data():
                 else:
                     self.data = data_read
 
+    def parse_ts(name):
+            #for file names like NGFS_FIRE_DETECTIONS_NOAA-20_VIIRS_2026_03_11_070_06_17_03.csv
+            pattern = re.compile(r'(\d{4})_(\d{2})_(\d{2})_\d{3}_(\d{2})_(\d{2})_(\d{2})')
+            m = pattern.search(name)
+            return datetime(*map(int, m.groups())) if m else None
+
+    def download_ngfs_viirs(self,ngfs_cfg):    ### <<<<< ------------------------------------------------------replace with api or ftp routines
+        #downloads and assembles MNGFS viirs detections
+        #local storage setup
+        ingest_dir = ngfs_cfg['viirs_cfg']['ingest_directory']
+        local_dir = Path(ingest_dir)
+        local_dir.mkdir(parents=True, exist_ok=True)
+        data_format = ngfs_cfg['viirs_cfg']['data_format']
+        #remote ftp options   <<< -------------------------------------    add api options
+        host = ngfs_cfg['viirs_cfg']['host']
+        remote_directory = ngfs_cfg['viirs_cfg']['remote_directory']
+        
+        def parse_ts(name):
+            #for file names like NGFS_FIRE_DETECTIONS_NOAA-20_VIIRS_2026_03_11_070_06_17_03.csv
+            pattern = re.compile(r'(\d{4})_(\d{2})_(\d{2})_\d{3}_(\d{2})_(\d{2})_(\d{2})')
+            m = pattern.search(name)
+            return datetime(*map(int, m.groups())) if m else None
+        
+        local_times = [parse_ts(p.name) for p in local_dir.glob(data_format)]
+        last_ts = max([t for t in local_times if t], default=datetime(1970,1,1))
+
+        ftp = FTP(host); ftp.login(); ftp.cwd(remote_directory)
+
+        files = sorted((parse_ts(f), f) for f in ftp.nlst() if f.endswith(data_format))
+        print(f'There are {len(files)} {data_format} files on the FTP site')
+        down_count = []
+        for ts, fname in files:
+            if ts and ts > last_ts:
+                if not os.path.exists(f'{ingest_dir}/{fname}'):
+                    down_count.append(fname)
+                    print("\tDownloading", fname)
+                    with open(local_dir / fname, "wb") as f:
+                        ftp.retrbinary(f"RETR {fname}", f.write)
+                else:
+                    pass
+                    #print('Skipping ', fname, ' file already downloaded')
+        print(f'Downloaded {len(down_count)} {data_format} files')
+        ftp.quit()
+
+    def add_ngfs_viirs(self,ngfs_cfg,parse_times = True):
+        #download the recent files
+        self.download_ngfs_viirs(ngfs_cfg)
+        #assemble NGFS viirs csf files into a dataframe
+        data_format = ngfs_cfg['viirs_cfg']['data_format'] 
+        ingest_dir = ngfs_cfg['viirs_cfg']['ingest_directory']
+        local_dir = Path(ingest_dir)
+        hours = ngfs_cfg['viirs_cfg']['days_to_get']*24
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        dfs = []
+        g = glob.glob(f'{ingest_dir}/*{data_format}')
+        print('Length of NGFS VIIRS file list :',len(g))
+
+        def parse_ts(name):
+            #for file names like NGFS_FIRE_DETECTIONS_NOAA-20_VIIRS_2026_03_11_070_06_17_03.csv
+            pattern = re.compile(r'(\d{4})_(\d{2})_(\d{2})_\d{3}_(\d{2})_(\d{2})_(\d{2})')
+            m = pattern.search(name)
+            return datetime(*map(int, m.groups())) if m else None
+        
+        for f in local_dir.glob(f'*.{data_format}'):
+            ts = parse_ts(f.name)
+            if ts is None or ts < cutoff:
+                continue
+            #print(f'File to read: {f.name}')
+            dfs.append(pd.read_csv(f))
+        if dfs:
+            print(f'Read {len(dfs)} csv files')
+            data_read = pd.concat(dfs, ignore_index=True)
+            data_read = data_read.drop_duplicates()
+            print(f'Length of concat NGFS VIIRS dataframe {len(data_read)}')
+            if parse_times:
+                data_read["pixel_date_time"] = pd.to_datetime(data_read["pixel_date_time"], utc=True, errors="coerce")
+                data_read["acq_date_time"] = pd.to_datetime(data_read["acq_date_time"], utc=True, errors="coerce")
+            data_read['acq_date'] = data_read['acq_date_time']   # <<<------------------------------------------------------ probably remove this
+            self.data = pd.merge(self.data,data_read,how = 'outer')
+        
+    
 
     def fix_times(self,data_read):
         #converts the acq_time to a column with hours and minutes and adds to the acq_date object
@@ -443,7 +537,10 @@ class polar_data():
             t2 = datetime.strptime(acq_str[i],t_fmt)
 
             data_read.loc[i,'acq_date'] = data_read.loc[i,'acq_date'] + (t2-t1)
-
+        
+        data_read['acq_date'] = pd.to_datetime(data_read['acq_date'])
+        data_read['pixel_date_time'] = data_read['acq_date']
+        data_read['acq_date_time'] = data_read['acq_date']
         return data_read
   
     #convert to work on self or move into the ngfs_incident class
@@ -452,10 +549,16 @@ class polar_data():
         #inc_bb is the incident bounding box (minx, miny, maxx, maxy)
         #GOignition_pixe
         print('\tFinding best viirs pixel for the incident GOES ignition point')
-        print('\tTime of GOES imaging: ',ignition_pixel.loc['observation_time'])
+        try:
+            print('\tTime of GOES imaging: ',ignition_pixel.loc['observation_time'])
+        except:
+            print('\tTime of GOES imaging: ',ignition_pixel.loc['pixel_date_time'])
 
         #setup ignition pixel polygon
-        vertices = [(ignition_pixel[f'lon_tc_c{i}'], ignition_pixel[f'lat_tc_c{i}']) for i in range(1, 5)]
+        try: #NGFS Version 1.x
+            vertices = [(ignition_pixel[f'lon_tc_c{i}'], ignition_pixel[f'lat_tc_c{i}']) for i in range(1, 5)]
+        except: #NGFS Version 2+
+            vertices = [(ignition_pixel[f'longitude_c{i}'], ignition_pixel[f'latitude_c{i}']) for i in range(1, 5)]
         ignition_polygon = Polygon(vertices)
         
         #setup incident polygon, easier construction for square box
@@ -493,7 +596,7 @@ class polar_data():
                     new_ign_pts = np.append(new_ign_pts,[viirs_ign],axis = 0)
                     new_ign_times = np.append(new_ign_times,self.data.loc[i,'acq_date'])
                     #print('\tFound viirs pixel within earliest GOES pixel:',viirs_ign,self.data.loc[i,'acq_date'])
-        print('\t', len(new_inc_pts),'viirs incident detections, ',len(new_ign_pts),' viirs ignition polygon detections')
+        print('\t',len(new_inc_pts),'viirs incident detections, ',len(new_ign_pts),' viirs ignition polygon detections')
         if (len(new_ign_pts) == 0 and len(new_inc_pts) > 0):
             print('\tUsing earliest VIIRS pixel, but it is not within the earliest GOES Pixel')
             new_ign_pts = new_inc_pts 
