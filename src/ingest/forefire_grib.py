@@ -284,8 +284,10 @@ def windninja_uv(grib, dem_tif, domain, work_dir, time_zone, mesh_m=None,
     vel_asc, ang_asc = _wn_output(out_dir, mesh_m)
     #WindNinja solves on its own mesh and its extent can be inset from the DEM, so
     #both fields are warped onto the exact fire grid before use.
-    vel = read_asc(_warp(vel_asc, osp.join(out_dir, 'vel_grid.asc'), domain, 'bilinear'))
-    ang = read_asc(_warp(ang_asc, osp.join(out_dir, 'ang_grid.asc'), domain, 'near'))
+    vel = _fill_edge(read_asc(_warp(vel_asc, osp.join(out_dir, 'vel_grid.asc'), domain, 'bilinear')),
+                     'speed', grib)
+    ang = _fill_edge(read_asc(_warp(ang_asc, osp.join(out_dir, 'ang_grid.asc'), domain, 'near')),
+                     'direction', grib)
 
     #_ang is the direction the wind blows *from*, in degrees; convert to vector
     #components blowing towards.
@@ -295,6 +297,32 @@ def windninja_uv(grib, dem_tif, domain, work_dir, time_zone, mesh_m=None,
 
     _check_wind(vel, grib)
     return u.astype(np.float32), v.astype(np.float32)
+
+
+def _fill_edge(a, name, grib, nodata=(32767.0, -9999.0)):
+    """Fill a no-data outer row/column of a warped WindNinja field from the one inside it.
+
+    WindNinja occasionally returns its grid one cell short of the DEM (619 x 619 for a
+    620 x 620 domain: Bienville and Dunklee, 2 of 2,995 hindcast steps), and the warp onto
+    the fire grid then leaves the last row and column at no-data, which _check_wind reads
+    as 32767 m/s.  Only that case is filled -- no-data confined to the outermost ring --
+    and it is logged; no-data anywhere inside is left for _check_wind to reject.  WindNinja
+    writes 32767 as no-data when the DEM declares it and -9999 when the DEM declares none
+    (the sea-level DEM since 2026-10-26), so both count.
+    """
+    bad = np.isin(a, nodata)
+    if not bad.any() or bad[1:-1, 1:-1].any():
+        return a
+    a = a.copy()
+    for col, src in ((0, 1), (-1, -2)):
+        a[:, col] = np.where(np.isin(a[:, col], nodata), a[:, src], a[:, col])
+    for row, src in ((0, 1), (-1, -2)):
+        a[row, :] = np.where(np.isin(a[row, :], nodata), a[src, :], a[row, :])
+    if np.isin(a, nodata).any():
+        return a
+    logging.warning('WindNinja %s for %s was short of the fire grid: filled %d edge cells '
+                    'from their inner neighbours', name, osp.basename(grib), int(bad.sum()))
+    return a
 
 
 def _check_wind(vel, grib):
@@ -320,6 +348,14 @@ def _check_wind(vel, grib):
             'skipping the solver when it cannot georeference the input. Only HRRR '
             'wrfprs GRIB is known to work; GFS sflux GRIB2 fails this way.'
             .format(grib))
+
+    #a speed cannot be negative: anything below zero is a no-data value (-9999) that got
+    #through, which the > 100 m/s test below cannot see
+    lo = float(np.nanmin(finite))
+    if lo < 0.0:
+        raise ForeFireGribError(
+            'WindNinja speed field for {} holds {} cells below zero (min {:.1f}) -- a no-data '
+            'value reached the fire grid.'.format(grib, int((finite < 0).sum()), lo))
 
     hi = float(np.nanmax(finite))
     if hi > 100.0:
