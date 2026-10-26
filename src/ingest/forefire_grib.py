@@ -572,8 +572,16 @@ def build_step_ncs(lat, lon, ign_utc, out_dir, grid_code, steps=8, domain_km=30.
                  domain['nx'], domain['ny'], domain['dx'], domain['epsg'])
 
     #static fields are cut once and reused by every step
-    dem_tif = _warp(ELEV_TIF, osp.join(work_dir, 'dem.tif'), domain, 'bilinear', fmt='GTiff')
-    dem_asc = _warp(dem_tif, osp.join(work_dir, 'dem.asc'), domain, 'near')
+    #LANDFIRE elevation stores the sea as -9999 while declaring 32767 as its no-data, so
+    #the sea came through as ground 9999 m down: bilinear smeared it into the coast and
+    #WindNinja either crawled (1 h for 10-14 steps) or returned > 100 m/s -- every coastal
+    #California hindcast failed this way (2026-10-24).  -9999 is no-data to the resampling,
+    #so the coast is interpolated from land only, and every cell without valid source --
+    #sea, or past the raster's edge offshore -- keeps the 0 m (sea level) it was initialised
+    #to.  The .asc keeps its NODATA_value line: read_asc skips exactly six header lines.
+    dem_tif = _warp(ELEV_TIF, osp.join(work_dir, 'dem.tif'), domain, 'bilinear', fmt='GTiff',
+                    extra='-srcnodata -9999 -dstnodata None -wo INIT_DEST=0')
+    dem_asc = _warp(dem_tif, osp.join(work_dir, 'dem.asc'), domain, 'near', extra='-dstnodata 32767')
     altitude = read_asc(dem_asc)
     #`fuel_tif` lets a run use an alternative fuel raster without editing this module --
     #specifically the copy with LANDFIRE code 91 (urban/developed) remapped to 14, so that
