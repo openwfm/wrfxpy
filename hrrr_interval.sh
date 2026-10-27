@@ -17,7 +17,7 @@ pwd
 CONFIG_PATH="$1"
 # Set up environment
 eval "$(conda shell.bash hook)"
-conda activate fmda_ml
+conda activate wrfx_ml
 
 export PYTHONPATH=src
 python src/hrrr_interval.py "$CONFIG_PATH"
