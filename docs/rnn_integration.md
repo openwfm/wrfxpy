@@ -164,6 +164,13 @@ for the observed failures and remaining real-data checks.
  
 ## Run FMDA with RNN integration
 
+For a small test domain, run:
+```bash
+./hrrr_cycler.sh a 42 -124.6 45 -119.4
+```
+
+With the full `fmda_cycler.json`, run:
+
 Analysis mode:
 ```bash
 ./hrrr_cycler.sh a
