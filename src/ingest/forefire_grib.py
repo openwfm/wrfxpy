@@ -36,6 +36,7 @@ import glob
 import logging
 import re
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
@@ -651,7 +652,7 @@ def build_step_ncs(lat, lon, ign_utc, out_dir, grid_code, steps=8, domain_km=30.
             % (domain['nx'], domain['ny'], lat, lon, domain['epsg'],
                terrain_ok, ELEV_TIF, fuel_ok, src_tif))
 
-    built = []
+    built, todo = [], []
     for i, row in tt.iterrows():
         #mirror make_script_set: the last row only supplies END_STEP, and spinup
         #rows before the ignition are not run
@@ -664,11 +665,23 @@ def build_step_ncs(lat, lon, ign_utc, out_dir, grid_code, steps=8, domain_km=30.
             built.append(target)
             continue
         logging.info('step %d: %s <- %s', i, row['UTC_str'], osp.basename(row['grib']))
-        u, v = windninja_uv(row['grib'], dem_tif, domain, work_dir, time_zone,
-                            mesh_m=wn_mesh)
-        u, v = apply_windrf(u, v, fuel, windrf=windrf)
-        write_ff_nc(target, domain, fuel, altitude, u, v)
-        built.append(target)
+        todo.append((row['grib'], target))
+
+    #WindNinja is ~95% of the build (~45 s a step) and barely uses its own threads: 32 or 8
+    #threads ran the same, while 4 steps at once with 2 threads each built 8 steps in 175 s
+    #instead of 367 s, with identical winds (Opal Piles, 8 cpus, 2026-10-30; 8 at once with
+    #1 thread gained only 6% more).  Steps are independent and each writes its own
+    #wn_<grib> directory.  The netcdfs are written here in the main thread, as each step's
+    #winds arrive, because HDF5 is not safe to write from several threads.
+    cpus = len(os.sched_getaffinity(0))
+    workers = max(1, min(4, cpus, len(todo)))
+    wn = lambda grib: windninja_uv(grib, dem_tif, domain, work_dir, time_zone, mesh_m=wn_mesh,
+                                   num_threads=max(1, cpus // workers))
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for (grib, target), (u, v) in zip(todo, ex.map(wn, [g for g, _ in todo])):
+            u, v = apply_windrf(u, v, fuel, windrf=windrf)
+            write_ff_nc(target, domain, fuel, altitude, u, v)
+            built.append(target)
 
     logging.info('built %d netcdfs in %s', len(built), out_dir)
     tt.to_csv(osp.join(out_dir, 'timing_table_grib.csv'), index=False)
