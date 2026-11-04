@@ -53,6 +53,37 @@ cfg = Dict(json.load(open("etc/fmda_cycler.json")))
 rnn_cfg = Dict(json.load(open("etc/rnn_cycler.json")))
 meso_token = json.load(open("etc/tokens.json"))["mesowest"]
 
+def create_rnn_and_scaler():
+    """
+    Wraps RNN creation. For easy reuse in main cycler and in interval cycler
+    """
+    # FM10 model, get params, and then seed replication with median accuracy to extract weights path and scaler. Add to RNN config with paths
+    rnn_cfg["params"] = Dict(read_yml(osp.join(rnn_cfg.rnn_model_path, "params.yaml")))
+    median_seed = pd.read_csv(osp.join(rnn_cfg.rnn_model_path, "median_seed.csv")).seed[0]
+    scaler = joblib.load(osp.join(rnn_cfg.rnn_model_path, f"seed_{median_seed}", "scaler.joblib"))
+    rnn_cfg["fm10_weights_path"] = osp.join(rnn_cfg.rnn_model_path, f"seed_{median_seed}", "rnn.weights.h5")
+    rnn_cfg["scaler"] = {
+        "type": "standard",
+        "mean": scaler.mean_,
+        "scale": scaler.scale_,
+    }
+    # Transfer learning, get twarps
+    twarp_summary = pd.read_csv(osp.join(rnn_cfg.transfer_path, "all_seeds_summary.csv"))
+    row = twarp_summary[twarp_summary.seed == median_seed].iloc[0]
+    rnn_cfg["warps"] = {
+        "fm1": (row["bi_1"], row["bf_1"]),
+        "fm100": (row["bi_100"], row["bf_100"]),
+        "fm1000": (row["bi_1000"], row["bf_1000"]),
+    }
+    # Build Object
+    rnn = RNNMoistureModel(
+        params=rnn_cfg.params,
+        weights_path=rnn_cfg.fm10_weights_path,
+        warps=rnn_cfg.warps
+    )
+
+    return rnn, scaler
+
 def get_hrrr_var_list(target_date):
     hrrr_vars = {
         datetime(2018, 7, 12): { # HRRRv3
@@ -877,15 +908,15 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
 
     # make wps format files for WPS
     time_tag = cycle.strftime("%Y-%m-%d_%H") + f"f{fcst_hour:02d}"
-    model.to_wps_format(osp.dirname(geo_path), index, lats, lons, time_tag)
-    rnn.to_wps_format(
-        preds=rnn_preds_grid,
-        path=osp.dirname(geo_rnn_path),
-        index=index,
-        lats=lats, lons=lons,
-        time_tag=time_tag,
-    )
-    blend.to_wps_format(osp.dirname(geo_blend_path), index, lats, lons, time_tag)
+    #model.to_wps_format(osp.dirname(geo_path), index, lats, lons, time_tag)
+    #rnn.to_wps_format(
+    #    preds=rnn_preds_grid,
+    #    path=osp.dirname(geo_rnn_path),
+    #    index=index,
+    #    lats=lats, lons=lons,
+    #    time_tag=time_tag,
+    #)
+    #blend.to_wps_format(osp.dirname(geo_blend_path), index, lats, lons, time_tag)
     logging.info("CHECKPOINT1") 
     # store the new model  
     model_path = compute_model_path(cycle, cfg.code, wksp_path, fcst_hour)
@@ -960,7 +991,7 @@ def is_cycle_computed(cycle, cfg, wksp_path, fcst_hour=0):
     return osp.isfile(model_path) and osp.isfile(rnn_path) and osp.isfile(blend_path)
 
 
-def fmda_cycle_interval(start_cycle, end_cycle):
+def fmda_cycle_interval(start_cycle, end_cycle, conf_path=None):
     """
     Run historical cycle of fuel moisture estimates using FMDA for all the regions 
     specified by the configuration.
@@ -968,6 +999,11 @@ def fmda_cycle_interval(start_cycle, end_cycle):
     :param start_cycle: initial time to create FMDA estimates
     :param end_cycle: final time to create FMDA estimates
     """
+    if conf_path is None:
+        conf = cfg
+    else:
+        conf = Dict(json.load(open(conf_path)))
+
     lookback_length = 0
     forecast_length = 0
     hrrra = HRRRA(sys_cfg)
@@ -976,18 +1012,18 @@ def fmda_cycle_interval(start_cycle, end_cycle):
     while cycle <= end_cycle:
         gribs = hrrra.retrieve_gribs(cycle, cycle)
         grib_files_anl = gribs["grib_files"]
-        for region_id,region_cfg in cfg.regions.items():
+        for region_id,region_cfg in conf.regions.items():
             logging.info(f"CYCLER processing region {region_id} for {cycle}")
             wrapped_cfg = Dict(region_cfg)
             wrapped_cfg.update({"region_id": region_id})
             wrapped_cfg.update({"forecast_length": forecast_length}) 
             # Process real-time
-            if not is_cycle_computed(cycle, wrapped_cfg, cfg.workspace_path):
+            if not is_cycle_computed(cycle, wrapped_cfg, conf.workspace_path):
                 logging.info(f"CYCLER real-time processing for region {region_id} at cycle {cycle}")
                 try:
                     fmda_advance_region(
                         cycle, wrapped_cfg, grib_files_anl, 
-                        cfg.workspace_path, lookback_length, 0, 
+                        conf.workspace_path, lookback_length, 0, 
                         meso_token, True
                     )
                 except Exception as e:
@@ -1003,7 +1039,11 @@ def fmda_cycle_interval(start_cycle, end_cycle):
         cycle += timedelta(hours=1)
         tstep += 1
         
-    
+
+## Create RNN object. Define in global environment for reuse
+rnn, scaler = create_rnn_and_scaler()
+
+
 if __name__ == "__main__":
     
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -1063,33 +1103,7 @@ if __name__ == "__main__":
     )
     logging.info(f"regions: {json.dumps(cfg.regions)}")
 
-    ### RNN Setup
-    # FM10 model, get params, and then seed replication with median accuracy to extract weights path and scaler. Add to RNN config with paths
-    rnn_cfg["params"] = Dict(read_yml(osp.join(rnn_cfg.rnn_model_path, "params.yaml")))
-    median_seed = pd.read_csv(osp.join(rnn_cfg.rnn_model_path, "median_seed.csv")).seed[0]
-    scaler = joblib.load(osp.join(rnn_cfg.rnn_model_path, f"seed_{median_seed}", "scaler.joblib"))
-    rnn_cfg["fm10_weights_path"] = osp.join(rnn_cfg.rnn_model_path, f"seed_{median_seed}", "rnn.weights.h5")
-    rnn_cfg["scaler"] = {
-        "type": "standard",
-        "mean": scaler.mean_,
-        "scale": scaler.scale_,
-    }
-    # Transfer learning, get twarps
-    twarp_summary = pd.read_csv(osp.join(rnn_cfg.transfer_path, "all_seeds_summary.csv"))
-    row = twarp_summary[twarp_summary.seed == median_seed].iloc[0]
-    rnn_cfg["warps"] = {
-        "fm1": (row["bi_1"], row["bf_1"]),
-        "fm100": (row["bi_100"], row["bf_100"]),
-        "fm1000": (row["bi_1000"], row["bf_1000"]),
-    }
-
-    # Build Object
-    rnn = RNNMoistureModel(
-        params=rnn_cfg.params,
-        weights_path=rnn_cfg.fm10_weights_path,
-        warps=rnn_cfg.warps
-    )
-    
+    ### RNN Created in module global environment. 
     ### REAL-TIME SECTION
     # Get HRRR real-time data
     try:
