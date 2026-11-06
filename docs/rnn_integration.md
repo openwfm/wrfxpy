@@ -11,7 +11,17 @@ cd wrfxpy
 git switch dev_fmda_JH
 ```
 
-### Update Config files in wrfxpy
+## Clone SynopticDB for retrieving RAWS
+
+For FMDA to acquire and store fuel moisture RAWS data, it uses an add-on that needs to be installed. These are the instructions to install it:
+
+```bash
+cd src/ingest
+git clone https://github.com/wirc-sjsu/SynopticDB
+```
+
+
+## Update Config files in wrfxpy
 
 Update the tokens and credentials configuration file:
 ```bash
@@ -31,8 +41,6 @@ Configure the queuing system, system directories, and workspace locations by edi
 "sys_install_path": "/path/to/wrfxpy"
 "wget" : /path/to/wget"
 ```
-
-
 
 ## Get static data
 Acquire the elevation static data from here:
