@@ -8,9 +8,9 @@
 
 # Set up environment
 eval "$(conda shell.bash hook)"
-#conda activate fmda_ml
-echo "Activating conda env: fmda_ml_test"
-conda activate fmda_ml_test
+#conda activate wrfx_ml
+echo "Activating conda env: wrfx_ml"
+conda activate wrfx_ml
 
 pwd
 export PYTHONPATH=src
