@@ -1401,10 +1401,10 @@ def process_output(job_id):
         if js.postproc.get('shuttle', None) is not None:
             steps = ','.join(['1' for x in range(max(list(map(int, list(jsin.domains.keys())))))])
             arg_inp = ' '.join([js.job_id, steps, 'inc'])
-            make_kmz(js, arg_inp)
+            make_kmz(jsin, arg_inp)
             arg_inp = ' '.join([js.job_id, steps, 'ref'])
-            make_kmz(js, arg_inp)
-            add_to_catalog(js)
+            make_kmz(jsin, arg_inp)
+            add_to_catalog(jsin)
 
         js.state = 'Completed'
 
