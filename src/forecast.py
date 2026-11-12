@@ -628,7 +628,8 @@ def vars_add_to_geogrid(js):
     geogrid_tbl_path = osp.join(js.wps_dir, 'geogrid/GEOGRID.TBL')
     link2copy(geogrid_tbl_path)
     # get number of fuel categories
-    nfuelcats = js.fire_nml['fuel_scalars'].get('nfuelcats', 13)
+    fuel_model = js.wrf_nml['fire'].get('fire_fuel_model', 2)
+    nfuelcats = 40 if fuel_model == 2  else 13
     # load the variables to process
     geo_data_path = osp.join(js.wps_dir, 'geo_data')
     geogrid_tbl_json_path = osp.join(geo_data_path, 'geogrid_tbl.json')
