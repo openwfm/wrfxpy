@@ -105,7 +105,7 @@
  /
 
 &fire ! be sure to set sr_x,sr_y in domains-namelist (to set refinement in x,y)
-ifire                               =   0,      2
+ifire                               =   0,      1
 fire_fuel_read                      =   0,      -1
 fire_fuel_cat                       =   3,      1
 fire_print_msg                      =   0,      0
@@ -116,45 +116,17 @@ fire_fmc_read                       =   0,      0
 fmoist_freq                         =   0,      0
 fmoist_dt                           =   0,      600
 fire_num_ignitions                  =   0,      0
-fire_ignition_start_lon1            =   0,      0
-fire_ignition_start_lat1            =   0,      0
-fire_ignition_end_lon1              =   0,      0
-fire_ignition_end_lat1              =   0,      0
-fire_ignition_radius1               =   0,      0
-fire_ignition_ros1                  =   0,      0
-fire_ignition_start_time1           =   0,      0
-fire_ignition_end_time1             =   0,      0
-fire_ignition_start_lon2            =   0,      0
-fire_ignition_start_lat2            =   0,      0
-fire_ignition_end_lon2              =   0,      0
-fire_ignition_end_lat2              =   0,      0
-fire_ignition_radius2               =   0,      0
-fire_ignition_start_time2           =   0,      0
-fire_ignition_end_time2             =   0,      0
-fire_ignition_start_lon3            =   0,      0
-fire_ignition_start_lat3            =   0,      0
-fire_ignition_end_lon3              =   0,      0
-fire_ignition_end_lat3              =   0,      0
-fire_ignition_radius3               =   0,      0
-fire_ignition_start_time3           =   0,      0
-fire_ignition_end_time3             =   0,      0
-fire_ignition_start_lon4            =   0,      0
-fire_ignition_start_lat4            =   0,      0
-fire_ignition_end_lon4              =   0,      0
-fire_ignition_end_lat4              =   0,      0
-fire_ignition_radius4               =   0,      0
-fire_ignition_start_time4           =   0,      0
-fire_ignition_end_time4             =   0,      0
-fire_ignition_start_lon5            =   0,      0
-fire_ignition_start_lat5            =   0,      0
-fire_ignition_end_lon5              =   0,      0
-fire_ignition_end_lat5              =   0,      0
-fire_ignition_radius5               =   0,      0
-fire_ignition_start_time5           =   0,      0
-fire_ignition_end_time5             =   0,      0
+fire_ignition_start_lon             =   0,      0
+fire_ignition_start_lat             =   0,      0
+fire_ignition_end_lon               =   0,      0
+fire_ignition_end_lat               =   0,      0
+fire_ignition_radius                =   0,      0
+fire_ignition_ros                   =   0,      0
+fire_ignition_start_time            =   0,      0
+fire_ignition_end_time              =   0,      0
 fire_viscosity                      =   0,      0
 fire_boundary_guard                 =   0,      0
-fire_upwinding                      =   0,      0
+fire_upwinding                      =   0,      3
 /
 
   &bdy_control

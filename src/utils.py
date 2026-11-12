@@ -472,6 +472,8 @@ def render_ignitions(js, max_dom):
     
     for dom_str, dom_igns in ign_specs.items():
         dom_id = int(dom_str)
+        # for each ignition, build the dictionary of values to update the namelist
+        ign_data = {key: [] for key in keys}
         # ensure fire model is switched on in every domain with ignitions
         nml_fire['ifire'][dom_id-1] = 1 # run SFIRE fire model
         nml_fire['fire_wind_log_interp'][dom_id-1] = 1 # fz0/fwh from fuel categories
@@ -496,15 +498,22 @@ def render_ignitions(js, max_dom):
             if 'latlon' in ign.keys():
                 lat,lon = ign['latlon']
                 nlon,nlat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
-                vals = [ nlat, nlat, nlon, nlon, start, start+dur, radius, ros]
+                slon, elon = nlon, nlon
+                slat, elat = nlat, nlat
             elif 'start_latlon' in ign.keys() and 'end_latlon' in ign.keys():
                 lat,lon = ign['start_latlon']
                 slon,slat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
                 lat,lon = ign['end_latlon']
                 elon,elat = clamp2mesh(glob.glob(osp.join(js.wps_dir,'geo_em.d{:02d}*'.format(max_dom)))[0], float(lon), float(lat))
-                vals = [ slat, elat, slon, elon, start, start+dur, radius, ros]
-            kv = dict(list(zip([x + str(ndx+1) for x in keys], [set_ignition_val(dom_id, v) for v in vals])))
-            nml_fire.update(kv)
+            ign_data['fire_ignition_start_lat'].append(slat)
+            ign_data['fire_ignition_end_lat'].append(elat)
+            ign_data['fire_ignition_start_lon'].append(slon)
+            ign_data['fire_ignition_end_lon'].append(elon)
+            ign_data['fire_ignition_start_time'].append(start)
+            ign_data['fire_ignition_end_time'].append(start+dur)
+            ign_data['fire_ignition_radius'].append(radius)
+            ign_data['fire_ignition_ros'].append(ros)
+        nml_fire.update(ign_data)
 
     # activate fire at domains with subgrid ratio specified
     for dom_str, dom_spec in dom_specs.items():
