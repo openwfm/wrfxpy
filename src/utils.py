@@ -440,14 +440,18 @@ def render_ignitions(js, max_dom):
             "fire_ignition_start_lon", "fire_ignition_end_lon",
             "fire_ignition_start_time", "fire_ignition_end_time",
             "fire_ignition_radius", "fire_ignition_ros" ]
-
+    
     nml_fire = { 'ifire' : [0] * max_dom, 'fire_num_ignitions' : [0] * max_dom,
-                 'fire_fuel_read' : [0] * max_dom, 'fire_fuel_cat' : [1] * max_dom,
-                 'fmoist_run' : [0] * max_dom, 'fmoist_interp' : [0] * max_dom,
-                 'fire_fmc_read' : [0] * max_dom, 'fmoist_dt' : [600] * max_dom,
-                 'fire_viscosity' : [0] * max_dom, 'fire_wind_log_interp': [0] * max_dom,
-                 'fire_use_windrf': [0] * max_dom, 'fire_upwinding': [0] * max_dom,
-                 'fire_can_fuel_read': [-1] * max_dom }
+                 'fire_fuel_cat_source' : [1] * max_dom, 'fire_fuel_cat' : [1] * max_dom,
+                 'fire_can_source': [0] * max_dom, 'fire_can_fuel_cat_source' : [1] * max_dom, 
+                 'fire_can_fuel_cat' : [0] * max_dom, 'fire_can_cover_source': [1] * max_dom, 
+                 'fire_can_bulk_density_mode' : [2] * max_dom, 'fire_can_cover_ros_mode': [1] * max_dom,
+                 'fire_wind_height_source': [1] * max_dom, 'fire_wind_method_source': [1] * max_dom,
+                 'fire_wind_dynamic_source': [1] * max_dom, 'hfx_scheme': [0] * max_dom, 
+                 'fire_fmc_source': [3] * max_dom, 'fmoist_run' : [0] * max_dom, 
+                 'fmoist_interp' : [0] * max_dom, 'fire_fmc_read' : [0] * max_dom, 
+                 'fmoist_dt' : [600] * max_dom, 'fire_viscosity' : [0] * max_dom, 
+                 'fire_upwinding': [0] * max_dom, 'fire_boundary_guard': [0] * max_dom }
 
     if js.use_realtime:
         fire_perimeter_time = js.get('fire_perimeter_time', 7200.)
@@ -476,17 +480,16 @@ def render_ignitions(js, max_dom):
         ign_data = {key: [] for key in keys}
         # ensure fire model is switched on in every domain with ignitions
         nml_fire['ifire'][dom_id-1] = 1 # run SFIRE fire model
-        nml_fire['fire_wind_log_interp'][dom_id-1] = 1 # fz0/fwh from fuel categories
-        nml_fire['fire_use_windrf'][dom_id-1] = 2 # set fwh from windrf 
         if not (js.use_tign_ignition or js.use_realtime):
             nml_fire['fire_num_ignitions'][dom_id-1] = len(dom_igns)
-        nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
-        nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
-        nml_fire['fmoist_run'][dom_id-1] = 1 # use the fuel moisture model
-        nml_fire['fmoist_interp'][dom_id-1] = 1 # interpolate fm onto fire mesh
-        nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
-        nml_fire['fire_upwinding'][dom_id-1] = 3 # use ENO1
-        nml_fire['fire_can_fuel_read'][dom_id-1] = 1 # get canopy data from wrfinput file
+        nml_fire['fire_fmc_source'][dom_id-1] = 3       # use wrfinput and/or running moisture model
+        nml_fire['fmoist_run'][dom_id-1] = 1            # use the fuel moisture model
+        nml_fire['fmoist_interp'][dom_id-1] = 1         # interpolate fm onto fire mesh
+        nml_fire['fire_upwinding'][dom_id-1] = 3        # use ENO1
+        nml_fire['fire_fuel_cat_source'][dom_id-1] = 3  # get fuel data from wrfinput file
+        nml_fire['fire_can_source'][dom_id-1] = 3       # get canopy data from wrfinput file
+        nml_fire['fire_can_cover_source'][dom_id-1] = 3 # get canopy cover data from wrfinput file
+        nml_fire['hfx_scheme'][dom_id-1] = 1            # use simplified BURNUP algorithm
 
         # for each ignition
         for ndx,ign in enumerate(dom_igns):
@@ -519,16 +522,15 @@ def render_ignitions(js, max_dom):
     for dom_str, dom_spec in dom_specs.items():
         dom_id = int(dom_str)
         if any([sr > 0 for sr in dom_spec['subgrid_ratio']]):
-            nml_fire['ifire'][dom_id-1] = 1 # switch on fire model
-            nml_fire['fire_wind_log_interp'][dom_id-1] = 1 # fz0/fwh from fuel categories 
-            nml_fire['fire_use_windrf'][dom_id-1] = 2 # set fwh from windrf
-            nml_fire['fire_fuel_read'][dom_id-1] = -1 # real fuel data from WPS
-            nml_fire['fire_fuel_cat'][dom_id-1] = 1 # arbitrary, won't be used
-            nml_fire['fmoist_run'][dom_id-1] = 1 # use the fuel moisture model
-            nml_fire['fmoist_interp'][dom_id-1] = 1 # interpolate fm onto fire mesh
-            nml_fire['fire_fmc_read'][dom_id-1] = 0 # use wrfinput and/or running moisture model
-            nml_fire['fire_upwinding'][dom_id-1] = 3 # use ENO1
-            nml_fire['fire_can_fuel_read'][dom_id-1] = 1 # get canopy data from wrfinput file
+            nml_fire['ifire'][dom_id-1] = 1                 # use SFIRE fire model
+            nml_fire['fire_fmc_source'][dom_id-1] = 3       # use wrfinput and/or running moisture model
+            nml_fire['fmoist_run'][dom_id-1] = 1            # use the fuel moisture model
+            nml_fire['fmoist_interp'][dom_id-1] = 1         # interpolate fm onto fire mesh
+            nml_fire['fire_upwinding'][dom_id-1] = 3        # use ENO1
+            nml_fire['fire_fuel_cat_source'][dom_id-1] = 3  # get fuel data from wrfinput file
+            nml_fire['fire_can_source'][dom_id-1] = 3       # get canopy data from wrfinput file
+            nml_fire['fire_can_cover_source'][dom_id-1] = 3 # get canopy cover data from wrfinput file
+            nml_fire['hfx_scheme'][dom_id-1] = 1            # use simplified BURNUP algorithm
 
     return { 'fire' : nml_fire }
 
