@@ -702,14 +702,20 @@ def fmda_advance_region(cycle, cfg, grib_files, wksp_path, lookback_length, fcst
     
     # make geogrid files for WPS; datasets and lines to add to GEOGRID.TBL
     geo_path = compute_model_path(cycle, cfg.code, wksp_path, fcst_hour, ext="geo")
+    # HRRR nodes are 3000 m apart on its 6371229 m reference sphere.
+    # Geogrid ignores the index radius and uses its 6370000 m sphere.
+    # Scale spacing to 2999.4213 m on that sphere, preserving node lon/lat.
+    hrrr_radius = 6371229.0
+    wps_radius = 6370000.0
+    wps_spacing = 3000.0 * wps_radius / hrrr_radius
     index = {
         "projection": "lambert",
-        "dx" : 3000.0,
-        "dy" : -3000.0,
+        "dx" : wps_spacing,
+        "dy" : -wps_spacing,
         "truelat1" : 38.5,
         "truelat2" : 38.5,
         "stdlon" : 262.5,
-        "radius" : 6370000.0
+        "radius" : wps_radius
     }
     model.to_geogrid(geo_path, index, lats, lons)
 
