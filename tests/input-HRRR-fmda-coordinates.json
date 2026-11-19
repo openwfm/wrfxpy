@@ -1,0 +1,139 @@
+{
+    "grid_code": "angel-sycamore",
+    "grib_source": "HRRR",
+    "use_wgrib2": true,
+    "wps_namelist_path": "etc/nlists/default.wps",
+    "wrf_namelist_path": "etc/nlists/default.input",
+    "fire_namelist_path": "etc/nlists/default.fire_behave_13",
+    "emissions_namelist_path": "etc/nlists/default.fire_emissions",
+    "num_nodes": 1,
+    "ppn": 16,
+    "wall_time_hrs": 1,
+    "start_utc": "2026-06-14_23:30:00",
+    "end_utc": "2026-06-15_01:00:00",
+    "domains": {
+        "1": {
+            "cell_size": [
+                1000,
+                1000
+            ],
+            "domain_size": [
+                193,
+                193
+            ],
+            "center_latlon": [
+                33.593093905719805,
+                -110.77199721109594
+            ],
+            "truelats": [
+                33.593093905719805,
+                33.593093905719805
+            ],
+            "stand_lon": -110.77199721109594,
+            "time_step": 5,
+            "history_interval": 30,
+            "geog_res": "30s",
+            "subgrid_ratio": [
+                0,
+                0
+            ]
+        },
+        "2": {
+            "parent_id": 1,
+            "parent_cell_size_ratio": 3,
+            "parent_time_step_ratio": 3,
+            "geog_res": ".3s",
+            "subgrid_ratio": [
+                10,
+                10
+            ],
+            "parent_start": [
+                65,
+                65
+            ],
+            "parent_end": [
+                128,
+                128
+            ],
+            "history_interval": 15
+        }
+    },
+    "use_tign_ignition": false,
+    "ignitions": {
+        "2": [
+            {
+                "time_utc": "2026-06-15_00:00:00",
+                "duration_s": 240,
+                "latlon": [
+                    33.593093905719805,
+                    -110.77199721109594
+                ]
+            }
+        ]
+    },
+    "postproc": {
+        "1": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "PM25_INT",
+            "PM25_SFC_D",
+            "PLUME_HEIGHT"
+        ],
+        "2": [
+            "T2",
+            "PSFC",
+            "WINDSPD",
+            "WINDVEC",
+            "NFUEL_CAT",
+            "1HR_FM",
+            "10HR_FM",
+            "100HR_FM",
+            "PM25_INT",
+            "PM25_SFC_D",
+            "PLUME_HEIGHT",
+            "FIRE_AREA",
+            "FGRNHFX"
+        ],
+        "shuttle": "incremental",
+        "description": "Angel Sycamore HRRR fuel13"
+    },
+    "job_id": "wfc-20260629-Sycamore-fmda-short",
+    "fmda_geogrid_path": "/storage/math/NSF1/hirschij/wrfxpy_fmda_outputs/S-CONUS/202605/fmda-S-CONUS-20260528-03/fmda-S-CONUS-20260528-03.geo",
+    "check_fmda_coordinates": true,
+    "mem_per_cpu_gb": 7,
+    "slurm_mem_per_cpu": "7G",
+    "source_fire": {
+        "fire_name": "Sycamore",
+        "fire_id": "{6975A94E-ADE5-4BC9-AFD6-897D94C24863}",
+        "time_utc": "2026-06-15_00:00:00",
+        "input_bbox": {
+            "lon_lower": -111.08084430700228,
+            "lon_upper": -110.4631501151896,
+            "lat_lower": 33.3364715253456,
+            "lat_upper": 33.84971628609401
+        },
+        "bbox_buffer_status": "Angel CSV bbox already includes approximately 25 km buffer"
+    },
+    "template": "wrfxctrl/profiles/2d_333m_HRRR_XL.json",
+    "coverage": {
+        "active_domain": "2",
+        "span_km": 63.0,
+        "resolution_m": 333.3333333333333,
+        "nodes": 16,
+        "can_grow": false,
+        "profile": "2d_333m_HRRR_XL.json",
+        "grown_domain_size": null,
+        "selection_reason": "profile covers Angel-provided buffered fire box",
+        "input_bbox_width_km": 57.278,
+        "input_bbox_height_km": 57.134,
+        "required_span_km": 57.278
+    },
+    "rerun_notes": {
+        "fuel_geogrid": "fuel13 path uses wrfxpy/etc/vtables/geo_vars.json NFUEL_CAT mapping and etc/nlists/default.fire_behave_13",
+        "bbox": "Do not add another buffer; Angel's input bbox is already buffered."
+    },
+    "run_wrf": true,
+    "short_runtime_test_note": "Short WRF-SFIRE run to verify FMDA fields active at runtime; no tign/fire_init ignition processing."
+}
