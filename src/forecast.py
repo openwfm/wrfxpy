@@ -53,7 +53,7 @@ from ingest.MODIS import Terra, Aqua
 from ingest.VIIRS import SNPP, SNPPHR, NOAA20, NOAA20HR
 from ingest.GOES import GOES16, GOES17, GOES18
 
-from fmda.fuel_moisture_da import assimilate_fm10_observations
+from fmda.fuel_moisture_da import assimilate_fm10_observations, check_fmda_coordinates
 
 from ssh_shuttle import send_product_to_server, ssh_command
 
@@ -1006,6 +1006,10 @@ def execute(args,job_args):
     ]
     for in_path in subgrid_wrfinput_files:
         fill_subgrid(osp.join(js.wrf_dir, in_path))
+
+    # Check the imported tracers before assimilation or fire initialization changes fields.
+    if args.get('check_fmda_coordinates', False):
+        check_fmda_coordinates(js.wrf_dir, js.wrf_nml['fire']['ifire'])
 
     logging.info('step 7b: if requested, do fuel moisture DA')
     logging.info('fmda = %s' % js.fmda)

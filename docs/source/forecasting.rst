@@ -166,6 +166,24 @@ All of the following keys are required.
 
 The keys in the remainder of this section are optional.
 
+* ``check_fmda_coordinates : [boolean]`` defaults to ``false``. Add
+  ``"check_fmda_coordinates": true`` at the top level of the forecast input JSON
+  to check imported fuel-moisture coordinates after ``real.exe``, before
+  assimilation, fire initialization, or WRF execution. This also works with
+  ``"run_wrf": false`` for preprocessing-only validation.
+
+  Enabling this asserts that the final two ``FMC_GC`` planes contain source
+  longitude and latitude in degrees, following the FMDA geogrid exporter's
+  diagnostic convention. Do not enable it for packages without these tracers.
+  The check reads ``wrfinput_dXX`` for every domain with ``ifire > 0`` in the
+  effective WRF namelist and compares these planes with ``XLONG`` and ``XLAT``
+  on the atmospheric nodes of that fire-enabled domain, not the refined fire
+  mesh. It logs the file, node count, RMS error, and maximum error in meters.
+  Distance uses a local spherical approximation with radius 6371000 m and
+  wrapped longitude differences. Maximum error must be below 1 m. Missing
+  files or fields, invalid coordinates, no enabled fire domains, or excessive
+  error stop preprocessing before WRF is launched. No fields are changed.
+
 * ``ignitions : [dict]`` (optional) is a dictionary of domains (string identifier, e.g. "1") to a list of ignitions that should be added to the domain, each being a dictionary with the following keys:
   
 * ``time_utc : [esmf_time]`` time of ignition

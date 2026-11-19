@@ -32,6 +32,50 @@ import netCDF4
 import logging
 import json
 
+def check_fmda_coordinates(wrf_dir, ifire):
+    """Check exported lon/lat tracers in each fire domain's initial WRF input.
+
+    Calling this asserts that the final two FMC_GC planes contain longitude
+    and latitude, as written by FuelMoistureModel.to_geogrid, not moisture.
+    Files are read-only. Require maximum coordinate error below 1 m.
+    """
+    domains = np.flatnonzero(np.atleast_1d(ifire) > 0) + 1
+    if not len(domains):
+        raise ValueError('FMDA coordinate check requested but no fire domains are enabled')
+    for domain in domains:
+        path = os.path.join(wrf_dir, 'wrfinput_d%02d' % domain)
+        with netCDF4.Dataset(path, 'r') as ds:
+            for name, dimensions in (
+                ('FMC_GC', ('Time', 'fuel_moisture_classes_stag', 'south_north', 'west_east')),
+                ('XLONG', ('Time', 'south_north', 'west_east')),
+                ('XLAT', ('Time', 'south_north', 'west_east')),
+            ):
+                if name not in ds.variables or ds.variables[name].dimensions != dimensions:
+                    raise ValueError('%s: missing or incorrectly dimensioned %s' % (path, name))
+            fmc = ds.variables['FMC_GC']
+            if fmc.shape[0] != 1 or fmc.shape[1] < 3 or min(fmc.shape[2:]) == 0:
+                raise ValueError('%s: expected one initial time and moisture plus lon/lat planes' % path)
+            lon, lat = fmc[0, -2:].astype('float64').filled(np.nan)
+            wrf_lon = ds.variables['XLONG'][0].astype('float64').filled(np.nan)
+            wrf_lat = ds.variables['XLAT'][0].astype('float64').filled(np.nan)
+        if not all(np.isfinite(values).all() for values in (lon, lat, wrf_lon, wrf_lat)):
+            raise ValueError('%s: masked or nonfinite coordinates' % path)
+        if (np.any(np.abs(lat) > 90) or np.any(np.abs(wrf_lat) > 90)
+                or np.any(np.abs(lon) > 360) or np.any(np.abs(wrf_lon) > 360)):
+            raise ValueError('%s: coordinates outside latitude/longitude ranges' % path)
+        # Local spherical distance in meters; wrap longitude across the dateline.
+        # The 6371000 m distance radius matches utils.great_circle_distance.
+        dlon = np.radians((lon - wrf_lon + 180) % 360 - 180)
+        dlat = np.radians(lat - wrf_lat)
+        error = 6371000.0 * np.hypot(dlat, np.cos(np.radians(wrf_lat)) * dlon)
+        rms, maximum = float(np.sqrt(np.mean(error**2))), float(np.max(error))
+        logging.info('FMDA coordinates %s: nodes=%d RMS=%.6f m max=%.6f m; require max < 1 m',
+                     path, error.size, rms, maximum)
+        if maximum >= 1.0:
+            raise ValueError('%s: FMDA coordinate error RMS=%.6f m max=%.6f m; require max < 1 m'
+                             % (path, rms, maximum))
+
+
 def check_overlap(wrf_path,ts_now):
   """
   Check if the WRF file <wrf_path> timstamps contain <ts_now>.
