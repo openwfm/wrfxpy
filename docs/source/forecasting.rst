@@ -180,9 +180,21 @@ The keys in the remainder of this section are optional.
   on the atmospheric nodes of that fire-enabled domain, not the refined fire
   mesh. It logs the file, node count, RMS error, and maximum error in meters.
   Distance uses a local spherical approximation with radius 6371000 m and
-  wrapped longitude differences. Maximum error must be below 1 m. Missing
+  wrapped longitude differences. Maximum error must be below 10 m. Missing
   files or fields, invalid coordinates, no enabled fire domains, or excessive
   error stop preprocessing before WRF is launched. No fields are changed.
+
+  The 10 m tolerance allows for geogrid's single-precision projection and
+  interpolation arithmetic while detecting the approximately 209 m displacement
+  reported in issue #100. Float32 has 24 significant binary bits. Near Sycamore,
+  longitude is about -111 degrees and latitude about 33 degrees, giving steps
+  between adjacent float32 values of ``2**(-17)`` degrees in longitude and
+  ``2**(-18)`` degrees in latitude. Using 111195 m per degree of latitude and
+  ``111195 * cos(latitude)`` m per degree of longitude, these steps are about
+  0.71 m east-west and 0.42 m north-south. Rounding once contributes at most
+  half a step; successive single-precision projection and interpolation
+  operations can accumulate errors of a few meters. The corrected Sycamore
+  run measured 0.733 m RMS and 2.236 m maximum coordinate error.
 
 * ``ignitions : [dict]`` (optional) is a dictionary of domains (string identifier, e.g. "1") to a list of ignitions that should be added to the domain, each being a dictionary with the following keys:
   
